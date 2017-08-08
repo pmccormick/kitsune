@@ -1403,7 +1403,8 @@ bool JumpThreadingPass::simplifyPartiallyRedundantLoad(LoadInst *LoadI) {
       }
     }
 
-    if (!PredAvailable) {
+    if (!PredAvailable ||
+        isa<ReattachInst>(PredBB->getTerminator())) {
       OneUnavailablePred = PredBB;
       continue;
     }
@@ -1446,6 +1447,9 @@ bool JumpThreadingPass::simplifyPartiallyRedundantLoad(LoadInst *LoadI) {
   // unconditional branch, we know that it isn't a critical edge.
   if (PredsScanned.size() == AvailablePreds.size()+1 &&
       OneUnavailablePred->getTerminator()->getNumSuccessors() == 1) {
+    // If the predecessor is a reattach, we can't split the edge
+    if (isa<ReattachInst>(OneUnavailablePred->getTerminator()))
+      return false;
     UnavailablePred = OneUnavailablePred;
   } else if (PredsScanned.size() != AvailablePreds.size()) {
     // Otherwise, we had multiple unavailable predecessors or we had a critical
@@ -1459,7 +1463,10 @@ bool JumpThreadingPass::simplifyPartiallyRedundantLoad(LoadInst *LoadI) {
     // Add all the unavailable predecessors to the PredsToSplit list.
     for (BasicBlock *P : predecessors(LoadBB)) {
       // If the predecessor is an indirect goto, we can't split the edge.
-      if (isa<IndirectBrInst>(P->getTerminator()))
+      // Same for CallBr, Reattach.
+      if (isa<IndirectBrInst>(P->getTerminator()) ||
+          isa<CallBrInst>(P->getTerminator()) ||
+          isa<ReattachInst>(P->getTerminator()))
         return false;
 
       if (!AvailablePredSet.count(P))
@@ -1962,7 +1969,7 @@ bool JumpThreadingPass::maybeMergeBasicBlockIntoOnlyPred(BasicBlock *BB) {
 
   const Instruction *TI = SinglePred->getTerminator();
   if (TI->isExceptionalTerminator() || TI->getNumSuccessors() != 1 ||
-      SinglePred == BB || hasAddressTakenAndUsed(BB))
+      isa<SyncInst>(TI) || SinglePred == BB || hasAddressTakenAndUsed(BB))
     return false;
 
   // If SinglePred was a loop header, BB becomes one.
@@ -2712,7 +2719,7 @@ bool JumpThreadingPass::duplicateCondBranchOnPHIIntoPred(
 // Pred is a predecessor of BB with an unconditional branch to BB. SI is
 // a Select instruction in Pred. BB has other predecessors and SI is used in
 // a PHI node in BB. SI has no other use.
-// A new basic block, NewBB, is created and SI is converted to compare and 
+// A new basic block, NewBB, is created and SI is converted to compare and
 // conditional branch. SI is erased from parent.
 void JumpThreadingPass::unfoldSelectInstr(BasicBlock *Pred, BasicBlock *BB,
                                           SelectInst *SI, PHINode *SIUse,
