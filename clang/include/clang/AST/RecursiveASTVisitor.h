@@ -24,6 +24,8 @@
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/DeclarationName.h"
 #include "clang/AST/Expr.h"
+#include "clang/AST/ExprCilk.h"
+#include "clang/AST/ExprConcepts.h"
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExprConcepts.h"
 #include "clang/AST/ExprObjC.h"
@@ -32,6 +34,7 @@
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/OpenMPClause.h"
 #include "clang/AST/Stmt.h"
+#include "clang/AST/StmtCilk.h"
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/StmtOpenMP.h"
@@ -2839,6 +2842,11 @@ DEF_TRAVERSE_STMT(OpaqueValueExpr, {})
 DEF_TRAVERSE_STMT(TypoExpr, {})
 DEF_TRAVERSE_STMT(RecoveryExpr, {})
 DEF_TRAVERSE_STMT(CUDAKernelCallExpr, {})
+
+DEF_TRAVERSE_STMT(CilkSpawnStmt, {})
+DEF_TRAVERSE_STMT(CilkSpawnExpr, {})
+DEF_TRAVERSE_STMT(CilkSyncStmt, {})
+DEF_TRAVERSE_STMT(CilkForStmt, {})
 
 // These operators (all of them) do not need any action except
 // iterating over the children.

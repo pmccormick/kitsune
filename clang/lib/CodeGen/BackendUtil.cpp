@@ -84,9 +84,16 @@
 #include "llvm/Transforms/Utils/Debugify.h"
 #include "llvm/Transforms/Utils/EntryExitInstrumenter.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
+#include "llvm/Transforms/Tapir/TapirTypes.h"
+#include "llvm/Transforms/Tapir/TapirUtils.h"
+#include "llvm/Transforms/Tapir/CilkABI.h"
+#include "llvm/Transforms/Tapir/CilkRABI.h"
+#include "llvm/Transforms/Tapir/OpenMPABI.h"
 #include "llvm/Transforms/Utils/NameAnonGlobals.h"
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include <memory>
+
+#include <iostream>
 using namespace clang;
 using namespace llvm;
 
@@ -242,6 +249,133 @@ static bool asanUseGlobalsGC(const Triple &T, const CodeGenOptions &CGOpts) {
     break;
   }
   return false;
+}
+
+static void addMemProfilerPasses(const PassManagerBuilder &Builder,
+                                 legacy::PassManagerBase &PM) {
+  PM.add(createMemProfilerFunctionPass());
+  PM.add(createModuleMemProfilerLegacyPassPass());
+}
+
+static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
+                                      legacy::PassManagerBase &PM) {
+  const PassManagerBuilderWrapper &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper&>(Builder);
+  const Triple &T = BuilderWrapper.getTargetTriple();
+  const CodeGenOptions &CGOpts = BuilderWrapper.getCGOpts();
+  bool Recover = CGOpts.SanitizeRecover.has(SanitizerKind::Address);
+  bool UseAfterScope = CGOpts.SanitizeAddressUseAfterScope;
+  bool UseOdrIndicator = CGOpts.SanitizeAddressUseOdrIndicator;
+  bool UseGlobalsGC = asanUseGlobalsGC(T, CGOpts);
+  llvm::AsanDtorKind DestructorKind = CGOpts.getSanitizeAddressDtor();
+  llvm::AsanDetectStackUseAfterReturnMode UseAfterReturn =
+      CGOpts.getSanitizeAddressUseAfterReturn();
+  PM.add(createAddressSanitizerFunctionPass(/*CompileKernel*/ false, Recover,
+                                            UseAfterScope, UseAfterReturn));
+  PM.add(createModuleAddressSanitizerLegacyPassPass(
+      /*CompileKernel*/ false, Recover, UseGlobalsGC, UseOdrIndicator,
+      DestructorKind));
+}
+
+static void addKernelAddressSanitizerPasses(const PassManagerBuilder &Builder,
+                                            legacy::PassManagerBase &PM) {
+  PM.add(createAddressSanitizerFunctionPass(
+      /*CompileKernel*/ true, /*Recover*/ true, /*UseAfterScope*/ false,
+      /*UseAfterReturn*/ llvm::AsanDetectStackUseAfterReturnMode::Never));
+  PM.add(createModuleAddressSanitizerLegacyPassPass(
+      /*CompileKernel*/ true, /*Recover*/ true, /*UseGlobalsGC*/ true,
+      /*UseOdrIndicator*/ false));
+}
+
+static void addHWAddressSanitizerPasses(const PassManagerBuilder &Builder,
+                                            legacy::PassManagerBase &PM) {
+  const PassManagerBuilderWrapper &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper &>(Builder);
+  const CodeGenOptions &CGOpts = BuilderWrapper.getCGOpts();
+  bool Recover = CGOpts.SanitizeRecover.has(SanitizerKind::HWAddress);
+  PM.add(createHWAddressSanitizerLegacyPassPass(
+      /*CompileKernel*/ false, Recover,
+      /*DisableOptimization*/ CGOpts.OptimizationLevel == 0));
+}
+
+static void addKernelHWAddressSanitizerPasses(const PassManagerBuilder &Builder,
+                                              legacy::PassManagerBase &PM) {
+  const PassManagerBuilderWrapper &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper &>(Builder);
+  const CodeGenOptions &CGOpts = BuilderWrapper.getCGOpts();
+  PM.add(createHWAddressSanitizerLegacyPassPass(
+      /*CompileKernel*/ true, /*Recover*/ true,
+      /*DisableOptimization*/ CGOpts.OptimizationLevel == 0));
+}
+
+static void addGeneralOptsForMemorySanitizer(const PassManagerBuilder &Builder,
+                                             legacy::PassManagerBase &PM,
+                                             bool CompileKernel) {
+  const PassManagerBuilderWrapper &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper&>(Builder);
+  const CodeGenOptions &CGOpts = BuilderWrapper.getCGOpts();
+  int TrackOrigins = CGOpts.SanitizeMemoryTrackOrigins;
+  bool Recover = CGOpts.SanitizeRecover.has(SanitizerKind::Memory);
+  PM.add(createMemorySanitizerLegacyPassPass(
+      MemorySanitizerOptions{TrackOrigins, Recover, CompileKernel,
+                             CGOpts.SanitizeMemoryParamRetval != 0}));
+
+  // MemorySanitizer inserts complex instrumentation that mostly follows
+  // the logic of the original code, but operates on "shadow" values.
+  // It can benefit from re-running some general purpose optimization passes.
+  if (Builder.OptLevel > 0) {
+    PM.add(createEarlyCSEPass());
+    PM.add(createReassociatePass());
+    PM.add(createLICMPass());
+    PM.add(createGVNPass());
+    PM.add(createInstructionCombiningPass());
+    PM.add(createDeadStoreEliminationPass());
+  }
+}
+
+static void addMemorySanitizerPass(const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+  addGeneralOptsForMemorySanitizer(Builder, PM, /*CompileKernel*/ false);
+}
+
+static void addKernelMemorySanitizerPass(const PassManagerBuilder &Builder,
+                                         legacy::PassManagerBase &PM) {
+  addGeneralOptsForMemorySanitizer(Builder, PM, /*CompileKernel*/ true);
+}
+
+static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
+                                   legacy::PassManagerBase &PM) {
+  PM.add(createThreadSanitizerLegacyPassPass());
+}
+
+static void addDataFlowSanitizerPass(const PassManagerBuilder &Builder,
+                                     legacy::PassManagerBase &PM) {
+  const PassManagerBuilderWrapper &BuilderWrapper =
+      static_cast<const PassManagerBuilderWrapper&>(Builder);
+  const LangOptions &LangOpts = BuilderWrapper.getLangOpts();
+  PM.add(createDataFlowSanitizerLegacyPassPass(LangOpts.NoSanitizeFiles));
+}
+
+static void addEntryExitInstrumentationPass(const PassManagerBuilder &Builder,
+                                            legacy::PassManagerBase &PM) {
+  PM.add(createEntryExitInstrumenterPass());
+}
+
+static void
+addPostInlineEntryExitInstrumentationPass(const PassManagerBuilder &Builder,
+                                          legacy::PassManagerBase &PM) {
+  PM.add(createPostInlineEntryExitInstrumenterPass());
+}
+
+static void addCilkSanitizerPass(const PassManagerBuilder &Builder,
+                                 legacy::PassManagerBase &PM) {
+  PM.add(createCilkSanitizerPass());
+}
+
+static void
+addComprehensiveStaticInstrumentationPass(const PassManagerBuilder &Builder,
+                                          PassManagerBase &PM) {
+  PM.add(createComprehensiveStaticInstrumentationPass());
 }
 
 static TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
@@ -510,6 +644,273 @@ getInstrProfOptions(const CodeGenOptions &CodeGenOpts,
   Options.InstrProfileOutput = CodeGenOpts.InstrProfileOutput;
   Options.Atomic = CodeGenOpts.AtomicProfileUpdate;
   return Options;
+}
+
+void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
+                                      legacy::FunctionPassManager &FPM) {
+  // Handle disabling of all LLVM passes, where we want to preserve the
+  // internal module before any optimization.
+  if (CodeGenOpts.DisableLLVMPasses)
+    return;
+
+  // Figure out TargetLibraryInfo.  This needs to be added to MPM and FPM
+  // manually (and not via PMBuilder), since some passes (eg. InstrProfiling)
+  // are inserted before PMBuilder ones - they'd get the default-constructed
+  // TLI with an unknown target otherwise.
+  Triple TargetTriple(TheModule->getTargetTriple());
+  std::unique_ptr<TargetLibraryInfoImpl> TLII(
+      createTLII(TargetTriple, CodeGenOpts));
+
+  // If we reached here with a non-empty index file name, then the index file
+  // was empty and we are not performing ThinLTO backend compilation (used in
+  // testing in a distributed build environment). Drop any the type test
+  // assume sequences inserted for whole program vtables so that codegen doesn't
+  // complain.
+  if (!CodeGenOpts.ThinLTOIndexFile.empty())
+    MPM.add(createLowerTypeTestsPass(/*ExportSummary=*/nullptr,
+                                     /*ImportSummary=*/nullptr,
+                                     /*DropTypeTests=*/true));
+
+  PassManagerBuilderWrapper PMBuilder(TargetTriple, CodeGenOpts, LangOpts);
+
+  // At O0 and O1 we only run the always inliner which is more efficient. At
+  // higher optimization levels we run the normal inliner.
+  if (CodeGenOpts.OptimizationLevel <= 1) {
+    bool InsertLifetimeIntrinsics = ((CodeGenOpts.OptimizationLevel != 0 &&
+                                      !CodeGenOpts.DisableLifetimeMarkers) ||
+                                     LangOpts.Coroutines);
+    PMBuilder.Inliner = createAlwaysInlinerLegacyPass(InsertLifetimeIntrinsics);
+  } else {
+    // We do not want to inline hot callsites for SamplePGO module-summary build
+    // because profile annotation will happen again in ThinLTO backend, and we
+    // want the IR of the hot path to match the profile.
+    PMBuilder.Inliner = createFunctionInliningPass(
+        CodeGenOpts.OptimizationLevel, CodeGenOpts.OptimizeSize,
+        (!CodeGenOpts.SampleProfileFile.empty() &&
+         CodeGenOpts.PrepareForThinLTO));
+  }
+
+  PMBuilder.OptLevel = CodeGenOpts.OptimizationLevel;
+
+  switch(LangOpts.Tapir){
+    case TapirTargetType::Cilk:
+      PMBuilder.tapirTarget = new llvm::CilkABI();
+      break;
+    case TapirTargetType::CilkR:
+      PMBuilder.tapirTarget = new llvm::CilkRABI();
+      break;
+    case TapirTargetType::OpenMP:
+      PMBuilder.tapirTarget = new llvm::OpenMPABI();
+      break;
+    case TapirTargetType::Serial:
+      assert(0 && "TODO MAKE OTHER TAPIR OPTS");
+    case TapirTargetType::None:
+      PMBuilder.tapirTarget = nullptr;
+      break;
+  }
+
+  if (LangOpts.Detach) PMBuilder.DisableTapirOpts = true;
+  if (LangOpts.Rhino) PMBuilder.Rhino = true;
+
+  PMBuilder.SizeLevel = CodeGenOpts.OptimizeSize;
+  PMBuilder.SLPVectorize = CodeGenOpts.VectorizeSLP;
+  PMBuilder.LoopVectorize = CodeGenOpts.VectorizeLoop;
+  // Only enable CGProfilePass when using integrated assembler, since
+  // non-integrated assemblers don't recognize .cgprofile section.
+  PMBuilder.CallGraphProfile = !CodeGenOpts.DisableIntegratedAS;
+
+  PMBuilder.DisableUnrollLoops = !CodeGenOpts.UnrollLoops;
+  // Loop interleaving in the loop vectorizer has historically been set to be
+  // enabled when loop unrolling is enabled.
+  PMBuilder.LoopsInterleaved = CodeGenOpts.UnrollLoops;
+  PMBuilder.MergeFunctions = CodeGenOpts.MergeFunctions;
+  PMBuilder.PrepareForThinLTO = CodeGenOpts.PrepareForThinLTO;
+  PMBuilder.PrepareForLTO = CodeGenOpts.PrepareForLTO;
+  PMBuilder.RerollLoops = CodeGenOpts.RerollLoops;
+
+  MPM.add(new TargetLibraryInfoWrapperPass(*TLII));
+
+  if (TM)
+    TM->adjustPassManager(PMBuilder);
+
+  if (CodeGenOpts.DebugInfoForProfiling ||
+      !CodeGenOpts.SampleProfileFile.empty())
+    PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                           addAddDiscriminatorsPass);
+
+  // In ObjC ARC mode, add the main ARC optimization passes.
+  if (LangOpts.ObjCAutoRefCount) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                           addObjCARCExpandPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_ModuleOptimizerEarly,
+                           addObjCARCAPElimPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
+                           addObjCARCOptPass);
+  }
+
+  if (LangOpts.Coroutines)
+    addCoroutinePassesToExtensionPoints(PMBuilder);
+
+  if (!CodeGenOpts.MemoryProfileOutput.empty()) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addMemProfilerPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addMemProfilerPasses);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::LocalBounds)) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
+                           addBoundsCheckingPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addBoundsCheckingPass);
+  }
+
+  if (CodeGenOpts.hasSanitizeCoverage()) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addSanitizerCoveragePass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addSanitizerCoveragePass);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::Address)) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addAddressSanitizerPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addAddressSanitizerPasses);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::KernelAddress)) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addKernelAddressSanitizerPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addKernelAddressSanitizerPasses);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::HWAddress)) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addHWAddressSanitizerPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addHWAddressSanitizerPasses);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::KernelHWAddress)) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addKernelHWAddressSanitizerPasses);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addKernelHWAddressSanitizerPasses);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::Memory)) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addMemorySanitizerPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addMemorySanitizerPass);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::KernelMemory)) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addKernelMemorySanitizerPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addKernelMemorySanitizerPass);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::Thread)) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addThreadSanitizerPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addThreadSanitizerPass);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::DataFlow)) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addDataFlowSanitizerPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addDataFlowSanitizerPass);
+  }
+
+  if (CodeGenOpts.InstrumentFunctions ||
+      CodeGenOpts.InstrumentFunctionEntryBare ||
+      CodeGenOpts.InstrumentFunctionsAfterInlining ||
+      CodeGenOpts.InstrumentForProfiling) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                           addEntryExitInstrumentationPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addEntryExitInstrumentationPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+                           addPostInlineEntryExitInstrumentationPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addPostInlineEntryExitInstrumentationPass);
+  }
+
+  if (LangOpts.Sanitize.has(SanitizerKind::Cilk)) {
+    // PMBuilder.InstrumentCilk = true;
+    // PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
+    //                        addThreadSanitizerPass);
+    // PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+    //                        addThreadSanitizerPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_TapirLate,
+                           addCilkSanitizerPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addCilkSanitizerPass);
+  }
+
+  if (LangOpts.ComprehensiveStaticInstrumentation) {
+    PMBuilder.addExtension(PassManagerBuilder::EP_TapirLate,
+                           addComprehensiveStaticInstrumentationPass);
+    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
+                           addComprehensiveStaticInstrumentationPass);
+  }
+
+  // Set up the per-function pass manager.
+  FPM.add(new TargetLibraryInfoWrapperPass(*TLII));
+  if (CodeGenOpts.VerifyModule)
+    FPM.add(createVerifierPass());
+
+  // Set up the per-module pass manager.
+  if (!CodeGenOpts.RewriteMapFiles.empty())
+    addSymbolRewriterPass(CodeGenOpts, &MPM);
+
+  if (Optional<GCOVOptions> Options = getGCOVOptions(CodeGenOpts, LangOpts)) {
+    MPM.add(createGCOVProfilerPass(*Options));
+    if (CodeGenOpts.getDebugInfo() == codegenoptions::NoDebugInfo)
+      MPM.add(createStripSymbolsPass(true));
+  }
+
+  if (Optional<InstrProfOptions> Options =
+          getInstrProfOptions(CodeGenOpts, LangOpts))
+    MPM.add(createInstrProfilingLegacyPass(*Options, false));
+
+  bool hasIRInstr = false;
+  if (CodeGenOpts.hasProfileIRInstr()) {
+    PMBuilder.EnablePGOInstrGen = true;
+    hasIRInstr = true;
+  }
+  if (CodeGenOpts.hasProfileCSIRInstr()) {
+    assert(!CodeGenOpts.hasProfileCSIRUse() &&
+           "Cannot have both CSProfileUse pass and CSProfileGen pass at the "
+           "same time");
+    assert(!hasIRInstr &&
+           "Cannot have both ProfileGen pass and CSProfileGen pass at the "
+           "same time");
+    PMBuilder.EnablePGOCSInstrGen = true;
+    hasIRInstr = true;
+  }
+  if (hasIRInstr) {
+    if (!CodeGenOpts.InstrProfileOutput.empty())
+      PMBuilder.PGOInstrGen = CodeGenOpts.InstrProfileOutput;
+    else
+      PMBuilder.PGOInstrGen = getDefaultProfileGenName();
+  }
+  if (CodeGenOpts.hasProfileIRUse()) {
+    PMBuilder.PGOInstrUse = CodeGenOpts.ProfileInstrumentUsePath;
+    PMBuilder.EnablePGOCSInstrUse = CodeGenOpts.hasProfileCSIRUse();
+  }
+
+  if (!CodeGenOpts.SampleProfileFile.empty())
+    PMBuilder.PGOSampleUse = CodeGenOpts.SampleProfileFile;
+
+  PMBuilder.populateFunctionPassManager(FPM);
+  PMBuilder.populateModulePassManager(MPM);
 }
 
 static void setCommandLineOpts(const CodeGenOptions &CodeGenOpts) {

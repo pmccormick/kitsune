@@ -74,6 +74,7 @@ void tools::minix::Linker::ConstructJob(Compilation &C, const JobAction &JA,
 
   if (!Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs,
                    options::OPT_r)) {
+    getToolChain().AddTapirRuntimeLibArgs(Args, CmdArgs);
     if (D.CCCIsCXX()) {
       if (getToolChain().ShouldLinkCXXStdlib(Args))
         getToolChain().AddCXXStdlibLibArgs(Args, CmdArgs);
