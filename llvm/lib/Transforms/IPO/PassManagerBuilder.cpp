@@ -644,13 +644,8 @@ void PassManagerBuilder::populateModulePassManager(
 
   do {
     RerunAfterTapirLowering =
-<<<<<<< HEAD
        !TapirHasBeenLowered && (ParallelLevel > 0) && !PrepareForThinLTO;
 
-=======
-       !TapirHasBeenLowered && tapirTarget && !PrepareForThinLTO;
-
->>>>>>> e2b3907f3d71 (OpenMP Backend for Tapir (#18))
   // Infer attributes about declarations if possible.
   MPM.add(createInferFunctionAttrsLegacyPass());
 
