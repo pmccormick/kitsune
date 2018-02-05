@@ -698,6 +698,7 @@ enum AttributeKindCodes {
   ATTR_KIND_PRESPLIT_COROUTINE = 83,
   ATTR_KIND_FNRETTHUNK_EXTERN = 84,
   ATTR_KIND_SANITIZE_CILK = 85,
+  ATTR_KIND_STEALABLE = 86,
 };
 
 enum ComdatSelectionKindCodes {
