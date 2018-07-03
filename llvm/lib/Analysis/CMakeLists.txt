@@ -130,6 +130,7 @@ add_llvm_component_library(LLVMAnalysis
   SyntheticCountsUtils.cpp
   TFUtils.cpp
   TensorSpec.cpp
+  TapirTaskInfo.cpp
   TargetLibraryInfo.cpp
   TargetTransformInfo.cpp
   Trace.cpp
