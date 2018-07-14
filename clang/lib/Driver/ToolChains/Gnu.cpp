@@ -591,6 +591,8 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
       Arg->claim();
     }
   }
+  addCSIRuntime(ToolChain, Args, CmdArgs);
+
   ToolChain.AddTapirRuntimeLibArgs(Args, CmdArgs);
 
   if (D.CCCIsCXX() &&
