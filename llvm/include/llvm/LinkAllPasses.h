@@ -77,6 +77,7 @@ namespace {
       (void) llvm::createBitTrackingDCEPass();
       (void)llvm::createOpenMPOptCGSCCLegacyPass();
       (void) llvm::createAlignmentFromAssumptionsPass();
+      (void) llvm::createAnalyzeTapirPass();
       (void) llvm::createBasicAAWrapperPass();
       (void) llvm::createSCEVAAWrapperPass();
       (void) llvm::createTypeBasedAAWrapperPass();
