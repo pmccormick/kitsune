@@ -437,6 +437,7 @@ void initializeTargetPassConfigPass(PassRegistry&);
 void initializeTargetTransformInfoWrapperPassPass(PassRegistry&);
 void initializeTLSVariableHoistLegacyPassPass(PassRegistry &);
 void initializeTaskInfoWrapperPassPass(PassRegistry&);
+void initializeTaskSimplifyPass(PassRegistry&);
 void initializeThreadSanitizerLegacyPassPass(PassRegistry&);
 void initializeTwoAddressInstructionPassPass(PassRegistry&);
 void initializeTypeBasedAAWrapperPassPass(PassRegistry&);
