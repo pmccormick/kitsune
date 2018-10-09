@@ -227,6 +227,11 @@ createTargetMachine(const Config &Conf, const Target *TheTarget, Module &M) {
   return TM;
 }
 
+static bool hasTapirTarget(const Config &Conf) {
+  return (Conf.TapirTarget != TapirTargetID::Last_TapirTargetID) &&
+         (Conf.TapirTarget != TapirTargetID::None);
+}
+
 static void runNewPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
                            unsigned OptLevel, bool IsThinLTO,
                            ModuleSummaryIndex *ExportSummary,
@@ -319,15 +324,52 @@ static void runNewPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
   } else if (Conf.UseDefaultPipeline) {
     MPM.addPass(PB.buildPerModuleDefaultPipeline(OL));
   } else if (IsThinLTO) {
-    MPM.addPass(PB.buildThinLTODefaultPipeline(OL, ImportSummary));
+    MPM.addPass(PB.buildThinLTODefaultPipeline(OL, ImportSummary,
+                                               hasTapirTarget(Conf)));
   } else {
-    MPM.addPass(PB.buildLTODefaultPipeline(OL, ExportSummary));
+    MPM.addPass(PB.buildLTODefaultPipeline(OL, ExportSummary,
+                                           hasTapirTarget(Conf)));
   }
 
   if (!Conf.DisableVerify)
     MPM.addPass(VerifierPass());
 
   MPM.run(Mod, MAM);
+}
+
+static void runOldPMPasses(const Config &Conf, Module &Mod, TargetMachine *TM,
+                           bool IsThinLTO, ModuleSummaryIndex *ExportSummary,
+                           const ModuleSummaryIndex *ImportSummary) {
+  legacy::PassManager passes;
+  passes.add(createTargetTransformInfoWrapperPass(TM->getTargetIRAnalysis()));
+
+  PassManagerBuilder PMB;
+  PMB.LibraryInfo = new TargetLibraryInfoImpl(Triple(TM->getTargetTriple()));
+  if (Conf.Freestanding)
+    PMB.LibraryInfo->disableAllFunctions();
+  PMB.LibraryInfo->setTapirTarget(Conf.TapirTarget);
+  PMB.Inliner = createFunctionInliningPass();
+  PMB.ExportSummary = ExportSummary;
+  PMB.ImportSummary = ImportSummary;
+  // Unconditionally verify input since it is not verified before this
+  // point and has unknown origin.
+  PMB.VerifyInput = true;
+  PMB.VerifyOutput = !Conf.DisableVerify;
+  PMB.LoopVectorize = true;
+  PMB.SLPVectorize = true;
+  PMB.OptLevel = Conf.OptLevel;
+  PMB.PGOSampleUse = Conf.SampleProfile;
+  PMB.EnablePGOCSInstrGen = Conf.RunCSIRInstr;
+  if (!Conf.RunCSIRInstr && !Conf.CSIRProfile.empty()) {
+    PMB.EnablePGOCSInstrUse = true;
+    PMB.PGOInstrUse = Conf.CSIRProfile;
+  }
+  PMB.TapirTarget = Conf.TapirTarget;
+  if (IsThinLTO)
+    PMB.populateThinLTOPassManager(passes);
+  else
+    PMB.populateLTOPassManager(passes);
+  passes.run(Mod);
 }
 
 bool lto::opt(const Config &Conf, TargetMachine *TM, unsigned Task, Module &Mod,
