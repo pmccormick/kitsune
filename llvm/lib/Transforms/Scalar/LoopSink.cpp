@@ -265,8 +265,10 @@ static bool sinkInstruction(
 static bool sinkLoopInvariantInstructions(Loop &L, AAResults &AA, LoopInfo &LI,
                                           DominatorTree &DT,
                                           BlockFrequencyInfo &BFI,
+                                          ScalarEvolution *SE,
+                                          AliasSetTracker *CurAST,
                                           MemorySSA &MSSA,
-                                          ScalarEvolution *SE) {
+                                          TaskInfo *TI) {
   BasicBlock *Preheader = L.getLoopPreheader();
   assert(Preheader && "Expected loop to have preheader");
 
@@ -309,7 +311,8 @@ static bool sinkLoopInvariantInstructions(Loop &L, AAResults &AA, LoopInfo &LI,
     // No need to check for instruction's operands are loop invariant.
     assert(L.hasLoopInvariantOperands(&I) &&
            "Insts in a loop's preheader should have loop invariant operands!");
-    if (!canSinkOrHoistInst(I, &AA, &DT, &L, MSSAU, false, LICMFlags))
+    if (!canSinkOrHoistInst(I, &AA, &DT, &L, CurAST, MSSAU.get(), false,
+                            LICMFlags.get(), TI))
       continue;
     if (sinkInstruction(L, I, ColdLoopBBs, LoopBlockNumber, LI, DT, BFI,
                         &MSSAU))
@@ -329,6 +332,7 @@ PreservedAnalyses LoopSinkPass::run(Function &F, FunctionAnalysisManager &FAM) {
 
   AAResults &AA = FAM.getResult<AAManager>(F);
   DominatorTree &DT = FAM.getResult<DominatorTreeAnalysis>(F);
+  TaskInfo &TI = FAM.getResult<TaskAnalysis>(F);
   BlockFrequencyInfo &BFI = FAM.getResult<BlockFrequencyAnalysis>(F);
   MemorySSA &MSSA = FAM.getResult<MemorySSAAnalysis>(F).getMSSA();
 
@@ -355,8 +359,9 @@ PreservedAnalyses LoopSinkPass::run(Function &F, FunctionAnalysisManager &FAM) {
     // Note that we don't pass SCEV here because it is only used to invalidate
     // loops in SCEV and we don't preserve (or request) SCEV at all making that
     // unnecessary.
-    Changed |= sinkLoopInvariantInstructions(L, AA, LI, DT, BFI, MSSA,
-                                             /*ScalarEvolution*/ nullptr);
+    Changed |= sinkLoopInvariantInstructions(L, AA, LI, DT, BFI,
+                                             /*ScalarEvolution*/ nullptr,
+                                             CurAST.get(), MSSA, &TI);
   } while (!PreorderLoops.empty());
 
   if (!Changed)
@@ -395,11 +400,22 @@ struct LegacyLoopSinkPass : public LoopPass {
     AAResults &AA = getAnalysis<AAResultsWrapperPass>().getAAResults();
     MemorySSA &MSSA = getAnalysis<MemorySSAWrapperPass>().getMSSA();
     auto *SE = getAnalysisIfAvailable<ScalarEvolutionWrapperPass>();
+    auto *TI = getAnalysisIfAvailable<TaskInfoWrapperPass>();
+    std::unique_ptr<AliasSetTracker> CurAST;
+    MemorySSA *MSSA = nullptr;
+    if (EnableMSSAInLegacyLoopSink)
+      MSSA = &getAnalysis<MemorySSAWrapperPass>().getMSSA();
+    else {
+      CurAST = std::make_unique<AliasSetTracker>(AA);
+      computeAliasSet(*L, *Preheader, *CurAST.get());
+    }
+
     bool Changed = sinkLoopInvariantInstructions(
         *L, AA, getAnalysis<LoopInfoWrapperPass>().getLoopInfo(),
         getAnalysis<DominatorTreeWrapperPass>().getDomTree(),
         getAnalysis<BlockFrequencyInfoWrapperPass>().getBFI(),
-        MSSA, SE ? &SE->getSE() : nullptr);
+        SE ? &SE->getSE() : nullptr, CurAST.get(), MSSA,
+        TI ? &TI->getTaskInfo() : nullptr);
 
     if (VerifyMemorySSA)
       MSSA.verifyMemorySSA();

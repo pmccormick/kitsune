@@ -963,6 +963,8 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
       case Attribute::NoCfCheck:
       case Attribute::MustProgress:
       case Attribute::NoProfile:
+      case Attribute::SanitizeCilk:
+      case Attribute::Stealable:
         break;
       // These attributes cannot be applied to functions.
       case Attribute::Alignment:
