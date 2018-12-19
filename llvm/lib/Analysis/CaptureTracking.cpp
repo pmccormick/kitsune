@@ -311,6 +311,40 @@ llvm::FindEarliestCapture(const Value *V, Function &F, bool ReturnCaptures,
 UseCaptureKind llvm::DetermineUseCaptureKind(
     const Use &U,
     function_ref<bool(Value *, const DataLayout &)> IsDereferenceableOrNull) {
+  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(U.getUser())) {
+    switch (CE->getOpcode()) {
+    case Instruction::BitCast:
+    case Instruction::GetElementPtr:
+    case Instruction::Select:
+      // The original value is not captured via this if the new value isn't.
+      return UseCaptureKind::PASSTHROUGH;
+    case Instruction::ICmp: {
+      // Don't count comparisons of a no-alias return value against null as
+      // captures. This allows us to ignore comparisons of malloc results with
+      // null, for example.
+      if (ConstantPointerNull *CPN =
+              dyn_cast<ConstantPointerNull>(CE->getOperand(1)))
+        if (CPN->getType()->getAddressSpace() == 0)
+          if (isNoAliasCall(V->stripPointerCasts()))
+            return UseCaptureKind::NO_CAPTURE;
+      // Comparison against value stored in global variable. Given the pointer
+      // does not escape, its value cannot be guessed and stored separately in
+      // a global variable.
+      unsigned OtherIndex = (CE->getOperand(0) == V) ? 1 : 0;
+      auto *LI = dyn_cast<LoadInst>(CE->getOperand(OtherIndex));
+      if (LI && isa<GlobalVariable>(LI->getPointerOperand()))
+        return UseCaptureKind::NO_CAPTURE;
+      // Otherwise, be conservative. There are crazy ways to capture pointers
+      // using comparisons.
+      return UseCaptureKind::MAY_CAPTURE;
+    }
+    default:
+      // Something else - be conservative and say it is captured.
+      return UseCaptureKind::MAY_CAPTURE;
+    }
+    continue;
+  }
+
   Instruction *I = cast<Instruction>(U.getUser());
 
   switch (I->getOpcode()) {
