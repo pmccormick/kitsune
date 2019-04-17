@@ -507,6 +507,11 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
     PM.add(createWarnMissedTransformationsPass());
   }
 
+  if (EnableSerializeSmallTasks)
+    PM.add(createSerializeSmallTasksPass());
+  if (EnableDRFAA)
+    PM.add(createDRFScopedNoAliasWrapperPass());
+
   if (!IsFullLTO) {
     // Eliminate loads by forwarding stores from the previous iteration to loads
     // of the current iteration.
@@ -761,6 +766,27 @@ void PassManagerBuilder::populateModulePassManager(
     MPM.add(createGlobalOptimizerPass());
     MPM.add(createGlobalDCEPass());
   }
+
+  if (EnableSerializeSmallTasks)
+    MPM.add(createSerializeSmallTasksPass());
+
+  // If we are planning to perform ThinLTO later, let's not bloat the code with
+  // unrolling/vectorization/... now. We'll first run the inliner + CGSCC passes
+  // during ThinLTO and perform the rest of the optimizations afterward.
+  if (PrepareForThinLTO) {
+    // Ensure we perform any last passes, but do so before renaming anonymous
+    // globals in case the passes add any.
+    addExtensionsToPM(EP_OptimizerLast, MPM);
+    MPM.add(createCanonicalizeAliasesPass());
+    // Rename anon globals to be able to export them in the summary.
+    MPM.add(createNameAnonGlobalPass());
+    return;
+  }
+
+  if (PerformThinLTO)
+    // Optimize globals now when performing ThinLTO, this enables more
+    // optimizations later.
+    MPM.add(createGlobalOptimizerPass());
 
   // Scheduling LoopVersioningLICM when inlining is over, because after that
   // we may see more accurate aliasing. Reason to run this late is that too
