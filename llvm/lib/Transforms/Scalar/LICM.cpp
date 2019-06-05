@@ -145,13 +145,8 @@ static bool isNotUsedOrFreeInLoop(const Instruction &I, const Loop *CurLoop,
                                   bool LoopNestMode);
 static void hoist(Instruction &I, const DominatorTree *DT, const Loop *CurLoop,
                   BasicBlock *Dest, ICFLoopSafetyInfo *SafetyInfo,
-<<<<<<< HEAD
-                  MemorySSAUpdater &MSSAU, ScalarEvolution *SE,
-                  OptimizationRemarkEmitter *ORE);
-=======
                   MemorySSAUpdater *MSSAU, ScalarEvolution *SE,
                   const TaskInfo *TI, OptimizationRemarkEmitter *ORE);
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
 static bool sink(Instruction &I, LoopInfo *LI, DominatorTree *DT,
                  BlockFrequencyInfo *BFI, const Loop *CurLoop,
                  ICFLoopSafetyInfo *SafetyInfo, MemorySSAUpdater &MSSAU,
@@ -445,28 +440,16 @@ bool LoopInvariantCodeMotion::runOnLoop(
   if (L->hasDedicatedExits())
     Changed |= LoopNestMode
                    ? sinkRegionForLoopNest(DT->getNode(L->getHeader()), AA, LI,
-<<<<<<< HEAD
                                            DT, BFI, TLI, TTI, L, MSSAU,
-                                           &SafetyInfo, Flags, ORE)
-                   : sinkRegion(DT->getNode(L->getHeader()), AA, LI, DT, BFI,
-                                TLI, TTI, L, MSSAU, &SafetyInfo, Flags, ORE);
-  Flags.setIsSink(false);
-  if (Preheader)
-    Changed |= hoistRegion(DT->getNode(L->getHeader()), AA, LI, DT, BFI, TLI, L,
-                           MSSAU, SE, &SafetyInfo, Flags, ORE, LoopNestMode,
-                           LicmAllowSpeculation);
-=======
-                                           DT, BFI, TLI, TTI, L, &MSSAU,
                                            &SafetyInfo, Flags, TI, ORE)
                    : sinkRegion(DT->getNode(L->getHeader()), AA, LI, DT, BFI,
-                                TLI, TTI, L, &MSSAU, &SafetyInfo, Flags, TI,
+                                TLI, TTI, L, MSSAU, &SafetyInfo, Flags, TI,
                                 ORE);
   Flags.setIsSink(false);
   if (Preheader)
     Changed |= hoistRegion(DT->getNode(L->getHeader()), AA, LI, DT, BFI, TLI, L,
-                           &MSSAU, SE, &SafetyInfo, Flags, TI, ORE,
+                           MSSAU, SE, &SafetyInfo, Flags, TI, ORE,
                            LoopNestMode, LicmAllowSpeculation);
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
 
   // Now that all loop invariants have been removed from the loop, promote any
   // memory references to scalars that we can.
@@ -508,11 +491,7 @@ bool LoopInvariantCodeMotion::runOnLoop(
              collectPromotionCandidates(MSSA, AA, L)) {
           LocalPromoted |= promoteLoopAccessesToScalars(
               PointerMustAliases, ExitBlocks, InsertPts, MSSAInsertPts, PIC, LI,
-<<<<<<< HEAD
-              DT, TLI, L, MSSAU, &SafetyInfo, ORE, LicmAllowSpeculation);
-=======
-              DT, TLI, L, &MSSAU, &SafetyInfo, TI, ORE, LicmAllowSpeculation);
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
+              DT, TLI, L, MSSAU, &SafetyInfo, TI, ORE, LicmAllowSpeculation);
         }
         Promoted |= LocalPromoted;
       } while (LocalPromoted);
@@ -560,13 +539,8 @@ bool llvm::sinkRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
 
   // Verify inputs.
   assert(N != nullptr && AA != nullptr && LI != nullptr && DT != nullptr &&
-<<<<<<< HEAD
          CurLoop != nullptr && SafetyInfo != nullptr &&
-         "Unexpected input to sinkRegion.");
-=======
-         CurLoop != nullptr && MSSAU != nullptr && SafetyInfo != nullptr &&
          TI != nullptr && "Unexpected input to sinkRegion.");
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
 
   // We want to visit children before parents. We will enqueue all the parents
   // before their children in the worklist and process the worklist in reverse
@@ -606,12 +580,7 @@ bool llvm::sinkRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
       if (!I.mayHaveSideEffects() &&
           isNotUsedOrFreeInLoop(I, LoopNestMode ? OutermostLoop : CurLoop,
                                 SafetyInfo, TTI, FreeInLoop, LoopNestMode) &&
-<<<<<<< HEAD
-          canSinkOrHoistInst(I, AA, DT, CurLoop, MSSAU, true, Flags, ORE)) {
-=======
-          canSinkOrHoistInst(I, AA, DT, CurLoop, /*CurAST*/nullptr, MSSAU, true,
-                             &Flags, TI, ORE)) {
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
+          canSinkOrHoistInst(I, AA, DT, CurLoop, MSSAU, true, Flags, TI, ORE)) {
         if (sink(I, LI, DT, BFI, CurLoop, SafetyInfo, MSSAU, ORE)) {
           if (!FreeInLoop) {
             ++II;
@@ -631,14 +600,9 @@ bool llvm::sinkRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
 bool llvm::sinkRegionForLoopNest(
     DomTreeNode *N, AAResults *AA, LoopInfo *LI, DominatorTree *DT,
     BlockFrequencyInfo *BFI, TargetLibraryInfo *TLI, TargetTransformInfo *TTI,
-<<<<<<< HEAD
     Loop *CurLoop, MemorySSAUpdater &MSSAU, ICFLoopSafetyInfo *SafetyInfo,
-    SinkAndHoistLICMFlags &Flags, OptimizationRemarkEmitter *ORE) {
-=======
-    Loop *CurLoop, MemorySSAUpdater *MSSAU, ICFLoopSafetyInfo *SafetyInfo,
-    SinkAndHoistLICMFlags &Flags, TaskInfo *TI,
+    SinkAndHoistLICMFlags &Flags, TaskInfo *TI, 
     OptimizationRemarkEmitter *ORE) {
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
 
   bool Changed = false;
   SmallPriorityWorklist<Loop *, 4> Worklist;
@@ -895,13 +859,8 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
                        bool AllowSpeculation) {
   // Verify inputs.
   assert(N != nullptr && AA != nullptr && LI != nullptr && DT != nullptr &&
-<<<<<<< HEAD
          CurLoop != nullptr && SafetyInfo != nullptr &&
-         "Unexpected input to hoistRegion.");
-=======
-         CurLoop != nullptr && MSSAU != nullptr && SafetyInfo != nullptr &&
          TI != nullptr && "Unexpected input to hoistRegion.");
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
 
   ControlFlowHoister CFH(LI, DT, CurLoop, MSSAU);
 
@@ -945,12 +904,7 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
       // and we have accurately duplicated the control flow from the loop header
       // to that block.
       if (CurLoop->hasLoopInvariantOperands(&I) &&
-<<<<<<< HEAD
-          canSinkOrHoistInst(I, AA, DT, CurLoop, MSSAU, true, Flags, ORE) &&
-=======
-          canSinkOrHoistInst(I, AA, DT, CurLoop, /*CurAST*/ nullptr, MSSAU,
-                             true, &Flags, TI, ORE) &&
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
+          canSinkOrHoistInst(I, AA, DT, CurLoop, MSSAU, true, Flags, TI, ORE) &&
           isSafeToExecuteUnconditionally(
               I, DT, TLI, CurLoop, SafetyInfo, TI, ORE,
               CurLoop->getLoopPreheader()->getTerminator(), AllowSpeculation)) {
@@ -993,14 +947,14 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
                match(&I, m_Intrinsic<Intrinsic::invariant_start>());
       };
       auto MustExecuteWithoutWritesBefore = [&](Instruction &I) {
-        return SafetyInfo->isGuaranteedToExecute(I, DT, CurLoop) &&
+        return SafetyInfo->isGuaranteedToExecute(I, DT, TI, CurLoop) &&
                SafetyInfo->doesNotWriteMemoryBefore(I, CurLoop);
       };
       if ((IsInvariantStart(I) || isGuard(&I)) &&
           CurLoop->hasLoopInvariantOperands(&I) &&
           MustExecuteWithoutWritesBefore(I)) {
         hoist(I, DT, CurLoop, CFH.getOrCreateHoistedBlock(BB), SafetyInfo,
-              MSSAU, SE, ORE);
+              MSSAU, SE, TI, ORE);
         HoistedInstructions.push_back(&I);
         Changed = true;
         continue;
@@ -1014,7 +968,7 @@ bool llvm::hoistRegion(DomTreeNode *N, AAResults *AA, LoopInfo *LI,
             PN->setIncomingBlock(
                 i, CFH.getOrCreateHoistedBlock(PN->getIncomingBlock(i)));
           hoist(*PN, DT, CurLoop, CFH.getOrCreateHoistedBlock(BB), SafetyInfo,
-                MSSAU, SE, ORE);
+                MSSAU, SE, TI, ORE);
           assert(DT->dominates(PN, BB) && "Conditional PHIs not expected");
           Changed = true;
           continue;
@@ -1188,11 +1142,7 @@ bool isOnlyMemoryAccess(const Instruction *I, const Loop *L,
 bool llvm::canSinkOrHoistInst(Instruction &I, AAResults *AA, DominatorTree *DT,
                               Loop *CurLoop, MemorySSAUpdater &MSSAU,
                               bool TargetExecutesOncePerLoop,
-<<<<<<< HEAD
-                              SinkAndHoistLICMFlags &Flags,
-=======
-                              SinkAndHoistLICMFlags *Flags, TaskInfo *TI,
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
+                              SinkAndHoistLICMFlags &Flags, TaskInfo *TI,
                               OptimizationRemarkEmitter *ORE) {
   // If we don't understand the instruction, bail early.
   if (!isHoistableAndSinkableInst(I))
@@ -1749,13 +1699,8 @@ static bool sink(Instruction &I, LoopInfo *LI, DominatorTree *DT,
 ///
 static void hoist(Instruction &I, const DominatorTree *DT, const Loop *CurLoop,
                   BasicBlock *Dest, ICFLoopSafetyInfo *SafetyInfo,
-<<<<<<< HEAD
                   MemorySSAUpdater &MSSAU, ScalarEvolution *SE,
-                  OptimizationRemarkEmitter *ORE) {
-=======
-                  MemorySSAUpdater *MSSAU, ScalarEvolution *SE,
                   const TaskInfo *TI, OptimizationRemarkEmitter *ORE) {
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
   LLVM_DEBUG(dbgs() << "LICM hoisting to " << Dest->getNameOrAsOperand() << ": "
                     << I << "\n");
   ORE->emit([&]() {
@@ -1775,7 +1720,7 @@ static void hoist(Instruction &I, const DominatorTree *DT, const Loop *CurLoop,
       // The check on hasMetadataOtherThanDebugLoc is to prevent us from burning
       // time in isGuaranteedToExecute if we don't actually have anything to
       // drop.  It is a compile time optimization, not required for correctness.
-      !SafetyInfo->isGuaranteedToExecute(I, DT, CurLoop))
+      !SafetyInfo->isGuaranteedToExecute(I, DT, TI, CurLoop))
     I.dropUndefImplyingAttrsAndUnknownMetadata();
 
   if (isa<PHINode>(I))
@@ -1806,7 +1751,7 @@ static bool isSafeToExecuteUnconditionally(
     return true;
 
   bool GuaranteedToExecute =
-      SafetyInfo->isGuaranteedToExecute(Inst, DT, CurLoop);
+      SafetyInfo->isGuaranteedToExecute(Inst, DT, TI, CurLoop);
 
   if (!GuaranteedToExecute) {
     auto *LI = dyn_cast<LoadInst>(&Inst);
@@ -1969,7 +1914,7 @@ bool llvm::promoteLoopAccessesToScalars(
     SmallVectorImpl<Instruction *> &InsertPts,
     SmallVectorImpl<MemoryAccess *> &MSSAInsertPts, PredIteratorCache &PIC,
     LoopInfo *LI, DominatorTree *DT, const TargetLibraryInfo *TLI,
-    Loop *CurLoop, MemorySSAUpdater *MSSAU, ICFLoopSafetyInfo *SafetyInfo,
+    Loop *CurLoop, MemorySSAUpdater &MSSAU, ICFLoopSafetyInfo *SafetyInfo,
     TaskInfo *TI, OptimizationRemarkEmitter *ORE, bool AllowSpeculation) {
   // Verify inputs.
   assert(LI != nullptr && DT != nullptr && CurLoop != nullptr &&
@@ -2128,7 +2073,7 @@ bool llvm::promoteLoopAccessesToScalars(
         StoreIsGuanteedToExecute |= GuaranteedToExecute;
         if (!DereferenceableInPH || !SafeToInsertStore ||
             (InstAlignment > Alignment)) {
-          if (GuaranteedToExecute) {
+          if (SafetyInfo->isGuaranteedToExecute(*UI, DT, TI, CurLoop)) {
             DereferenceableInPH = true;
             SafeToInsertStore = true;
             Alignment = std::max(Alignment, InstAlignment);
