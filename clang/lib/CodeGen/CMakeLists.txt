@@ -53,6 +53,7 @@ add_clang_library(clangCodeGen
   CGExprScalar.cpp
   CGGPUBuiltin.cpp
   CGHLSLRuntime.cpp
+  CGKokkos.cpp   
   CGLoopInfo.cpp
   CGNonTrivialStruct.cpp
   CGObjC.cpp

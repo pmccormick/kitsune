@@ -462,6 +462,11 @@ ENUM_LANGOPT(ExtendIntArgs, ExtendArgsKind, 1, ExtendArgsKind::ExtendTo32,
              "to unprototyped and varargs functions")
 
 VALUE_LANGOPT(FuchsiaAPILevel, 32, 0, "Fuchsia API level")
+// kitsune: Kokkos support. 
+BENIGN_LANGOPT(Kokkos, 1, 0, "Enable specialized Kokkos code generation")
+
+// kitsune: FleCSI support. 
+BENIGN_LANGOPT(FleCSI, 1, 0, "Enable specialized FleCSI code generation")
 
 // This option will be removed in the future once the backend
 // supports all operations (like division or float-to-integer conversion)
