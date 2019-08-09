@@ -6943,6 +6943,16 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   bool ProprietaryToolChainNeeded =
     checkForAMDProprietaryOptOptions(TC, D, Args, CmdArgs, false /*isLLD*/);
+
+  // -fstripmine is enabled based on the optimization level selected.  For now,
+  // we enable stripmining when the optimization level enables vectorization.
+  bool EnableStripmine = EnableVec;
+  OptSpecifier StripmineAliasOption =
+      EnableStripmine ? options::OPT_O_Group : options::OPT_fstripmine;
+  if (Args.hasFlag(options::OPT_fstripmine, StripmineAliasOption,
+                   options::OPT_fno_stripmine, EnableStripmine))
+    CmdArgs.push_back("-stripmine-loops");
+
   ParseMPreferVectorWidth(D, Args, CmdArgs);
 
   Args.AddLastArg(CmdArgs, options::OPT_fshow_overloads_EQ);
