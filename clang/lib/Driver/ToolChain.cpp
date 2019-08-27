@@ -47,6 +47,7 @@
 #include <cassert>
 #include <cstddef>
 #include <cstring>
+#include <cstdio> // kitsune - FIXME: remove this. 
 #include <string>
 
 using namespace clang;
@@ -1079,6 +1080,110 @@ void ToolChain::AddFortranStdlibLibArgs(const ArgList &Args,
 
   // Allways link Fortran executables with Pthreads
   CmdArgs.push_back("-lpthread");
+
+
+/// The string produced by CMake configuration parameters for multiple
+/// libraries (e.g. "-lkokkos -ldl -lrt") do not work well for direct
+/// use as arguments.  This helper extracts them into individal
+/// arguments.
+void ToolChain::ExtractArgsFromString(const char *s, 
+				      ArgStringList &CmdArgs, 
+				      const ArgList &Args,
+				      const char delimiter) const {
+  std::string ArgString(s);
+  std::string token;
+  std::istringstream TokenStream(ArgString);
+  while(std::getline(TokenStream, token, delimiter)) {
+    CmdArgs.push_back(Args.MakeArgStringRef(token));
+  }
+}
+
+void ToolChain::AddKitsuneIncludeArgs(const ArgList &Args,
+				      ArgStringList &CmdArgs) const {
+  if (D.CCCIsCXX() && Args.hasArg(options::OPT_fkokkos)) {
+    if (KITSUNE_ENABLE_KOKKOS) { 
+      CmdArgs.push_back("-I" KITSUNE_KOKKOS_INCLUDE_DIR);
+    } else {
+      getDriver().Diag(diag::warn_kokkos_missing_build_params);
+    }
+  }
+
+  if (Args.hasArg(options::OPT_ftapir)) {
+    if (Arg *A = Args.getLastArg(options::OPT_ftapir)) {
+      StringRef Name = A->getValue();
+      if (Name == "cilk") {
+	if (KITSUNE_ENABLE_CILKRTS) { 
+	  CmdArgs.push_back("-I" KITSUNE_CILKRTS_INCLUDE_DIR);
+	} else {
+	  getDriver().Diag(diag::warn_cilkrts_missing_build_params);
+	}
+      } else if (Name == "qthreads") {
+	if (KITSUNE_ENABLE_QTHREADS) { 
+	  CmdArgs.push_back("-I" KITSUNE_QTHREADS_INCLUDE_DIR);
+	} else {
+	  getDriver().Diag(diag::warn_qthreads_missing_build_params);
+	}
+      } else if (Name == "realm") {
+	if (KITSUNE_ENABLE_REALM) { 
+	  CmdArgs.push_back("-I" KITSUNE_REALM_INCLUDE_DIR);
+	} else {
+	  getDriver().Diag(diag::warn_realm_missing_build_params);
+	}
+      } else {
+	// no-op -- FIXME -- probably want a sanity check here... 
+	// can fall back to user-specified command line arguments 
+	// in unsupported/missing configurations... 
+	;
+      }
+    }
+  }
+}
+
+void ToolChain::AddKitsuneLibArgs(const ArgList &Args, 
+				  ArgStringList &CmdArgs) const {
+
+  if (D.CCCIsCXX() && Args.hasArg(options::OPT_fkokkos)) {
+    if (KITSUNE_ENABLE_KOKKOS) {
+      const std::string LibraryPath(KITSUNE_KOKKOS_LIBRARY_DIR);
+      CmdArgs.push_back("-L" KITSUNE_KOKKOS_LIBRARY_DIR);
+      ExtractArgsFromString(KITSUNE_KOKKOS_LINK_LIBS, CmdArgs, Args);
+    } else {
+      getDriver().Diag(diag::warn_kokkos_missing_build_params);
+    }
+  }
+
+  if (Args.hasArg(options::OPT_ftapir)) {
+    if (Arg *A = Args.getLastArg(options::OPT_ftapir)) {
+      StringRef Name = A->getValue();
+      if (Name == "cilk") { 
+	if (KITSUNE_ENABLE_CILKRTS) {
+	  CmdArgs.push_back("-L" KITSUNE_CILKRTS_LIBRARY_DIR);
+	  ExtractArgsFromString(KITSUNE_CILKRTS_LINK_LIBS, CmdArgs, Args);
+	} else {
+	  getDriver().Diag(diag::warn_cilkrts_missing_build_params);
+	}
+      } else if (Name == "qthreads") {
+	if (KITSUNE_ENABLE_QTHREADS) { 
+	  CmdArgs.push_back("-L" KITSUNE_QTHREADS_LIBRARY_DIR);
+	  ExtractArgsFromString(KITSUNE_QTHREADS_LINK_LIBS, CmdArgs, Args);
+	} else {
+	  getDriver().Diag(diag::warn_qthreads_missing_build_params);
+	}
+      } else if (Name == "realm") {
+	if (KITSUNE_ENABLE_REALM) { 
+	  CmdArgs.push_back("-L" KITSUNE_REALM_LIBRARY_DIR);
+	  ExtractArgsFromString(KITSUNE_REALM_LINK_LIBS, CmdArgs, Args);
+	} else {
+	  getDriver().Diag(diag::warn_realm_missing_build_params);	  
+	}
+      } else {
+	// no-op -- FIXME -- probably want a warning here but we 
+	// can fall back to user-specified command line arguments 
+	// in unsupported/missing configurations... 
+	;
+      }
+    }
+  }
 }
 
 void ToolChain::AddFilePathLibArgs(const ArgList &Args,

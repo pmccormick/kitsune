@@ -4214,6 +4214,26 @@ def note_called_once_gets_called_twice : Note<
   "previous call is here%select{; set to nil to indicate "
   "it cannot be called afterwards|}0">;
 
+
+// +===== kitsune: errors related to parallel-ir specific attributes. 
+
+// target-centric error/warnings. 
+def err_kitsune_target_attr_unsupported_stmt: Error<
+    "target attribute applied to unsupported statement.">;
+def err_kitsune_target_attr_wrong_nargs: Error<
+    "target attribute takes a single argument.">;
+def err_kitsune_target_unknown: Error<
+    "attribute uses unrecognized target.">;
+
+def err_kitsune_strategy_attr_unsupported_stmt: Error<
+    "strategy attribute applied to unsupported statement.">;
+def err_kitsune_strategy_attr_wrong_nargs: Error<
+    "strategy attribute takes a single argument.">;
+def err_kitsune_strategy_unknown: Error<
+    "attribute uses uncognized strategy.">;
+
+// =====+
+
 // objc_designated_initializer attribute diagnostics.
 def warn_objc_designated_init_missing_super_call : Warning<
   "designated initializer missing a 'super' call to a designated initializer of the super class">,

@@ -1524,6 +1524,9 @@ void Clang::AddPreprocessingOptions(Compilation &C, const JobAction &JA,
   // arguments of related offloading toolchains or arguments that are specific
   // of an offloading programming model.
 
+  // +==== Handle special include paths for kitsune-/tapir-centric modes. 
+  getToolChain().AddKitsuneIncludeArgs(Args, CmdArgs);
+
   // Add C++ include arguments, if needed.
   if (types::isCXX(Inputs[0].getType())) {
     bool HasStdlibxxIsystem = Args.hasArg(options::OPT_stdlibxx_isystem);

@@ -596,6 +596,19 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   addCilktoolRuntime(ToolChain, Args, CmdArgs);
 
   ToolChain.AddTapirRuntimeLibArgs(Args, CmdArgs);
+  if (Args.hasArg(options::OPT_ftapir)) {
+    if (Arg *A = Args.getLastArg(options::OPT_ftapir)) {
+      StringRef Name = A->getValue();
+      if (Name == "cilk") 
+        CmdArgs.push_back("-lcilkrts");
+      else if (Name == "qthreads"){
+        CmdArgs.push_back("-lqthread");
+        CmdArgs.push_back("-lhwloc");
+        CmdArgs.push_back("-lnuma");
+        CmdArgs.push_back("-lpthread");
+      }
+    }
+  }
 
   if (D.CCCIsCXX() &&
       !Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs,
@@ -2055,6 +2068,7 @@ static llvm::StringRef getGCCToolchainDir(const ArgList &Args,
 
   return GCC_INSTALL_PREFIX;
 }
+
 
 /// Initialize a GCCInstallationDetector from the driver.
 ///
