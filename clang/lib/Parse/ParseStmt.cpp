@@ -462,6 +462,12 @@ Retry:
     // }
     Res = ParseCilkSyncStatement();
     SemiError = "_Cilk_sync";
+  case tok::kw__tapir_spawn:              // spawn statement
+    return ParseSpawnStatement();
+
+  case tok::kw__tapir_sync:               // sync statement
+    Res = ParseSyncStatement();
+    SemiError = "sync";
     break;
 
   case tok::kw__Cilk_for:
