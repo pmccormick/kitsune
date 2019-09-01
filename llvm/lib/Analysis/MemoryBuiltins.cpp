@@ -213,20 +213,22 @@ getAllocationDataForFunction(const Function *Callee, AllocType AllocTy,
 }
 
 static Optional<AllocFnsTy> getAllocationData(const Value *V, AllocType AllocTy,
-                                              const TargetLibraryInfo *TLI) {
+                                              const TargetLibraryInfo *TLI,
+                                              bool IgnoreBuiltinAttr = false) {
   bool IsNoBuiltinCall;
   if (const Function *Callee = getCalledFunction(V, IsNoBuiltinCall))
-    if (!IsNoBuiltinCall)
+    if (IgnoreBuiltinAttr || !IsNoBuiltinCall)
       return getAllocationDataForFunction(Callee, AllocTy, TLI);
   return None;
 }
 
 static Optional<AllocFnsTy>
 getAllocationData(const Value *V, AllocType AllocTy,
-                  function_ref<const TargetLibraryInfo &(Function &)> GetTLI) {
+                  function_ref<const TargetLibraryInfo &(Function &)> GetTLI,
+                  bool IgnoreBuiltinAttr = false) {
   bool IsNoBuiltinCall;
   if (const Function *Callee = getCalledFunction(V, IsNoBuiltinCall))
-    if (!IsNoBuiltinCall)
+    if (IgnoreBuiltinAttr || !IsNoBuiltinCall)
       return getAllocationDataForFunction(
           Callee, AllocTy, &GetTLI(const_cast<Function &>(*Callee)));
   return None;
@@ -292,14 +294,16 @@ static bool checkFnAllocKind(const Function *F, AllocFnKind Wanted) {
 /// Tests if a value is a call or invoke to a library function that
 /// allocates or reallocates memory (either malloc, calloc, realloc, or strdup
 /// like).
-bool llvm::isAllocationFn(const Value *V, const TargetLibraryInfo *TLI) {
-  return getAllocationData(V, AnyAlloc, TLI).has_value() ||
+bool llvm::isAllocationFn(const Value *V, const TargetLibraryInfo *TLI,
+                          bool IgnoreBuiltinAttr) {
+  return getAllocationData(V, AnyAlloc, TLI, IgnoreBuiltinAttr).has_value() ||
          checkFnAllocKind(V, AllocFnKind::Alloc | AllocFnKind::Realloc);
 }
 bool llvm::isAllocationFn(
     const Value *V,
-    function_ref<const TargetLibraryInfo &(Function &)> GetTLI) {
-  return getAllocationData(V, AnyAlloc, GetTLI).has_value() ||
+    function_ref<const TargetLibraryInfo &(Function &)> GetTLI,
+    bool IgnoreBuiltinAttr) {
+  return getAllocationData(V, AnyAlloc, GetTLI, IgnoreBuiltinAttr).has_value() ||
          checkFnAllocKind(V, AllocFnKind::Alloc | AllocFnKind::Realloc);
 }
 
