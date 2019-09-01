@@ -131,6 +131,7 @@ add_llvm_component_library(LLVMAnalysis
   SyntheticCountsUtils.cpp
   TFUtils.cpp
   TensorSpec.cpp
+  TapirRaceDetect.cpp
   TapirTaskInfo.cpp
   TargetLibraryInfo.cpp
   TargetTransformInfo.cpp

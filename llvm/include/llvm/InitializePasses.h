@@ -438,6 +438,7 @@ void initializeTargetLibraryInfoWrapperPassPass(PassRegistry&);
 void initializeTargetPassConfigPass(PassRegistry&);
 void initializeTargetTransformInfoWrapperPassPass(PassRegistry&);
 void initializeTLSVariableHoistLegacyPassPass(PassRegistry &);
+void initializeTapirRaceDetectWrapperPassPass(PassRegistry&);
 void initializeTaskInfoWrapperPassPass(PassRegistry&);
 void initializeTaskSimplifyPass(PassRegistry&);
 void initializeThreadSanitizerLegacyPassPass(PassRegistry&);
