@@ -1614,6 +1614,10 @@ void MemorySSA::buildMemorySSA(BatchAAResults &BAA) {
   SmallPtrSet<BasicBlock *, 16> Visited;
   renamePass(DT->getRootNode(), LiveOnEntryDef.get(), Visited);
 
+  ClobberWalkerBase<BatchAAResults> WalkerBase(this, &BAA, DT, TI);
+  CachingWalker<BatchAAResults> WalkerLocal(this, &WalkerBase);
+  OptimizeUses(this, &WalkerLocal, &BAA, DT).optimizeUses();
+
   // Mark the uses in unreachable blocks as live on entry, so that they go
   // somewhere.
   for (auto &BB : F)

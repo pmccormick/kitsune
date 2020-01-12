@@ -149,13 +149,8 @@ protected:
 /// this function is called by \p sinkRegionForLoopNest.
 bool sinkRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
                 BlockFrequencyInfo *, TargetLibraryInfo *,
-<<<<<<< HEAD
                 TargetTransformInfo *, Loop *CurLoop, MemorySSAUpdater &,
-                ICFLoopSafetyInfo *, SinkAndHoistLICMFlags &,
-=======
-                TargetTransformInfo *, Loop *CurLoop, MemorySSAUpdater *,
                 ICFLoopSafetyInfo *, SinkAndHoistLICMFlags &, TaskInfo *,
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
                 OptimizationRemarkEmitter *, Loop *OutermostLoop = nullptr);
 
 /// Call sinkRegion on loops contained within the specified loop
@@ -163,13 +158,8 @@ bool sinkRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
 bool sinkRegionForLoopNest(DomTreeNode *, AAResults *, LoopInfo *,
                            DominatorTree *, BlockFrequencyInfo *,
                            TargetLibraryInfo *, TargetTransformInfo *, Loop *,
-<<<<<<< HEAD
                            MemorySSAUpdater &, ICFLoopSafetyInfo *,
-                           SinkAndHoistLICMFlags &,
-=======
-                           MemorySSAUpdater *, ICFLoopSafetyInfo *,
                            SinkAndHoistLICMFlags &, TaskInfo *,
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
                            OptimizationRemarkEmitter *);
 
 /// Walk the specified region of the CFG (defined by all blocks
@@ -184,15 +174,9 @@ bool sinkRegionForLoopNest(DomTreeNode *, AAResults *, LoopInfo *,
 /// guaranteed to execute in the loop, but are safe to speculatively execute.
 bool hoistRegion(DomTreeNode *, AAResults *, LoopInfo *, DominatorTree *,
                  BlockFrequencyInfo *, TargetLibraryInfo *, Loop *,
-<<<<<<< HEAD
                  MemorySSAUpdater &, ScalarEvolution *, ICFLoopSafetyInfo *,
-                 SinkAndHoistLICMFlags &, OptimizationRemarkEmitter *, bool,
-                 bool AllowSpeculation);
-=======
-                 MemorySSAUpdater *, ScalarEvolution *, ICFLoopSafetyInfo *,
                  SinkAndHoistLICMFlags &, TaskInfo *,
                  OptimizationRemarkEmitter *, bool, bool AllowSpeculation);
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
 
 /// This function deletes dead loops. The caller of this function needs to
 /// guarantee that the loop is infact dead.
@@ -315,6 +299,8 @@ TransformationMode hasUnrollAndJamTransformation(const Loop *L);
 TransformationMode hasVectorizeTransformation(const Loop *L);
 TransformationMode hasDistributeTransformation(const Loop *L);
 TransformationMode hasLICMVersioningTransformation(const Loop *L);
+TransformationMode hasLoopStripmineTransformation(const Loop *L);
+TransformationMode hasLoopSpawningTransformation(const Loop *L);
 /// @}
 
 /// Set input string into loop metadata by keeping other values intact.
@@ -362,17 +348,10 @@ void getLoopAnalysisUsage(AnalysisUsage &AU);
 /// true when moving out of loop and not true when moving into loops.
 /// If \p ORE is set use it to emit optimization remarks.
 bool canSinkOrHoistInst(Instruction &I, AAResults *AA, DominatorTree *DT,
-<<<<<<< HEAD
                         Loop *CurLoop, MemorySSAUpdater &MSSAU,
                         bool TargetExecutesOncePerLoop,
                         SinkAndHoistLICMFlags &LICMFlags,
-                        OptimizationRemarkEmitter *ORE = nullptr);
-=======
-                        Loop *CurLoop, AliasSetTracker *CurAST,
-                        MemorySSAUpdater *MSSAU, bool TargetExecutesOncePerLoop,
-                        SinkAndHoistLICMFlags *LICMFlags = nullptr,
                         TaskInfo *TI, OptimizationRemarkEmitter *ORE = nullptr);
->>>>>>> 5d312edb1929 (Bug fixes for rebase onto release_70)
 
 /// Returns the comparison predicate used when expanding a min/max reduction.
 CmpInst::Predicate getMinMaxReductionPredicate(RecurKind RK);

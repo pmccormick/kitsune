@@ -145,7 +145,7 @@ static bool isNotUsedOrFreeInLoop(const Instruction &I, const Loop *CurLoop,
                                   bool LoopNestMode);
 static void hoist(Instruction &I, const DominatorTree *DT, const Loop *CurLoop,
                   BasicBlock *Dest, ICFLoopSafetyInfo *SafetyInfo,
-                  MemorySSAUpdater *MSSAU, ScalarEvolution *SE,
+                  MemorySSAUpdater &MSSAU, ScalarEvolution *SE,
                   const TaskInfo *TI, OptimizationRemarkEmitter *ORE);
 static bool sink(Instruction &I, LoopInfo *LI, DominatorTree *DT,
                  BlockFrequencyInfo *BFI, const Loop *CurLoop,
