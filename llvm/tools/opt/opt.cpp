@@ -541,6 +541,7 @@ int main(int argc, char **argv) {
   initializeTypePromotionPass(Registry);
   initializeReplaceWithVeclibLegacyPass(Registry);
   initializeJMCInstrumenterPass(Registry);
+  initializeTapirCleanupPass(Registry);
 
 #ifdef BUILD_EXAMPLES
   initializeExampleIRTransforms(Registry);
