@@ -27,6 +27,7 @@
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/StmtOpenMP.h"
+#include "clang/AST/StmtTapir.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/LLVM.h"
@@ -1451,3 +1452,20 @@ CilkForStmt::CilkForStmt(Stmt *Init, DeclStmt *Limit, Expr *InitCond,
   SubExprs[LOOPVAR] = LoopVar;
   SubExprs[BODY] = Body;
 }
+
+const Stmt* SpawnStmt::getSpawnedStmt() const {
+  return SpawnedStmt;
+}
+
+Stmt* SpawnStmt::getSpawnedStmt() {
+  return SpawnedStmt;
+}
+
+StringRef SpawnStmt::getSyncVar() const {
+  return SyncVar;
+}
+
+StringRef SyncStmt::getSyncVar() const {
+  return SyncVar;
+}
+

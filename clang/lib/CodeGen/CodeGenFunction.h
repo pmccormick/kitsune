@@ -1211,6 +1211,7 @@ public:
     ~OMPLocalDeclMapRAII() { SavedMap.swap(CGF.LocalDeclMap); }
   };
 
+  
   /// In Cilk, flag indicating whether the current call/invoke is spawned.
   bool IsSpawned = false;
   bool SpawnedCleanup = false;
@@ -1579,8 +1580,9 @@ public:
     // Finish the spawned task.
     void FinishDetach();
 
-    // Create a temporary for the spawned task, specifically, before the spawned
-    // task has started.
+    void StartLabeledDetach(SyncRegion* SR);
+    void FinishLabeledDetach(SyncRegion* SR);
+
     Address CreateDetachedMemTemp(QualType Ty, StorageDuration SD,
                                   const Twine &Name = "det.tmp");
   };
@@ -3869,6 +3871,9 @@ public:
   void EmitCilkForStmt(const CilkForStmt &S,
                        ArrayRef<const Attr *> Attrs = None);
   LValue EmitCilkSpawnExprLValue(const CilkSpawnExpr *E);
+
+  void EmitSpawnStmt(const SpawnStmt &S);
+  void EmitSyncStmt(const SyncStmt &S);
 
   void EmitObjCForCollectionStmt(const ObjCForCollectionStmt &S);
   void EmitObjCAtTryStmt(const ObjCAtTryStmt &S);

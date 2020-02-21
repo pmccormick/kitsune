@@ -33,6 +33,7 @@ add_clang_library(clangCodeGen
   CGBlocks.cpp
   CGBuiltin.cpp
   CGCilk.cpp
+  CGTapir.cpp
   CGCUDANV.cpp
   CGCUDARuntime.cpp
   CGCXX.cpp
@@ -66,6 +67,7 @@ add_clang_library(clangCodeGen
   CGRecordLayoutBuilder.cpp
   CGStmt.cpp
   CGStmtOpenMP.cpp
+  CGTapir.cpp
   CGVTT.cpp
   CGVTables.cpp
   CodeGenABITypes.cpp

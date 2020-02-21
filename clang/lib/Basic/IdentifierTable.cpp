@@ -26,7 +26,9 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include "clang/Basic/Tapir.h"
 #include <cassert>
+#include "llvm/Transforms/Tapir/TapirTypes.h"
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -109,7 +111,8 @@ namespace {
     KEYMSCOMPAT   = 0x800000,
     KEYSYCL       = 0x1000000,
     KEYCUDA       = 0x2000000,
-    KEYMAX        = KEYCUDA, // The maximum key
+    KEYTAPIR      = 0x4000000,
+    KEYMAX        = KEYTAPIR, // The maximum key
     KEYALLCXX = KEYCXX | KEYCXX11 | KEYCXX20,
     KEYALL = (KEYMAX | (KEYMAX-1)) & ~KEYNOMS18 &
              ~KEYNOOPENCL // KEYNOMS18 and KEYNOOPENCL are used to exclude.

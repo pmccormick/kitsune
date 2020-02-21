@@ -2716,6 +2716,17 @@ void ASTStmtReader::VisitCilkForStmt(CilkForStmt *S) {
 }
 
 //===----------------------------------------------------------------------===//
+void ASTStmtReader::VisitSpawnStmt(SpawnStmt *S) {
+  VisitStmt(S);
+  S->setSpawnLoc(ReadSourceLocation());
+  S->setSpawnedStmt(Record.readSubStmt());
+}
+
+void ASTStmtReader::VisitSyncStmt(SyncStmt *S) {
+  VisitStmt(S);
+  S->setSyncLoc(ReadSourceLocation());
+}
+
 // ASTReader Implementation
 //===----------------------------------------------------------------------===//
 

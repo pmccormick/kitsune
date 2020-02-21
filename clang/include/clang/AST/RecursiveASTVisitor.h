@@ -38,6 +38,7 @@
 #include "clang/AST/StmtCXX.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/StmtOpenMP.h"
+#include "clang/AST/StmtTapir.h"
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/TemplateName.h"
 #include "clang/AST/Type.h"
@@ -2859,6 +2860,9 @@ DEF_TRAVERSE_STMT(OpaqueValueExpr, {})
 DEF_TRAVERSE_STMT(TypoExpr, {})
 DEF_TRAVERSE_STMT(RecoveryExpr, {})
 DEF_TRAVERSE_STMT(CUDAKernelCallExpr, {})
+
+DEF_TRAVERSE_STMT(SpawnStmt, {})
+DEF_TRAVERSE_STMT(SyncStmt, {})
 
 DEF_TRAVERSE_STMT(CilkSpawnStmt, {})
 DEF_TRAVERSE_STMT(CilkSpawnExpr, {})

@@ -216,6 +216,10 @@ def MSDependentExistsStmt : StmtNode<Stmt>;
 // OpenCL Extensions.
 def AsTypeExpr : StmtNode<Expr>;
 
+// Tapir Extensions.
+def SyncStmt : Stmt;
+def SpawnStmt : Stmt;
+
 // Cilk Plus Extensions.
 def CilkSyncStmt : StmtNode<Stmt>;
 def CilkSpawnStmt : StmtNode<Stmt>;

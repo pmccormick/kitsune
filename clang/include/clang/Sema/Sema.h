@@ -5061,6 +5061,14 @@ public:
                                   const NamedReturnInfo &NRInfo, Expr *Value,
                                   bool SupressSimplerImplicitMoves = false);
 
+  StmtResult ActOnSyncStmt(SourceLocation SyncLoc, StringRef sv);
+  StmtResult ActOnSpawnStmt(SourceLocation SpawnLoc, StringRef sv, Stmt *S);
+
+  VarDecl *getCopyElisionCandidate(QualType ReturnType, Expr *E,
+                                   CopyElisionSemanticsKind CESK);
+  bool isCopyElisionCandidate(QualType ReturnType, const VarDecl *VD,
+                              CopyElisionSemanticsKind CESK);
+
   void DiagnoseCilkSpawn(Stmt *S);
   StmtResult ActOnCilkScopeStmt(SourceLocation ScopeLoc, Stmt *S);
   StmtResult ActOnCilkSyncStmt(SourceLocation SyncLoc);
