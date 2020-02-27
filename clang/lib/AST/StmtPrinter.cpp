@@ -436,6 +436,19 @@ void StmtPrinter::VisitCXXForRangeStmt(CXXForRangeStmt *Node) {
   PrintControlledStmt(Node->getBody());
 }
 
+void StmtPrinter::VisitCXXForallRangeStmt(CXXForallRangeStmt *Node) {
+  Indent() << "_tapir_forall (";
+  if (Node->getInit())
+    PrintInitStmt(Node->getInit(), 5);
+  PrintingPolicy SubPolicy(Policy);
+  SubPolicy.SuppressInitializers = true;
+  Node->getLoopVariable()->print(OS, SubPolicy, IndentLevel);
+  OS << " : ";
+  PrintExpr(Node->getRangeInit());
+  OS << ")";
+  PrintControlledStmt(Node->getBody());
+}
+
 void StmtPrinter::VisitMSDependentExistsStmt(MSDependentExistsStmt *Node) {
   Indent();
   if (Node->isIfExists())
@@ -2790,6 +2803,23 @@ void StmtPrinter::VisitCilkScopeStmt(CilkScopeStmt *Node) {
     PrintStmt(Node->getBody());
   }
 } 
+
+void StmtPrinter::VisitForallStmt(ForallStmt *Node) {
+  Indent() << "_tapir_forall (";
+  if (Node->getInit())
+    PrintInitStmt(Node->getInit(), 5);
+  else
+    OS << (Node->getCond() ? "; " : ";");
+  if (Node->getCond())
+    PrintExpr(Node->getCond());
+  OS << ";";
+  if (Node->getInc()) {
+    OS << " ";
+    PrintExpr(Node->getInc());
+  }
+  OS << ")";
+  PrintControlledStmt(Node->getBody());
+}
 
 void StmtPrinter::VisitSyncStmt(SyncStmt *Node) {
   Indent() << "sync " << Node->getSyncVar() << ";"; 

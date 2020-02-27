@@ -219,6 +219,8 @@ def AsTypeExpr : StmtNode<Expr>;
 // Tapir Extensions.
 def SyncStmt : Stmt;
 def SpawnStmt : Stmt;
+def ForallStmt : Stmt;
+def CXXForallRangeStmt : Stmt;
 
 // Cilk Plus Extensions.
 def CilkSyncStmt : StmtNode<Stmt>;
