@@ -234,6 +234,7 @@ namespace {
       (void) llvm::createFixIrreduciblePass();
       (void)llvm::createFunctionSpecializationPass();
       (void)llvm::createSelectOptimizePass();
+      (void) llvm::createTaskCanonicalizePass();
       (void) llvm::createTaskSimplifyPass();
 
       (void)new llvm::IntervalPartition();
