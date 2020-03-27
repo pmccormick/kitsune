@@ -2580,10 +2580,13 @@ def ftapir : Joined<["-"], "ftapir=">, Group<f_Group>, Flags<[CC1Option]>,
 // kitsune: Tapir, Kokkos and FleCSI support.
 def fkokkos : Flag<["-"], "fkokkos">, Group<f_Group>, 
   Flags<[CC1Option, NoArgumentUnused]>, 
-  HelpText<"Enable Kokkos extensions: recognition and code generation">;
+  HelpText<"Enable Kokkos extensions: recognition and custom code generation">;
+def fkokkos_no_init : Flag<["-"], "fkokkos-no-init">, Group<f_Group>, 
+  Flags<[CC1Option, NoArgumentUnused]>, 
+  HelpText<"Skip code gen of Kokkos initialization (and finalize) calls.">;
 def fflecsi : Flag<["-"], "fflecsi">, Group<f_Group>, 
   Flags<[CC1Option,NoArgumentUnused]>, 
-  HelpText<"Enable FleCSI extensions: recognition and code generation">; 
+  HelpText<"Enable FleCSI extensions: recognition and custome code generation">; 
 
 def fno_openmp : Flag<["-"], "fno-openmp">, Group<f_Group>, Flags<[NoArgumentUnused]>;
 def fopenmp_version_EQ : Joined<["-"], "fopenmp-version=">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,

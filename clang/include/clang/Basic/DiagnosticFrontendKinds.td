@@ -1,4 +1,4 @@
-//==--- DiagnosticFrontendKinds.td - frontend diagnostics -----------------===//
+
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -303,11 +303,18 @@ def warn_alias_with_section : Warning<
   InGroup<IgnoredAttributes>;
 
 def warn_kokkos_no_functor : Warning<
-    "-fkokkos : functors unsupported (reverting to C++ mode for construct).">,
+    "kokkos - functors unsupported (reverting to C++ mode for construct).">,
     InGroup<BackendOptimizationFailure>;
 def warn_kokkos_unknown_bounds_expr : Warning<
-    "-fkokkos : unrecognized bounds/limit expression (reverting to C++ mode for construct).">,
+    "kokkos - unrecognized bounds/limit expression (reverting to C++ mode for construct).">,
     InGroup<BackendOptimizationFailure>;
+def warn_kokkos_reduce_bad_intermediate_vardecl : Warning<
+    "kokkos - failure determining intermediate reduction variable (reverting to C++ mode for construct).">,
+    InGroup<BackendOptimizationFailure>;
+def warn_kokkos_reduce_bad_final_vardecl : Warning<
+    "kokkos - failure determining final reduction variable (reverting to C++ mode for construct).">,
+    InGroup<BackendOptimizationFailure>;
+
 
 let CategoryName = "Instrumentation Issue" in {
 def warn_profile_data_out_of_date : Warning<
