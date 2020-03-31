@@ -26,6 +26,7 @@
 #include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace llvm;
 
@@ -746,8 +747,8 @@ void OpenMPABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
     ++ArgIt;
   }
 
-  auto ForkRTFn = createRuntimeFunction(
-      OpenMPRuntimeFunction::OMPRTL__kmpc_fork_call, F.getParent());
+  //auto ForkRTFn = createRuntimeFunction(
+  //    OpenMPRuntimeFunction::OMPRTL__kmpc_fork_call, F.getParent());
   // Replace the old call with __kmpc_fork_call
   emitRuntimeCall(ForkRTFn, OMPRegionFnArgs, "", b);
   ExtractedFnCI->eraseFromParent();

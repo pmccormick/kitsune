@@ -488,13 +488,12 @@ static Attr *handleKitsuneTargetAttr(Sema &S, Stmt *St,
   if(!KitsuneTargetAttr::ConvertStrToKitsuneTargetTy(targetStr, targetKind)) {
     // FIXME: Is this redundant w/ CheckString call above???
     S.Diag(A.getLoc(), diag::err_kitsune_target_unknown)
-      << A.getName() << targetStr << argLoc;
+      << targetStr << argLoc;
     return nullptr;
   }
 
-  unsigned Index = A.getAttributeSpellingListIndex();
   return ::new(S.Context)
-    KitsuneTargetAttr(A.getLoc(), S.Context, targetKind, Index);
+    KitsuneTargetAttr(S.Context, A, targetKind);
 }
 
 
@@ -518,13 +517,12 @@ static Attr *handleKitsuneStrategyAttr(Sema &S, Stmt *St,
   if (!KitsuneStrategyAttr::ConvertStrToKitsuneStrategyTy(strategyStr, strategyKind)) {
     // FIXME: Is this redundant w/ CheckString call above???
     S.Diag(A.getLoc(), diag::err_kitsune_strategy_unknown)
-      << A.getName() << strategyStr << argLoc;
+      << strategyStr << argLoc;
     return nullptr;
   }
 
-  unsigned Index = A.getAttributeSpellingListIndex();
   return ::new (S.Context)
-    KitsuneStrategyAttr(A.getLoc(), S.Context, strategyKind, Index);
+    KitsuneStrategyAttr(S.Context, A, strategyKind);
 }
 
 // =====+

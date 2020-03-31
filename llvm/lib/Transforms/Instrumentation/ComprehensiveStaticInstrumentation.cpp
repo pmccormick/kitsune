@@ -49,6 +49,7 @@
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace llvm;
 

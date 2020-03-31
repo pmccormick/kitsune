@@ -217,10 +217,10 @@ def MSDependentExistsStmt : StmtNode<Stmt>;
 def AsTypeExpr : StmtNode<Expr>;
 
 // Tapir Extensions.
-def SyncStmt : Stmt;
-def SpawnStmt : Stmt;
-def ForallStmt : Stmt;
-def CXXForallRangeStmt : Stmt;
+def SyncStmt : StmtNode<Stmt>;
+def SpawnStmt : StmtNode<Stmt>;
+def ForallStmt : StmtNode<Stmt>;
+def CXXForallRangeStmt : StmtNode<Stmt>;
 
 // Cilk Plus Extensions.
 def CilkSyncStmt : StmtNode<Stmt>;
