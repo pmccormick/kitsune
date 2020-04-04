@@ -1276,8 +1276,9 @@ public:
   /// The current sync region.
   SyncRegion *CurSyncRegion = nullptr;
 
-  void PushSyncRegion() {
+  SyncRegion *PushSyncRegion() {
     CurSyncRegion = new SyncRegion(*this);
+    return CurSyncRegion;
   }
 
   llvm::Instruction *EmitSyncRegionStart();
