@@ -101,10 +101,10 @@ public:
     case Intrinsic::dbg_def:
     case Intrinsic::dbg_kill:
     case Intrinsic::invariant_start:
+    case Intrinsic::invariant_end:
     case Intrinsic::launder_invariant_group:
     case Intrinsic::strip_invariant_group:
     case Intrinsic::is_constant:
-    case Intrinsic::invariant_end:
     case Intrinsic::lifetime_start:
     case Intrinsic::lifetime_end:
     case Intrinsic::experimental_noalias_scope_decl:
@@ -123,6 +123,10 @@ public:
     case Intrinsic::coro_param:
     case Intrinsic::coro_subfn_addr:
     case Intrinsic::syncregion_start:
+    case Intrinsic::taskframe_create:
+    case Intrinsic::taskframe_use:
+    case Intrinsic::taskframe_load_guard:
+    case Intrinsic::sync_unwind:
       return true;
     }
     return false;
