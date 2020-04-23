@@ -4744,6 +4744,7 @@ void Verifier::visitInstruction(Instruction &I) {
       // taken. Ignore cases where the address of the intrinsic function is used
       // as the argument of operand bundle "clang.arc.attachedcall" as those
       // cases are handled in verifyAttachedCallBundle.
+<<<<<<< HEAD
       Check((!F->isIntrinsic() ||
              (CBI && &CBI->getCalledOperandUse() == &I.getOperandUse(i)) ||
              IsAttachedCallOperand(F, CBI, i)),
@@ -4761,9 +4762,13 @@ void Verifier::visitInstruction(Instruction &I) {
                 F->getIntrinsicID() == Intrinsic::experimental_patchpoint_i64 ||
                 F->getIntrinsicID() == Intrinsic::experimental_gc_statepoint ||
                 F->getIntrinsicID() == Intrinsic::wasm_rethrow ||
+                F->getIntrinsicID() == Intrinsic::detached_rethrow ||
+                F->getIntrinsicID() == Intrinsic::taskframe_resume ||
+                F->getIntrinsicID() == Intrinsic::sync_unwind ||
                 IsAttachedCallOperand(F, CBI, i),
             "Cannot invoke an intrinsic other than donothing, patchpoint, "
-            "statepoint, coro_resume, coro_destroy or clang.arc.attachedcall",
+            "statepoint, coro_resume, coro_destroy, detached_rethrow, "
+            "taskframe_resume, sync_unwind or clang.arc.attachedcall",
             &I);
       Check(F->getParent() == &M, "Referencing function in another module!", &I,
             &M, F, F->getParent());
