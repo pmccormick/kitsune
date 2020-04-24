@@ -2072,6 +2072,12 @@ inlineRetainOrClaimRVCalls(CallBase &CB, objcarc::ARCInstKind RVCallKind,
   }
 }
 
+static bool isTaskFrameCreate(const Instruction &I) {
+  if (const IntrinsicInst *II = dyn_cast<IntrinsicInst>(&I))
+    return Intrinsic::taskframe_create == II->getIntrinsicID();
+  return false;
+}
+
 static BasicBlock *SplitResume(ResumeInst *RI, Intrinsic::ID TermFunc,
                                Value *Token, BasicBlock *Unreachable) {
   Value *RIValue = RI->getValue();
@@ -2184,6 +2190,10 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
       !Caller->getAttributes().hasFnAttr(Attribute::StrictFP)) {
     return InlineResult::failure("incompatible strictfp attributes");
   }
+  // Canonicalize the caller by splitting blocks containing taskframe.create
+  // intrinsics.
+  if (splitTaskFrameCreateBlocks(*Caller))
+    OrigBB = CB.getParent();
 
   // GC poses two hazards to inlining, which only occur when the callee has GC:
   //  1. If the caller has no GC, then the callee's GC must be propagated to the
@@ -2274,10 +2284,9 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
   // we move allocas from the inlined code, we must move them to this block.
   BasicBlock *DetachedCtxEntryBlock;
   {
-    BasicBlock *CallingBlock = CB.getParent();
-    DetachedCtxEntryBlock = GetDetachedCtx(CallingBlock);
-    assert(((&(CallingBlock->getParent()->getEntryBlock()) ==
-             DetachedCtxEntryBlock) ||
+    DetachedCtxEntryBlock = GetDetachedCtx(OrigBB);
+    assert(((&(Caller->getEntryBlock()) == DetachedCtxEntryBlock) ||
+            pred_empty(DetachedCtxEntryBlock) ||
             DetachedCtxEntryBlock->getSinglePredecessor()) &&
            "Entry block of detached context has multiple predecessors.");
   }
@@ -2471,6 +2480,8 @@ llvm::InlineResult llvm::InlineFunction(CallBase &CB, InlineFunctionInfo &IFI,
   // instructions at the end of the current alloca list.
   {
     BasicBlock::iterator InsertPoint = DetachedCtxEntryBlock->begin();
+    if (isTaskFrameCreate(*InsertPoint))
+      InsertPoint++;
     for (BasicBlock::iterator I = FirstNewBlock->begin(),
          E = FirstNewBlock->end(); I != E; ) {
       AllocaInst *AI = dyn_cast<AllocaInst>(I++);
