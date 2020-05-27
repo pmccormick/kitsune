@@ -75,7 +75,7 @@ TEST(LoopUtils, DeleteDeadLoopNest) {
         Loop *L = *LI.begin();
         assert(L && L->getName() == "for.i" && "Expecting loop for.i");
 
-        deleteDeadLoop(L, &DT, &SE, &LI);
+        deleteDeadLoop(L, &DT, &SE, &LI, nullptr);
 
         assert(DT.verify(DominatorTree::VerificationLevel::Fast) &&
                "Expecting valid dominator tree");
