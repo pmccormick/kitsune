@@ -1063,6 +1063,18 @@ public:
         Options(Options) {
     loadConfiguration();
   }
+  CSIImpl(Module &M, CallGraph *CG,
+          function_ref<DominatorTree &(Function &)> GetDomTree,
+          function_ref<LoopInfo &(Function &)> GetLoopInfo,
+          function_ref<TaskInfo &(Function &)> GetTaskInfo,
+          function_ref<TargetLibraryInfo &(Function &)> GetTLI,
+          function_ref<ScalarEvolution &(Function &)> GetSE,
+          const CSIOptions &Options = CSIOptions())
+      : M(M), DL(M.getDataLayout()), CG(CG), GetDomTree(GetDomTree),
+        GetLoopInfo(GetLoopInfo), GetTaskInfo(GetTaskInfo), GetTLI(GetTLI), 
+        GetScalarEvolution(GetSE), Options(Options) {
+    loadConfiguration();
+  }
 
   virtual ~CSIImpl() {}
 
