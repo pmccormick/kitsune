@@ -3111,9 +3111,6 @@ void InnerLoopVectorizer::createVectorLoopSkeleton(StringRef Prefix) {
   // before calling any utilities such as SCEV that require valid LoopInfo.
   if (ParentLoop) {
     ParentLoop->addChildLoop(Lp);
-    ParentLoop->addBasicBlockToLoop(LoopScalarPreHeader, *LI);
-    ParentLoop->addBasicBlockToLoop(LoopMiddleBlock, *LI);
-    if (SyncSplit) ParentLoop->addBasicBlockToLoop(SyncSplit, *LI);
   } else {
     LI->addTopLevelLoop(Lp);
   }
