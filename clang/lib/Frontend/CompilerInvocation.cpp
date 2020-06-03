@@ -4001,11 +4001,6 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
   // Check if -fopenmp is specified and set default version to 5.0.
   Opts.OpenMP = Args.hasArg(OPT_fopenmp) ? 50 : 0;
 
-  // Don't permit -fopenacc with -fopenmp because we cannot accept OpenACC and
-  // OpenMP in the same source.  However, if only -fopenacc, activate OpenMP
-  // for the sake of translating OpenACC to it.  (Parsing of OpenMP directives
-  // is disabled if Opts.OpenACC despite Opts.OpenMP.)
-
   // Check if -fkokkos is specified. 
   Opts.Kokkos = Args.hasArg(options::OPT_fkokkos) ? 1 : 0;
 
