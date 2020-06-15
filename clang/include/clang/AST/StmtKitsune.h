@@ -1,4 +1,4 @@
-//===- StmtTapir.h - Classes for Tapir statements -----------------*- C++ -*-===//
+//===- StmtKitsune.h - Classes for Kitsune statements -----------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -8,15 +8,14 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief This file defines Tapir AST classes for executable statements and
+/// \brief This file defines Kistune AST classes for executable statements and
 /// clauses.
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_CLANG_AST_STMTTAPIR_H
-#define LLVM_CLANG_AST_STMTTAPIR_H
+#ifndef LLVM_CLANG_AST_STMTKITSUNE_H
+#define LLVM_CLANG_AST_STMTKITSUNE_H
 
-// #include "clang/AST/Expr.h"
 #include "clang/AST/Stmt.h"
 #include "clang/Basic/SourceLocation.h"
 

@@ -19,6 +19,7 @@
 namespace llvm {
 
 enum class TapirTargetID {
+  Off,      // Completely disabled (i.e., no -ftapir argument was present). 
   None,     // Perform no lowering
   Serial,   // Lower to serial projection
   Cheetah,  // Lower to the Cheetah ABI

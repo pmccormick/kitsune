@@ -111,7 +111,8 @@ namespace {
     KEYSYCL       = 0x1000000,
     KEYCUDA       = 0x2000000,
     KEYTAPIR      = 0x4000000,
-    KEYMAX        = KEYTAPIR, // The maximum key
+    KEYKITSUNE    = 0x8000000,
+    KEYMAX        = KEYKITSUNE, // The maximum key
     KEYALLCXX = KEYCXX | KEYCXX11 | KEYCXX20,
     KEYALL = (KEYMAX | (KEYMAX-1)) & ~KEYNOMS18 &
              ~KEYNOOPENCL // KEYNOMS18 and KEYNOOPENCL are used to exclude.
@@ -164,7 +165,7 @@ static KeywordStatus getKeywordStatus(const LangOptions &LangOpts,
     return KS_Enabled;
   if (LangOpts.CUDA && (Flags & KEYCUDA))
     return KS_Enabled;
-  if (LangOpts.Tapir != llvm::TapirTargetType::Last_TapirTargetType && (Flags & KEYTAPIR)) 
+  if ((LangOpts.Kitsune || (LangOpts.Tapir != TapirTargetID::Last_TapirTargetID)) && (Flags & KEYKITSUNE)) 
     return KS_Enabled;
   return KS_Disabled;
 }

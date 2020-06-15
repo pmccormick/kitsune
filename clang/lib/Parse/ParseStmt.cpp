@@ -454,15 +454,15 @@ Retry:
     SemiError = "_Cilk_sync";
     break; 
 
-  case tok::kw__tapir_spawn:              // spawn statement
+  case tok::kw__kitsune_spawn:              // spawn statement
     return ParseSpawnStatement();
 
-  case tok::kw__tapir_sync:               // sync statement
+  case tok::kw__kitsune_sync:               // sync statement
     Res = ParseSyncStatement();
     SemiError = "sync";
     break;
 
-  case tok::kw__tapir_forall:
+  case tok::kw__kitsune_forall:
     return ParseForallStatement(TrailingElseLoc);
 
   case tok::kw__Cilk_for:

@@ -465,64 +465,68 @@ static Attr *handleOpenCLUnrollHint(Sema &S, Stmt *St, const ParsedAttr &A,
   return ::new (S.Context) OpenCLUnrollHintAttr(S.Context, A, UnrollFactor);
 }
 
-// +===== Handle kitsune-centric attributes 
-// 
-static Attr *handleKitsuneTargetAttr(Sema &S, Stmt *St, 
-				     const ParsedAttr &A,
+static Attr *handleTapirRTTargetAttr(Sema &S, Stmt *St, const ParsedAttr &A,
 				     SourceRange Range)
 {
+  if (St->getStmtClass() != Stmt::ForallStmtClass ||
+      St->getStmtClass() != Stmt::CXXForallRangeStmtClass) {
+    S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);    
+    return nullptr;
+  }
+  
   if (A.getNumArgs() != 1) {
-    S.Diag(A.getLoc(), diag::err_kitsune_target_attr_wrong_nargs);
+    S.Diag(A.getLoc(), diag::err_tapir_target_attr_wrong_nargs);
     return nullptr;
   }
 
   StringRef      targetStr;
   SourceLocation argLoc;
-
   if (!S.checkStringLiteralArgumentAttr(A, 0, targetStr, &argLoc)) {
-    S.Diag(A.getLoc(), diag::err_kitsune_target_unknown);
+    S.Diag(A.getLoc(), diag::err_tapir_target_unknown);
     return nullptr;
   }
 
-  KitsuneTargetAttr::KitsuneTargetTy   targetKind;
-  if(!KitsuneTargetAttr::ConvertStrToKitsuneTargetTy(targetStr, targetKind)) {
-    // FIXME: Is this redundant w/ CheckString call above???
-    S.Diag(A.getLoc(), diag::err_kitsune_target_unknown)
-      << targetStr << argLoc;
+  TapirRTTargetAttr::TapirRTTargetTy   rtTargetKind;
+  if (!TapirRTTargetAttr::ConvertStrToTapirRTTargetTy(targetStr, rtTargetKind)) {
+    S.Diag(A.getLoc(), diag::err_tapir_target_unknown) << targetStr << argLoc;
     return nullptr;
   }
 
-  return ::new(S.Context)
-    KitsuneTargetAttr(S.Context, A, targetKind);
+  return ::new(S.Context)TapirRTTargetAttr(S.Context, A, rtTargetKind);
 }
 
 
-static Attr *handleKitsuneStrategyAttr(Sema &S, Stmt *St, 
-				       const ParsedAttr &A,
-				       SourceRange Range) 
+static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,
+				                      SourceRange Range) 
 {
+  if (St->getStmtClass() != Stmt::ForallStmtClass ||
+      St->getStmtClass() != Stmt::CXXForallRangeStmtClass) {
+    S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);    
+    return nullptr;
+  }
+  
   if (A.getNumArgs() != 1) {
-    S.Diag(A.getLoc(), diag::err_kitsune_strategy_attr_wrong_nargs);
+    S.Diag(A.getLoc(), diag::err_tapir_strategy_attr_wrong_nargs);
     return nullptr;
   }
 
   StringRef      strategyStr;
   SourceLocation argLoc;
   if (!S.checkStringLiteralArgumentAttr(A, 0, strategyStr, &argLoc)) {
-    S.Diag(A.getLoc(), diag::err_kitsune_strategy_unknown);
+    S.Diag(A.getLoc(), diag::err_tapir_strategy_unknown);
     return nullptr;
   }
 
-  KitsuneStrategyAttr::KitsuneStrategyTy strategyKind;
-  if (!KitsuneStrategyAttr::ConvertStrToKitsuneStrategyTy(strategyStr, strategyKind)) {
-    // FIXME: Is this redundant w/ CheckString call above???
-    S.Diag(A.getLoc(), diag::err_kitsune_strategy_unknown)
+  TapirStrategyAttr::TapirStrategyTy strategyKind;
+  if (!TapirStrategyAttr::ConvertStrToTapirStrategyTy(strategyStr, strategyKind)) {
+    // TODO: Is this redundant w/ CheckString call above???
+    S.Diag(A.getLoc(), diag::err_tapir_strategy_unknown)
       << strategyStr << argLoc;
     return nullptr;
   }
 
   return ::new (S.Context)
-    KitsuneStrategyAttr(S.Context, A, strategyKind);
+    TapirStrategyAttr(S.Context, A, strategyKind);
 }
 
 // =====+

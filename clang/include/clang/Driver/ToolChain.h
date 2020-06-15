@@ -700,7 +700,7 @@ public:
   virtual void AddCXXStdlibLibArgs(const llvm::opt::ArgList &Args,
                                    llvm::opt::ArgStringList &CmdArgs) const;
 
-  // +===== kitsune 
+
   /// Some of our command line arguments come in via cmake as a single 
   /// string.  We use this to extract each argument from the string and
   /// push it onto the argument list. 
@@ -715,14 +715,12 @@ public:
   /// the default include file search path. 
   virtual void AddKitsuneIncludeArgs(const llvm::opt::ArgList &Args, 
 				     llvm::opt::ArgStringList &CmdArgs) const;
-
   /// AddKitsuneLibArgs - Add some kitsune-centric linker arguments to use 
-  /// given the special modes of operation (kokkos, backend runtime 
+  /// given the special modes of operation (kitsune, kokkos, backend runtime 
   /// arguments, etc.). 
   virtual void AddKitsuneLibArgs(const llvm::opt::ArgList &Args, 
 				 llvm::opt::ArgStringList &CmdArgs) const;
-  // =====+
-
+  
   /// AddFilePathLibArgs - Add each thing in getFilePaths() as a "-L" option.
   void AddFilePathLibArgs(const llvm::opt::ArgList &Args,
                           llvm::opt::ArgStringList &CmdArgs) const;

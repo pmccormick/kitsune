@@ -4215,23 +4215,29 @@ def note_called_once_gets_called_twice : Note<
   "it cannot be called afterwards|}0">;
 
 
-// +===== kitsune: errors related to parallel-ir specific attributes. 
+// +===== kitsune/tapir: errors related to custom codegen attributes. 
 
-// target-centric error/warnings. 
-def err_kitsune_target_attr_unsupported_stmt: Error<
-    "target attribute applied to unsupported statement.">;
-def err_kitsune_target_attr_wrong_nargs: Error<
-    "target attribute takes a single argument.">;
-def err_kitsune_target_unknown: Error<
-    "attribute uses unrecognized target.">;
+def warn_tapir_attr_not_enabled: Warning<
+    "tapir-centric attribute found but tapir (-ftapir) is not enabled.  Attribute will be ignored.">;
 
-def err_kitsune_strategy_attr_unsupported_stmt: Error<
-    "strategy attribute applied to unsupported statement.">;
-def err_kitsune_strategy_attr_wrong_nargs: Error<
+def warn_tapir_target_attr_bad_stmt_class: Warning<
+    "tapir target runtime applied to an unsupported statement.  Attribute will be ignored.">;
+
+// rutnime target-centric error/warnings. 
+def err_tapir_target_attr_unsupported_stmt: Error<
+    "tapir target runtime attribute applied to unsupported statement kind.">;
+def err_tapir_target_attr_wrong_nargs: Error<
+    "tapir target runtime attribute takes a single argument.">;
+def err_tapir_target_unknown: Error<
+    "statement using unknonwn tapir target runtime attribute.">;
+
+// execution strategy/policy error/warnings. 
+def err_tapir_strategy_attr_unsupported_stmt: Error<
+    "strategy attribute applied to unsupported statement kind.">;
+def err_tapir_strategy_attr_wrong_nargs: Error<
     "strategy attribute takes a single argument.">;
-def err_kitsune_strategy_unknown: Error<
-    "attribute uses uncognized strategy.">;
-
+def err_tapir_strategy_unknown: Error<
+    "statement using unknown strategy attribute.">;
 // =====+
 
 // objc_designated_initializer attribute diagnostics.

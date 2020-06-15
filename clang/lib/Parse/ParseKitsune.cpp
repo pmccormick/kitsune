@@ -1,4 +1,4 @@
-//===--- ParseTapir.cpp - Tapir Parsing -------------------------------------===//
+//===--- ParseKitsune.cpp - Kitsune Parsing -------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements the Tapir portions of the Parser interface.
+//  This file implements the Kitsune-centric Parser interface.
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,8 +21,8 @@ using namespace clang;
 ///       sync-statement:
 ///         'sync' identifier ';'
 StmtResult Parser::ParseSyncStatement() {
-  assert(Tok.is(tok::kw__tapir_sync) && "Not a sync stmt!");
-  SourceLocation SyncLoc = ConsumeToken(); // eat the '_tapir_sync'
+  assert(Tok.is(tok::kw__kitsune_sync) && "Not a sync stmt!");
+  SourceLocation SyncLoc = ConsumeToken(); // eat the '_kitsune_sync'
   assert(Tok.is(tok::identifier) && Tok.getIdentifierInfo() &&
          "Not an identifier!");
   Token IdentTok = Tok; 
@@ -34,8 +34,8 @@ StmtResult Parser::ParseSyncStatement() {
 ///       spawn-statement:
 ///         'spawn' identifier statement
 StmtResult Parser::ParseSpawnStatement() {
-  assert(Tok.is(tok::kw__tapir_spawn) && "Not a spawn stmt!");
-  SourceLocation SpawnLoc = ConsumeToken();  // eat the '_tapir_spawn'.
+  assert(Tok.is(tok::kw__kitsune_spawn) && "Not a spawn stmt!");
+  SourceLocation SpawnLoc = ConsumeToken();  // eat the '_kitsune_spawn'.
 
   assert(Tok.is(tok::identifier) && Tok.getIdentifierInfo() &&
          "Not an identifier!");
@@ -53,11 +53,11 @@ StmtResult Parser::ParseSpawnStatement() {
 
 
 /// ParseForallStatement
-///       _tapir_forall-statement:
-///         '_tapir_forall' '(' expr ';' expr ';' expr ')' statement
-///         '_tapir_forall' '(' declaration expr ';' expr ';' expr ')' statement
+///       _kitsune_forall-statement:
+///         '_kitsune_forall' '(' expr ';' expr ';' expr ')' statement
+///         '_kitsune_forall' '(' declaration expr ';' expr ';' expr ')' statement
 StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
-  assert(Tok.is(tok::kw__tapir_forall) && "Not a forall stmt!");
+  assert(Tok.is(tok::kw__kitsune_forall) && "Not a forall stmt!");
   SourceLocation ForLoc = ConsumeToken();  // eat the 'for'.
 
   SourceLocation CoawaitLoc;

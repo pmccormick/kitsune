@@ -1,4 +1,10 @@
-#define spawn _tapir_spawn
-#define sync _tapir_sync
-#define forall _tapir_forall
+#ifndef __KITSUNE__H__
+#define __KITSUNE__H__
+
+#define spawn _kitsune_spawn
+#define sync _kitsune_sync
+#define forall _kitsune_forall
+
+#endif
+
 

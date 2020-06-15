@@ -394,6 +394,8 @@ public:
   /// The used language standard.
   LangStandard::Kind LangStd;
 
+  bool Kitsune = false;
+
   /// Set of enabled sanitizers.
   SanitizerSet Sanitize;
   /// Is at least one coverage instrumentation type enabled.

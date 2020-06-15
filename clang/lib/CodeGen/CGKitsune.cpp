@@ -1,4 +1,4 @@
-//===--- CGTapir.cpp - Emit LLVM Code for Tapir expressions -----------------===//
+//===--- CGKitsune.cpp - Emit LLVM Code for Kitsune expressions -----------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,14 +7,14 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This contains code dealing with code generation of Tapir statements and
+// This contains code dealing with code generation of Kitsune statements and
 // expressions.
 //
 //===----------------------------------------------------------------------===//
 
 #include "CodeGenFunction.h"
 #include "CGCleanup.h"
-#include "clang/AST/StmtTapir.h"
+#include "clang/AST/StmtKitsune.h"
 #include "llvm/IR/ValueMap.h"
 
 using namespace clang;

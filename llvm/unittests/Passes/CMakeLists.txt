@@ -24,6 +24,13 @@ if (NOT WIN32)
   export_executable_symbols_for_plugins(PluginsTests)
   target_link_libraries(PluginsTests PRIVATE LLVMTestingSupport)
 
+set(LLVM_LINK_COMPONENTS TransformUtils Support Passes Core)
+add_llvm_unittest(PluginsTests
+  PluginsTest.cpp
+  )
+export_executable_symbols(PluginsTests)
+target_link_libraries(PluginsTests PRIVATE LLVMTestingSupport)
+
   set(LLVM_LINK_COMPONENTS)
   foreach(PLUGIN TestPlugin DoublerPlugin)
     add_llvm_library(${PLUGIN} MODULE BUILDTREE_ONLY ${PLUGIN}.cpp)

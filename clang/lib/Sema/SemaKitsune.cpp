@@ -1,4 +1,4 @@
-//===--- SemaTapir.cpp - Semantic analysis for Tapir extensions -------------===//
+//===--- SemaKitsune.cpp - Semantic analysis for Kitsune extensions -------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,11 +7,11 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements semantic analysis for Tapir extensions.
+//  This file implements semantic analysis for Kitsune extensions.
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/AST/StmtTapir.h"
+#include "clang/AST/StmtKitsune.h"
 #include "clang/Sema/SemaInternal.h"
 using namespace clang;
 using namespace sema;

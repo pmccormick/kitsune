@@ -464,7 +464,6 @@ ENUM_LANGOPT(ExtendIntArgs, ExtendArgsKind, 1, ExtendArgsKind::ExtendTo32,
 VALUE_LANGOPT(FuchsiaAPILevel, 32, 0, "Fuchsia API level")
 // kitsune: Kokkos support. 
 BENIGN_LANGOPT(Kokkos, 1, 0, "Enable specialized Kokkos code generation")
-
 // kitsune: FleCSI support. 
 BENIGN_LANGOPT(FleCSI, 1, 0, "Enable specialized FleCSI code generation")
 

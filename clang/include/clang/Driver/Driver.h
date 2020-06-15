@@ -82,8 +82,9 @@ class Driver {
     CLMode,
     FlangMode,
     DXCMode
-    KokkosMode, // kitsune: custom Kokkos extensions 
-    FleCSIMode  // kitsune: custom FleCSI extensions 
+    KitsuneMode, 
+    KokkosMode,
+    FleCSIMode
   } Mode;
 
   enum SaveTempsMode {
@@ -233,7 +234,10 @@ public:
   /// Whether the driver should follow dxc.exe like behavior.
   bool IsDXCMode() const { return Mode == DXCMode; }
 
-  /// kitsune: Whether the driver should follow custom Kokkos behaviors.
+  /// Whether the driver should follow custom Kitsune behaviors.
+  bool isKitsuneMode() const { return Mode == KitsuneMode; }
+
+  /// Whether the driver should follow custom Kokkos behaviors.
   bool IsKokkosMode() const { return Mode == KokkosMode; }
 
   /// kitsune: Whether the driver should follow custom FleCSI behaviors. 
