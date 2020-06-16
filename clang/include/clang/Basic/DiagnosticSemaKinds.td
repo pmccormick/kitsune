@@ -4216,12 +4216,16 @@ def note_called_once_gets_called_twice : Note<
 
 
 // +===== kitsune/tapir: errors related to custom codegen attributes. 
-
 def warn_tapir_attr_not_enabled: Warning<
-    "tapir-centric attribute found but tapir (-ftapir) is not enabled.  Attribute will be ignored.">;
+    "tapir attribute encountered but tapir is not enabled (via -ftapir).  "
+    "Attribute ignored.">;
 
 def warn_tapir_target_attr_bad_stmt_class: Warning<
-    "tapir target runtime applied to an unsupported statement.  Attribute will be ignored.">;
+    "tapir target runtime attribute applied to an unsupported statement.  "
+    "Attribute ignored.">;
+
+def warn_kitsune_not_enabled: Warning<
+    "kitsune not enabled (-fkitsune) tapir attribute will be ignored.">;
 
 // rutnime target-centric error/warnings. 
 def err_tapir_target_attr_unsupported_stmt: Error<
