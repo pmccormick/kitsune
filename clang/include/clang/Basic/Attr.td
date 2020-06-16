@@ -4124,9 +4124,9 @@ def TapirRTTarget : StmtAttr {
      "qthreads",   "realm",  "rocm",
      "serial",     "zero"],
     ["CheetahRT",  "CilkRT",  "CudaRT",
-     "HipRT",      "OmpRT",   "NoRT",
-     "QthreadsRT", "RealmRT", "RocmRT",
-     "SerialRT",   "ZeroRT"], 0>
+     "HipRT",      "OmpRT",   "QthreadsRT", 
+     "RealmRT",    "RocmRT",  "SequentialRT",
+     "ZeroRT"], 0>
   ];
   let Documentation = [TapirRTDocs];
 }

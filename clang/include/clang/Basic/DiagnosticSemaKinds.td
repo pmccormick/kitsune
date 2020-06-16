@@ -4227,7 +4227,7 @@ def warn_tapir_target_attr_bad_stmt_class: Warning<
 def warn_kitsune_not_enabled: Warning<
     "kitsune not enabled (-fkitsune) tapir attribute will be ignored.">;
 
-// rutnime target-centric error/warnings. 
+// rutnime target-centric errors/warnings. 
 def err_tapir_target_attr_unsupported_stmt: Error<
     "tapir target runtime attribute applied to unsupported statement kind.">;
 def err_tapir_target_attr_wrong_nargs: Error<
@@ -4235,13 +4235,18 @@ def err_tapir_target_attr_wrong_nargs: Error<
 def err_tapir_target_unknown: Error<
     "statement using unknonwn tapir target runtime attribute.">;
 
-// execution strategy/policy error/warnings. 
+// execution strategy/policy errors/warnings. 
 def err_tapir_strategy_attr_unsupported_stmt: Error<
     "strategy attribute applied to unsupported statement kind.">;
 def err_tapir_strategy_attr_wrong_nargs: Error<
     "strategy attribute takes a single argument.">;
 def err_tapir_strategy_unknown: Error<
     "statement using unknown strategy attribute.">;
+
+// spawn+sync errors/warnings.
+// 
+def warn_spawn_as_loop_body: Warning<
+    "%0 loop with spawn statement body has undefined behavior.">;
 // =====+
 
 // objc_designated_initializer attribute diagnostics.

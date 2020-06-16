@@ -12,13 +12,116 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/Attr.h"
+#include "clang/Basic/Attributes.h"
+#include "clang/Basic/AttrKinds.h"
+#include "clang/Frontend/FrontendDiagnostic.h"
+#include "clang/CodeGen/CGFunctionInfo.h"
 #include "CodeGenFunction.h"
 #include "CGCleanup.h"
 #include "clang/AST/StmtKitsune.h"
 #include "llvm/IR/ValueMap.h"
 
+
 using namespace clang;
 using namespace CodeGen;
+
+
+LoopAttributes::LSStrategy CodeGenFunction::GetTapirStrategyAttr(
+       ArrayRef<const Attr *> Attrs) {
+
+
+    LoopAttributes::LSStrategy Strategy = LoopAttributes::SEQ;
+  
+  auto curAttr = Attrs.begin();
+
+  while(curAttr != Attrs.end()) {
+    
+    const attr::Kind AttrKind = (*curAttr)->getKind();
+
+    if (AttrKind == attr::TapirStrategy) {
+      const auto *SAttr = cast<const TapirStrategyAttr>(*curAttr);
+      
+      switch(SAttr->getTapirStrategyType()) {
+
+      case TapirStrategyAttr::SEQ:
+        Strategy = LoopAttributes::SEQ;
+        break;
+
+      case TapirStrategyAttr::DAC:
+        Strategy = LoopAttributes::DAC;
+        break;
+
+      case TapirStrategyAttr::GPU:
+        Strategy = LoopAttributes::GPU;
+        break;
+
+      default:
+        llvm_unreachable("all strategies should be handled before this!");
+        break;
+      }
+    }
+  }
+  return Strategy;
+}
+
+LoopAttributes::LTarget CodeGenFunction::GetTapirRTTargetAttr(
+      ArrayRef<const Attr *> Attrs) {
+
+  auto curAttr = Attrs.begin();
+
+  // TODO: Need to make sure the default matches build parameters! 
+  LoopAttributes::LTarget Target = LoopAttributes::CilkRT; 
+
+  while(curAttr != Attrs.end()) {
+    
+    const attr::Kind AttrKind = (*curAttr)->getKind();
+
+    if (AttrKind == attr::TapirRTTarget) {
+      const auto *TAttr = cast<const TapirRTTargetAttr>(*curAttr);
+      
+      switch(TAttr->getTapirRTTargetType()) {
+
+      case TapirRTTargetAttr::CheetahRT:
+        Target = LoopAttributes::CheetahRT;
+        break;
+      case TapirRTTargetAttr::CilkRT: 
+        Target = LoopAttributes::CilkRT;
+        break;        
+      case TapirRTTargetAttr::CudaRT:
+        Target = LoopAttributes::CudaRT;
+        break;
+      case TapirRTTargetAttr::HipRT:
+        Target = LoopAttributes::HipRT;
+        break;
+      case TapirRTTargetAttr::OmpRT:
+        Target = LoopAttributes::OmpRT;
+        break;
+      case TapirRTTargetAttr::QthreadsRT:
+        Target = LoopAttributes::QthreadsRT;
+        break;
+      case TapirRTTargetAttr::RealmRT:
+        Target = LoopAttributes::RealmRT;
+        break;
+      case TapirRTTargetAttr::RocmRT:
+        Target = LoopAttributes::RocmRT;
+        break;
+      case TapirRTTargetAttr::SequentialRT:
+        Target = LoopAttributes::SequentialRT;
+        break;
+      case TapirRTTargetAttr::ZeroRT:
+        Target = LoopAttributes::ZeroRT;
+        break;
+      default:
+        llvm_unreachable("All target attributes should be handled here!");
+        break;
+      }
+    }
+    curAttr++;
+  }
+  return Target;
+}
+
 
 // Stolen from CodeGenFunction.cpp
 static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
@@ -420,5 +523,7 @@ void CodeGenFunction::EmitDetachBlock(const DeclStmt *DS, llvm::ValueMap<llvm::V
 
     #endif
   }
+
+
 
 }
