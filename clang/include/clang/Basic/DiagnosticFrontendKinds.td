@@ -308,6 +308,9 @@ def warn_kokkos_no_functor : Warning<
 def warn_kokkos_unknown_bounds_expr : Warning<
     "kokkos - unrecognized bounds/limit expression (reverting to C++ mode for construct).">,
     InGroup<BackendOptimizationFailure>;
+def warn_kokkos_reduce_unsupported : Warning<
+    "kokkos - reduction constructs are currently unsupported.">,
+    InGroup<BackendOptimizationFailure>;    
 def warn_kokkos_reduce_bad_intermediate_vardecl : Warning<
     "kokkos - failure determining intermediate reduction variable (reverting to C++ mode for construct).">,
     InGroup<BackendOptimizationFailure>;
