@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Tapir/LoopSpawningTI.h"
+#include "llvm/Transforms/Tapir/OpenCLABI.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -384,6 +385,13 @@ static void emitMissedWarning(const Loop *L, const TapirLoopHints &LH,
               << "failed to use divide-and-conquer loop spawning."
               << "  Compile with -Rpass-analysis=" << LS_NAME
               << " for more details.");
+    break;
+  case TapirLoopHints::ST_OCL:
+    ORE->emit(DiagnosticInfoOptimizationFailure(
+                  DEBUG_TYPE, "FailedRequestedSpawning",
+                  L->getStartLoc(), L->getHeader())
+              << "Tapir loop not transformed: "
+              << "failed to use opencl loop spawning");
     break;
   case TapirLoopHints::ST_SEQ:
     ORE->emit(DiagnosticInfoOptimizationFailure(
