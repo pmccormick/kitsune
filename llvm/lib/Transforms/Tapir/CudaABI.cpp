@@ -31,6 +31,343 @@ using namespace llvm;
 
 #define DEBUG_TYPE "cudaabi"
 
+// Copied from clang/lib/CodeGen/CGCUDANV.cpp
+constexpr unsigned CudaFatMagic = 0x466243b1;
+
+FunctionType *CudaLoop::getRegisterGlobalsFnTy() const {
+  LLVMContext &Ctx = M.getContext();
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+  return FunctionType::get(VoidTy, VoidPtrTy->getPointerTo(), false);
+}
+
+FunctionType *CudaLoop::getCallbackFnTy() const {
+  LLVMContext &Ctx = M.getContext();
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+  return FunctionType::get(VoidTy, VoidPtrTy, false);
+}
+
+FunctionType *CudaLoop::getRegisterLinkedBinaryFnTy() const {
+  LLVMContext &Ctx = M.getContext();
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+  auto CallbackFnTy = getCallbackFnTy();
+  auto RegisterGlobalsFnTy = getRegisterGlobalsFnTy();
+  Type *Params[] = {RegisterGlobalsFnTy->getPointerTo(), VoidPtrTy,
+                    VoidPtrTy, CallbackFnTy->getPointerTo()};
+  return FunctionType::get(VoidTy, Params, false);
+}
+
+/// Helper function that generates an empty dummy function returning void.
+static Function *makeDummyFunction(Module &M, FunctionType *FnTy) {
+  assert(FnTy->getReturnType()->isVoidTy() &&
+         "Can only generate dummy functions returning void!");
+  LLVMContext &Ctx = M.getContext();
+  Function *DummyFunc = Function::Create(
+      FnTy, GlobalValue::InternalLinkage, "dummy", &M);
+
+  BasicBlock *DummyBlock = BasicBlock::Create(Ctx, "", DummyFunc);
+  IRBuilder<> FuncBuilder(DummyBlock);
+  FuncBuilder.CreateRetVoid();
+
+  return DummyFunc;
+}
+
+/// Creates a function that sets up state on the host side for CUDA objects that
+/// have a presence on both the host and device sides. Specifically, registers
+/// the host side of kernel functions and device global variables with the CUDA
+/// runtime.
+/// \code
+/// void __cuda_register_globals(void** GpuBinaryHandle) {
+///    __cudaRegisterFunction(GpuBinaryHandle,Kernel0,...);
+///    ...
+///    __cudaRegisterFunction(GpuBinaryHandle,KernelM,...);
+///    __cudaRegisterVar(GpuBinaryHandle, GlobalVar0, ...);
+///    ...
+///    __cudaRegisterVar(GpuBinaryHandle, GlobalVarN, ...);
+/// }
+/// \endcode
+Function *CudaLoop::makeRegisterGlobalsFn() {
+  // No need to register anything
+  if (EmittedKernels.empty()/* && DeviceVars.empty()*/)
+    return nullptr;
+
+  LLVMContext &Ctx = M.getContext();
+  const DataLayout &DL = M.getDataLayout();
+  PointerType *CharPtrTy = Type::getInt8Ty(Ctx)->getPointerTo();
+  Type *IntTy = Type::getInt32Ty(Ctx);
+  // Type *VoidTy = Type::getVoidTy(Ctx);
+  PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+  PointerType *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
+
+  Function *RegisterKernelsFunc = Function::Create(
+      getRegisterGlobalsFnTy(), GlobalValue::InternalLinkage,
+      "__cuda_register_globals", &M);
+  BasicBlock *EntryBB = BasicBlock::Create(Ctx, "entry", RegisterKernelsFunc);
+  IRBuilder<> Builder(EntryBB);
+
+  // void __cudaRegisterFunction(void **, const char *, char *, const char *,
+  //                             int, uint3*, uint3*, dim3*, dim3*, int*)
+  Type *RegisterFuncParams[] = {
+      VoidPtrPtrTy, CharPtrTy, CharPtrTy, CharPtrTy, IntTy,
+      VoidPtrTy,    VoidPtrTy, VoidPtrTy, VoidPtrTy, IntTy->getPointerTo()};
+  FunctionCallee RegisterFunc = M.getOrInsertFunction(
+      "__cudaRegisterFunction",
+      FunctionType::get(IntTy, RegisterFuncParams, false));
+
+  // Extract GpuBinaryHandle passed as the first argument passed to
+  // __cuda_register_globals() and generate __cudaRegisterFunction() call for
+  // each emitted kernel.
+  Argument &GpuBinaryHandlePtr = *RegisterKernelsFunc->arg_begin();
+  for (auto &&I : EmittedKernels) {
+    Constant *KernelNameCS =
+        ConstantDataArray::getString(Ctx, I.DeviceFunc.str());
+    GlobalVariable *KernelNameGV =
+        new GlobalVariable(M, KernelNameCS->getType(), true,
+                           GlobalValue::PrivateLinkage, KernelNameCS, ".str");
+    Type *StrTy = KernelNameGV->getType();
+        // cast<PointerType>(KernelNameCS->getType())->getElementType();
+    Constant *Zeros[] = { ConstantInt::get(DL.getIndexType(StrTy), 0),
+                          ConstantInt::get(DL.getIndexType(StrTy), 0) };
+    Constant *KernelName = ConstantExpr::getGetElementPtr(
+        KernelNameGV->getValueType(), KernelNameGV, Zeros);
+    Constant *NullPtr = ConstantPointerNull::get(VoidPtrTy);
+    Value *Args[] = {
+        &GpuBinaryHandlePtr,
+        /*hostFun*/    Builder.CreateBitCast(I.Kernel, VoidPtrTy),
+        /*deviceFun*/  KernelName,
+        /*deviceName*/ KernelName,
+        ConstantInt::get(IntTy, -1),
+        NullPtr,
+        NullPtr,
+        NullPtr,
+        NullPtr,
+        ConstantPointerNull::get(IntTy->getPointerTo())};
+    Builder.CreateCall(RegisterFunc, Args);
+  }
+
+  // // void __cudaRegisterVar(void **, char *, char *, const char *,
+  // //                        int, int, int, int)
+  // Type *RegisterVarParams[] = {VoidPtrPtrTy, CharPtrTy, CharPtrTy,
+  //                              CharPtrTy,    IntTy,     IntTy,
+  //                              IntTy,        IntTy};
+  // FunctionCallee RegisterVar = CGM.CreateRuntimeFunction(
+  //     FunctionType::get(IntTy, RegisterVarParams, false),
+  //     addUnderscoredPrefixToName("RegisterVar"));
+  // for (auto &&Info : DeviceVars) {
+  //   GlobalVariable *Var = Info.Var;
+  //   unsigned Flags = Info.Flag;
+  //   Constant *VarName = makeConstantString(getDeviceSideName(Info.D));
+  //   uint64_t VarSize =
+  //       CGM.getDataLayout().getTypeAllocSize(Var->getValueType());
+  //   Value *Args[] = {
+  //       &GpuBinaryHandlePtr,
+  //       Builder.CreateBitCast(Var, VoidPtrTy),
+  //       VarName,
+  //       VarName,
+  //       ConstantInt::get(IntTy, (Flags & ExternDeviceVar) ? 1 : 0),
+  //       ConstantInt::get(IntTy, VarSize),
+  //       ConstantInt::get(IntTy, (Flags & ConstantDeviceVar) ? 1 : 0),
+  //       ConstantInt::get(IntTy, 0)};
+  //   Builder.CreateCall(RegisterVar, Args);
+  // }
+
+  Builder.CreateRetVoid();
+  return RegisterKernelsFunc;
+}
+
+/// Creates a global constructor function for the module:
+///
+/// For CUDA:
+/// \code
+/// void __cuda_module_ctor(void*) {
+///     Handle = __cudaRegisterFatBinary(GpuBinaryBlob);
+///     __cuda_register_globals(Handle);
+/// }
+/// \endcode
+// Based on makeModuleCtorFunction() in clang/lib/CodeGen/CGCUDANV.cpp.
+Function *CudaLoop::makeModuleCtorFunction() {
+  LLVMContext &Ctx = M.getContext();
+  const DataLayout &DL = M.getDataLayout();
+  Type *IntTy = Type::getInt32Ty(Ctx);
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+  PointerType *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
+
+  // void __cuda_register_globals(void* handle);
+  Function *RegisterGlobalsFunc = makeRegisterGlobalsFn();
+  // We always need a function to pass in as callback. Create a dummy
+  // implementation if we don't need to register anything.
+  if (!RegisterGlobalsFunc)
+    RegisterGlobalsFunc = makeDummyFunction(M, getRegisterGlobalsFnTy());
+
+  // void ** __cudaRegisterFatBinary(void *);
+  FunctionCallee RegisterFatbinFunc = M.getOrInsertFunction(
+      "__cudaRegisterFatBinary",
+      FunctionType::get(VoidPtrPtrTy, VoidPtrTy, false));
+
+  // struct { int magic, int version, void * gpu_binary, void * dont_care };
+  StructType *FatbinWrapperTy =
+      StructType::get(IntTy, IntTy, VoidPtrTy, VoidPtrTy);
+
+  Function *ModuleCtorFunc = Function::Create(
+      FunctionType::get(VoidTy, VoidPtrTy, false),
+      GlobalValue::InternalLinkage,
+      "__cuda_module_ctor", &M);
+  BasicBlock *CtorEntryBB =
+      BasicBlock::Create(Ctx, "entry", ModuleCtorFunc);
+  IRBuilder<> CtorBuilder(CtorEntryBB);
+
+  // TODO: Differentiate the following code based on whether the kernels call
+  // external functions, i.e., according to -fgpu-rdc definition.
+  const char *FatbinConstantName = ".nv_fatbin";
+  // const char *FatbinConstantName = "__nv_relfatbin";
+  const char *FatbinSectionName = ".nvFatBinSegment";
+  // const char *ModuleIDSectionName = "__nv_module_id";
+
+  // PTXGlobal should be a string literal containing the fat binary of the
+  // outlined kernels.
+  PTXGlobal->setSection(FatbinConstantName);
+  // Mark the address as used which make sure that this section isn't
+  // merged and we will really have it in the object file.
+  PTXGlobal->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
+  PTXGlobal->setAlignment(DL.getPrefTypeAlignment(PTXGlobal->getType()));
+
+  unsigned FatbinVersion = 1;
+  unsigned FatMagic = CudaFatMagic;
+
+  Type *StrTy = PTXGlobal->getType();
+  Constant *Zeros[] = { ConstantInt::get(DL.getIndexType(StrTy), 0),
+                        ConstantInt::get(DL.getIndexType(StrTy), 0) };
+  Constant *PTXGlobalPtr = ConstantExpr::getGetElementPtr(
+      PTXGlobal->getValueType(), PTXGlobal, Zeros);
+  Constant *FatbinWrapperVal =
+      ConstantStruct::get(FatbinWrapperTy,
+                          ConstantInt::get(IntTy, FatMagic),
+                          ConstantInt::get(IntTy, FatbinVersion),
+                          PTXGlobalPtr, ConstantPointerNull::get(VoidPtrTy));
+  GlobalVariable *FatbinWrapper = new GlobalVariable(
+      M, FatbinWrapperTy, /*isConstant*/ true, GlobalValue::InternalLinkage,
+      FatbinWrapperVal, "__cuda_fatbin_wrapper");
+  FatbinWrapper->setSection(FatbinSectionName);
+  FatbinWrapper->setAlignment(DL.getPrefTypeAlignment(
+                                  FatbinWrapper->getType()));
+
+  CallInst *RegisterFatbinCall = CtorBuilder.CreateCall(
+      RegisterFatbinFunc,
+      CtorBuilder.CreateBitCast(FatbinWrapper, VoidPtrTy));
+  GpuBinaryHandle = new GlobalVariable(
+      M, VoidPtrPtrTy, /*isConstant*/ false, GlobalValue::InternalLinkage,
+      ConstantPointerNull::get(VoidPtrPtrTy), "__cuda_gpubin_handle");
+  GpuBinaryHandle->setAlignment(DL.getPointerABIAlignment(0));
+  CtorBuilder.CreateAlignedStore(RegisterFatbinCall, GpuBinaryHandle,
+                                 DL.getPointerABIAlignment(0));
+
+  // Call __cuda_register_globals(GpuBinaryHandle);
+  if (RegisterGlobalsFunc)
+    CtorBuilder.CreateCall(RegisterGlobalsFunc, RegisterFatbinCall);
+
+  // // Call __cudaRegisterFatBinaryEnd(Handle) if this CUDA version needs it.
+  // if (CudaFeatureEnabled(CGM.getTarget().getSDKVersion(),
+  //                        CudaFeature::CUDA_USES_FATBIN_REGISTER_END)) {
+  //   // void __cudaRegisterFatBinaryEnd(void **);
+  //   llvm::FunctionCallee RegisterFatbinEndFunc = CGM.CreateRuntimeFunction(
+  //       llvm::FunctionType::get(VoidTy, VoidPtrPtrTy, false),
+  //       "__cudaRegisterFatBinaryEnd");
+  //   CtorBuilder.CreateCall(RegisterFatbinEndFunc, RegisterFatbinCall);
+  // }
+
+  // Create destructor and register it with atexit() the way NVCC does it. Doing
+  // it during regular destructor phase worked in CUDA before 9.2 but results in
+  // double-free in 9.2.
+  if (Function *CleanupFn = makeModuleDtorFunction()) {
+    // extern "C" int atexit(void (*f)(void));
+    FunctionType *AtExitTy =
+        FunctionType::get(IntTy, CleanupFn->getType(), false);
+    FunctionCallee AtExitFunc =
+        M.getOrInsertFunction("atexit", AtExitTy, AttributeList());
+    CtorBuilder.CreateCall(AtExitFunc, CleanupFn);
+  }
+
+  CtorBuilder.CreateRetVoid();
+  return ModuleCtorFunc;
+}
+
+Function *CudaLoop::makeModuleDtorFunction() {
+  // No need for destructor if we don't have a handle to unregister.
+  if (!GpuBinaryHandle)
+    return nullptr;
+
+  LLVMContext &Ctx = M.getContext();
+  const DataLayout &DL = M.getDataLayout();
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+  Type *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
+
+  // void __cudaUnregisterFatBinary(void ** handle);
+  FunctionCallee UnregisterFatbinFunc = M.getOrInsertFunction(
+      "__cudaUnregisterFatBinary",
+      FunctionType::get(VoidTy, VoidPtrPtrTy, false));
+
+  Function *ModuleDtorFunc = Function::Create(
+      FunctionType::get(VoidTy, VoidPtrTy, false),
+      GlobalValue::InternalLinkage,
+      "__cuda_module_dtor", &M);
+
+  BasicBlock *DtorEntryBB =
+      BasicBlock::Create(Ctx, "entry", ModuleDtorFunc);
+  IRBuilder<> DtorBuilder(DtorEntryBB);
+
+  Value *HandleValue =
+      DtorBuilder.CreateAlignedLoad(VoidPtrPtrTy, GpuBinaryHandle,
+                                    DL.getPointerABIAlignment(0));
+  DtorBuilder.CreateCall(UnregisterFatbinFunc, HandleValue);
+  DtorBuilder.CreateRetVoid();
+  return ModuleDtorFunc;
+}
+
+void PTXLoop::makeFatBinaryString() {
+  LLVM_DEBUG(dbgs() << "PTX Module: " << PTXM);
+
+  legacy::PassManager *PassManager = new legacy::PassManager;
+
+  PassManager->add(createVerifierPass());
+
+  // Add in our optimization passes
+
+  //PassManager->add(createInstructionCombiningPass());
+  PassManager->add(createReassociatePass());
+  PassManager->add(createGVNPass());
+  PassManager->add(createCFGSimplificationPass());
+  PassManager->add(createSLPVectorizerPass());
+  //PassManager->add(createBreakCriticalEdgesPass());
+  PassManager->add(createConstantPropagationPass());
+  PassManager->add(createDeadInstEliminationPass());
+  PassManager->add(createDeadStoreEliminationPass());
+  //PassManager->add(createInstructionCombiningPass());
+  PassManager->add(createCFGSimplificationPass());
+
+  SmallVector<char, 65536> Buf;
+  raw_svector_ostream Ostr(Buf);
+
+  bool Fail = PTXTargetMachine->addPassesToEmitFile(
+      *PassManager, Ostr, &Ostr,
+      CodeGenFileType::CGFT_AssemblyFile, false);
+  assert(!Fail && "Failed to emit PTX");
+
+  PassManager->run(PTXM);
+
+  delete PassManager;
+
+  // Create a global string to hold the PTX code
+  Constant *PCS = ConstantDataArray::getString(M.getContext(),
+                                               Ostr.str().str());
+  PTXGlobal = new GlobalVariable(M, PCS->getType(), true,
+                                 GlobalValue::PrivateLinkage, PCS,
+                                 "ptx" + Twine(MyKernelID));
+}
+
 Value *CudaABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Grainsize = ConstantInt::get(GrainsizeCall->getType(), 8);
 
@@ -47,6 +384,66 @@ void CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
                                  bool ProcessingTapirLoops) {}
 
 void CudaABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {}
+// Adapted from Transforms/Utils/ModuleUtils.cpp
+static void appendToGlobalArray(const char *Array, Module &M, Constant *C,
+                                int Priority, Constant *Data) {
+  IRBuilder<> IRB(M.getContext());
+  FunctionType *FnTy = FunctionType::get(IRB.getVoidTy(), false);
+
+  // Get the current set of static global constructors and add the new ctor
+  // to the list.
+  SmallVector<Constant *, 16> CurrentCtors;
+  StructType *EltTy = StructType::get(
+      IRB.getInt32Ty(), PointerType::getUnqual(FnTy), IRB.getInt8PtrTy());
+  if (GlobalVariable *GVCtor = M.getNamedGlobal(Array)) {
+    if (Constant *Init = GVCtor->getInitializer()) {
+      unsigned n = Init->getNumOperands();
+      CurrentCtors.reserve(n + 1);
+      for (unsigned i = 0; i != n; ++i)
+        CurrentCtors.push_back(cast<Constant>(Init->getOperand(i)));
+    }
+    GVCtor->eraseFromParent();
+  }
+
+  // Build a 3 field global_ctor entry.  We don't take a comdat key.
+  Constant *CSVals[3];
+  CSVals[0] = IRB.getInt32(Priority);
+  CSVals[1] = C;
+  CSVals[2] = Data ? ConstantExpr::getPointerCast(Data, IRB.getInt8PtrTy())
+                   : Constant::getNullValue(IRB.getInt8PtrTy());
+  Constant *RuntimeCtorInit =
+      ConstantStruct::get(EltTy, makeArrayRef(CSVals, EltTy->getNumElements()));
+
+  CurrentCtors.push_back(RuntimeCtorInit);
+
+  // Create a new initializer.
+  ArrayType *AT = ArrayType::get(EltTy, CurrentCtors.size());
+  Constant *NewInit = ConstantArray::get(AT, CurrentCtors);
+
+  // Create the new global variable and replace all uses of
+  // the old global variable with the new one.
+  (void)new GlobalVariable(M, NewInit->getType(), false,
+                           GlobalValue::AppendingLinkage, NewInit, Array);
+}
+
+void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
+  if (!OutliningTapirLoops || !LOP)
+    return;
+
+  LOP->makeFatBinaryString();
+
+  LLVMContext &Ctx = M.getContext();
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  if (Function *CudaCtorFunction = LOP->makeModuleCtorFunction()) {
+    // Ctor function type is void()*.
+    FunctionType* CtorFTy = FunctionType::get(VoidTy, false);
+    Type *CtorPFTy =
+        PointerType::get(CtorFTy, M.getDataLayout().getProgramAddressSpace());
+    appendToGlobalArray(
+        "llvm.global_ctors", M,
+        ConstantExpr::getBitCast(CudaCtorFunction, CtorPFTy), 65536, nullptr);
+  }
+}
 
 void CudaABI::postProcessHelper(Function &F) {}
 
@@ -95,8 +492,10 @@ PTXLoop::PTXLoop(Module &M)
     });
   assert(PTXTarget && "Failed to find NVPTX target");
 
+  // TODO: Hard-coded machine configuration for Supercloud nodes with Voltas and
+  // CUDA 10.  Generalize this code.
   PTXTargetMachine =
-      PTXTarget->createTargetMachine(PTXTriple.getTriple(), "sm_70", "+ptx60",
+      PTXTarget->createTargetMachine(PTXTriple.getTriple(), "sm_70", "+ptx64",
                                      TargetOptions(), Reloc::PIC_,
                                      CodeModel::Small, CodeGenOpt::Aggressive);
   PTXM.setDataLayout(PTXTargetMachine->createDataLayout());
@@ -404,5 +803,239 @@ void PTXLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   B.CreateCall(KitsuneGPUFinish, {});
 
+  ReplCall->eraseFromParent();
+}
+
+CudaLoop::CudaLoop(Module &M) : PTXLoop(M) {
+  LLVMContext &Ctx = M.getContext();
+  const DataLayout &DL = M.getDataLayout();
+  CudaStreamTy = StructType::lookupOrCreate(Ctx, "struct.cudaStream");
+  Type *CudaStreamPtrTy = PointerType::getUnqual(CudaStreamTy);
+  Type *Int32Ty = Type::getInt32Ty(Ctx);
+  Type *Int64Ty = Type::getInt64Ty(Ctx);
+  Type *SizeTy = DL.getIntPtrType(Ctx);
+  Dim3Ty = StructType::create("struct.dim3", Int32Ty, Int32Ty, Int32Ty);
+  Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+
+  CudaPushCallConfig = M.getOrInsertFunction(
+      "__cudaPushCallConfiguration", Int32Ty, Int64Ty, Int32Ty, Int64Ty,
+      Int32Ty, SizeTy, CudaStreamPtrTy);
+  CudaPopCallConfig = M.getOrInsertFunction(
+      "__cudaPopCallConfiguration", Int32Ty, PointerType::getUnqual(Dim3Ty),
+      PointerType::getUnqual(Dim3Ty), PointerType::getUnqual(SizeTy),
+      PointerType::getUnqual(VoidPtrTy));
+  CudaLaunchKernel = M.getOrInsertFunction(
+      "cudaLaunchKernel", Int32Ty, VoidPtrTy, Int64Ty, Int32Ty, Int64Ty,
+      Int32Ty, PointerType::getUnqual(VoidPtrTy), SizeTy, CudaStreamPtrTy);
+}
+
+void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
+                                       DominatorTree &DT) {
+  Function *Outlined = TOI.Outline;
+  Instruction *ReplStart = TOI.ReplStart;
+  Instruction *ReplCall = TOI.ReplCall;
+  CallSite CS(ReplCall);
+  BasicBlock *CallCont = TOI.ReplRet;
+  BasicBlock *UnwindDest = TOI.ReplUnwind;
+  Function *Parent = ReplCall->getFunction();
+  Value *TripCount = CS.getArgOperand(getLimitArgIndex(*Parent, TOI.InputSet));
+
+  LLVMContext &Ctx = M.getContext();
+  const DataLayout &DL = M.getDataLayout();
+  Type *Int32Ty = Type::getInt32Ty(Ctx);
+  Type *Int64Ty = Type::getInt64Ty(Ctx);
+  Type *SizeTy = DL.getIntPtrType(Ctx);
+  PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+  PointerType *CudaStreamPtrTy = CudaStreamTy->getPointerTo();
+
+  // Split the basic block containing the detach replacement just before the
+  // start of the detach-replacement instructions.
+  BasicBlock *DetBlock = ReplStart->getParent();
+  BasicBlock *CallBlock = SplitBlock(DetBlock, ReplStart);
+
+  // Create a call to CudaPopCallConfiguration
+
+  IRBuilder<> B(ReplCall);
+  // Create local allocations for components of the configuration.
+  AllocaInst *GridDim = B.CreateAlloca(Dim3Ty, nullptr, "grid_dim");
+  AllocaInst *BlockDim = B.CreateAlloca(Dim3Ty, nullptr, "block_dim");
+  AllocaInst *SHMemSize = B.CreateAlloca(SizeTy, nullptr, "shmem_size");
+  AllocaInst *StreamPtr = B.CreateAlloca(VoidPtrTy, nullptr, "stream");
+  // Call __cudaPopCallConfiguration
+  B.CreateCall(CudaPopCallConfig, { GridDim, BlockDim, SHMemSize, StreamPtr });
+
+  // Coerce dimensions into arguments for launch kernel
+  Type *CoercedDim3Ty = StructType::get(Int64Ty, Int32Ty);
+  AllocaInst *CoercedGridDim = B.CreateAlloca(CoercedDim3Ty);
+  AllocaInst *CoercedBlockDim = B.CreateAlloca(CoercedDim3Ty);
+  B.CreateMemCpy(CoercedGridDim, CoercedGridDim->getAlignment(), GridDim,
+                 GridDim->getAlignment(),
+                 ConstantInt::get(SizeTy, DL.getTypeAllocSize(Dim3Ty)));
+  B.CreateMemCpy(CoercedBlockDim, CoercedBlockDim->getAlignment(), BlockDim,
+                 BlockDim->getAlignment(),
+                 ConstantInt::get(SizeTy, DL.getTypeAllocSize(Dim3Ty)));
+
+  // Load coerced grid and block dimensions
+  Value *GridDimStart =
+      B.CreateLoad(Int64Ty, B.CreateConstInBoundsGEP2_32(CoercedDim3Ty,
+                                                         CoercedGridDim, 0, 0));
+  Value *GridDimEnd =
+      B.CreateLoad(Int32Ty, B.CreateConstInBoundsGEP2_32(CoercedDim3Ty,
+                                                         CoercedGridDim, 0, 1));
+  Value *BlockDimStart =
+      B.CreateLoad(Int64Ty, B.CreateConstInBoundsGEP2_32(CoercedDim3Ty,
+                                                         CoercedBlockDim,
+                                                         0, 0));
+  Value *BlockDimEnd =
+      B.CreateLoad(Int32Ty, B.CreateConstInBoundsGEP2_32(CoercedDim3Ty,
+                                                         CoercedBlockDim,
+                                                         0, 1));
+
+  // Create an array of kernel arguments.
+  AllocaInst *KernelArgs;
+  // Calculate amount of space we will need for all arguments.  If we have no
+  // args, allocate a single pointer so we still have a valid pointer to the
+  // argument array that we can pass to runtime, even if it will be unused.
+  if (CS.arg_size() <= 2)
+    // CS.args() contains no arguments to pass to the kernel.
+    KernelArgs = B.CreateAlloca(VoidPtrTy, nullptr, "kernel_args");
+  else {
+    KernelArgs = B.CreateAlloca(VoidPtrTy, B.getInt8(CS.arg_size() - 2),
+                                "kernel_args");
+    // Store pointers to the arguments.
+    unsigned Index = 0, ArgNum = 0;
+    for (Value *Arg : CS.args()) {
+      if (ArgNum < 2) {
+        ++ArgNum;
+        continue;
+      }
+      AllocaInst *ArgAlloc = B.CreateAlloca(Arg->getType());
+      B.CreateStore(Arg, ArgAlloc);
+      B.CreateStore(
+          B.CreateBitCast(ArgAlloc, VoidPtrTy),
+          B.CreateConstInBoundsGEP1_32(VoidPtrTy, KernelArgs, Index));
+      ++Index; ++ArgNum;
+    }
+  }
+  // Insert call to cudaLaunchKernel
+  CallInst *Call = B.CreateCall(CudaLaunchKernel,
+                                { ConstantPointerNull::get(VoidPtrTy),
+                                  GridDimStart, GridDimEnd, BlockDimStart,
+                                  BlockDimEnd, KernelArgs,
+                                  B.CreateLoad(SHMemSize),
+                                  B.CreateBitCast(B.CreateLoad(StreamPtr),
+                                                  CudaStreamPtrTy) });
+
+  LLVM_DEBUG(dbgs() << "CudaLoop: Adding helper for cudaLaunchKernel call "
+                       "site.\n");
+
+  // Update the value of ReplCall.
+  ReplCall = TOI.ReplCall;
+  // Create a separate spawn-helper function to allocate and populate the
+  // argument struct.
+  // Inputs to the spawn helper
+  ValueSet SHInputSet = TOI.InputSet;
+  ValueSet SHInputs;
+  fixupInputSet(*Parent, SHInputSet, SHInputs);
+  LLVM_DEBUG({
+      dbgs() << "SHInputSet:\n";
+      for (Value *V : SHInputSet)
+        dbgs() << "\t" << *V << "\n";
+      dbgs() << "SHInputs:\n";
+      for (Value *V : SHInputs)
+        dbgs() << "\t" << *V << "\n";
+    });
+
+  ValueSet Outputs;  // Should be empty.
+  // Only one block needs to be cloned into the spawn helper
+  std::vector<BasicBlock *> BlocksToClone;
+  BlocksToClone.push_back(CallBlock);
+  SmallVector<ReturnInst *, 1> Returns;  // Ignore returns cloned.
+  ValueToValueMapTy VMap;
+  Twine NameSuffix = ".stub";
+  Function *CudaLoopHelper =
+      CreateHelper(SHInputs, Outputs, BlocksToClone, CallBlock, DetBlock,
+                   CallCont, VMap, &M, Parent->getSubprogram() != nullptr,
+                   Returns, NameSuffix.str(), nullptr, nullptr, nullptr,
+                   UnwindDest);
+
+  assert(Returns.empty() && "Returns cloned when creating SpawnHelper.");
+
+  // If there is no unwind destination, then the SpawnHelper cannot throw.
+  if (!UnwindDest)
+    CudaLoopHelper->setDoesNotThrow();
+
+  // Add attributes to new helper function.
+  //
+  // Use a fast calling convention for the helper.
+  CudaLoopHelper->setCallingConv(CallingConv::Fast);
+  // Note that the address of the helper is unimportant.
+  CudaLoopHelper->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
+  // The helper is private to this module.
+  CudaLoopHelper->setLinkage(GlobalValue::PrivateLinkage);
+
+  // Add alignment assumptions to arguments of helper, based on alignment of
+  // values in old function.
+  AddAlignmentAssumptions(Parent, SHInputs, VMap, ReplCall, nullptr, nullptr);
+
+  // Move allocas in the newly cloned block to the entry block of the helper.
+  {
+    // Collect the end instructions of the task.
+    SmallVector<Instruction *, 4> Ends;
+    Ends.push_back(cast<BasicBlock>(VMap[CallCont])->getTerminator());
+    if (isa<InvokeInst>(ReplCall))
+      Ends.push_back(cast<BasicBlock>(VMap[UnwindDest])->getTerminator());
+
+    // Move allocas in cloned detached block to entry of helper function.
+    BasicBlock *ClonedBlock = cast<BasicBlock>(VMap[CallBlock]);
+    MoveStaticAllocasInBlock(&CudaLoopHelper->getEntryBlock(), ClonedBlock,
+                             Ends);
+
+    // We do not need to add new llvm.stacksave/llvm.stackrestore intrinsics,
+    // because calling and returning from the helper will automatically manage
+    // the stack appropriately.
+  }
+
+  // Insert a call to the spawn helper.
+  SmallVector<Value *, 8> SHInputVec;
+  for (Value *V : SHInputs)
+    SHInputVec.push_back(V);
+  SplitEdge(DetBlock, CallBlock);
+  B.SetInsertPoint(CallBlock->getTerminator());
+  // First insert call to __cudaPushCallConfiguration.
+  Value *ThreadsPerBlock = TripCount;
+  Value *CoercedThreadsPerBlock = B.CreateOr(
+      B.CreateShl(ThreadsPerBlock, 32, "", true, true), B.getInt64(1));
+  B.CreateCall(CudaPushCallConfig,
+               { /*gridDim*/   B.getInt64(1UL << 32 | 1UL), B.getInt32(1),
+                 /*blockDim*/  CoercedThreadsPerBlock, B.getInt32(1),
+                 /*sharedMem*/ ConstantInt::get(SizeTy, 0),
+                 /*stream*/    ConstantPointerNull::get(CudaStreamPtrTy) });
+  if (isa<InvokeInst>(ReplCall)) {
+    InvokeInst *HelperCall = InvokeInst::Create(CudaLoopHelper, CallCont,
+                                                UnwindDest, SHInputVec);
+    HelperCall->setDebugLoc(ReplCall->getDebugLoc());
+    HelperCall->setCallingConv(CudaLoopHelper->getCallingConv());
+    ReplaceInstWithInst(CallBlock->getTerminator(), HelperCall);
+  } else {
+    CallInst *HelperCall = B.CreateCall(CudaLoopHelper, SHInputVec);
+    HelperCall->setDebugLoc(ReplCall->getDebugLoc());
+    HelperCall->setCallingConv(CudaLoopHelper->getCallingConv());
+    HelperCall->setDoesNotThrow();
+    // Branch around CallBlock.  Its contents are now dead.
+    ReplaceInstWithInst(CallBlock->getTerminator(),
+                        BranchInst::Create(CallCont));
+  }
+
+  // Replace the first argument of cudaLaunchKernel to point to the helper.
+  CallInst *CallInHelper = cast<CallInst>(VMap[Call]);
+  B.SetInsertPoint(CallInHelper);
+  CallInHelper->setArgOperand(0, B.CreateBitCast(CudaLoopHelper, VoidPtrTy));
+
+  // Record CudaLoopHelper as an emitted kernel
+  EmittedKernels.push_back({ CudaLoopHelper, Outlined->getName() });
+
+  // Erase extraneous call instructions
+  cast<Instruction>(VMap[ReplCall])->eraseFromParent();
   ReplCall->eraseFromParent();
 }
