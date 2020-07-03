@@ -418,6 +418,9 @@ public:
     TapirLoops.clear();
     TaskToTapirLoop.clear();
     LoopToTapirLoop.clear();
+    // Delete any loop outline processors we're managing.
+    for (LoopOutlineProcessor *ManagedLOP : ManagedOutlineProcessors)
+      delete ManagedLOP;
   }
 
   bool run();
@@ -466,8 +469,7 @@ private:
   // Get the LoopOutlineProcessor for handling Tapir loop \p TL.
   LoopOutlineProcessor *getOutlineProcessor(TapirLoopInfo *TL);
 
-  using LOPMapTy = DenseMap<TapirLoopInfo *,
-                            std::unique_ptr<LoopOutlineProcessor>>;
+  using LOPMapTy = DenseMap<TapirLoopInfo *, LoopOutlineProcessor *>;
 
   // For all recorded Tapir loops, determine the function arguments and inputs
   // for the outlined helper functions for those loops.
@@ -531,6 +533,7 @@ private:
   DenseMap<Task *, TapirLoopInfo *> TaskToTapirLoop;
   DenseMap<Loop *, TapirLoopInfo *> LoopToTapirLoop;
   LOPMapTy OutlineProcessors;
+  SmallVector<LoopOutlineProcessor *, 16> ManagedOutlineProcessors;
 };
 } // end anonymous namespace
 
@@ -909,10 +912,17 @@ LoopOutlineProcessor *LoopSpawningImpl::getOutlineProcessor(TapirLoopInfo *TL) {
   Loop *L = TL->getLoop();
   TapirLoopHints Hints(L);
 
+  LoopOutlineProcessor *ManagedLOP;
   switch (Hints.getStrategy()) {
-  case TapirLoopHints::ST_DAC: return new DACSpawning(M);
-  default: return new DefaultLoopOutlineProcessor(M);
+  case TapirLoopHints::ST_DAC:
+    ManagedLOP = new DACSpawning(M);
+    break;
+  default:
+    ManagedLOP = new DefaultLoopOutlineProcessor(M);
+    break;
   }
+  ManagedOutlineProcessors.push_back(ManagedLOP);
+  return ManagedLOP;
 }
 
 /// Associate tasks with Tapir loops that enclose them.
@@ -1438,8 +1448,7 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
       }
 
       // Get an outline processor for each Tapir loop.
-      OutlineProcessors[TL] =
-        std::unique_ptr<LoopOutlineProcessor>(getOutlineProcessor(TL));
+      OutlineProcessors[TL] = getOutlineProcessor(TL);
     }
   }
 

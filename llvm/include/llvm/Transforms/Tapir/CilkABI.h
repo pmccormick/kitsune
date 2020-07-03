@@ -24,6 +24,7 @@ class TapirLoopInfo;
 class CilkABI : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
   SmallPtrSet<CallBase *, 8> CallsToInline;
+  LoopOutlineProcessor *LOP = nullptr;
 
   // Cilk RTS data types
   StructType *PedigreeTy = nullptr;
