@@ -18,6 +18,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Option/ArgList.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -26,6 +27,11 @@
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Vectorize.h"
 #include "llvm/Support/CodeGen.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Program.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VersionTuple.h"
 
 using namespace llvm;
 
@@ -33,6 +39,9 @@ using namespace llvm;
 
 // Copied from clang/lib/CodeGen/CGCUDANV.cpp
 constexpr unsigned CudaFatMagic = 0x466243b1;
+
+const char *TargetGPUArch = "sm_70";
+const char *TargetGPUFeatures = "+ptx64,+sm_70";
 
 FunctionType *CudaLoop::getRegisterGlobalsFnTy() const {
   LLVMContext &Ctx = M.getContext();
@@ -126,8 +135,8 @@ Function *CudaLoop::makeRegisterGlobalsFn() {
     GlobalVariable *KernelNameGV =
         new GlobalVariable(M, KernelNameCS->getType(), true,
                            GlobalValue::PrivateLinkage, KernelNameCS, ".str");
+    KernelNameGV->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
     Type *StrTy = KernelNameGV->getType();
-        // cast<PointerType>(KernelNameCS->getType())->getElementType();
     Constant *Zeros[] = { ConstantInt::get(DL.getIndexType(StrTy), 0),
                           ConstantInt::get(DL.getIndexType(StrTy), 0) };
     Constant *KernelName = ConstantExpr::getGetElementPtr(
@@ -261,6 +270,7 @@ Function *CudaLoop::makeModuleCtorFunction() {
       M, VoidPtrPtrTy, /*isConstant*/ false, GlobalValue::InternalLinkage,
       ConstantPointerNull::get(VoidPtrPtrTy), "__cuda_gpubin_handle");
   GpuBinaryHandle->setAlignment(DL.getPointerABIAlignment(0));
+  GpuBinaryHandle->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
   CtorBuilder.CreateAlignedStore(RegisterFatbinCall, GpuBinaryHandle,
                                  DL.getPointerABIAlignment(0));
 
@@ -277,6 +287,10 @@ Function *CudaLoop::makeModuleCtorFunction() {
   //       "__cudaRegisterFatBinaryEnd");
   //   CtorBuilder.CreateCall(RegisterFatbinEndFunc, RegisterFatbinCall);
   // }
+  FunctionCallee RegisterFatbinEndFunc = M.getOrInsertFunction(
+      "__cudaRegisterFatBinaryEnd",
+      FunctionType::get(VoidTy, VoidPtrPtrTy, false));
+  CtorBuilder.CreateCall(RegisterFatbinEndFunc, RegisterFatbinCall);
 
   // Create destructor and register it with atexit() the way NVCC does it. Doing
   // it during regular destructor phase worked in CUDA before 9.2 but results in
@@ -348,21 +362,88 @@ void PTXLoop::makeFatBinaryString() {
   //PassManager->add(createInstructionCombiningPass());
   PassManager->add(createCFGSimplificationPass());
 
-  SmallVector<char, 65536> Buf;
-  raw_svector_ostream Ostr(Buf);
+  opt::ArgStringList PTXASArgList, FatBinArgList;
+  auto PTXASExec  = sys::findProgramByName("ptxas");
+  auto FatBinExec = sys::findProgramByName("fatbinary");
+  LLVM_DEBUG({
+      if (PTXASExec)
+        dbgs() << "Found " << *PTXASExec << "\n";
+      if (FatBinExec)
+        dbgs() << "Found " << *FatBinExec << "\n";
+    });
+
+  std::error_code EC;
+  sys::fs::OpenFlags OpenFlags = sys::fs::F_None;
+  std::string PTXFile = M.getSourceFileName() + ".s";
+  std::string AsmFile = M.getSourceFileName() + ".o";
+  std::string FatBinFile = M.getSourceFileName() + ".cubin";
+  LLVM_DEBUG({
+      dbgs() << "PTXFile = " << PTXFile << "\n";
+      dbgs() << "AsmFile = " << AsmFile << "\n";
+      dbgs() << "FatBinFile = " << FatBinFile << "\n";
+    });
+  std::unique_ptr<ToolOutputFile> FDOut =
+      llvm::make_unique<ToolOutputFile>(PTXFile, EC, OpenFlags);
+  raw_pwrite_stream *OS = &FDOut->os();
 
   bool Fail = PTXTargetMachine->addPassesToEmitFile(
-      *PassManager, Ostr, &Ostr,
+      *PassManager, *OS, nullptr,
       CodeGenFileType::CGFT_AssemblyFile, false);
   assert(!Fail && "Failed to emit PTX");
 
   PassManager->run(PTXM);
-
   delete PassManager;
+
+  FDOut->keep();
+
+  PTXASArgList.push_back("-m64");
+  PTXASArgList.push_back("-O1");
+  PTXASArgList.push_back("--gpu-name");
+  PTXASArgList.push_back(TargetGPUArch);
+  PTXASArgList.push_back("--output-file");
+  PTXASArgList.push_back(AsmFile.c_str());
+  PTXASArgList.push_back(PTXFile.c_str());
+
+  FatBinArgList.push_back("-64");
+  FatBinArgList.push_back("--create");
+  FatBinArgList.push_back(FatBinFile.c_str());
+  std::string AsmInput =
+      std::string("--image=profile=") + TargetGPUArch + ",file=" +
+      AsmFile;
+  FatBinArgList.push_back(AsmInput.c_str());
+  std::string PTXInput =
+      std::string("--image=profile=") + "compute_70" + ",file=" +
+      PTXFile;
+  FatBinArgList.push_back(PTXInput.c_str());
+
+  SmallVector<const char *, 128> PTXASArgv;
+  PTXASArgv.push_back(PTXASExec->c_str());
+  PTXASArgv.append(PTXASArgList.begin(), PTXASArgList.end());
+  PTXASArgv.push_back(nullptr);
+  auto PTXASArgs = toStringRefArray(PTXASArgv.data());
+  LLVM_DEBUG({
+      for (auto Str : PTXASArgs)
+        dbgs() << Str << "\n";
+    });
+  sys::ExecuteAndWait(*PTXASExec, PTXASArgs);
+
+  SmallVector<const char *, 128> FatBinArgv;
+  FatBinArgv.push_back(FatBinExec->c_str());
+  FatBinArgv.append(FatBinArgList.begin(), FatBinArgList.end());
+  FatBinArgv.push_back(nullptr);
+  auto FatBinArgs = toStringRefArray(FatBinArgv.data());
+  LLVM_DEBUG({
+      for (auto Str : FatBinArgs)
+        dbgs() << Str << "\n";
+    });
+  sys::ExecuteAndWait(*FatBinExec, FatBinArgs);
+
+  ErrorOr<std::unique_ptr<MemoryBuffer>> FatBinBuf =
+      MemoryBuffer::getFile(FatBinFile);
 
   // Create a global string to hold the PTX code
   Constant *PCS = ConstantDataArray::getString(M.getContext(),
-                                               Ostr.str().str());
+                                               FatBinBuf.get()->getBuffer());
   PTXGlobal = new GlobalVariable(M, PCS->getType(), true,
                                  GlobalValue::PrivateLinkage, PCS,
                                  "ptx" + Twine(MyKernelID));
@@ -477,11 +558,11 @@ PTXLoop::PTXLoop(Module &M)
   MyKernelID = NextKernelID++;
 
   // Setup an NVPTX triple.
-  Triple PTXTriple(M.getTargetTriple());
-  PTXTriple.setArch(Triple::nvptx64);
-  PTXTriple.setOS(Triple::CUDA);
-
+  Triple PTXTriple("nvptx64", "nvidia", "cuda");
   PTXM.setTargetTriple(PTXTriple.str());
+  PTXM.setSDKVersion(VersionTuple(10, 1));
+  if (M.getSDKVersion().empty())
+    M.setSDKVersion(VersionTuple(10, 1));
 
   // Find the NVPTX module pass which will create the PTX code
   std::string error;
@@ -493,10 +574,10 @@ PTXLoop::PTXLoop(Module &M)
   assert(PTXTarget && "Failed to find NVPTX target");
 
   // TODO: Hard-coded machine configuration for Supercloud nodes with Voltas and
-  // CUDA 10.  Generalize this code.
+  // CUDA 10.1  Generalize this code.
   PTXTargetMachine =
-      PTXTarget->createTargetMachine(PTXTriple.getTriple(), "sm_70", "+ptx64",
-                                     TargetOptions(), Reloc::PIC_,
+      PTXTarget->createTargetMachine(PTXTriple.getTriple(), TargetGPUArch,
+                                     "+ptx64", TargetOptions(), Reloc::PIC_,
                                      CodeModel::Small, CodeGenOpt::Aggressive);
   PTXM.setDataLayout(PTXTargetMachine->createDataLayout());
 
@@ -608,6 +689,13 @@ void PTXLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
 
   // Set the helper function to have external linkage.
   Helper->setLinkage(Function::ExternalLinkage);
+  // Set the target-cpu and target-features
+  AttrBuilder Attrs;
+  Attrs.addAttribute("target-cpu", TargetGPUArch);
+  Attrs.addAttribute("target-features", TargetGPUFeatures);
+  Helper->removeFnAttr("target-cpu");
+  Helper->removeFnAttr("target-features");
+  Helper->addAttributes(AttributeList::FunctionIndex, Attrs);
 
   // Get the thread ID for this invocation of Helper.
   IRBuilder<> B(Entry->getTerminator());
@@ -809,7 +897,7 @@ void PTXLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 CudaLoop::CudaLoop(Module &M) : PTXLoop(M) {
   LLVMContext &Ctx = M.getContext();
   const DataLayout &DL = M.getDataLayout();
-  CudaStreamTy = StructType::lookupOrCreate(Ctx, "struct.cudaStream");
+  CudaStreamTy = StructType::lookupOrCreate(Ctx, "struct.CUstream_st");
   Type *CudaStreamPtrTy = PointerType::getUnqual(CudaStreamTy);
   Type *Int32Ty = Type::getInt32Ty(Ctx);
   Type *Int64Ty = Type::getInt64Ty(Ctx);
@@ -819,7 +907,7 @@ CudaLoop::CudaLoop(Module &M) : PTXLoop(M) {
 
   CudaPushCallConfig = M.getOrInsertFunction(
       "__cudaPushCallConfiguration", Int32Ty, Int64Ty, Int32Ty, Int64Ty,
-      Int32Ty, SizeTy, CudaStreamPtrTy);
+      Int32Ty, SizeTy, VoidPtrTy);
   CudaPopCallConfig = M.getOrInsertFunction(
       "__cudaPopCallConfiguration", Int32Ty, PointerType::getUnqual(Dim3Ty),
       PointerType::getUnqual(Dim3Ty), PointerType::getUnqual(SizeTy),
@@ -840,6 +928,17 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   Function *Parent = ReplCall->getFunction();
   Value *TripCount = CS.getArgOperand(getLimitArgIndex(*Parent, TOI.InputSet));
 
+  // Fixup name of outlined function, since PTX does not like '.' characters in
+  // function names.
+  SmallString<256> Buf;
+  for (char C : Outlined->getName().bytes()) {
+    if ('.' == C)
+      Buf.push_back('_');
+    else
+      Buf.push_back(C);
+  }
+  Outlined->setName(Buf);
+
   LLVMContext &Ctx = M.getContext();
   const DataLayout &DL = M.getDataLayout();
   Type *Int32Ty = Type::getInt32Ty(Ctx);
@@ -854,7 +953,6 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   BasicBlock *CallBlock = SplitBlock(DetBlock, ReplStart);
 
   // Create a call to CudaPopCallConfiguration
-
   IRBuilder<> B(ReplCall);
   // Create local allocations for components of the configuration.
   AllocaInst *GridDim = B.CreateAlloca(Dim3Ty, nullptr, "grid_dim");
@@ -896,19 +994,15 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // Calculate amount of space we will need for all arguments.  If we have no
   // args, allocate a single pointer so we still have a valid pointer to the
   // argument array that we can pass to runtime, even if it will be unused.
-  if (CS.arg_size() <= 2)
+  if (CS.arg_empty())
     // CS.args() contains no arguments to pass to the kernel.
     KernelArgs = B.CreateAlloca(VoidPtrTy, nullptr, "kernel_args");
   else {
-    KernelArgs = B.CreateAlloca(VoidPtrTy, B.getInt8(CS.arg_size() - 2),
+    KernelArgs = B.CreateAlloca(VoidPtrTy, B.getInt8(CS.arg_size()),
                                 "kernel_args");
     // Store pointers to the arguments.
     unsigned Index = 0, ArgNum = 0;
     for (Value *Arg : CS.args()) {
-      if (ArgNum < 2) {
-        ++ArgNum;
-        continue;
-      }
       AllocaInst *ArgAlloc = B.CreateAlloca(Arg->getType());
       B.CreateStore(Arg, ArgAlloc);
       B.CreateStore(
@@ -931,20 +1025,11 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   // Update the value of ReplCall.
   ReplCall = TOI.ReplCall;
-  // Create a separate spawn-helper function to allocate and populate the
-  // argument struct.
-  // Inputs to the spawn helper
-  ValueSet SHInputSet = TOI.InputSet;
+
+  // cudaLaunchKernel needs this function to have the same type as the kernel
   ValueSet SHInputs;
-  fixupInputSet(*Parent, SHInputSet, SHInputs);
-  LLVM_DEBUG({
-      dbgs() << "SHInputSet:\n";
-      for (Value *V : SHInputSet)
-        dbgs() << "\t" << *V << "\n";
-      dbgs() << "SHInputs:\n";
-      for (Value *V : SHInputs)
-        dbgs() << "\t" << *V << "\n";
-    });
+  for (Value *Arg : CS.args())
+    SHInputs.insert(Arg);
 
   ValueSet Outputs;  // Should be empty.
   // Only one block needs to be cloned into the spawn helper
@@ -966,13 +1051,10 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     CudaLoopHelper->setDoesNotThrow();
 
   // Add attributes to new helper function.
-  //
-  // Use a fast calling convention for the helper.
-  CudaLoopHelper->setCallingConv(CallingConv::Fast);
-  // Note that the address of the helper is unimportant.
-  CudaLoopHelper->setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
-  // The helper is private to this module.
-  CudaLoopHelper->setLinkage(GlobalValue::PrivateLinkage);
+  CudaLoopHelper->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
+
+  // cudaLaunchKernel needs this function to have the same name as the kernel
+  CudaLoopHelper->setName(Outlined->getName());
 
   // Add alignment assumptions to arguments of helper, based on alignment of
   // values in old function.
@@ -1005,12 +1087,12 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // First insert call to __cudaPushCallConfiguration.
   Value *ThreadsPerBlock = TripCount;
   Value *CoercedThreadsPerBlock = B.CreateOr(
-      B.CreateShl(ThreadsPerBlock, 32, "", true, true), B.getInt64(1));
+      B.CreateShl(B.getInt64(1), 32, "", true, true), ThreadsPerBlock);
   B.CreateCall(CudaPushCallConfig,
-               { /*gridDim*/   B.getInt64(1UL << 32 | 1UL), B.getInt32(1),
-                 /*blockDim*/  CoercedThreadsPerBlock, B.getInt32(1),
+               { /*gridDim*/   CoercedThreadsPerBlock, B.getInt32(1),
+                 /*blockDim*/  B.getInt64(1UL << 32 | 1UL), B.getInt32(1),
                  /*sharedMem*/ ConstantInt::get(SizeTy, 0),
-                 /*stream*/    ConstantPointerNull::get(CudaStreamPtrTy) });
+                 /*stream*/    ConstantPointerNull::get(VoidPtrTy) });
   if (isa<InvokeInst>(ReplCall)) {
     InvokeInst *HelperCall = InvokeInst::Create(CudaLoopHelper, CallCont,
                                                 UnwindDest, SHInputVec);
