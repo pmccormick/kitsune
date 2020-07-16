@@ -4800,6 +4800,9 @@ bool llvm::isSafeToSpeculativelyExecuteWithOpcode(
   case Instruction::CatchRet:
   case Instruction::CleanupPad:
   case Instruction::CleanupRet:
+  case Instruction::Detach:
+  case Instruction::Reattach:
+  case Instruction::Sync:
     return false; // Misc instructions which have effects
   }
 }
