@@ -2432,6 +2432,7 @@ void llvm::TapirLoopHints::clearHintsMetadata() {
 bool llvm::hintsDemandOutlining(const TapirLoopHints &Hints) {
   switch (Hints.getStrategy()) {
   case TapirLoopHints::ST_DAC: return true;
+  case TapirLoopHints::ST_OCL: return true;
   default: return false;
   }
 }
