@@ -67,5 +67,17 @@ void OCLSpawning::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   SPIRVKernel = new GlobalVariable(M, SPIRV->getType(), true,
                                  GlobalValue::PrivateLinkage, SPIRV,
                                  "spirv_" + Twine(OL->getName()));
+   
+  Type *SizeTy = Type::getInt32Ty(M.getContext());
+  Type *VoidTy = Type::getVoidTy(M.getContext());
+  Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+  auto KitsuneOpenCLCall = M.getOrInsertFunction("_kitsune_cl_call", VoidTy, VoidPtrTy, SizeTy);
+
+  Constant *kernelSize = ConstantInt(SPIRVKernel.getArrayNumElements()); 
+
+  ReplaceInstWithInst(Out.ReplCall, 
+    CallInst::Create(KitsuneOpenCLCall, { SPIRVKernel, kernelSize })); 
+
+  OL.eraseFromParent(); 
 }
 
