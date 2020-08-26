@@ -1,6 +1,8 @@
 #include <CL/cl.hpp>
 #include<iostream>
 
+extern "C" void _kitsune_cl_call(void* spirkernel, size_t len, size_t n); 
+
 using namespace std; 
 
 void check(bool pred, std::string msg){

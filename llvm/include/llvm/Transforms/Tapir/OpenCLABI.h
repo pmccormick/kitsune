@@ -4,9 +4,9 @@
 
 using namespace llvm; 
 
-class OCLSpawning : public LoopOutlineProcessor {
+class OpenCL : public LoopOutlineProcessor {
 public:
-  OCLSpawning(Module &M) : LoopOutlineProcessor(M) {}
+  OpenCL(Module &M) : LoopOutlineProcessor(M) {}
   void postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
                           ValueToValueMapTy &VMap) override final;  
   GlobalVariable* SPIRVKernel; 
