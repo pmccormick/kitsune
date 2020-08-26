@@ -304,13 +304,13 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   const DeclStmt *DS = cast<DeclStmt>(S.getInit());
  
   // Set up IVs to be copied as firstprivate 
+  auto OldAllocaInsertPt = AllocaInsertPt;
+  llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
+  AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
+                                             Detach);
   DeclMapTy IVDeclMap; 
   for (auto *DI : DS->decls()){
     auto *LoopVar = dyn_cast<VarDecl>(DI);
-    auto OldAllocaInsertPt = AllocaInsertPt;
-    llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
-    AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
-                                               Detach);
     Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
     IVDeclMap.insert({LoopVar, OuterLoc}); 
     LocalDeclMap.erase(LoopVar);
@@ -323,10 +323,11 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
     LV.setNonGC(true);
     EmitStoreThroughLValue(OuterRV, LV, true);
     EmitAutoVarCleanups(LVEmission);
-    auto tmp = AllocaInsertPt; 
-    AllocaInsertPt = OldAllocaInsertPt; 
-    tmp->removeFromParent(); 
   }
+
+  auto tmp = AllocaInsertPt; 
+  AllocaInsertPt = OldAllocaInsertPt; 
+  tmp->removeFromParent(); 
 
   // create the detach terminator
   Builder.CreateDetach(ForBody, Increment, SRStart);  
