@@ -296,51 +296,43 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   // Handle the Detach block
   //////////////////////////////
 
-  EmitBlock(Increment);
-
-  EmitStmt(S.getInc());
-
-  BreakContinueStack.pop_back();
-
-  ConditionScope.ForceCleanup();
-
-  EmitStopPoint(&S);
-
-  EmitBranch(ConditionBlock);
 
   // Emit the (currently empty) detach block
   EmitBlock(Detach);
 
   // Extract the DeclStmt from the statement init
   const DeclStmt *DS = cast<DeclStmt>(S.getInit());
-  
-  // Emit the detach block
+ 
+  // Set up IVs to be copied as firstprivate 
+  DeclMapTy IVDeclMap; 
   for (auto *DI : DS->decls()){
     auto *LoopVar = dyn_cast<VarDecl>(DI);
     auto OldAllocaInsertPt = AllocaInsertPt;
     llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
     AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
                                                Detach);
-    Address OldLoc = LocalDeclMap.find(LoopVar)->second; 
+    Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
+    IVDeclMap.insert({LoopVar, OuterLoc}); 
     LocalDeclMap.erase(LoopVar);
     AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
     QualType type = LoopVar->getType();
     Address Loc = LVEmission.getObjectAddress(*this);
     LValue LV = MakeAddrLValue(Loc, type);
-    LValue OldLV = MakeAddrLValue(OldLoc, type); 
-    RValue OldRV = EmitLoadOfLValue(OldLV, DI->getBeginLoc()); 
+    LValue OuterLV = MakeAddrLValue(OuterLoc, type); 
+    RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
     LV.setNonGC(true);
-    EmitStoreThroughLValue(OldRV, LV, true);
+    EmitStoreThroughLValue(OuterRV, LV, true);
     EmitAutoVarCleanups(LVEmission);
+    auto tmp = AllocaInsertPt; 
+    AllocaInsertPt = OldAllocaInsertPt; 
+    tmp->removeFromParent(); 
   }
 
   // create the detach terminator
   Builder.CreateDetach(ForBody, Increment, SRStart);  
 
   EmitBlock(ForBody);
-
   incrementProfileCounter(&S);
-
   {
     // Create a separate cleanup scope for the body, in case it is not
    // a compound statement.
@@ -348,17 +340,21 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
     EmitStmt(S.getBody());
   }
 
-
-  /////////////////////////////////////////////////////////////////
-  // Modify the body block to use the detach block variable mirror.
-  // At this point in the codegen, the body block has been emitted
-  // and we can safely replace the induction variable with the detach
-  // block mirror in the entire function, since the increment block
-  // (a valid use of the induction variable) has not been emitted yet.
-  /////////////////////////////////////////////////////////////////
+  // Restore IVs after emitting body
+  for (const auto &p : IVDeclMap){
+    LocalDeclMap.erase(p.first);
+    LocalDeclMap.insert(p); 
+  }
 
   EmitBlock(Reattach.getBlock());
   Builder.CreateReattach(Increment, SRStart);
+
+  EmitBlock(Increment);
+  EmitStmt(S.getInc());
+  BreakContinueStack.pop_back();
+  ConditionScope.ForceCleanup();
+  EmitStopPoint(&S);
+  EmitBranch(ConditionBlock);
 
   ForScope.ForceCleanup();
 
@@ -368,6 +364,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   Builder.CreateSync(End, SRStart);
 
   EmitBlock(End, true);
+
 }
 
 void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
@@ -434,23 +431,31 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   EmitBlock(Detach);
 
   // Extract the DeclStmt from the statement init
-  const DeclStmt *DS = cast<DeclStmt>(S.getInit());
+  const DeclStmt *DS = cast<DeclStmt>(S.getBeginStmt());
   
-  // Emit the detach block
+  // Set up IVs to be copied as firstprivate 
+  DeclMapTy IVDeclMap; 
   for (auto *DI : DS->decls()){
     auto *LoopVar = dyn_cast<VarDecl>(DI);
-    auto LVInitRV = EmitAnyExprToTemp(LoopVar->getInit()); 
     auto OldAllocaInsertPt = AllocaInsertPt;
     llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
     AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
                                                Detach);
+    Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
+    IVDeclMap.insert({LoopVar, OuterLoc}); 
+    LocalDeclMap.erase(LoopVar);
     AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
     QualType type = LoopVar->getType();
     Address Loc = LVEmission.getObjectAddress(*this);
     LValue LV = MakeAddrLValue(Loc, type);
+    LValue OuterLV = MakeAddrLValue(OuterLoc, type); 
+    RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
     LV.setNonGC(true);
-    EmitStoreThroughLValue(LVInitRV, LV, true);
+    EmitStoreThroughLValue(OuterRV, LV, true);
     EmitAutoVarCleanups(LVEmission);
+    auto tmp = AllocaInsertPt; 
+    AllocaInsertPt = OldAllocaInsertPt; 
+    tmp->removeFromParent(); 
   }
 
   // create the detach terminator
@@ -469,6 +474,12 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
     LexicalScope BodyScope(*this, R);
     EmitStmt(S.getLoopVarStmt());
     EmitStmt(S.getBody());
+  }
+
+  // Restore IVs after emitting body
+  for (const auto &p : IVDeclMap){
+    LocalDeclMap.erase(p.first);
+    LocalDeclMap.insert(p); 
   }
 
   /////////////////////////////////////////////////////////////////
