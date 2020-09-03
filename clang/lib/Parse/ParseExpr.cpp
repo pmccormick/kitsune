@@ -1749,7 +1749,7 @@ ExprResult Parser::ParseCastExpression(CastParseKind ParseKind,
     //   return ExprError();
     // }
 
-    Res = ParseCastExpression(false);
+    Res = ParseCastExpression(AnyCastExpr);
     if (!Res.isInvalid())
       Res = Actions.ActOnCilkSpawnExpr(SpawnLoc, Res.get());
     return Res;
