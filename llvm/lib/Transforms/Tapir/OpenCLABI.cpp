@@ -24,10 +24,12 @@
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Vectorize.h"
 #include "llvm/Support/TargetRegistry.h"
+#include <LLVMSPIRVLib/LLVMSPIRVLib.h>
+#include <sstream>
 
 using namespace llvm;
 
-#define DEBUG_TYPE "cudaabi"
+#define DEBUG_TYPE "openclabi"
 
 Value *OpenCLABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Grainsize = ConstantInt::get(GrainsizeCall->getType(), 8);
@@ -77,50 +79,33 @@ SPIRVLoop::SPIRVLoop(Module &M)
   Triple SPIRVTriple("spir64-unknown-unknown");
   SPIRVM.setTargetTriple(SPIRVTriple.str());
 
-  // Find the SPIRV module pass which will create the SPIRV code
-  std::string error;
-  const Target *SPIRVTarget = TargetRegistry::lookupTarget("", SPIRVTriple, error);
-  LLVM_DEBUG({
-      if (!SPIRVTarget)
-        dbgs() << "ERROR: Failed to lookup SPIRV target: " << error << "\n";
-    });
-  assert(SPIRVTarget && "Failed to find SPIRV target");
-
-  SPIRVTargetMachine =
-      SPIRVTarget->createTargetMachine(SPIRVTriple.getTriple(), "sm_70", "+ptx60",
-                                     TargetOptions(), Reloc::PIC_,
-                                     CodeModel::Small, CodeGenOpt::Aggressive);
-  SPIRVM.setDataLayout(SPIRVTargetMachine->createDataLayout());
-
-  /*
   // Insert runtime-function declarations in SPIRV host modules.
   Type *SPIRVInt32Ty = Type::getInt32Ty(SPIRVM.getContext());
-  GetThreadIdx = SPIRVM.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.tid.x",
-                                          SPIRVInt32Ty);
-  GetBlockIdx = SPIRVM.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.ctaid.x",
-                                         SPIRVInt32Ty);
-  GetBlockDim = SPIRVM.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.ntid.x",
-                                         SPIRVInt32Ty);
-  */
+  GetThreadIdx = SPIRVM.getOrInsertFunction("get_global_id",
+                                          SPIRVInt32Ty, SPIRVInt32Ty);
+  GetBlockIdx = SPIRVM.getOrInsertFunction("get_local_id",
+                                         SPIRVInt32Ty, SPIRVInt32Ty);
+  GetBlockDim = SPIRVM.getOrInsertFunction("get_local_size",
+                                         SPIRVInt32Ty, SPIRVInt32Ty);
 
   Type *VoidTy = Type::getVoidTy(M.getContext());
   Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
   Type *Int8Ty = Type::getInt8Ty(M.getContext());
   Type *Int32Ty = Type::getInt32Ty(M.getContext());
   Type *Int64Ty = Type::getInt64Ty(M.getContext());
-  KitsuneOpenCLInit = M.getOrInsertFunction("__kitsune_cuda_init", VoidTy);
-  KitsuneGPUInitKernel = M.getOrInsertFunction("__kitsune_gpu_init_kernel",
-                                               VoidTy, Int32Ty, VoidPtrTy);
-  KitsuneGPUInitField = M.getOrInsertFunction("__kitsune_gpu_init_field",
+  KitsuneOpenCLInit = M.getOrInsertFunction("__kitsune_opencl_init", VoidTy);
+  KitsuneGPUInitKernel = M.getOrInsertFunction("__kitsune_opencl_init_kernel",
+                                               VoidTy, Int32Ty, Int32Ty, VoidPtrTy);
+  KitsuneGPUInitField = M.getOrInsertFunction("__kitsune_opencl_init_field",
                                               VoidTy, Int32Ty, VoidPtrTy,
                                               VoidPtrTy, Int32Ty, Int64Ty,
                                               Int8Ty);
-  KitsuneGPUSetRunSize = M.getOrInsertFunction("__kitsune_gpu_set_run_size",
+  KitsuneGPUSetRunSize = M.getOrInsertFunction("__kitsune_opencl_set_run_size",
                                                VoidTy, Int32Ty, Int64Ty,
                                                Int64Ty, Int64Ty);
-  KitsuneGPURunKernel = M.getOrInsertFunction("__kitsune_gpu_run_kernel",
+  KitsuneGPURunKernel = M.getOrInsertFunction("__kitsune_opencl_run_kernel",
                                               VoidTy, Int32Ty);
-  KitsuneGPUFinish = M.getOrInsertFunction("__kitsune_gpu_finish", VoidTy);
+  KitsuneGPUFinish = M.getOrInsertFunction("__kitsune_opencl_finish", VoidTy);
 }
 
 void SPIRVLoop::setupLoopOutlineArgs(
@@ -185,6 +170,11 @@ unsigned SPIRVLoop::getLimitArgIndex(const Function &F, const ValueSet &Args)
 
 void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
                                  ValueToValueMapTy &VMap) {
+  LLVMContext &Ctx = M.getContext();
+  Type *Int8Ty = Type::getInt8Ty(Ctx);
+  Type *Int32Ty = Type::getInt32Ty(Ctx);
+  Type *Int64Ty = Type::getInt64Ty(Ctx);
+  Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
   Task *T = TL.getTask();
   Loop *L = TL.getLoop();
 
@@ -205,9 +195,9 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
 
   // Get the thread ID for this invocation of Helper.
   IRBuilder<> B(Entry->getTerminator());
-  Value *ThreadIdx = B.CreateCall(GetThreadIdx);
-  Value *BlockIdx = B.CreateCall(GetBlockIdx);
-  Value *BlockDim = B.CreateCall(GetBlockDim);
+  Value *ThreadIdx = B.CreateCall(GetThreadIdx, ConstantInt::get(Int32Ty, 0));
+  Value *BlockIdx = B.CreateCall(GetBlockIdx, ConstantInt::get(Int32Ty, 0));
+  Value *BlockDim = B.CreateCall(GetBlockDim, ConstantInt::get(Int32Ty, 0));
   Value *ThreadID = B.CreateIntCast(
       B.CreateAdd(ThreadIdx, B.CreateMul(BlockIdx, BlockDim), "threadId"),
       PrimaryIV->getType(), false);
@@ -248,12 +238,12 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
          "End argument not used in condition");
   ClonedCond->setOperand(TripCountIdx, ThreadEnd);
 
-  LLVMContext &Ctx = SPIRVM.getContext();
+  LLVMContext &SPIRVCtx = SPIRVM.getContext();
 
   SmallVector<Metadata *, 3> AV;
   AV.push_back(ValueAsMetadata::get(Helper));
-  AV.push_back(MDString::get(Ctx, "kernel"));
-  AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx),
+  AV.push_back(MDString::get(SPIRVCtx, "kernel"));
+  AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(SPIRVCtx),
                                                      1)));
   //Annotations->addOperand(MDNode::get(Ctx, AV));
 
@@ -276,25 +266,24 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   PassManager->add(createDeadStoreEliminationPass());
   //PassManager->add(createInstructionCombiningPass());
   PassManager->add(createCFGSimplificationPass());
-
-  SmallVector<char, 65536> Buf;
-  raw_svector_ostream Ostr(Buf);
-
-  bool Fail = SPIRVTargetMachine->addPassesToEmitFile(
-      *PassManager, Ostr, &Ostr,
-      CodeGenFileType::CGFT_AssemblyFile, false);
-  assert(!Fail && "Failed to emit SPIRV");
-
   PassManager->run(SPIRVM);
 
   delete PassManager;
 
-  // Create a global string to hold the SPIRV code
-  Constant *PCS = ConstantDataArray::getString(M.getContext(),
-                                               Ostr.str().str());
-  SPIRVGlobal = new GlobalVariable(M, PCS->getType(), true,
-                                 GlobalValue::PrivateLinkage, PCS,
-                                 "ptx" + Twine(MyKernelID));
+  // generate spirv kernel code
+  std::ostringstream str; 
+  std::string ErrMsg; 
+  bool success = writeSpirv(&SPIRVM, str, ErrMsg); 
+  if(!success){
+    std::cerr << "Failed to compile to spirv: " << ErrMsg << std::endl; 
+    exit(1); 
+  }
+  auto s = str.str(); 
+  Constant *SPIRV = ConstantDataArray::getRaw(s, s.length(), Int8Ty);
+  SPIRVGlobal = new GlobalVariable(M, SPIRV->getType(), true,
+                                 GlobalValue::PrivateLinkage, SPIRV,
+                                 "spirv_" + Twine(Helper->getName()));
+
 }
 
 void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
@@ -315,10 +304,13 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   IRBuilder<> B(ReplCall);
 
   Value *KernelID = ConstantInt::get(Int32Ty, MyKernelID);
-  Value *SPIRVBytes = B.CreateBitCast(SPIRVGlobal, VoidPtrTy);
+  Value *SPIRVPtr = B.CreateBitCast(SPIRVGlobal, VoidPtrTy);
+
+  Constant *kernelSize = ConstantInt::get(Int32Ty, 
+    SPIRVGlobal->getInitializer()->getType()->getArrayNumElements()); 
 
   B.CreateCall(KitsuneOpenCLInit, {});
-  B.CreateCall(KitsuneGPUInitKernel, { KernelID, SPIRVBytes });
+  B.CreateCall(KitsuneGPUInitKernel, { KernelID, kernelSize, SPIRVPtr });
 
   for (Value *V : TOI.InputSet) {
     Value *ElementSize = nullptr;
