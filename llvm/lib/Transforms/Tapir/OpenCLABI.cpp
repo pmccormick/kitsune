@@ -96,13 +96,10 @@ SPIRVLoop::SPIRVLoop(Module &M)
   KitsuneOpenCLInit = M.getOrInsertFunction("__kitsune_opencl_init", VoidTy);
   KitsuneGPUInitKernel = M.getOrInsertFunction("__kitsune_opencl_init_kernel",
                                                VoidTy, Int32Ty, Int32Ty, VoidPtrTy);
-  KitsuneGPUInitField = M.getOrInsertFunction("__kitsune_opencl_init_field",
-                                              VoidTy, Int32Ty, VoidPtrTy,
-                                              VoidPtrTy, Int32Ty, Int64Ty,
-                                              Int8Ty);
+  KitsuneGPUSetArg = M.getOrInsertFunction("__kitsune_opencl_set_arg",
+                                              VoidTy, Int32Ty, Int32Ty, VoidPtrTy, Int32Ty, Int8Ty);
   KitsuneGPUSetRunSize = M.getOrInsertFunction("__kitsune_opencl_set_run_size",
-                                               VoidTy, Int32Ty, Int64Ty,
-                                               Int64Ty, Int64Ty);
+                                               VoidTy, Int32Ty, Int64Ty);
   KitsuneGPURunKernel = M.getOrInsertFunction("__kitsune_opencl_run_kernel",
                                               VoidTy, Int32Ty);
   KitsuneGPUFinish = M.getOrInsertFunction("__kitsune_opencl_finish", VoidTy);
@@ -247,8 +244,6 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
                                                      1)));
   //Annotations->addOperand(MDNode::get(Ctx, AV));
 
-  LLVM_DEBUG(dbgs() << "SPIRV Module: " << SPIRVM);
-
   legacy::PassManager *PassManager = new legacy::PassManager;
 
   PassManager->add(createVerifierPass());
@@ -269,6 +264,9 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   PassManager->run(SPIRVM);
 
   delete PassManager;
+
+  LLVM_DEBUG(dbgs() << "SPIRV Module: " << SPIRVM);
+
 
   // generate spirv kernel code
   std::ostringstream str; 
@@ -312,51 +310,11 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   B.CreateCall(KitsuneOpenCLInit, {});
   B.CreateCall(KitsuneGPUInitKernel, { KernelID, kernelSize, SPIRVPtr });
 
+  int ArgID = 0; 
   for (Value *V : TOI.InputSet) {
     Value *ElementSize = nullptr;
-    Value *VPtr;
     Value *FieldName;
-    Value *Size = nullptr;
-
-    // TODO: fix
-    // this is a temporary hack to get the size of the field
-    // it will currently only work for a limited case
-
-    if (BitCastInst *BC = dyn_cast<BitCastInst>(V)) {
-      CallInst *CI = dyn_cast<CallInst>(BC->getOperand(0));
-      assert(CI && "Unable to detect field size");
-
-      Value *Bytes = CI->getOperand(0);
-      assert(Bytes->getType()->isIntegerTy(64));
-
-      PointerType *PT = dyn_cast<PointerType>(V->getType());
-      IntegerType *IntT = dyn_cast<IntegerType>(PT->getElementType());
-      assert(IntT && "Expected integer type");
-
-      Constant *Fn = ConstantDataArray::getString(Ctx, CI->getName());
-      GlobalVariable *FieldNameGlobal =
-          new GlobalVariable(M, Fn->getType(), true,
-                             GlobalValue::PrivateLinkage, Fn, "field.name");
-      FieldName = B.CreateBitCast(FieldNameGlobal, VoidPtrTy);
-      VPtr = B.CreateBitCast(V, VoidPtrTy);
-      ElementSize = ConstantInt::get(Int32Ty, IntT->getBitWidth()/8);
-      Size = B.CreateUDiv(Bytes, ConstantInt::get(Int64Ty,
-                                                  IntT->getBitWidth()/8));
-    } else if (AllocaInst *AI = dyn_cast<AllocaInst>(V)) {
-      Constant *Fn = ConstantDataArray::getString(Ctx, AI->getName());
-      GlobalVariable *FieldNameGlobal =
-          new GlobalVariable(M, Fn->getType(), true,
-                             GlobalValue::PrivateLinkage, Fn, "field.name");
-      FieldName = B.CreateBitCast(FieldNameGlobal, VoidPtrTy);
-      VPtr = B.CreateBitCast(V, VoidPtrTy);
-      ArrayType *AT = dyn_cast<ArrayType>(AI->getAllocatedType());
-      assert(AT && "Expected array type");
-      ElementSize =
-          ConstantInt::get(Int32Ty,
-                           AT->getElementType()->getPrimitiveSizeInBits()/8);
-      Size = ConstantInt::get(Int64Ty, AT->getNumElements());
-    }
-
+    LLVM_DEBUG(dbgs() << "Input set value: " << *V << "\n"); 
     unsigned m = 0;
     for (const User *U : V->users()) {
       if (const Instruction *I = dyn_cast<Instruction>(U)) {
@@ -374,14 +332,19 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
       }
     }
     Value *Mode = ConstantInt::get(Int8Ty, m);
-    if (ElementSize && Size)
-      B.CreateCall(KitsuneGPUInitField, { KernelID, FieldName, VPtr,
-                                          ElementSize, Size, Mode });
+    Value *VPtr = B.CreateAlloca(V->getType()); 
+    Value *VoidVPtr = B.CreateBitCast(VPtr, VoidPtrTy);
+    B.CreateStore(V, VPtr); 
+    DataLayout DL(Parent->getParent());
+    Value *VSize = B.getInt32(DL.getTypeAllocSize(V->getType())); 
+    Value *ArgIDV = ConstantInt::get(Int32Ty, ArgID++); 
+    B.CreateCall(KitsuneGPUSetArg, { KernelID, ArgIDV, VoidVPtr, VSize, Mode });
   }
+
 
   Value *RunSize = B.CreateSub(TripCount, ConstantInt::get(TripCount->getType(),
                                                            1));
-  B.CreateCall(KitsuneGPUSetRunSize, { KernelID, RunSize, RunStart, RunStart });
+  B.CreateCall(KitsuneGPUSetRunSize, { KernelID, RunSize });
 
   B.CreateCall(KitsuneGPURunKernel, { KernelID });
 
