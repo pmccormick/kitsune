@@ -146,11 +146,15 @@ void SPIRVLoop::setupLoopOutlineArgs(
     InputSet.insert(InputVal);
   }
 
-  // Add the remaining inputs
+  // Add the loop control inputs.
   for (Value *V : TLInputsFixed) {
     assert(!HelperArgs.count(V));
     HelperArgs.insert(V);
     HelperInputs.push_back(V);
+  }
+
+  for(Value *V : HelperInputs){
+    OrderedInputs.push_back(V);
   }
 }
 
@@ -261,6 +265,7 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   PassManager->add(createDeadStoreEliminationPass());
   //PassManager->add(createInstructionCombiningPass());
   PassManager->add(createCFGSimplificationPass());
+  PassManager->add(createDeadCodeEliminationPass());
   PassManager->run(SPIRVM);
 
   delete PassManager;
@@ -311,7 +316,7 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   B.CreateCall(KitsuneGPUInitKernel, { KernelID, kernelSize, SPIRVPtr });
 
   int ArgID = 0; 
-  for (Value *V : TOI.InputSet) {
+  for (Value *V : OrderedInputs) {
     Value *ElementSize = nullptr;
     Value *FieldName;
     LLVM_DEBUG(dbgs() << "Input set value: " << *V << "\n"); 

@@ -62,6 +62,8 @@ private:
   FunctionCallee KitsuneGPUSetRunSize = nullptr;
   FunctionCallee KitsuneGPURunKernel = nullptr;
   FunctionCallee KitsuneGPUFinish = nullptr;
+
+  SmallVector<Value *, 5> OrderedInputs; 
 public:
   SPIRVLoop(Module &M);
 
