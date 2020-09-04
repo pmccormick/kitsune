@@ -96,8 +96,10 @@ SPIRVLoop::SPIRVLoop(Module &M)
   KitsuneOpenCLInit = M.getOrInsertFunction("__kitsune_opencl_init", VoidTy);
   KitsuneGPUInitKernel = M.getOrInsertFunction("__kitsune_opencl_init_kernel",
                                                VoidTy, Int32Ty, Int32Ty, VoidPtrTy);
+  KitsuneGPUMemMove = M.getOrInsertFunction("__kitsune_opencl_mem_move",
+                                              VoidPtrTy, Int32Ty, VoidPtrTy, Int64Ty, Int8Ty);
   KitsuneGPUSetArg = M.getOrInsertFunction("__kitsune_opencl_set_arg",
-                                              VoidTy, Int32Ty, Int32Ty, VoidPtrTy, Int32Ty, Int8Ty);
+                                              VoidTy, Int32Ty, Int32Ty, VoidPtrTy, Int32Ty);
   KitsuneGPUSetRunSize = M.getOrInsertFunction("__kitsune_opencl_set_run_size",
                                                VoidTy, Int32Ty, Int64Ty);
   KitsuneGPURunKernel = M.getOrInsertFunction("__kitsune_opencl_run_kernel",
@@ -174,8 +176,8 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   LLVMContext &Ctx = M.getContext();
   Type *Int8Ty = Type::getInt8Ty(Ctx);
   Type *Int32Ty = Type::getInt32Ty(Ctx);
-  Type *Int64Ty = Type::getInt64Ty(Ctx);
-  Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+  //Type *Int64Ty = Type::getInt64Ty(Ctx);
+  //Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
   Task *T = TL.getTask();
   Loop *L = TL.getLoop();
 
@@ -315,35 +317,42 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   B.CreateCall(KitsuneOpenCLInit, {});
   B.CreateCall(KitsuneGPUInitKernel, { KernelID, kernelSize, SPIRVPtr });
 
+  DataLayout DL(Parent->getParent());
   int ArgID = 0; 
   for (Value *V : OrderedInputs) {
     Value *ElementSize = nullptr;
-    Value *FieldName;
     LLVM_DEBUG(dbgs() << "Input set value: " << *V << "\n"); 
-    unsigned m = 0;
-    for (const User *U : V->users()) {
-      if (const Instruction *I = dyn_cast<Instruction>(U)) {
-        // TODO: Properly restrict this check to users within the cloned loop
-        // body.  Checking the dominator tree doesn't properly check
-        // exception-handling code, although it's not clear we should see such
-        // code in these loops.
-        if (!DT.dominates(T->getEntry(), I->getParent()))
-          continue;
-
-        if (isa<LoadInst>(U))
-          m |= 1;
-        else if (isa<StoreInst>(U))
-          m |= 2;
-      }
-    }
-    Value *Mode = ConstantInt::get(Int8Ty, m);
-    Value *VPtr = B.CreateAlloca(V->getType()); 
-    Value *VoidVPtr = B.CreateBitCast(VPtr, VoidPtrTy);
-    B.CreateStore(V, VPtr); 
-    DataLayout DL(Parent->getParent());
-    Value *VSize = B.getInt32(DL.getTypeAllocSize(V->getType())); 
+    Type *VTy = V->getType();
     Value *ArgIDV = ConstantInt::get(Int32Ty, ArgID++); 
-    B.CreateCall(KitsuneGPUSetArg, { KernelID, ArgIDV, VoidVPtr, VSize, Mode });
+    Value *VoidVPtr, *VSize; 
+    if (auto VPTy = dyn_cast<PointerType>(VTy)){
+      unsigned m = 0;
+      for (const User *U : V->users()) {
+        if (const GetElementPtrInst *Ind = dyn_cast<GetElementPtrInst>(U)) {
+          for(const User *U : Ind->users()){
+            // TODO: check for GEP instruction, with *that being used for a load
+            // or store
+            if (isa<LoadInst>(U))
+              m |= 1;
+            else if (isa<StoreInst>(U))
+              m |= 2;
+          }
+        }
+      }
+      Type *VElemType = VPTy->getElementType(); 
+      Value *VElemSize = B.getInt64(DL.getTypeAllocSize(VElemType)); 
+      Value *VArrSize = B.CreateMul(VElemSize, OrderedInputs[0]); 
+      Value *VPtr = B.CreateBitCast(V, VoidPtrTy);
+      Value *mval = B.getInt8(m); 
+      VoidVPtr = B.CreateCall(KitsuneGPUMemMove, { KernelID, VPtr, VArrSize, mval }); 
+      VSize = B.getInt32(DL.getTypeAllocSize(VoidPtrTy));  
+    } else {
+      Value *VPtr = B.CreateAlloca(V->getType()); 
+      VoidVPtr = B.CreateBitCast(VPtr, VoidPtrTy);
+      VSize = B.getInt32(DL.getTypeAllocSize(VTy)); 
+    }
+
+    B.CreateCall(KitsuneGPUSetArg, { KernelID, ArgIDV, VoidVPtr, VSize });
   }
 
 
