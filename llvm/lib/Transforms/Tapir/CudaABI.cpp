@@ -241,7 +241,7 @@ Function *CudaLoop::makeModuleCtorFunction() {
   // Mark the address as used which make sure that this section isn't
   // merged and we will really have it in the object file.
   PTXGlobal->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
-  PTXGlobal->setAlignment(DL.getPrefTypeAlignment(PTXGlobal->getType()));
+  PTXGlobal->setAlignment(Align(DL.getPrefTypeAlignment(PTXGlobal->getType())));
 
   unsigned FatbinVersion = 1;
   unsigned FatMagic = CudaFatMagic;
@@ -260,8 +260,8 @@ Function *CudaLoop::makeModuleCtorFunction() {
       M, FatbinWrapperTy, /*isConstant*/ true, GlobalValue::InternalLinkage,
       FatbinWrapperVal, "__cuda_fatbin_wrapper");
   FatbinWrapper->setSection(FatbinSectionName);
-  FatbinWrapper->setAlignment(DL.getPrefTypeAlignment(
-                                  FatbinWrapper->getType()));
+  FatbinWrapper->setAlignment(
+      Align(DL.getPrefTypeAlignment(FatbinWrapper->getType())));
 
   CallInst *RegisterFatbinCall = CtorBuilder.CreateCall(
       RegisterFatbinFunc,
@@ -269,7 +269,7 @@ Function *CudaLoop::makeModuleCtorFunction() {
   GpuBinaryHandle = new GlobalVariable(
       M, VoidPtrPtrTy, /*isConstant*/ false, GlobalValue::InternalLinkage,
       ConstantPointerNull::get(VoidPtrPtrTy), "__cuda_gpubin_handle");
-  GpuBinaryHandle->setAlignment(DL.getPointerABIAlignment(0));
+  GpuBinaryHandle->setAlignment(Align(DL.getPointerABIAlignment(0)));
   GpuBinaryHandle->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
   CtorBuilder.CreateAlignedStore(RegisterFatbinCall, GpuBinaryHandle,
                                  DL.getPointerABIAlignment(0));
@@ -383,7 +383,7 @@ void PTXLoop::makeFatBinaryString() {
       dbgs() << "FatBinFile = " << FatBinFile << "\n";
     });
   std::unique_ptr<ToolOutputFile> FDOut =
-      llvm::make_unique<ToolOutputFile>(PTXFile, EC, OpenFlags);
+      std::make_unique<ToolOutputFile>(PTXFile, EC, OpenFlags);
   raw_pwrite_stream *OS = &FDOut->os();
 
   bool Fail = PTXTargetMachine->addPassesToEmitFile(
@@ -966,11 +966,11 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   Type *CoercedDim3Ty = StructType::get(Int64Ty, Int32Ty);
   AllocaInst *CoercedGridDim = B.CreateAlloca(CoercedDim3Ty);
   AllocaInst *CoercedBlockDim = B.CreateAlloca(CoercedDim3Ty);
-  B.CreateMemCpy(CoercedGridDim, CoercedGridDim->getAlignment(), GridDim,
-                 GridDim->getAlignment(),
+  B.CreateMemCpy(CoercedGridDim, Align(CoercedGridDim->getAlignment()), GridDim,
+                 Align(GridDim->getAlignment()),
                  ConstantInt::get(SizeTy, DL.getTypeAllocSize(Dim3Ty)));
-  B.CreateMemCpy(CoercedBlockDim, CoercedBlockDim->getAlignment(), BlockDim,
-                 BlockDim->getAlignment(),
+  B.CreateMemCpy(CoercedBlockDim, Align(CoercedBlockDim->getAlignment()),
+                 BlockDim, Align(BlockDim->getAlignment()),
                  ConstantInt::get(SizeTy, DL.getTypeAllocSize(Dim3Ty)));
 
   // Load coerced grid and block dimensions
