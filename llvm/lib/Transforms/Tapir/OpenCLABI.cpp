@@ -354,6 +354,11 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
                     mmap_marker = CI; 
                   }
                 }
+                if(auto *VCI = dyn_cast<CastInst>(V)){
+                  if(VCI->getOperand(0) == OPtr){
+                    mmap_marker = CI;
+                  }
+                }
               }
             }
           }
