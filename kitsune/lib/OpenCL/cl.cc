@@ -1,6 +1,7 @@
 #include <CL/cl.hpp>
 #include<iostream>
 #include<stdint.h>
+#include<stdbool.h>
 
 extern "C" void __kitsune_opencl_init(); 
 extern "C" void __kitsune_opencl_init_kernel(size_t id, size_t len, void* spirkernel); 
@@ -8,8 +9,8 @@ extern "C" void __kitsune_opencl_set_arg(int id, int argid, void* arg, uint32_t 
 extern "C" void __kitsune_opencl_set_run_size(int id, uint64_t n); 
 extern "C" void __kitsune_opencl_run_kernel(int id); 
 extern "C" void __kitsune_opencl_finish(); 
-
-extern "C" void* __kitsune_opencl_mem_move(int id, void* arg, uint64_t size, uint8_t mode); 
+extern "C" void __kitsune_opencl_mem_read(int id, void* ptr, void* buf, uint64_t size, uint8_t mode); 
+extern "C" void* __kitsune_opencl_mem_write(int id, void* arg, uint64_t size, uint8_t mode); 
 
 using namespace std; 
 
@@ -42,17 +43,25 @@ void __kitsune_opencl_init(){
   }
 }
 
-void* __kitsune_opencl_mem_move(size_t id, void* ptr, uint64_t size, uint8_t mode){
+void __kitsune_opencl_mmap_marker(void* arg, uint64_t size); 
+
+void* __kitsune_opencl_mem_write(size_t id, void* ptr, uint64_t size, uint8_t mode){
   cl_int err; 
-  cl_mem_flags mf = 
+  cl_mem_flags mf = CL_MEM_COPY_HOST_PTR |  
     mode & 1 && mode & 2 ? CL_MEM_READ_WRITE :
     mode & 1 ? CL_MEM_READ_ONLY : 
     mode & 2 ? CL_MEM_WRITE_ONLY :
-    CL_MEM_READ_WRITE; 
+    CL_MEM_READ_WRITE;
 
   cl_mem mem = clCreateBuffer(context(), mf, (size_t)size, ptr, &err);  
   check(err == CL_SUCCESS, "clCreateBuffer");
   return (void*) mem; 
+}
+
+void __kitsune_opencl_mem_read(size_t id, void* ptr, void* buf, uint64_t size){
+  cl_int err; 
+  clEnqueueReadBuffer(commandQueue(), (cl_mem)buf, true, 0, size, ptr, 0, NULL, NULL); 
+  check(err == CL_SUCCESS, "clEnqueueReadBuffer");
 }
 
 void __kitsune_opencl_init_kernel(size_t id, size_t len, void* spirkernel){

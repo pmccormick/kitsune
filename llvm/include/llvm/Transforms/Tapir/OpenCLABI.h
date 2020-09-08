@@ -58,7 +58,8 @@ private:
   FunctionCallee GetBlockDim = nullptr;
   FunctionCallee KitsuneOpenCLInit = nullptr;
   FunctionCallee KitsuneGPUInitKernel = nullptr;
-  FunctionCallee KitsuneGPUMemMove = nullptr;
+  FunctionCallee KitsuneGPUMemWrite = nullptr;
+  FunctionCallee KitsuneGPUMemRead = nullptr;
   FunctionCallee KitsuneGPUSetArg = nullptr;
   FunctionCallee KitsuneGPUSetRunSize = nullptr;
   FunctionCallee KitsuneGPURunKernel = nullptr;

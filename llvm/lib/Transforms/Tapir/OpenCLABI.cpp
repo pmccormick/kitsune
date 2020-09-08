@@ -96,8 +96,10 @@ SPIRVLoop::SPIRVLoop(Module &M)
   KitsuneOpenCLInit = M.getOrInsertFunction("__kitsune_opencl_init", VoidTy);
   KitsuneGPUInitKernel = M.getOrInsertFunction("__kitsune_opencl_init_kernel",
                                                VoidTy, Int32Ty, Int32Ty, VoidPtrTy);
-  KitsuneGPUMemMove = M.getOrInsertFunction("__kitsune_opencl_mem_move",
+  KitsuneGPUMemWrite = M.getOrInsertFunction("__kitsune_opencl_mem_write",
                                               VoidPtrTy, Int32Ty, VoidPtrTy, Int64Ty, Int8Ty);
+  KitsuneGPUMemRead = M.getOrInsertFunction("__kitsune_opencl_mem_read",
+                                              VoidTy, Int32Ty, VoidPtrTy, VoidPtrTy, Int64Ty);
   KitsuneGPUSetArg = M.getOrInsertFunction("__kitsune_opencl_set_arg",
                                               VoidTy, Int32Ty, Int32Ty, VoidPtrTy, Int32Ty);
   KitsuneGPUSetRunSize = M.getOrInsertFunction("__kitsune_opencl_set_run_size",
@@ -294,16 +296,16 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
 void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
                                       DominatorTree &DT) {
   LLVMContext &Ctx = M.getContext();
-  Type *Int8Ty = Type::getInt8Ty(Ctx);
+  //Type *Int8Ty = Type::getInt8Ty(Ctx);
   Type *Int32Ty = Type::getInt32Ty(Ctx);
-  Type *Int64Ty = Type::getInt64Ty(Ctx);
+  //Type *Int64Ty = Type::getInt64Ty(Ctx);
   Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
 
-  Task *T = TL.getTask();
+  //Task *T = TL.getTask();
   CallBase *ReplCall = cast<CallBase>(TOI.ReplCall);
   Function *Parent = ReplCall->getFunction();
-  Value *RunStart = ReplCall->getArgOperand(getIVArgIndex(*Parent,
-                                                          TOI.InputSet));
+  //Value *RunStart = ReplCall->getArgOperand(getIVArgIndex(*Parent,
+  //                                                        TOI.InputSet));
   Value *TripCount = ReplCall->getArgOperand(getLimitArgIndex(*Parent,
                                                               TOI.InputSet));
   IRBuilder<> B(ReplCall);
@@ -313,14 +315,16 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   Constant *kernelSize = ConstantInt::get(Int32Ty, 
     SPIRVGlobal->getInitializer()->getType()->getArrayNumElements()); 
-
-  B.CreateCall(KitsuneOpenCLInit, {});
-  B.CreateCall(KitsuneGPUInitKernel, { KernelID, kernelSize, SPIRVPtr });
+  BasicBlock &EBB = Parent->getEntryBlock(); 
+  IRBuilder<> EB(&EBB.front()); 
+  EB.CreateCall(KitsuneOpenCLInit, {});
+  EB.CreateCall(KitsuneGPUInitKernel, { KernelID, kernelSize, SPIRVPtr });
 
   DataLayout DL(Parent->getParent());
+  IRBuilder<> RB(ReplCall->getParent()->getTerminator()); 
   int ArgID = 0; 
   for (Value *V : OrderedInputs) {
-    Value *ElementSize = nullptr;
+    //Value *ElementSize = nullptr;
     LLVM_DEBUG(dbgs() << "Input set value: " << *V << "\n"); 
     Type *VTy = V->getType();
     Value *ArgIDV = ConstantInt::get(Int32Ty, ArgID++); 
@@ -330,8 +334,7 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
       for (const User *U : V->users()) {
         if (const GetElementPtrInst *Ind = dyn_cast<GetElementPtrInst>(U)) {
           for(const User *U : Ind->users()){
-            // TODO: check for GEP instruction, with *that being used for a load
-            // or store
+            // TODO: Less hacky solution
             if (isa<LoadInst>(U))
               m |= 1;
             else if (isa<StoreInst>(U))
@@ -339,30 +342,49 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
           }
         }
       }
-      Type *VElemType = VPTy->getElementType(); 
-      Value *VElemSize = B.getInt64(DL.getTypeAllocSize(VElemType)); 
-      Value *VArrSize = B.CreateMul(VElemSize, OrderedInputs[0]); 
-      Value *VPtr = B.CreateBitCast(V, VoidPtrTy);
+      CallInst *mmap_marker = nullptr;  
+      for(auto &BB : *Parent) if(DT.dominates(&BB, ReplCall->getParent())){
+        for(auto &I : BB){
+          if(auto *CI = dyn_cast<CallInst>(&I)){
+            if(Function *fun = CI->getCalledFunction()){
+              if(fun->getName() == "__kitsune_opencl_mmap_marker"){
+                Value *OPtr = CI->getArgOperand(0); 
+                if(auto *BCI = dyn_cast<CastInst>(OPtr)){
+                  if(BCI->getOperand(0) == V){
+                    mmap_marker = CI; 
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      assert(mmap_marker && "Couldn't find mmap for opencl parallel for"); 
+      IRBuilder<> MMB(mmap_marker); 
+      VoidVPtr = mmap_marker->getArgOperand(0);  
+      Value *N = mmap_marker->getArgOperand(1);  
       Value *mval = B.getInt8(m); 
-      VoidVPtr = B.CreateCall(KitsuneGPUMemMove, { KernelID, VPtr, VArrSize, mval }); 
-      VSize = B.getInt32(DL.getTypeAllocSize(VoidPtrTy));  
-    } else {
-      Value *VPtr = B.CreateAlloca(V->getType()); 
-      VoidVPtr = B.CreateBitCast(VPtr, VoidPtrTy);
-      VSize = B.getInt32(DL.getTypeAllocSize(VTy)); 
+      Type *VElemType = VPTy->getElementType(); 
+      Value *VElemSize = MMB.getInt64(DL.getTypeAllocSize(VElemType)); 
+      Value *VArrSize = MMB.CreateMul(VElemSize, N); 
+      Value *VPtr = B.CreateBitCast(V, VoidPtrTy);
+      V = MMB.CreateCall(KitsuneGPUMemWrite, { B.getInt32(MyKernelID), VPtr, VArrSize, mval }); 
+      if(m & 2) RB.CreateCall(KitsuneGPUMemRead, {B.getInt32(MyKernelID), VPtr, V, VArrSize }); 
     }
-
+    Value *VPtr = B.CreateAlloca(V->getType()); 
+    VoidVPtr = B.CreateBitCast(VPtr, VoidPtrTy);
+    VSize = B.getInt32(DL.getTypeAllocSize(VTy)); 
     B.CreateCall(KitsuneGPUSetArg, { KernelID, ArgIDV, VoidVPtr, VSize });
   }
 
 
-  Value *RunSize = B.CreateSub(TripCount, ConstantInt::get(TripCount->getType(),
-                                                           1));
+  Value *RunSize = B.CreateSub(TripCount, ConstantInt::get(TripCount->getType(), 1));
+  
   B.CreateCall(KitsuneGPUSetRunSize, { KernelID, RunSize });
 
   B.CreateCall(KitsuneGPURunKernel, { KernelID });
 
-  B.CreateCall(KitsuneGPUFinish, {});
+  RB.CreateCall(KitsuneGPUFinish, {});
 
   ReplCall->eraseFromParent();
 }
