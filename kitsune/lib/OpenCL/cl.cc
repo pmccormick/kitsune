@@ -11,6 +11,7 @@ extern "C" void __kitsune_opencl_run_kernel(int id);
 extern "C" void __kitsune_opencl_finish(); 
 extern "C" void __kitsune_opencl_mem_read(int id, void* ptr, void* buf, uint64_t size, uint8_t mode); 
 extern "C" void* __kitsune_opencl_mem_write(int id, void* arg, uint64_t size, uint8_t mode); 
+extern "C" void __kitsune_opencl_mmap_marker(void* arg, uint64_t size); 
 
 using namespace std; 
 
@@ -43,7 +44,7 @@ void __kitsune_opencl_init(){
   }
 }
 
-void __kitsune_opencl_mmap_marker(void* arg, uint64_t size); 
+void __kitsune_opencl_mmap_marker(void* arg, uint64_t size){}; 
 
 void* __kitsune_opencl_mem_write(size_t id, void* ptr, uint64_t size, uint8_t mode){
   cl_int err; 
