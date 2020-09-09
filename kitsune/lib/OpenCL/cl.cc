@@ -15,7 +15,7 @@ extern "C" void __kitsune_opencl_mem_read(uint64_t id, void* ptr, void* buf, uin
 
 using namespace std; 
 
-void check(bool pred, std::string msg, int err=0){
+void check(bool pred, std::string msg){
   if(!pred){
     std::cerr << msg << std::endl;
     exit(-1);
