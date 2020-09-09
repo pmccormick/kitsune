@@ -4,20 +4,27 @@
 #include<stdbool.h>
 
 extern "C" void __kitsune_opencl_init(); 
-extern "C" void __kitsune_opencl_init_kernel(size_t id, size_t len, void* spirkernel); 
+extern "C" void __kitsune_opencl_init_kernel(uint64_t id, uint64_t len, void* spirkernel); 
 extern "C" void __kitsune_opencl_set_arg(int id, int argid, void* arg, uint32_t size, uint8_t mode); 
 extern "C" void __kitsune_opencl_set_run_size(int id, uint64_t n); 
 extern "C" void __kitsune_opencl_run_kernel(int id); 
 extern "C" void __kitsune_opencl_finish(); 
-extern "C" void __kitsune_opencl_mem_read(int id, void* ptr, void* buf, uint64_t size, uint8_t mode); 
-extern "C" void* __kitsune_opencl_mem_write(int id, void* arg, uint64_t size, uint8_t mode); 
 extern "C" void __kitsune_opencl_mmap_marker(void* arg, uint64_t size); 
+extern "C" void* __kitsune_opencl_mem_write(uint64_t id, void* arg, uint64_t size, uint8_t mode); 
+extern "C" void __kitsune_opencl_mem_read(uint64_t id, void* ptr, void* buf, uint64_t size); 
 
 using namespace std; 
 
-void check(bool pred, std::string msg){
+void check(bool pred, std::string msg, int err=0){
   if(!pred){
     std::cerr << msg << std::endl;
+    exit(-1);
+  }
+}
+
+void checkCL(int err, std::string msg){
+  if(err != CL_SUCCESS){
+    std::cerr << msg << " errno: " << err << std::endl;
     exit(-1);
   }
 }
@@ -46,30 +53,30 @@ void __kitsune_opencl_init(){
 
 void __kitsune_opencl_mmap_marker(void* arg, uint64_t size){}; 
 
-void* __kitsune_opencl_mem_write(size_t id, void* ptr, uint64_t size, uint8_t mode){
+void* __kitsune_opencl_mem_write(uint64_t id, void* ptr, uint64_t size, uint8_t mode){
   cl_int err; 
-  cl_mem_flags mf = CL_MEM_COPY_HOST_PTR |  
-    mode & 1 && mode & 2 ? CL_MEM_READ_WRITE :
-    mode & 1 ? CL_MEM_READ_ONLY : 
-    mode & 2 ? CL_MEM_WRITE_ONLY :
-    CL_MEM_READ_WRITE;
+  cl_mem_flags mf = CL_MEM_COPY_HOST_PTR; 
+  mf |= ((mode & 1) && (mode & 2)) ? CL_MEM_READ_WRITE :
+        ((mode & 1) ? CL_MEM_READ_ONLY : 
+        ((mode & 2) ? CL_MEM_WRITE_ONLY :
+        CL_MEM_READ_WRITE)); 
 
-  cl_mem mem = clCreateBuffer(context(), mf, (size_t)size, ptr, &err);  
-  check(err == CL_SUCCESS, "clCreateBuffer");
+  cl_mem mem = clCreateBuffer(context(), mf, size, ptr, &err);  
+  checkCL(err, "clCreateBuffer failed");
   return (void*) mem; 
 }
 
-void __kitsune_opencl_mem_read(size_t id, void* ptr, void* buf, uint64_t size){
-  cl_int err; 
-  clEnqueueReadBuffer(commandQueue(), (cl_mem)buf, true, 0, size, ptr, 0, NULL, NULL); 
-  check(err == CL_SUCCESS, "clEnqueueReadBuffer");
+void __kitsune_opencl_mem_read(uint64_t id, void* ptr, void* buf, uint64_t size){
+  cl_int err = clEnqueueReadBuffer(commandQueue(), (cl_mem)buf, true, 0, size, ptr, 0, NULL, NULL); 
+  checkCL(err, "clEnqueueReadBuffer failed");
 }
 
-void __kitsune_opencl_init_kernel(size_t id, size_t len, void* spirkernel){
-  cl_int err; 
+void __kitsune_opencl_init_kernel(uint64_t id, uint64_t len, void* spirkernel){
   cl::Program program {clCreateProgramWithIL(context(), spirkernel, len, nullptr)};   
-  program.build(nullptr); 
-  kernels[id] = cl::Kernel{program, "kitsune_spirv_kernel"};
+  cl_int err = program.build(nullptr); 
+  checkCL(err, "program build failed");
+  kernels[id] = cl::Kernel{program, "kitsune_spirv_kernel", &err};
+  checkCL(err, "kernel creation failed"); 
 }
 
 void __kitsune_opencl_set_arg(int id, int argid, void* arg, uint32_t size, uint8_t mode){
@@ -81,10 +88,10 @@ void __kitsune_opencl_set_run_size(int id, uint64_t n){
 }
 
 void __kitsune_opencl_run_kernel(int id){
-  commandQueue.enqueueNDRangeKernel(kernels[id], cl::NullRange, cl::NDRange{sizes[id]}); 
-  commandQueue.finish(); 
+  cl_int err = commandQueue.enqueueNDRangeKernel(kernels[id], cl::NullRange, cl::NDRange{sizes[id]}); 
+  checkCL(err, "enqueue kernel failed"); 
 }
 
 void __kitsune_opencl_finish(){
-  // TODO
+  commandQueue.finish(); 
 }
