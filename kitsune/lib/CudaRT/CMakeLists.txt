@@ -1,23 +1,28 @@
-add_custom_target(kitsune)
+project (kitcudaart)
 
-set(KITSUNE_RTL_CFLAGS -std=c++11)
-append_rtti_flag(OFF KITSUNE_RTL_CFLAGS)
+find_package(CUDA REQUIRED)
 
-include_directories(../../include ${CUDA_INCLUDE_DIRS})
+include_directories(
+  ${KITSUNE_INCLUDE_DIR}
+  ${CUDA_INCLUDE_DIRS}
+)
 
-set(KITSUNE_SOURCES
-    CUDARuntime.cpp
-    GPURuntime.cpp)
+file(GLOB kit_cudart_srcs
+  *.cpp
+)
 
-foreach (arch ${KITSUNE_SUPPORTED_ARCH})
-  add_compiler_rt_runtime(clang_rt.kitsune
-    STATIC
-    ARCHS ${arch}
-    SOURCES ${KITSUNE_SOURCES}
-    CFLAGS ${KITSUNE_RTL_CFLAGS} -D_GLIBCXX_USE_CXX11_ABI=0
-    PARENT_TARGET kitsune)
-  add_dependencies(kitsune
-    clang_rt.kitsune-${arch})
-endforeach()
+add_library(kitcudart SHARED ${kit_cudart_srcs})
 
-add_dependencies(compiler-rt kitsune)
+set_target_properties(kitcudart
+  PROPERTIES
+  POSITION_INDEPENDENT_CODE   1
+  COMPILE_FLAGS  "-fPIC"
+)
+
+link_directories(${CUDA_LIBRARY_DIR} ${CUDA_RTLIBRARY_DIR})
+
+install(TARGETS kitcudart
+        DESTINATION lib
+)
+
+

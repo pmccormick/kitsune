@@ -63,38 +63,37 @@ const CudaRTArgAccessMode CUDART_ARG_READ_WRITE = 0x6;  // Both LHS and RHS acce
 
 // The information needed by the runtime to manage a single kernel parameter/argument. 
 struct CudaRTKernelArg {
+  
   CudaRTKernelArg() {
-    kind     = CUDART_ARG_TYPE_UNKNOWN; 
-    access   = CUDART_UNKNOWN_ACCESS;
-    host_ptr = 0;
-    dev_ptr  = 0;
-    size     = 0;
+    Kind = CUDART_ARG_TYPE_UNKNOWN; 
+    Access = CUDART_UNKNOWN_ACCESS;
+    HostPtr = 0;
+    DevPtr = 0;
+    Size = 0;
   };
 
-  CudaRTArgKind        kind;
-  CudaRTArgAccessMode  access;
-  size_t               size;
-  CUdeviceptr          dev_ptr;
-  void                 *host_ptr;
+  CudaRTArgKind        Kind;
+  CudaRTArgAccessMode  Access;
+  size_t               Size;
+  CUdeviceptr          DevPtr;
+  void                 *HostPtr;
 };
 
 struct CudaRTKernelInfo {
+  
   CudaRTKernelInfo()  { 
-    args.reserve(16);
-    module = 0;
-    function = 0;
-    dev_id = -1;
-
-    grid_dims[0]  = grid_dims[1]  = grid_dims[2]  = -1;
-    block_dims[0] = block_dims[2] = block_dims[2] = -1;
+    Args.reserve(16);
+    Module = 0;
+    Function = 0;
+    GridDims[0]  = GridDims[1]  = GridDims[2]  = -1;
+    BlockDims[0] = BlockDims[2] = BlockDims[2] = -1;
   }
     
-  CUmodule    module;
-  CUfunction  function;
-  int         dev_id;
-  int         grid_dims[3];
-  int         block_dims[3];
-  std::vector<CudaRTKernelArg> args;
+  CUmodule    Module;
+  CUfunction  Function;
+  int         GridDims[3];
+  int         BlockDims[3];
+  std::vector<CudaRTKernelArg> Args;
 };
 
 
@@ -105,16 +104,16 @@ struct CudaRTDeviceInfo {
   CUdevice     Device;
 };
 
-static bool __kitsune_cudart_initialized = false;
-static bool __kitsune_verbose_rt = false;
-static std::vector<CudaRTDeviceInfo> devices;
-static std::vector<CudaRTKernelInfo> kernels;
+static bool __cudart_initialized = false;
+static bool __cudart_verbose_rt = false;
+std::vector<CudaRTDeviceInfo> __cudart_devices;
+static std::vector<CudaRTKernelInfo> __cudart_kernels;
 
 
 extern "C" 
 void __kitsune_check_env_vars() {
   if (getenv("KITSUNE_ENV_VERBOSE_RT"))
-    __kitsune_verbose_rt = true;
+    __cudart_verbose_rt = true;
 }
 
 extern "C"
@@ -131,148 +130,172 @@ void __kitsune_cudart_initialize() {
   for(unsigned int devID = 0; devID < DeviceCount; ++devID) {
     CHECK_KITCUDART_ERROR( cuDeviceGet(&DeviceInfo.Device, devID) );
     CHECK_KITCUDART_ERROR( cuCtxCreate(&DeviceInfo.Context, 0, DeviceInfo.Device) );
-    devices.push_back(DeviceInfo);
+    __cudart_devices.push_back(DeviceInfo);
   }
 
   if (DeviceCount > 0)
-    __kitsune_cudart_initialized = true;
+    __cudart_initialized = true;
 }
 
 extern "C"
 void __kitsune_cudart_finalize() {
-  assert(__kitsune_cudart_initialized == true && "attempt at finalizing uninitialized runtime");
+  assert(__cudart_initialized == true && "attempt at finalizing uninitialized runtime");
 
   for(int dev_id = 0; dev_id < __kitsune_cudart_ndevices(); ++dev_id)
-    CHECK_KITCUDART_ERROR( cuCtxDestroy( devices[dev_id].Context) );
+    CHECK_KITCUDART_ERROR( cuCtxDestroy( __cudart_devices[dev_id].Context) );
 }
 
 
 extern "C"
 inline int __kitsune_cudart_ndevices() {
-  assert(__kitsune_cudart_initialized == true && "runtime was not initialized prior to call");
-  return devices.size();
+  assert(__cudart_initialized == true && "runtime was not initialized prior to call");
+  return __cudart_devices.size();
 }
 
 
 extern "C"
 inline int __kitsune_cudart_nkernels() {
   // TODO: We probably want something per context/device here... 
-  assert(__kitsune_cudart_initialized == true && "runtime was not initialized prior to call");
-  return kernels.size();
+  assert(__cudart_initialized == true && "runtime was not initialized prior to call");
+  return __cudart_kernels.size();
 }
 
 extern "C"
 int __kitsune_cudart_create_kernel(int devID, const char *ptxSource, const char *funcName) {
-  assert(__kitsune_cudart_initialized == true && "runtime was not initialized prior to call");
+  assert(__cudart_initialized == true && "runtime was not initialized prior to call");
   assert(ptxSource != nullptr && "null ptx source string");
   assert(funcName != nullptr && "null function name string");
   assert(devID < __kitsune_cudart_ndevices() && "invalid device id provided");
   
 
   CudaRTKernelInfo KernInfo;
-  CHECK_KITCUDART_ERROR( cuModuleLoadData(&KernInfo.module, ptxSource) );
-  CHECK_KITCUDART_ERROR( cuModuleGetFunction(&KernInfo.function, KernInfo.module, funcName) );
+  CHECK_KITCUDART_ERROR( cuModuleLoadData(&KernInfo.Module, ptxSource) );
+  CHECK_KITCUDART_ERROR( cuModuleGetFunction(&KernInfo.Function, KernInfo.Module, funcName) );
 
-  kernels.push_back(KernInfo);
-  return kernels.size() - 1;
+  __cudart_kernels.push_back(KernInfo);
+  return __cudart_kernels.size() - 1;
 }
 
 
 extern "C"
-void __kitsune_cudart_add_arg(int kernID, void *hostArgPtr, size_t argSizeInBytes,
-                              CudaRTArgKind kind, CudaRTArgAccessMode modeFlag) {
+void __kitsune_cudart_add_arg(int kernID,
+			      void *hostArgPtr,
+			      size_t argSizeInBytes,
+                              CudaRTArgKind kind,
+			      CudaRTArgAccessMode modeFlag) {
 
-  assert(__kitsune_cudart_initialized == true && "runtime was not initialized prior to call");
-  assert(kernID < __kitsune_cudart_nkernels() && "invaild kernel id provided");
+  assert(__cudart_initialized == true &&
+	 "runtime was not initialized prior to call");
+  assert(kernID < __kitsune_cudart_nkernels() &&
+	 "invaild kernel id provided");
   assert(hostArgPtr != 0 && "null host data pointer");
   assert(argSizeInBytes > 0 && "zero-sized argument");
 
   CudaRTKernelArg ArgInfo;
   
-  ArgInfo.host_ptr = hostArgPtr;
-  ArgInfo.kind = kind;
-  ArgInfo.access = modeFlag;  
-  ArgInfo.size = argSizeInBytes;
+  ArgInfo.HostPtr = hostArgPtr;
+  ArgInfo.Kind = kind;
+  ArgInfo.Access = modeFlag;  
+  ArgInfo.Size = argSizeInBytes;
 
    // Data blocks (arrays) get device-side memory allocations.
   if (kind == CUDART_ARG_TYPE_DATA_BLK) {
-    CHECK_KITCUDART_ERROR( cuMemAlloc(&(ArgInfo.dev_ptr), ArgInfo.size) );
+    CHECK_KITCUDART_ERROR( cuMemAlloc(&(ArgInfo.DevPtr), ArgInfo.Size) );
     // Copy down to device iff a 'read-from' target.
     if (modeFlag == CUDART_ARG_READ_ONLY || modeFlag == CUDART_ARG_READ_WRITE) 
-      CHECK_KITCUDART_ERROR( cuMemcpyHtoD(ArgInfo.dev_ptr, ArgInfo.host_ptr, argSizeInBytes) );
+      CHECK_KITCUDART_ERROR( cuMemcpyHtoD(ArgInfo.DevPtr,
+					  ArgInfo.HostPtr,
+					  argSizeInBytes) );
   } else
-    ArgInfo.dev_ptr = 0;
+    ArgInfo.DevPtr = 0;
 
-
-  kernels[kernID].args.push_back(ArgInfo);
+  __cudart_kernels[kernID].Args.push_back(ArgInfo);
 }
 
 extern "C"
-void __kitsune_cudart_set_grid_dims(int kernID, int dimX, int dimY, int dimZ) {
-  assert(dimX > 0 && dimY > 0 && dimZ > 0 && "grid dims must all be > 0.");
-  assert(kernID < __kitsune_cudart_nkernels() && "invalid kernel id provided");
-  kernels[kernID].grid_dims[0] = dimX;
-  kernels[kernID].grid_dims[1] = dimY;
-  kernels[kernID].grid_dims[2] = dimZ;
+void __kitsune_cudart_set_grid_dims(int kernID, int dimX,
+				    int dimY, int dimZ) {
+  assert(dimX > 0 && dimY > 0 && dimZ > 0 &&
+	 "grid dims must all be > 0.");
+  assert(kernID < __kitsune_cudart_nkernels() &&
+	 "invalid kernel id provided");
+  
+  __cudart_kernels[kernID].GridDims[0] = dimX;
+  __cudart_kernels[kernID].GridDims[1] = dimY;
+  __cudart_kernels[kernID].GridDims[2] = dimZ;
 }
 
 extern "C"
-void __kitsune_cudart_set_block_dims(int kernID, int dimX, int dimY, int dimZ) {
-  assert(dimX > 0 && dimY > 0 && dimZ > 0 && "block dims must all be > 0.");
-  assert(kernID < __kitsune_cudart_nkernels() && "invalid kernel id provided");
-  kernels[kernID].block_dims[0] = dimX;
-  kernels[kernID].block_dims[1] = dimY;
-  kernels[kernID].block_dims[2] = dimZ;
+void __kitsune_cudart_set_block_dims(int kernID, int dimX,
+				     int dimY, int dimZ) {
+  assert(dimX > 0 && dimY > 0 && dimZ > 0 &&
+	 "block dims must all be > 0.");
+  assert(kernID < __kitsune_cudart_nkernels() &&
+	 "invalid kernel id provided");
+  
+  __cudart_kernels[kernID].BlockDims[0] = dimX;
+  __cudart_kernels[kernID].BlockDims[1] = dimY;
+  __cudart_kernels[kernID].BlockDims[2] = dimZ;
 }
 
 extern "C" 
 void __kitsune_cudart_set_kernel_params(int kernID, 
                                         int gridDims[3],
                                         int blockDims[3]) {
-  assert(kernID < kernels.size() && "invalid kernel ID");
-  __kitsune_cudart_set_grid_dims(kernID, gridDims[0], gridDims[1], gridDims[2]);
-  __kitsune_cudart_set_block_dims(kernID, blockDims[0], blockDims[1], blockDims[2]);
+  assert(kernID < __cudart_kernels.size() && "invalid kernel ID");
+  
+  __kitsune_cudart_set_grid_dims(kernID,
+				 gridDims[0],
+				 gridDims[1],
+				 gridDims[2]);
+  
+  __kitsune_cudart_set_block_dims(kernID,
+				  blockDims[0],
+				  blockDims[1],
+				  blockDims[2]);
 }
 
 extern "C"
 void __kitsune_cudart_launch_kernel(int kernID) {
-  assert(kernID < kernels.size() && "invalid kernel ID");
+  assert(kernID < __cudart_kernels.size() && "invalid kernel ID");
 
-  CudaRTKernelInfo &Kinfo = kernels[kernID];
-  assert(Kinfo.block_dims[0] > 0 && Kinfo.block_dims[1] > 0 && 
-         Kinfo.block_dims[2] > 0 && "kernel must have block dimensions >= 1");
-  assert(Kinfo.grid_dims[0] > 0 && Kinfo.grid_dims[1] > 0 && 
-         Kinfo.grid_dims[2] > 0 && "kernel must have grid dimensions >= 1");
+  CudaRTKernelInfo &Kinfo = __cudart_kernels[kernID];
+  assert(Kinfo.BlockDims[0] > 0 && Kinfo.BlockDims[1] > 0 && 
+         Kinfo.BlockDims[2] > 0 && "kernel must have block dimensions >= 1");
+  assert(Kinfo.GridDims[0] > 0 && Kinfo.GridDims[1] > 0 && 
+         Kinfo.GridDims[2] > 0 && "kernel must have grid dimensions >= 1");
 
-  int argCount = Kinfo.args.size();
+  int argCount = Kinfo.Args.size();
   void *Kargs[16];
   assert(argCount <= 16 && "kernel has too many arguments!");
 
   memset(Kargs, 0, 16 * sizeof(void*));
 
   for(int i = 0; i < argCount; ++i) {
-    if (Kinfo.args[i].kind == CUDART_ARG_TYPE_DATA_BLK)
-      Kargs[i] = &(Kinfo.args[i].dev_ptr);
+    if (Kinfo.Args[i].Kind == CUDART_ARG_TYPE_DATA_BLK)
+      Kargs[i] = &(Kinfo.Args[i].DevPtr);
     else
-      Kargs[i] = Kinfo.args[i].host_ptr;
+      Kargs[i] = Kinfo.Args[i].HostPtr;
   }
 
   CHECK_KITCUDART_ERROR( cuCtxSynchronize() );
 
-  int *grid_dims  = &(Kinfo.grid_dims[0]);
-  int *block_dims = &(Kinfo.block_dims[0]); 
-  CHECK_KITCUDART_ERROR( cuLaunchKernel(Kinfo.function, 
-                                        grid_dims[0], grid_dims[1], grid_dims[2],
-                                        block_dims[0], block_dims[1], block_dims[2], 
-                                        0, NULL, Kargs, NULL) );
+  int *grid_dims  = &(Kinfo.GridDims[0]);
+  int *block_dims = &(Kinfo.BlockDims[0]); 
+  CHECK_KITCUDART_ERROR( cuLaunchKernel(Kinfo.Function, 
+                           grid_dims[0], grid_dims[1], grid_dims[2],
+                           block_dims[0], block_dims[1], block_dims[2], 
+                           0, NULL, Kargs, NULL) );
 
   // Copy data back after kernel has run... 
-  for(int i = 0; i < kernels[kernID].args.size(); ++i) {
-    if (Kinfo.args[i].access == CUDART_ARG_WRITE_ONLY ||
-	      Kinfo.args[i].access == CUDART_ARG_READ_WRITE) {
-        assert(Kinfo.args[i].dev_ptr != 0 && "attempted copy from null device pointer");
-        CHECK_KITCUDART_ERROR( cuMemcpyDtoH((void*)Kinfo.args[i].host_ptr,
-					                                  Kinfo.args[i].dev_ptr, Kinfo.args[i].size) );
+  for(int i = 0; i < __cudart_kernels[kernID].Args.size(); ++i) {
+    if (Kinfo.Args[i].Access == CUDART_ARG_WRITE_ONLY ||
+	Kinfo.Args[i].Access == CUDART_ARG_READ_WRITE) {
+      assert(Kinfo.Args[i].DevPtr != 0 &&
+	     "attempted copy from null device pointer");
+      CHECK_KITCUDART_ERROR( cuMemcpyDtoH((void*)Kinfo.Args[i].HostPtr,
+					  Kinfo.Args[i].DevPtr,
+					  Kinfo.Args[i].Size) );
     }
   }
 }
