@@ -514,7 +514,7 @@ private:
   // the arguments to that helper function.  The map \p VMap will store the
   // mapping of values in the original function to values in the outlined
   // helper.
-  Function *createHelperForTapirLoop(TapirLoopInfo *TL, ValueSet &Args,
+  Function *createHelperForTapirLoop(TapirLoopInfo *TL, ValueSet &Args, ValueSet &Inputs,
                                      unsigned IVArgIndex,
                                      unsigned LimitArgIndex, Module *DestM,
                                      ValueToValueMapTy &VMap,
@@ -1267,7 +1267,7 @@ public:
 /// the arguments to that helper function.  The map \p VMap will store the
 /// mapping of values in the original function to values in the outlined helper.
 Function *LoopSpawningImpl::createHelperForTapirLoop(
-    TapirLoopInfo *TL, ValueSet &Args, unsigned IVArgIndex,
+    TapirLoopInfo *TL, ValueSet &Args, ValueSet &Inputs, unsigned IVArgIndex,
     unsigned LimitArgIndex, Module *DestM, ValueToValueMapTy &VMap,
     ValueToValueMapTy &InputMap) {
   Task *T = TL->getTask();
@@ -1311,7 +1311,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
                          TimerGroupName, TimerGroupDescription,
                          TimePassesIsEnabled);
     Helper = CreateHelper(
-        Args, Outputs, TLBlocks, Header, Preheader, TL->getExitBlock(), VMap,
+        Args, Inputs, Outputs, TLBlocks, Header, Preheader, TL->getExitBlock(), VMap,
         DestM, F.getSubprogram() != nullptr, Returns, NameSuffix.str(), nullptr,
         &DetachedRethrowBlocks, &SharedEHEntries, TL->getUnwindDest(),
         &UnreachableExits, nullptr, nullptr, nullptr, Mat);
@@ -1326,6 +1326,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
   if (F.doesNotReturn())
     Helper->removeFnAttr(Attribute::NoReturn);
 
+  /*
   // Update cloned loop condition to use the end-iteration argument.
   unsigned TripCountIdx = 0;
   Value *TripCount = TL->getTripCount();
@@ -1337,6 +1338,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
          "Trip count not used in condition");
   ICmpInst *ClonedCond = cast<ICmpInst>(VMap[TL->getCondition()]);
   ClonedCond->setOperand(TripCountIdx, VMap[Args[LimitArgIndex]]);
+  */
 
   // If the trip count is variable and we're not passing the trip count as an
   // argument, undo the eariler temporarily mapping.
@@ -1347,7 +1349,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
   }
 
   // Rewrite cloned IV's to start at their start-iteration arguments.
-  updateClonedIVs(TL, Preheader, Args, VMap, IVArgIndex);
+  updateClonedIVs(TL, Preheader, Inputs, VMap, IVArgIndex);
 
   // Add alignment assumptions to arguments of helper, based on alignment of
   // values in old function.
@@ -1356,7 +1358,7 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
                        "Add alignment assumptions to Tapir-loop helper",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
-  AddAlignmentAssumptions(&F, Args, VMap, Preheader->getTerminator(), &AC, &DT);
+  AddAlignmentAssumptions(&F, Inputs, VMap, Preheader->getTerminator(), &AC, &DT);
   } // end timed region
 
   // CreateHelper partially serializes the cloned copy of the loop by converting
@@ -1535,10 +1537,11 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
       LoopInputs[L].push_back(V);
     LoopArgStarts[L] = ArgStart;
 
+    auto tmpLoopInputSet = ValueSet(LoopInputs[L].begin(), LoopInputs[L].end()); 
     ValueToValueMapTy VMap;
     // Create the helper function.
     Function *Outline = createHelperForTapirLoop(
-        TL, LoopArgs[L], OutlineProcessors[TL]->getIVArgIndex(F, LoopArgs[L]),
+        TL, LoopArgs[L], tmpLoopInputSet, OutlineProcessors[TL]->getIVArgIndex(F, LoopArgs[L]),
         OutlineProcessors[TL]->getLimitArgIndex(F, LoopArgs[L]),
         &OutlineProcessors[TL]->getDestinationModule(), VMap, InputMap);
     TaskToOutline[T] = TaskOutlineInfo(

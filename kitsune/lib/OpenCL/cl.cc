@@ -5,7 +5,7 @@
 
 extern "C" void __kitsune_opencl_init(); 
 extern "C" void __kitsune_opencl_init_kernel(uint64_t id, uint64_t len, void* spirkernel); 
-extern "C" void __kitsune_opencl_set_arg(int id, int argid, void* arg, uint32_t size, uint8_t mode); 
+extern "C" void __kitsune_opencl_set_arg(int id, int argid, void* arg, uint32_t size); 
 extern "C" void __kitsune_opencl_set_run_size(int id, uint64_t n); 
 extern "C" void __kitsune_opencl_run_kernel(int id); 
 extern "C" void __kitsune_opencl_finish(); 
@@ -79,7 +79,7 @@ void __kitsune_opencl_init_kernel(uint64_t id, uint64_t len, void* spirkernel){
   checkCL(err, "kernel creation failed"); 
 }
 
-void __kitsune_opencl_set_arg(int id, int argid, void* arg, uint32_t size, uint8_t mode){
+void __kitsune_opencl_set_arg(int id, int argid, void* arg, uint32_t size){
   clSetKernelArg(kernels[id](), argid, size, arg); 
 }
 

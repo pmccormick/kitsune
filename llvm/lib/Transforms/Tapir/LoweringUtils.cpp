@@ -1220,6 +1220,9 @@ Instruction *llvm::replaceLoopWithCallToOutline(
                       TopCall->getParent());
     return TopCall;
   }
+  auto *br = BranchInst::Create(Out.ReplRet); 
+  ReplaceInstWithInst(Out.ReplCall, br); 
+  return br; 
 }
 
 bool TapirTarget::shouldProcessFunction(const Function &F) const {
