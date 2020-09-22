@@ -456,10 +456,6 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
     EmitAutoVarCleanups(LVEmission);
   }
 
-  auto tmp = AllocaInsertPt; 
-  AllocaInsertPt = OldAllocaInsertPt; 
-  tmp->removeFromParent(); 
-
   // create the detach terminator
   Builder.CreateDetach(ForBody, Increment, SRStart);
 
@@ -477,6 +473,11 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
     EmitStmt(S.getLoopVarStmt());
     EmitStmt(S.getBody());
   }
+
+  auto tmp = AllocaInsertPt; 
+  AllocaInsertPt = OldAllocaInsertPt; 
+  tmp->removeFromParent(); 
+
 
   // Restore IVs after emitting body
   for (const auto &p : IVDeclMap){
