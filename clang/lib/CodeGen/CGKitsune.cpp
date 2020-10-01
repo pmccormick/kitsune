@@ -267,7 +267,6 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   LexicalScope ConditionScope(*this, S.getSourceRange());
 
   auto OldAllocaInsertPt = AllocaInsertPt;
-  Address OldNormalCleanupDest = NormalCleanupDest;
   llvm::SmallVector<std::pair<VarDecl*, RValue>, 4> ivs;  
   DeclMapTy IVDeclMap; 
   if (S.getCond()) {
@@ -334,7 +333,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   {
     // Create a separate cleanup scope for the body, in case it is not
     // a compound statement.
-    RunCleanupsScope InnerBodyScope(*this);
+    RunCleanupsScope BodyScope(*this);
     if(S.getCond()){
       for (auto &ivp : ivs){
         auto* LoopVar = ivp.first; 
@@ -356,7 +355,6 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
     auto tmp = AllocaInsertPt; 
     AllocaInsertPt = OldAllocaInsertPt; 
     tmp->removeFromParent(); 
-    NormalCleanupDest = OldNormalCleanupDest; 
 
     // Restore IVs after emitting body, and set lifetime ends
     for (const auto &p : IVDeclMap){
@@ -466,6 +464,18 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
                                              Detach);
   
   DeclMapTy IVDeclMap; 
+  llvm::SmallVector<std::pair<VarDecl*, RValue>, 4> ivs;  
+  for (auto *DI : DS->decls()){
+    auto *LoopVar = dyn_cast<VarDecl>(DI);
+    Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
+    LocalDeclMap.erase(LoopVar);
+    IVDeclMap.insert({LoopVar, OuterLoc}); 
+    QualType type = LoopVar->getType();
+    LValue OuterLV = MakeAddrLValue(OuterLoc, type); 
+    RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
+    ivs.push_back({LoopVar, OuterRV}); 
+  }
+  /*
   for (auto *DI : DS->decls()){
     auto *LoopVar = dyn_cast<VarDecl>(DI);
     Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
@@ -481,21 +491,30 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
     EmitStoreThroughLValue(OuterRV, LV, true);
     EmitAutoVarCleanups(LVEmission);
   }
+  */
 
   // create the detach terminator
   Builder.CreateDetach(ForBody, Increment, SRStart);
 
-  /////////////////////////////////
-  // Finished the detach block
-  /////////////////////////////////
   
   EmitBlock(ForBody);
-
   incrementProfileCounter(&S);
 
   {
     // Create a separate cleanup scope for the loop variable and body.
-    LexicalScope BodyScope(*this, R);
+    RunCleanupsScope BodyScope(*this);
+    for (auto &ivp : ivs){
+      auto* LoopVar = ivp.first; 
+      auto OuterRV = ivp.second; 
+      AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
+      EmitAutoVarCleanups(LVEmission);
+      QualType type = LoopVar->getType();
+      Address Loc = LVEmission.getObjectAddress(*this);
+      LValue LV = MakeAddrLValue(Loc, type);
+      LV.setNonGC(true);
+
+      EmitStoreThroughLValue(OuterRV, LV, true);
+    }
     EmitStmt(S.getLoopVarStmt());
     EmitStmt(S.getBody());
   }
