@@ -224,35 +224,15 @@ void CodeGenFunction::EmitSpawnStmt(const SpawnStmt &S) {
 }
 
 void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
-                                             ArrayRef<const Attr *> ForAttrs) {
-
-  assert(S.getInit() && "forall loop has no init");
-  assert(S.getCond() && "forall loop has no condition");
-  assert(S.getInc() && "forall loop has no increment");
-
-  // Create all jump destinations and blocks in the order they appear in the IR
-  // some are jump destinations, some are basic blocks
-  JumpDest Condition = getJumpDestInCurrentScope("forall.cond");
-  llvm::BasicBlock *Detach = createBasicBlock("forall.detach");
-  llvm::BasicBlock *ForBody = createBasicBlock("forall.body");
-  JumpDest Reattach = getJumpDestInCurrentScope("forall.reattach");
-  llvm::BasicBlock *Increment = createBasicBlock("forall.inc");
-  JumpDest Cleanup = getJumpDestInCurrentScope("forall.cond.cleanup");
+                                  ArrayRef<const Attr *> ForAttrs) {
+  JumpDest LoopExit = getJumpDestInCurrentScope("forall.end");
   JumpDest Sync = getJumpDestInCurrentScope("forall.sync");
-  llvm::BasicBlock *End = createBasicBlock("forall.end");
 
-  // Extract a convenience block
-  llvm::BasicBlock *ConditionBlock = Condition.getBlock();
-
-  const SourceRange &R = S.getSourceRange();
-  LexicalScope ForScope(*this, R);
+  LexicalScope ForScope(*this, S.getSourceRange());
 
   // Evaluate the first part before the loop.
-  EmitStmt(S.getInit());
-
-  // get the current insert block (e.g. 'entry'), this will be the basic block
-  // where the induction variable is allocated/defined
-  //llvm::BasicBlock *EntryBlock = Builder.GetInsertBlock();
+  if (S.getInit())
+    EmitStmt(S.getInit());
 
   // create the sync region
   PushSyncRegion();
@@ -261,111 +241,156 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
 
   // TODO: Need to check attributes for spawning strategy. 
   LoopStack.setSpawnStrategy(LoopAttributes::DAC);
+  // Start the loop with a block that tests the condition.
+  // If there's an increment, the continue scope will be overwritten
+  // later.
+  JumpDest Continue = getJumpDestInCurrentScope("forall.cond");
+  llvm::BasicBlock *CondBlock = Continue.getBlock();
+  EmitBlock(CondBlock);
 
-  EmitBlock(ConditionBlock);
-
-  LoopStack.push(ConditionBlock, CGM.getContext(), ForAttrs,
+  const SourceRange &R = S.getSourceRange();
+  LoopStack.push(CondBlock, CGM.getContext(), ForAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 
+  // If the for loop doesn't have an increment we can just use the
+  // condition as the continue block.  Otherwise we'll need to create
+  // a block for it (in the current scope, i.e. in the scope of the
+  // condition), and that we will become our continue block.
+  if (S.getInc())
+    Continue = getJumpDestInCurrentScope("forall.inc");
+
   // Store the blocks to use for break and continue.
-  BreakContinueStack.push_back(BreakContinue(Reattach, Reattach));
+  BreakContinueStack.push_back(BreakContinue(LoopExit, Continue));
 
   // Create a cleanup scope for the condition variable cleanups.
-  LexicalScope ConditionScope(*this, R);
+  LexicalScope ConditionScope(*this, S.getSourceRange());
 
-  // If the for statement has a condition scope, emit the local variable
-  // declaration.
-  if (S.getConditionVariable()) {
-    EmitDecl(*S.getConditionVariable());
-  }
-
-  // C99 6.8.5p2/p4: The first substatement is executed if the expression
-  // compares unequal to 0.  The condition must be a scalar type.
-  llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getCond());
-  Builder.CreateCondBr(
-      BoolCondVal, Detach, Sync.getBlock(),
-      createProfileWeightsForLoop(S.getCond(), getProfileCount(S.getBody())));
-
-  if (ForScope.requiresCleanups()) {
-    EmitBlock(Cleanup.getBlock());
-    EmitBranchThroughCleanup(Sync);
-  }
-
-  //////////////////////////////
-  // Handle the Detach block
-  //////////////////////////////
-
-
-  // Emit the (currently empty) detach block
-  EmitBlock(Detach);
-
-  // Extract the DeclStmt from the statement init
-  const DeclStmt *DS = cast<DeclStmt>(S.getInit());
- 
-  // Set up IVs to be copied as firstprivate 
   auto OldAllocaInsertPt = AllocaInsertPt;
-  llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
-  AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
-                                             Detach);
+  Address OldNormalCleanupDest = NormalCleanupDest;
+  llvm::SmallVector<std::pair<VarDecl*, RValue>, 4> ivs;  
   DeclMapTy IVDeclMap; 
-  for (auto *DI : DS->decls()){
-    auto *LoopVar = dyn_cast<VarDecl>(DI);
-    Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
-    IVDeclMap.insert({LoopVar, OuterLoc}); 
-    LocalDeclMap.erase(LoopVar);
-    AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
-    QualType type = LoopVar->getType();
-    Address Loc = LVEmission.getObjectAddress(*this);
-    LValue LV = MakeAddrLValue(Loc, type);
-    LValue OuterLV = MakeAddrLValue(OuterLoc, type); 
-    RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
-    LV.setNonGC(true);
-    EmitStoreThroughLValue(OuterRV, LV, true);
-    EmitAutoVarCleanups(LVEmission);
+  if (S.getCond()) {
+    // If the for statement has a condition scope, emit the local variable
+    // declaration.
+    if (S.getConditionVariable()) {
+      EmitDecl(*S.getConditionVariable());
+    }
+
+    llvm::BasicBlock *ExitBlock = LoopExit.getBlock();
+    // If there are any cleanups between here and the loop-exit scope,
+    // create a block to stage a loop exit along.
+    if (ForScope.requiresCleanups())
+      ExitBlock = createBasicBlock("forall.cond.cleanup");
+
+    // As long as the condition is true, iterate the loop.
+    llvm::BasicBlock* Detach = createBasicBlock("forall.detach");
+    llvm::BasicBlock *ForBody = createBasicBlock("forall.body");
+
+    // C99 6.8.5p2/p4: The first substatement is executed if the expression
+    // compares unequal to 0.  The condition must be a scalar type.
+    llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getCond());
+    Builder.CreateCondBr(
+        BoolCondVal, Detach, Sync.getBlock(),
+        createProfileWeightsForLoop(S.getCond(), getProfileCount(S.getBody())));
+
+    if (ExitBlock != LoopExit.getBlock()) {
+      EmitBlock(ExitBlock);
+      EmitBranchThroughCleanup(Sync);
+    }
+
+    EmitBlock(Detach);
+    // Extract the DeclStmt from the statement init
+    const DeclStmt *DS = cast<DeclStmt>(S.getInit());
+   
+    //Load induction variables as values before the detach 
+    for (auto *DI : DS->decls()){
+      auto *LoopVar = dyn_cast<VarDecl>(DI);
+      Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
+      LocalDeclMap.erase(LoopVar);
+      IVDeclMap.insert({LoopVar, OuterLoc}); 
+      QualType type = LoopVar->getType();
+      LValue OuterLV = MakeAddrLValue(OuterLoc, type); 
+      RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
+      ivs.push_back({LoopVar, OuterRV}); 
+    }
+
+    // create the detach terminator
+    Builder.CreateDetach(ForBody, Continue.getBlock(), SRStart);  
+
+    // Set up IVs to be copied as firstprivate 
+    llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
+    AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
+                                               ForBody);
+    EmitBlock(ForBody);
+  } else {
+    // Treat it as a non-zero constant.  Don't even create a new block for the
+    // body, just fall into it.
   }
 
-  // create the detach terminator
-  Builder.CreateDetach(ForBody, Increment, SRStart);  
 
-  EmitBlock(ForBody);
   incrementProfileCounter(&S);
+
   {
     // Create a separate cleanup scope for the body, in case it is not
-   // a compound statement.
-    RunCleanupsScope BodyScope(*this);
-    EmitStmt(S.getBody());
+    // a compound statement.
+    RunCleanupsScope InnerBodyScope(*this);
+    if(S.getCond()){
+      for (auto &ivp : ivs){
+        auto* LoopVar = ivp.first; 
+        auto OuterRV = ivp.second; 
+        AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
+        EmitAutoVarCleanups(LVEmission);
+        QualType type = LoopVar->getType();
+        Address Loc = LVEmission.getObjectAddress(*this);
+        LValue LV = MakeAddrLValue(Loc, type);
+        LV.setNonGC(true);
+
+        EmitStoreThroughLValue(OuterRV, LV, true);
+      }
+      EmitStmt(S.getBody());
+    }
   }
 
-  auto tmp = AllocaInsertPt; 
-  AllocaInsertPt = OldAllocaInsertPt; 
-  tmp->removeFromParent(); 
+  if(S.getCond()){
+    auto tmp = AllocaInsertPt; 
+    AllocaInsertPt = OldAllocaInsertPt; 
+    tmp->removeFromParent(); 
+    NormalCleanupDest = OldNormalCleanupDest; 
 
-  // Restore IVs after emitting body
-  for (const auto &p : IVDeclMap){
-    LocalDeclMap.erase(p.first);
-    LocalDeclMap.insert(p); 
+    // Restore IVs after emitting body, and set lifetime ends
+    for (const auto &p : IVDeclMap){
+      LocalDeclMap.erase(p.first);
+      LocalDeclMap.insert(p); 
+    }
+  
+    JumpDest Reattach = getJumpDestInCurrentScope("forall.reattach");
+    EmitBlock(Reattach.getBlock());
+    Builder.CreateReattach(Continue.getBlock(), SRStart);
   }
 
-  EmitBlock(Reattach.getBlock());
-  Builder.CreateReattach(Increment, SRStart);
+  // If there is an increment, emit it next.
+  if (S.getInc()) {
+    EmitBlock(Continue.getBlock());
+    EmitStmt(S.getInc());
+  }
 
-  EmitBlock(Increment);
-  EmitStmt(S.getInc());
   BreakContinueStack.pop_back();
+
   ConditionScope.ForceCleanup();
+
   EmitStopPoint(&S);
-  EmitBranch(ConditionBlock);
+  EmitBranch(CondBlock);
 
   ForScope.ForceCleanup();
 
   LoopStack.pop();
 
   EmitBlock(Sync.getBlock());
-  Builder.CreateSync(End, SRStart);
+  Builder.CreateSync(LoopExit.getBlock(), SRStart);
 
-  EmitBlock(End, true);
-
+  // Emit the fall-through block.
+  EmitBlock(LoopExit.getBlock(), true);
 }
 
 void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
@@ -439,6 +464,7 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
   AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
                                              Detach);
+  
   DeclMapTy IVDeclMap; 
   for (auto *DI : DS->decls()){
     auto *LoopVar = dyn_cast<VarDecl>(DI);
