@@ -65,6 +65,7 @@ protected:
   FunctionCallee GetBlockIdx = nullptr;
   FunctionCallee GetBlockDim = nullptr;
 
+  void EmitPTX(raw_pwrite_stream *OS);
   void makeFatBinaryString();
   virtual Function *makeModuleCtorFunction() { return nullptr; }
   virtual Function *makeModuleDtorFunction() { return nullptr; }

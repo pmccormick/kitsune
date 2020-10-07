@@ -1234,8 +1234,8 @@ namespace {
 // for the loop backedge and, possibly, in metadata.
 class ArgEndMaterializer final : public OutlineMaterializer {
 private:
-  Value *TripCount;
-  Value *ArgEnd;
+  Value *TripCount = nullptr;
+  Value *ArgEnd = nullptr;
 public:
   ArgEndMaterializer(const Instruction *SrcSyncRegion, Value *TripCount,
                      Value *ArgEnd)
@@ -1253,10 +1253,11 @@ public:
                                       MDTuple::get(V->getContext(), None));
     }
 
-    // Materialize TripCount with ArgEnd.  This should only occur in the loop
-    // latch, and we'll overwrite the use of ArgEnd later.
-    if (V == TripCount)
-      return ArgEnd;
+      // Materialize TripCount with ArgEnd.  This should only occur in the loop
+      // latch, and we'll overwrite the use of ArgEnd later.
+      if (V == TripCount)
+        return ArgEnd;
+    }
 
     // Otherwise go with the default behavior.
     return OutlineMaterializer::materialize(V);

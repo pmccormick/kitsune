@@ -186,8 +186,16 @@ void llvm::CloneIntoFunction(Function *NewFunc, const Function *OldFunc,
     if (ISP != SP)
       VMap.MD()[ISP].reset(ISP);
 
-  for (DICompileUnit *CU : DIFinder.compile_units())
+  NamedMDNode *NMD = nullptr;
+  for (DICompileUnit *CU : DIFinder.compile_units()) {
     VMap.MD()[CU].reset(CU);
+    // Populate llvm.dbg.cu in NewFunc's module, if necessary.
+    if (NewFunc->getParent() != OldFunc->getParent()) {
+      if (!NMD)
+        NMD = NewFunc->getParent()->getOrInsertNamedMetadata("llvm.dbg.cu");
+      NMD->addOperand(CU);
+    }
+  }
 
   for (DIType *Type : DIFinder.types())
     VMap.MD()[Type].reset(Type);

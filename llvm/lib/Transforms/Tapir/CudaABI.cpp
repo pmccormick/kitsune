@@ -1,14 +1,13 @@
-//===- CudaABI.cpp - Lower Tapir to the Kitsune CUDA back end -------------===//
+//===- CudaABI.cpp - Lower Tapir loop to a CUDA kernel --------------------===//
 //
-//                     The LLVM Compiler Infrastructure
-//
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the Kitsune CUDA ABI to convert Tapir instructions to
-// calls into the Kitsune runtime system for NVIDIA GPU code.
+// This file implements the CUDA ABI to convert Tapir instructions to calls into
+// GPU runtime system for NVIDIA GPU code.
 //
 //===----------------------------------------------------------------------===//
 
@@ -27,11 +26,19 @@
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Vectorize.h"
 #include "llvm/Support/CodeGen.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Tapir/Outline.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Vectorize.h"
 
 using namespace llvm;
 
@@ -40,8 +47,68 @@ using namespace llvm;
 // Copied from clang/lib/CodeGen/CGCUDANV.cpp
 constexpr unsigned CudaFatMagic = 0x466243b1;
 
-const char *TargetGPUArch = "sm_70";
-const char *TargetGPUFeatures = "+ptx64,+sm_70";
+static cl::opt<std::string>
+GPUArch("tapir-gpu-arch", cl::init("sm_70"),
+        cl::desc("GPU architecture for Tapir-CUDA backend"));
+
+static cl::opt<std::string>
+GPUFeatures("tapir-gpu-features", cl::init("+ptx64"),
+            cl::desc("GPU features for Tapir-CUDA backend"));
+
+static cl::opt<std::string>
+PTXASOptLevel("tapir-ptxas-opt", cl::init("-O2"),
+            cl::desc("Optimization level for PTXAS"));
+
+// const unsigned ThreadsPerBlock = 1024;
+static cl::opt<unsigned> ThreadsPerBlock(
+    "threads-per-block", cl::init(1024), cl::Hidden,
+    cl::desc("Use this threads-per-block count"));
+// TODO: Better ThreadsPerBlock value = 256?
+
+static cl::opt<bool>
+Verbose("tapir-cuda-verbose", cl::init(false),
+        cl::desc("Verbose output for Tapir-CUDA backend"));
+
+/// Get the compute_xx corresponding to a CUDA architecture, e.g., sm_yy.
+static std::string VirtualArchForCudaArch(StringRef Arch) {
+  return llvm::StringSwitch<std::string>(Arch)
+      .Case("sm_20", "compute_20")
+      .Case("sm_21", "compute_20")
+      .Case("sm_30", "compute_30")
+      .Case("sm_32", "compute_32")
+      .Case("sm_35", "compute_35")
+      .Case("sm_37", "compute_37")
+      .Case("sm_50", "compute_50")
+      .Case("sm_52", "compute_52")
+      .Case("sm_53", "compute_53")
+      .Case("sm_60", "compute_60")
+      .Case("sm_61", "compute_61")
+      .Case("sm_62", "compute_62")
+      .Case("sm_70", "compute_70")
+      .Case("sm_72", "compute_72")
+      .Case("sm_75", "compute_75")
+      .Case("gfx600", "compute_amdgcn")
+      .Case("gfx601", "compute_amdgcn")
+      .Case("gfx700", "compute_amdgcn")
+      .Case("gfx701", "compute_amdgcn")
+      .Case("gfx702", "compute_amdgcn")
+      .Case("gfx703", "compute_amdgcn")
+      .Case("gfx704", "compute_amdgcn")
+      .Case("gfx801", "compute_amdgcn")
+      .Case("gfx802", "compute_amdgcn")
+      .Case("gfx803", "compute_amdgcn")
+      .Case("gfx810", "compute_amdgcn")
+      .Case("gfx900", "compute_amdgcn")
+      .Case("gfx902", "compute_amdgcn")
+      .Case("gfx904", "compute_amdgcn")
+      .Case("gfx906", "compute_amdgcn")
+      .Case("gfx908", "compute_amdgcn")
+      .Case("gfx909", "compute_amdgcn")
+      .Case("gfx1010", "compute_amdgcn")
+      .Case("gfx1011", "compute_amdgcn")
+      .Case("gfx1012", "compute_amdgcn")
+      .Default("unknown");
+}
 
 FunctionType *CudaLoop::getRegisterGlobalsFnTy() const {
   LLVMContext &Ctx = M.getContext();
@@ -341,28 +408,64 @@ Function *CudaLoop::makeModuleDtorFunction() {
   return ModuleDtorFunc;
 }
 
+static void AddOptimizationPasses(legacy::PassManagerBase &MPM,
+                                  legacy::FunctionPassManager &FPM,
+                                  TargetMachine *TM, unsigned OptLevel,
+                                  unsigned SizeLevel) {
+  PassManagerBuilder Builder;
+  Builder.OptLevel = OptLevel;
+  Builder.SizeLevel = SizeLevel;
+
+  if (TM)
+    TM->adjustPassManager(Builder);
+
+  Builder.populateFunctionPassManager(FPM);
+  Builder.populateModulePassManager(MPM);
+
+  // // Add in our optimization passes.
+  // //
+  // // TODO: Fix this set of optimization passes for PTX.
+
+  // //MPM.add(createInstructionCombiningPass());
+  // MPM.add(createReassociatePass());
+  // MPM.add(createGVNPass());
+  // MPM.add(createCFGSimplificationPass());
+  // MPM.add(createSLPVectorizerPass());
+  // //MPM.add(createBreakCriticalEdgesPass());
+  // MPM.add(createConstantPropagationPass());
+  // MPM.add(createDeadInstEliminationPass());
+  // MPM.add(createDeadStoreEliminationPass());
+  // //MPM.add(createInstructionCombiningPass());
+  // MPM.add(createCFGSimplificationPass());
+}
+
+void PTXLoop::EmitPTX(raw_pwrite_stream *OS) {
+  legacy::PassManager PM;
+  legacy::FunctionPassManager FPM(&PTXM);
+
+  // Add final module optimization passes and emit PTX.
+  AddOptimizationPasses(PM, FPM, PTXTargetMachine, CodeGenOpt::Default, 0);
+
+  bool Fail = PTXTargetMachine->addPassesToEmitFile(
+      PM, *OS, nullptr,
+      CodeGenFileType::CGFT_AssemblyFile, false);
+  assert(!Fail && "Failed to emit PTX");
+
+  // Add function optimization passes.
+  FPM.doInitialization();
+  for (Function &F : PTXM)
+    FPM.run(F);
+  FPM.doFinalization();
+
+  PM.add(createVerifierPass());
+
+  PM.run(PTXM);
+}
+
 void PTXLoop::makeFatBinaryString() {
   LLVM_DEBUG(dbgs() << "PTX Module: " << PTXM);
 
-  legacy::PassManager *PassManager = new legacy::PassManager;
-
-  PassManager->add(createVerifierPass());
-
-  // Add in our optimization passes
-
-  //PassManager->add(createInstructionCombiningPass());
-  PassManager->add(createReassociatePass());
-  PassManager->add(createGVNPass());
-  PassManager->add(createCFGSimplificationPass());
-  PassManager->add(createSLPVectorizerPass());
-  //PassManager->add(createBreakCriticalEdgesPass());
-  PassManager->add(createConstantPropagationPass());
-  PassManager->add(createDeadInstEliminationPass());
-  PassManager->add(createDeadStoreEliminationPass());
-  //PassManager->add(createInstructionCombiningPass());
-  PassManager->add(createCFGSimplificationPass());
-
-  opt::ArgStringList PTXASArgList, FatBinArgList;
+  // Get ptxas and fatbinary executables on the system.
   auto PTXASExec  = sys::findProgramByName("ptxas");
   auto FatBinExec = sys::findProgramByName("fatbinary");
   LLVM_DEBUG({
@@ -371,51 +474,58 @@ void PTXLoop::makeFatBinaryString() {
       if (FatBinExec)
         dbgs() << "Found " << *FatBinExec << "\n";
     });
+  assert(PTXASExec && "Failed to find ptxas executable.");
+  assert(FatBinExec && "Failed to find fatbinary executable.");
 
-  std::error_code EC;
-  sys::fs::OpenFlags OpenFlags = sys::fs::F_None;
+  // Output file storing PTX
   std::string PTXFile = M.getSourceFileName() + ".s";
+  // Output file storing assembly generated from running ptxas
   std::string AsmFile = M.getSourceFileName() + ".o";
+  // Output file storing fat binary generated from assembly
   std::string FatBinFile = M.getSourceFileName() + ".cubin";
   LLVM_DEBUG({
       dbgs() << "PTXFile = " << PTXFile << "\n";
       dbgs() << "AsmFile = " << AsmFile << "\n";
       dbgs() << "FatBinFile = " << FatBinFile << "\n";
     });
+
+  // Emit PTX for the PTX module
+  std::error_code EC;
+  sys::fs::OpenFlags OpenFlags = sys::fs::F_None;
   std::unique_ptr<ToolOutputFile> FDOut =
       std::make_unique<ToolOutputFile>(PTXFile, EC, OpenFlags);
   raw_pwrite_stream *OS = &FDOut->os();
 
-  bool Fail = PTXTargetMachine->addPassesToEmitFile(
-      *PassManager, *OS, nullptr,
-      CodeGenFileType::CGFT_AssemblyFile, false);
-  assert(!Fail && "Failed to emit PTX");
-
-  PassManager->run(PTXM);
-  delete PassManager;
+  EmitPTX(OS);
 
   FDOut->keep();
 
+  opt::ArgStringList PTXASArgList, FatBinArgList;
+
+  // Setup arguments to ptxas.
   PTXASArgList.push_back("-m64");
-  PTXASArgList.push_back("-O1");
+  if (!PTXM.getNamedMetadata("llvm.dbg.cu"))
+    PTXASArgList.push_back(PTXASOptLevel.c_str());
   PTXASArgList.push_back("--gpu-name");
-  PTXASArgList.push_back(TargetGPUArch);
+  PTXASArgList.push_back(GPUArch.c_str());
   PTXASArgList.push_back("--output-file");
   PTXASArgList.push_back(AsmFile.c_str());
   PTXASArgList.push_back(PTXFile.c_str());
 
+  // Setup arguments to fatbinary.
   FatBinArgList.push_back("-64");
   FatBinArgList.push_back("--create");
   FatBinArgList.push_back(FatBinFile.c_str());
   std::string AsmInput =
-      std::string("--image=profile=") + TargetGPUArch + ",file=" +
+      std::string("--image=profile=") + GPUArch + ",file=" +
       AsmFile;
   FatBinArgList.push_back(AsmInput.c_str());
   std::string PTXInput =
-      std::string("--image=profile=") + "compute_70" + ",file=" +
-      PTXFile;
+      std::string("--image=profile=") + VirtualArchForCudaArch(GPUArch) +
+      ",file=" + PTXFile;
   FatBinArgList.push_back(PTXInput.c_str());
 
+  // Run ptxas on the emitted PTX
   SmallVector<const char *, 128> PTXASArgv;
   PTXASArgv.push_back(PTXASExec->c_str());
   PTXASArgv.append(PTXASArgList.begin(), PTXASArgList.end());
@@ -427,6 +537,7 @@ void PTXLoop::makeFatBinaryString() {
     });
   sys::ExecuteAndWait(*PTXASExec, PTXASArgs);
 
+  // Run fatbinary
   SmallVector<const char *, 128> FatBinArgv;
   FatBinArgv.push_back(FatBinExec->c_str());
   FatBinArgv.append(FatBinArgList.begin(), FatBinArgList.end());
@@ -438,10 +549,10 @@ void PTXLoop::makeFatBinaryString() {
     });
   sys::ExecuteAndWait(*FatBinExec, FatBinArgs);
 
+  // Create a global string in the original module to hold the binary output of
+  // running ptxas and fatbinary.
   ErrorOr<std::unique_ptr<MemoryBuffer>> FatBinBuf =
       MemoryBuffer::getFile(FatBinFile);
-
-  // Create a global string to hold the PTX code
   Constant *PCS = ConstantDataArray::getString(M.getContext(),
                                                FatBinBuf.get()->getBuffer());
   PTXGlobal = new GlobalVariable(M, PCS->getType(), true,
@@ -553,7 +664,8 @@ LoopOutlineProcessor *CudaABI::getLoopOutlineProcessor(
 unsigned PTXLoop::NextKernelID = 0;
 
 PTXLoop::PTXLoop(Module &M)
-    : LoopOutlineProcessor(M, PTXM), PTXM("ptxModule", M.getContext()) {
+    : LoopOutlineProcessor(M, PTXM),
+      PTXM("ptxModule", M.getContext()) {
   // Assign an ID to this kernel.
   MyKernelID = NextKernelID++;
 
@@ -576,7 +688,7 @@ PTXLoop::PTXLoop(Module &M)
   // TODO: Hard-coded machine configuration for Supercloud nodes with Voltas and
   // CUDA 10.1  Generalize this code.
   PTXTargetMachine =
-      PTXTarget->createTargetMachine(PTXTriple.getTriple(), TargetGPUArch,
+      PTXTarget->createTargetMachine(PTXTriple.getTriple(), GPUArch,
                                      "+ptx64", TargetOptions(), Reloc::PIC_,
                                      CodeModel::Small, CodeGenOpt::Aggressive);
   PTXM.setDataLayout(PTXTargetMachine->createDataLayout());
@@ -691,11 +803,32 @@ void PTXLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   Helper->setLinkage(Function::ExternalLinkage);
   // Set the target-cpu and target-features
   AttrBuilder Attrs;
-  Attrs.addAttribute("target-cpu", TargetGPUArch);
-  Attrs.addAttribute("target-features", TargetGPUFeatures);
+  Attrs.addAttribute("target-cpu", GPUArch);
+  Attrs.addAttribute("target-features", GPUFeatures + ",+" + GPUArch);
   Helper->removeFnAttr("target-cpu");
   Helper->removeFnAttr("target-features");
   Helper->addAttributes(AttributeList::FunctionIndex, Attrs);
+
+  // Verify that the Thread ID corresponds to a valid iteration.  Because Tapir
+  // loops use canonical induction variables, valid iterations range from 0 to
+  // the loop limit with stride 1.  The End argument encodes the loop limit.
+  // Get end and grainsize arguments
+  Argument *End, *Start;
+  Value *Grainsize;
+  {
+    auto OutlineArgsIter = Helper->arg_begin();
+    // End argument is the first LC arg.
+    End = &*OutlineArgsIter++;
+    // Start argument is the second LC arg.
+    Start = &*OutlineArgsIter++;
+
+    // Get the grainsize value, which is either constant or the third LC arg.
+    if (unsigned ConstGrainsize = TL.getGrainsize())
+      Grainsize = ConstantInt::get(PrimaryIV->getType(), ConstGrainsize);
+    else
+      // Grainsize argument is the third LC arg.
+      Grainsize = &*OutlineArgsIter;
+  }
 
   // Get the thread ID for this invocation of Helper.
   IRBuilder<> B(Entry->getTerminator());
@@ -706,24 +839,6 @@ void PTXLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
       B.CreateAdd(ThreadIdx, B.CreateMul(BlockIdx, BlockDim), "threadId"),
       PrimaryIV->getType(), false);
 
-  // Verify that the Thread ID corresponds to a valid iteration.  Because Tapir
-  // loops use canonical induction variables, valid iterations range from 0 to
-  // the loop limit with stride 1.  The End argument encodes the loop limit.
-  // Get end and grainsize arguments
-  Argument *End;
-  Value *Grainsize;
-  {
-    auto OutlineArgsIter = Helper->arg_begin();
-    // End argument is the first LC arg.
-    End = &*OutlineArgsIter;
-
-    // Get the grainsize value, which is either constant or the third LC arg.
-    if (unsigned ConstGrainsize = TL.getGrainsize())
-      Grainsize = ConstantInt::get(PrimaryIV->getType(), ConstGrainsize);
-    else
-      // Grainsize argument is the third LC arg.
-      Grainsize = &*++(++OutlineArgsIter);
-  }
   ThreadID = B.CreateMul(ThreadID, Grainsize);
   Value *ThreadEnd = B.CreateAdd(ThreadID, Grainsize);
   Value *Cond = B.CreateICmpUGE(ThreadID, End);
@@ -966,11 +1081,11 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   Type *CoercedDim3Ty = StructType::get(Int64Ty, Int32Ty);
   AllocaInst *CoercedGridDim = B.CreateAlloca(CoercedDim3Ty);
   AllocaInst *CoercedBlockDim = B.CreateAlloca(CoercedDim3Ty);
-  B.CreateMemCpy(CoercedGridDim, Align(CoercedGridDim->getAlignment()), GridDim,
-                 Align(GridDim->getAlignment()),
+  B.CreateMemCpy(CoercedGridDim, MaybeAlign(CoercedGridDim->getAlignment()),
+                 GridDim, MaybeAlign(GridDim->getAlignment()),
                  ConstantInt::get(SizeTy, DL.getTypeAllocSize(Dim3Ty)));
-  B.CreateMemCpy(CoercedBlockDim, Align(CoercedBlockDim->getAlignment()),
-                 BlockDim, Align(BlockDim->getAlignment()),
+  B.CreateMemCpy(CoercedBlockDim, MaybeAlign(CoercedBlockDim->getAlignment()),
+                 BlockDim, MaybeAlign(BlockDim->getAlignment()),
                  ConstantInt::get(SizeTy, DL.getTypeAllocSize(Dim3Ty)));
 
   // Load coerced grid and block dimensions
@@ -1084,13 +1199,82 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     SHInputVec.push_back(V);
   SplitEdge(DetBlock, CallBlock);
   B.SetInsertPoint(CallBlock->getTerminator());
+  // Value *ModVal = B.CreateAnd(TripCount, ThreadsPerBlock, "xtraiter");
+  Value *BranchVal = B.CreateICmpULT(TripCount,
+                                     ConstantInt::get(TripCount->getType(),
+                                                      ThreadsPerBlock));
+  Value *BlockVal = B.CreateSelect(BranchVal, TripCount,
+                                   ConstantInt::get(TripCount->getType(),
+                                                    ThreadsPerBlock));
+  // Value *Threads =
+  //     B.CreateSelect(BranchVal, ConstantInt::get(TripCount->getType(), 1),
+  //                    B.CreateAdd(
+  //                        ConstantInt::get(TripCount->getType(), 1),
+  //                        B.CreateUDiv(TripCount,
+  //                                     ConstantInt::get(TripCount->getType(),
+  //                                                      ThreadsPerBlock))));
+  Value *Threads = B.CreateAdd(
+      ConstantInt::get(TripCount->getType(), 1),
+      B.CreateUDiv(TripCount, ConstantInt::get(TripCount->getType(),
+                                               ThreadsPerBlock)));
+
+  // Instruction *ThenTerm, *ElseTerm;
+  // SplitBlockAndInsertIfThenElse(BranchVal, CallBlock->getTerminator(),
+  //                               &ThenTerm, &ElseTerm);
+  // {
+  //   B.SetInsertPoint(ThenTerm);
+  //   // Insert call to __cudaPushCallConfiguration.
+  //   Value *Threads = ModVal;
+  //   Value *CoercedThreads = B.CreateOr(B.getInt64(1UL << 32), Threads);
+  //   B.CreateCall(CudaPushCallConfig,
+  //                { /*gridDim*/   B.getInt64(1UL << 32 | 1UL), B.getInt32(1),
+  //                  /*blockDim*/  CoercedThreads, B.getInt32(1),
+  //                  /*sharedMem*/ ConstantInt::get(SizeTy, 0),
+  //                  /*stream*/    ConstantPointerNull::get(VoidPtrTy) });
+
+  //   CallInst *HelperCall = B.CreateCall(CudaLoopHelper, SHInputVec);
+  //   HelperCall->setDebugLoc(ReplCall->getDebugLoc());
+  //   HelperCall->setCallingConv(CudaLoopHelper->getCallingConv());
+  //   HelperCall->setDoesNotThrow();
+  // }
+
+  // {
+  //   B.SetInsertPoint(ElseTerm);
+  //   // Insert call to __cudaPushCallConfiguration.
+  //   Value *Threads = B.CreateAdd(
+  //       ConstantInt::get(TripCount->getType(), 1),
+  //       B.CreateUDiv(TripCount, ConstantInt::get(TripCount->getType(),
+  //                                                ThreadsPerBlock)));
+  //   Value *CoercedThreads = B.CreateOr(B.getInt64(1UL << 32), Threads);
+  //   B.CreateCall(CudaPushCallConfig,
+  //                { /*gridDim*/   CoercedThreads, B.getInt32(1),
+  //                  /*blockDim*/  B.getInt64(
+  //                      1UL << 32 | (uint64_t)ThreadsPerBlock), B.getInt32(1),
+  //                  /*sharedMem*/ ConstantInt::get(SizeTy, 0),
+  //                  /*stream*/    ConstantPointerNull::get(VoidPtrTy) });
+
+  //   CallInst *HelperCall = B.CreateCall(CudaLoopHelper, SHInputVec);
+  //   HelperCall->setDebugLoc(ReplCall->getDebugLoc());
+  //   HelperCall->setCallingConv(CudaLoopHelper->getCallingConv());
+  //   HelperCall->setDoesNotThrow();
+  // }
+
   // First insert call to __cudaPushCallConfiguration.
-  Value *ThreadsPerBlock = TripCount;
-  Value *CoercedThreadsPerBlock = B.CreateOr(
-      B.CreateShl(B.getInt64(1), 32, "", true, true), ThreadsPerBlock);
+  // Value *Threads = TripCount;
+  // Value *CoercedThreads = B.CreateOr(B.getInt64(1UL << 32), Threads);
+  // B.CreateCall(CudaPushCallConfig,
+  //              { /*gridDim*/   CoercedThreads, B.getInt32(1),
+  //                /*blockDim*/  B.getInt64(1UL << 32 | 1UL), B.getInt32(1),
+  //                /*sharedMem*/ ConstantInt::get(SizeTy, 0),
+  //                /*stream*/    ConstantPointerNull::get(VoidPtrTy) });
+
+  // TODO: Use LoopStripMine to generate specialized versions of the kernel for
+  // different iteration counts, rather than use a complex call configuration.
+  Value *CoercedThreads = B.CreateOr(B.getInt64(1UL << 32), Threads);
+  Value *CoercedBlockVal = B.CreateOr(B.getInt64(1UL << 32), BlockVal);
   B.CreateCall(CudaPushCallConfig,
-               { /*gridDim*/   CoercedThreadsPerBlock, B.getInt32(1),
-                 /*blockDim*/  B.getInt64(1UL << 32 | 1UL), B.getInt32(1),
+               { /*gridDim*/   CoercedThreads, B.getInt32(1),
+                 /*blockDim*/  CoercedBlockVal, B.getInt32(1),
                  /*sharedMem*/ ConstantInt::get(SizeTy, 0),
                  /*stream*/    ConstantPointerNull::get(VoidPtrTy) });
   if (isa<InvokeInst>(ReplCall)) {

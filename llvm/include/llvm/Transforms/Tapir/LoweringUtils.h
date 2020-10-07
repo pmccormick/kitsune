@@ -138,6 +138,28 @@ struct TaskOutlineInfo {
 using TaskOutlineMapTy = DenseMap<const Task *, TaskOutlineInfo>;
 using TFOutlineMapTy = DenseMap<const Spindle *, TaskOutlineInfo>;
 
+// Value materializer for Tapir outlining.
+//
+// If a non-null destination module DstM is specified, then it is assumed that
+// Tapir lowering will place the code into the module DstM that is distinct from
+// the source module.  In that case, this materializer will ensure will
+// materialize any necessary information, such as global values, in DstM to
+// produce a valid module.
+//
+// If DstM is null, then it's assumed that the outlining process uses the same
+// destination and source modules.  In that case, this value materializer does
+// nothing.
+//
+// TODO: Extend this value materializer to materialize any additional data in
+// DstM.
+class OutlineMaterializer : public ValueMaterializer {
+  Module *DstM = nullptr;
+public:
+  OutlineMaterializer(Module *DstM) : DstM(DstM) {}
+
+  Value *materialize(Value *V) override;
+};
+
 /// Abstract class for a parallel-runtime-system target for Tapir lowering.
 ///
 /// The majority of the Tapir-lowering infrastructure focuses on outlining Tapir
@@ -543,7 +565,6 @@ TaskOutlineInfo outlineTaskFrame(
 /// Given a Tapir loop \p TL and the set of inputs to the task inside that loop,
 /// returns the set of inputs for the Tapir loop itself.
 ValueSet getTapirLoopInputs(TapirLoopInfo *TL, ValueSet &TaskInputs);
-
 
 /// Replaces the Tapir loop \p TL, with associated TaskOutlineInfo \p Out, with
 /// a call or invoke to the outlined helper function created for \p TL.
