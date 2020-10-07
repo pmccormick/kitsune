@@ -220,7 +220,7 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 ; CHECK-NEXT: sync within %[[NESTEDSYNCREG]], label %[[STRPLOOPREATTACH:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPREATTACH]]:
-; CHECK-NEXT: call void @llvm.sync.unwind(token %[[NESTEDSYNCREG]])
+; CHECK-NOT: call void @llvm.sync.unwind(token %[[NESTEDSYNCREG]])
 ; CHECK-NEXT: reattach within %syncreg, label %[[STRPLOOPDETACHCONT]]
 
 ; Function Attrs: nounwind uwtable
