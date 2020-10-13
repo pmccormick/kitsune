@@ -145,9 +145,9 @@ typedef enum {
   LLVMCatchSwitch    = 65,
 
   /* Parallel operators */
-  LLVMDetach         = 69,
-  LLVMReattach       = 70,
-  LLVMSync           = 71,
+  LLVMDetach         = 72,
+  LLVMReattach       = 73,
+  LLVMSync           = 74,
 } LLVMOpcode;
 
 typedef enum {

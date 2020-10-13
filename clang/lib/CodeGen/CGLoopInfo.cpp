@@ -554,11 +554,11 @@ void LoopInfo::getTapirLoopProperties(
     const LoopAttributes &Attrs, SmallVectorImpl<Metadata *> &LoopProperties) {
   LLVMContext &Ctx = Header->getContext();
 
-  if (Attrs.SpawnStrategy == LoopAttributes::Sequential)
+  if (Attrs.SpawnStrategy == LoopAttributes::SEQ)
     return;
 
   // Setting tapir.loop.spawn.strategy
-  if (Attrs.SpawnStrategy != LoopAttributes::Sequential) {
+  if (Attrs.SpawnStrategy != LoopAttributes::SEQ) {
     Metadata *Vals[] = {
         MDString::get(Ctx, "tapir.loop.spawn.strategy"),
         ConstantAsMetadata::get(ConstantInt::get(llvm::Type::getInt32Ty(Ctx),

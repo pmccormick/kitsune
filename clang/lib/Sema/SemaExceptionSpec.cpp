@@ -1522,11 +1522,8 @@ CanThrowResult Sema::canThrow(const Stmt *S) {
   case Stmt::CilkScopeStmtClass:
     return canSubStmtsThrow(*this, S);
 
-    // Given their parallel nature we won't let forall and others throw...
-    // TODO: Is this a sane assumption?
-  case Stmt::CilkForStmtClass:
-  case Stmt::CilkSpawnStmtClass:
-  case Stmt::CilkSyncStmtClass:
+  // Given their parallel nature we won't let forall and others throw...
+  // TODO: Is this a sane assumption?
   case Stmt::SpawnStmtClass:
   case Stmt::SyncStmtClass:    
   case Stmt::ForallStmtClass:
