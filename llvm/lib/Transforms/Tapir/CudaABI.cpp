@@ -38,6 +38,7 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Vectorize.h"
 
 using namespace llvm;
@@ -701,25 +702,6 @@ PTXLoop::PTXLoop(Module &M)
                                          PTXInt32Ty);
   GetBlockDim = PTXM.getOrInsertFunction("llvm.nvvm.read.ptx.sreg.ntid.x",
                                          PTXInt32Ty);
-
-  Type *VoidTy = Type::getVoidTy(M.getContext());
-  Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
-  Type *Int8Ty = Type::getInt8Ty(M.getContext());
-  Type *Int32Ty = Type::getInt32Ty(M.getContext());
-  Type *Int64Ty = Type::getInt64Ty(M.getContext());
-  KitsuneCUDAInit = M.getOrInsertFunction("__kitsune_cuda_init", VoidTy);
-  KitsuneGPUInitKernel = M.getOrInsertFunction("__kitsune_gpu_init_kernel",
-                                               VoidTy, Int32Ty, VoidPtrTy);
-  KitsuneGPUInitField = M.getOrInsertFunction("__kitsune_gpu_init_field",
-                                              VoidTy, Int32Ty, VoidPtrTy,
-                                              VoidPtrTy, Int32Ty, Int64Ty,
-                                              Int8Ty);
-  KitsuneGPUSetRunSize = M.getOrInsertFunction("__kitsune_gpu_set_run_size",
-                                               VoidTy, Int32Ty, Int64Ty,
-                                               Int64Ty, Int64Ty);
-  KitsuneGPURunKernel = M.getOrInsertFunction("__kitsune_gpu_run_kernel",
-                                              VoidTy, Int32Ty);
-  KitsuneGPUFinish = M.getOrInsertFunction("__kitsune_gpu_finish", VoidTy);
 }
 
 void PTXLoop::setupLoopOutlineArgs(
@@ -908,8 +890,31 @@ void PTXLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
                                  "ptx" + Twine(MyKernelID));
 }
 
-void PTXLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
-                                      DominatorTree &DT) {
+KitsuneCudaLoop::KitsuneCudaLoop(Module &M) : PTXLoop(M) {
+  Type *VoidTy = Type::getVoidTy(M.getContext());
+  Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+  Type *Int8Ty = Type::getInt8Ty(M.getContext());
+  Type *Int32Ty = Type::getInt32Ty(M.getContext());
+  Type *Int64Ty = Type::getInt64Ty(M.getContext());
+  KitsuneCUDAInit = M.getOrInsertFunction("__kitsune_cuda_init", VoidTy);
+  KitsuneGPUInitKernel = M.getOrInsertFunction("__kitsune_gpu_init_kernel",
+                                               VoidTy, Int32Ty, VoidPtrTy);
+  KitsuneGPUInitField = M.getOrInsertFunction("__kitsune_gpu_init_field",
+                                              VoidTy, Int32Ty, VoidPtrTy,
+                                              VoidPtrTy, Int32Ty, Int64Ty,
+                                              Int8Ty);
+  KitsuneGPUSetRunSize = M.getOrInsertFunction("__kitsune_gpu_set_run_size",
+                                               VoidTy, Int32Ty, Int64Ty,
+                                               Int64Ty, Int64Ty);
+  KitsuneGPURunKernel = M.getOrInsertFunction("__kitsune_gpu_run_kernel",
+                                              VoidTy, Int32Ty);
+  KitsuneGPUFinish = M.getOrInsertFunction("__kitsune_gpu_finish", VoidTy);
+
+}
+
+void KitsuneCudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
+                                              TaskOutlineInfo &TOI,
+                                              DominatorTree &DT) {
   LLVMContext &Ctx = M.getContext();
   Type *Int8Ty = Type::getInt8Ty(Ctx);
   Type *Int32Ty = Type::getInt32Ty(Ctx);
