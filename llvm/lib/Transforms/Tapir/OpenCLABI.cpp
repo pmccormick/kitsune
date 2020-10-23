@@ -43,6 +43,11 @@ void OpenCLABI::lowerSync(SyncInst &SI) {
   // currently a no-op...
 }
 
+void OpenCLABI::preProcessOutlinedTask(llvm::Function&, llvm::Instruction*, llvm::Instruction*, bool){}
+void OpenCLABI::postProcessOutlinedTask(llvm::Function&, llvm::Instruction*, llvm::Instruction*, bool){}
+void OpenCLABI::preProcessRootSpawner(llvm::Function&){}
+void OpenCLABI::postProcessRootSpawner(llvm::Function&){}
+
 void OpenCLABI::preProcessFunction(Function &F, TaskInfo &TI,
                                  bool OutliningTapirLoops) {
 }
@@ -53,18 +58,14 @@ void OpenCLABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
 void OpenCLABI::postProcessHelper(Function &F) {
 }
 
-void OpenCLABI::processOutlinedTask(Function &F) {
-}
-
-void OpenCLABI::processSpawner(Function &F) {
-}
-
 void OpenCLABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 }
 
 LoopOutlineProcessor *OpenCLABI::getLoopOutlineProcessor(
-    const TapirLoopInfo *TL) const {
-  return new SPIRVLoop(M);
+    const TapirLoopInfo *TL) {
+  if(!LOP) 
+    return new SPIRVLoop(M);
+  return LOP;
 }
 
 // Static counter for assigning IDs to kernels.

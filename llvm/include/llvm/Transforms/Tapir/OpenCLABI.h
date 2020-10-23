@@ -21,8 +21,10 @@ namespace llvm {
 
 class DataLayout;
 class TargetMachine;
+class SPIRVLoop; 
 
 class OpenCLABI : public TapirTarget {
+  SPIRVLoop *LOP = nullptr;
 public:
   OpenCLABI(Module &M) : TapirTarget(M) {}
   ~OpenCLABI() {}
@@ -35,17 +37,25 @@ public:
   void postProcessFunction(Function &F, bool OutliningTapirLoops)
     override final;
   void postProcessHelper(Function &F) override final;
+  void preProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                              Instruction *TaskFrameCreate,
+                              bool IsSpawner) override final;
+  void postProcessOutlinedTask(Function &F, Instruction *DetachPt,
+                                       Instruction *TaskFrameCreate,
+                                       bool IsSpawner) override final;
+  void preProcessRootSpawner(Function &F) override final;
+  void postProcessRootSpawner(Function &F) override final;
 
-  void processOutlinedTask(Function &F) override final;
-  void processSpawner(Function &F) override final;
   void processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT)
     override final;
 
-  LoopOutlineProcessor *getLoopOutlineProcessor(const TapirLoopInfo *TL) const
+  LoopOutlineProcessor *getLoopOutlineProcessor(const TapirLoopInfo *TL)
     override final;
 };
 
 class SPIRVLoop : public LoopOutlineProcessor {
+  friend class OpenCLABI; 
+
 private:
   static unsigned NextKernelID;
   unsigned MyKernelID;
