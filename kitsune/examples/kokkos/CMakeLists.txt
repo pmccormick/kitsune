@@ -7,8 +7,6 @@
 # the LLVM license.
 #
 
-message("  adding kokkos examples...")
-
 set(examples 
   vecadd.cpp 
 )
@@ -16,7 +14,7 @@ set(examples
 get_kitsune_tapir_rt_flags(tapir_args)
 
 foreach(src_file IN ITEMS ${examples}) 
-  message(STATUS "    example: ${src_file}")
+  message(STATUS "  kokkos example: ${src_file}")
   get_filename_component(base ${src_file} NAME_WLE)
   string(TOLOWER ${base} ${src_file})
 
@@ -35,7 +33,7 @@ foreach(src_file IN ITEMS ${examples})
   # Add a executable per enabled runtime target. 
   foreach(rt IN ITEMS ${tapir_args})
     set(target_name kokkos-${base}-${rt})
-    message(STATUS "    example: ${target_name}")
+    message(STATUS "    ${rt} example: ${target_name}")
     add_kitsune_example(${target_name}
       ${src_file}
       )

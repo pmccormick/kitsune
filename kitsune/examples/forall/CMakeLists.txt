@@ -7,29 +7,26 @@
 # the LLVM license.
 #
 
-message("  adding forall examples...")
-
 set(forall_examples 
   vecadd.cpp 
 )
 
 get_kitsune_tapir_rt_flags(tapir_args)
 
-foreach(src_file IN ITEMS ${forall_examples}) 
-  message(STATUS "    example: ${src_file}")
+foreach(src_file IN ITEMS ${forall_examples})
+  message(STATUS "  forall example: ${src_file}")
   get_filename_component(base ${src_file} NAME_WLE)
   string(TOLOWER ${base} ${src_file})
 
   # Add a kitsune-centric executable per enabled runtime. 
   foreach(rt IN ITEMS ${tapir_args})
     set(target_name forall-${base}-${rt})
-    message(STATUS "    example: ${target_name}")
+    message(STATUS "    ${rt} example: ${target_name}")
     add_kitsune_example(${target_name} ${src_file})
     set_target_properties(${target_name} 
       PROPERTIES
         COMPILE_FLAGS "-ftapir=${rt}"
         LINK_FLAGS "-ftapir=${rt}"
-	    INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/kitsune/examples/forall
     )
   endforeach()
   
