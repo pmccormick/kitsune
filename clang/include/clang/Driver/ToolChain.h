@@ -154,7 +154,7 @@ private:
   /// Kitsune-centric list of link library arguments for cases where
   /// strings need to be extracted from CMake settings and need to 
   /// persist... 
-  link_library_list  KitsuneLibArgs;
+  //link_library_list  KitsuneLibArgs;
 
   mutable std::unique_ptr<Tool> Clang;
   mutable std::unique_ptr<Tool> Flang;
@@ -718,8 +718,8 @@ public:
   /// AddKitsuneLibArgs - Add some kitsune-centric linker arguments to use 
   /// given the special modes of operation (kitsune, kokkos, backend runtime 
   /// arguments, etc.). 
-  virtual void AddKitsuneLibArgs(const llvm::opt::ArgList &Args, 
-				 llvm::opt::ArgStringList &CmdArgs) const;
+  //virtual void AddKitsuneLibArgs(const llvm::opt::ArgList &Args, 
+  //			 llvm::opt::ArgStringList &CmdArgs) const;
   
   /// AddFilePathLibArgs - Add each thing in getFilePaths() as a "-L" option.
   void AddFilePathLibArgs(const llvm::opt::ArgList &Args,

@@ -292,7 +292,7 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   //    2. We ignore the details of what is captured by the lambda.
   // 
   // TODO: Do we need to "relax" these assumptions to support broader code coverage?
-  // This is 'equivalent' to the Init statement in a tranditional for loop (e.g. int i = 0). 
+  // This is 'equivalent' to the Init statement in a traditional for loop (e.g. int i = 0). 
   const ParmVarDecl *InductionVarDecl; 
   InductionVarDecl = EmitKokkosParallelForInductionVar(Lambda);
 
@@ -327,6 +327,10 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   // Handle the detach block...
   EmitBlock(Detach);
 
+  auto OldAllocaInsertPt = AllocaInsertPt;
+  llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
+  AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "", Detach);
+
   llvm::Value *GInductionVar = GetAddrOfLocalVar(InductionVarDecl).getPointer();
   llvm::Value *GInductionVal = Builder.CreateLoad(GetAddrOfLocalVar(InductionVarDecl));
 
@@ -349,6 +353,10 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     EmitStmt(Lambda->getBody());
     InKokkosConstruct = false;
   }
+  
+  auto tmp = AllocaInsertPt; 
+  AllocaInsertPt = OldAllocaInsertPt; 
+  tmp->removeFromParent(); 
 
   // Modify the body to use the ''detach''-local induction variable.
   // At this point in the codegen, the body block has been emitted 

@@ -3,6 +3,38 @@
 Kitsune follows the LLVM version numbering scheme and thus adopts the base 
 functionality of the toolchain corresponding to that release.
 
+*Date*: October 28, 2020 
+*Internal/ECP Release Reference*: ST-NS-01-1330
+
+  * Corresponding LLVM 10.x 10.01 [Release Notes](https://releases.llvm.org/10.0.0/docs/ReleaseNotes.html)
+
+    * commit e7323e808da84a9af37c53b14a1ac04accf55325
+
+  * __``forall`` statements__ (both traditional and range-based): 
+
+    * Identified an issue w/ the qthreads target that was causing apparent race conditions in the compiler-generated code.  Issue will be reported to qthreads developers. 
+
+    * Further tweaks code generation to account for additional race conditions that were discovered in generated code. 
+
+  * __*CUDA ABI*: New CUDA ABI interface in this release.  Currently only targets CUDA 10.1, 64-bit GPU code, GPU arch sm_70, and ptx64.  It also assumes that the 
+    ptxas and fatbinary executables can be successfully run.  The CudaABI Tapir target has only been tested on a simple Tapir loop compiled at optimization levels 
+   ``-O1`, ``-O2``, and ``-O3``.
+
+
+
+
+    * New runtime for CUDA that simplifies tracking and codegen'ing CUDA-centric data types.  (still not a supported runtime target). 
+
+  * Tapir updates: 
+
+    * [Verifier] Add simple checks to verify that Tapir tasks have a valid structure and that sync regions are properly used.
+    * 
+
+ 
+
+    
+
+
 *Date*: June 18, 2020  
 *Internal/ECP Release Reference*: STNS01-11
 

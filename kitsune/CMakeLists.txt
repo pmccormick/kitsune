@@ -1,19 +1,128 @@
-project(kitsune)
+#
+# Copyright (c) 2020 Triad National Security, LLC
+#                         All rights reserved.
+#
+# This file is part of the kitsune/llvm project.  It is released under 
+# the LLVM license.
+#
+cmake_minimum_required(VERSION 3.13.4)
 
-set(KITSUNE_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include)
-set(KITSUNE_LIBRARY_DIR ${CMAKE_SOURCE_DIR}/lib)
-
-
-option(KITSUNE_ENABLE_CUDA_RUNTIME "Build and enable targeting Kitsune's CUDA runtime." OFF)
-option(KITSUNE_ENABLE_OPENCL_RUNTIME "Build and enable targeting Kitsune's OpenCL runtime." OFF)
-option(KITSUNE_ENABLE_QTHREADS_RUNTIME "Enable targeting the Qthreads runtime." OFF)
-option(KITSUNE_ENABLE_CILK_RUNTIME "Enable targeting the Cilk runtime." OFF)
-option(KITSUNE_ENABLE_LIBOMP_RUNTIME "Enable targeting the OpenMP runtime." OFF)
-
-option(KITSUNE_ENABLE_KOKKOS_MODE "Enable Kokkos-aware features in the compiler." OFF)
-
-
-if (KITSUNE_ENABLE_CUDA_RUNTIME)
-   add_subdirectory(lib/CudaRT)
+# RPATH settings on macOS do not affect INSTALL_NAME.
+if (POLICY CMP0068)
+  cmake_policy(SET CMP0068 NEW)
+  set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 endif()
 
+# Include file check macros honor CMAKE_REQUIRED_LIBRARIES.
+if(POLICY CMP0075)
+  cmake_policy(SET CMP0075 NEW)
+endif()
+
+# option() honors normal variables.
+if (POLICY CMP0077)
+  cmake_policy(SET CMP0077 NEW)
+endif()
+
+set(KITSUNE_ENABLED TRUE
+    CACHE
+    BOOL
+    "Enable Kitsune and Tapir features to the LLVM infrastructure."
+)
+    
+set(KITSUNE_SOURCE_DIR  ${CMAKE_CURRENT_SOURCE_DIR})
+set(KITSUNE_BINARY_DIR  ${CMAKE_CURRENT_BINARY_DIR})
+set(KITSUNE_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
+
+option(KITSUNE_INCLUDE_TESTS
+  "Enable Kitsune tests." ${LLVM_INCLUDE_TESTS})
+option(KITSUNE_BUILD_EXAMPLES
+  "Build Kitsune example programs by default." ${KITSUNE_INCLUDE_TESTS}) 
+
+# Add Kitsune-centric modules to cmake path.
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+include(AddKitsune)
+
+option(KITSUNE_ENABLE_WERROR
+  "Fail kitsune builds if a warning is triggered." OFF)
+
+# Runtime backend targets.  
+
+find_package(CUDAToolkit)
+option(KITSUNE_ENABLE_CUDA
+  "Enable PTX+CUDART backend target." ${CUDAToolkit_FOUND})
+if (KITSUNE_ENABLE_CUDA_TARGET)
+  set(KITSUNE_EXTRA_CUDART_LINK_LIBS "-lkitcudart"
+    CACHE
+    STRING "Extra link libraries for CUDA runtime target."
+  )
+  add_subdirectory(lib/CudaRT)
+endif()
+
+find_package(OpenCL)
+option(KITSUNE_ENABLE_OPENCL_TARGET
+  "Enable SPIRV+OpenCL backend target." ${OpenCL_FOUND})
+if (KITSUNE_ENABLE_OPENCL_TARGET)
+  set(KITSUNE_EXTRA_OPENCL_LINK_LIBS "-lkitopencl"
+    CACHE
+    STRING "Extra link libraries for OpenCL runtime target."
+  )
+  add_subdirectory(lib/OpenCL)
+endif()
+
+find_package(CilkRTS)
+option(KITSUNE_ENABLE_CILKRTS_TARGET
+  "Enable Cilk runtime backend target." ${CilkRTS_FOUND})
+if (KITSUNE_ENABLE_CILKRTS_TARGET) 
+  set(KITSUNE_EXTRA_CILK_LINK_LIBS ""
+    CACHE 
+    STRING "Extra link libraries for the Cilk runtime target."
+  )
+endif()
+
+find_package(Qthreads)
+option(KITSUNE_ENABLE_QTHREADS_TARGET
+  "Enable Qthreads runtime backend target." ${Qthreads_FOUND})
+if (Qthreads_FOUND)
+  set(KITSUNE_EXTRA_QTHREADS_LINK_LIBS "")
+endif()
+
+find_package(Realm)
+option(KITSUNE_ENABLE_REALM_TARGET
+  "Enable Realm runtime backend target." ${Realm_FOUND})
+if (Realm_FOUND)
+  message(STATUS "Realm runtime target enabled.")
+  set(KITSUNE_EXTRA_REALM_LINK_LIBS "-ldl -lrt")
+  add_subdirectory(lib/Realm)
+endif()
+
+if ("openmp" IN_LIST LLVM_ENABLE_PROJECTS)
+  message(STATUS "adding support for libomp target code generation...")
+  option(KITSUNE_ENABLE_OPENMP "Enable OpenMP/libomp runtime backend target." ON)
+  set(KITSUNE_EXTRA_OPENMP_LINK_LIBS "")
+else()
+  option(KITSUNE_ENABLE_OPENMP_TARGET "Enable OpenMP/libomp runtime backend target." OFF)
+endif()
+
+# Special kitsune modes for clang. 
+find_package(Kokkos)
+option(KITSUNE_ENABLE_KOKKOS
+  "Enable Kokkos support." ${Kokkos_FOUND})
+if (Kokkos_FOUND)
+  set(KITSUNE_EXTRA_KOKKOS_LINK_LIBS "")
+endif()
+
+if (KITSUNE_INCLUDE_TESTS)
+  add_subdirectory(tests)
+endif()
+
+if (KITSUNE_BUILD_EXAMPLES)
+  add_kitsune_subdirectory(examples) 
+endif()
+
+message(STATUS "building kitsune configuration header...")
+message(STATUS "   kitsune/config will live at ${LLVM_BINARY_DIR}/include/")
+configure_file(
+  ${KITSUNE_SOURCE_DIR}/include/kitsune/config.h.cmake
+  ${LLVM_BINARY_DIR}/include/kitsune/config.h
+)

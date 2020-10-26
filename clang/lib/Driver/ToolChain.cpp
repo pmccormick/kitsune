@@ -44,6 +44,7 @@
 #include "llvm/Support/TargetParser.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/VirtualFileSystem.h"
+#include "kitsune/config.h"
 #include <cassert>
 #include <cstddef>
 #include <cstring>
@@ -1108,92 +1109,6 @@ void ToolChain::AddKitsuneIncludeArgs(const ArgList &Args,
   }
 }
 
-void ToolChain::AddKitsuneLibArgs(const ArgList &Args, 
-				  ArgStringList &CmdArgs) const {
-
-  if (D.CCCIsCXX() && Args.hasArg(options::OPT_fkokkos)) {
-    if (KITSUNE_ENABLE_KOKKOS) {
-      const std::string LibraryPath(KITSUNE_KOKKOS_LIBRARY_DIR);
-      CmdArgs.push_back("-L" KITSUNE_KOKKOS_LIBRARY_DIR);
-      ExtractArgsFromString(KITSUNE_KOKKOS_LINK_LIBS, CmdArgs, Args);
-    } else {
-      getDriver().Diag(diag::warn_kokkos_missing_build_params);
-    }
-  }
-  
-  if (Args.hasArg(options::OPT_ftapir_EQ)) {
-
-    if (Arg *A = Args.getLastArg(options::OPT_ftapir_EQ)) {
-      StringRef Name = A->getValue();
-      
-      if (Name == "cilk") {
-	if (KITSUNE_ENABLE_CILKRTS) {
-	  CmdArgs.push_back("-L" KITSUNE_CILKRTS_LIBRARY_DIR);
-	  if (Triple.isOSDarwin()) {
-	    CmdArgs.push_back("-rpath");
-	    CmdArgs.push_back(KITSUNE_CILKRTS_LIBRARY_DIR);
-	  } else 
-	    CmdArgs.push_back("-rpath=" KITSUNE_CILKRTS_LIBRARY_DIR);
-	  ExtractArgsFromString(KITSUNE_CILKRTS_LINK_LIBS, CmdArgs, Args);
-	} else {
-	  getDriver().Diag(diag::warn_cilkrts_missing_build_params);
-	}
-      } else if (Name == "omp") {
-	if (KITSUNE_ENABLE_OPENMP) { 
-	  CmdArgs.push_back("-L" KITSUNE_OPENMP_LIBRARY_DIR);
-	  if (Triple.isOSDarwin()) { 
-	    CmdArgs.push_back("-rpath");
-	    CmdArgs.push_back(KITSUNE_OPENMP_LIBRARY_DIR);	    
-	  } else 
-	    CmdArgs.push_back("-rpath=" KITSUNE_OPENMP_LIBRARY_DIR);
-	  ExtractArgsFromString(KITSUNE_OPENMP_LINK_LIBS, CmdArgs, Args);
-	}	  
-      } else if (Name == "qthreads") {
-	if (KITSUNE_ENABLE_QTHREADS) { 
-	  CmdArgs.push_back("-L" KITSUNE_QTHREADS_LIBRARY_DIR);
-	  if (Triple.isOSDarwin()) {
-	    CmdArgs.push_back("-rpath");
-	    CmdArgs.push_back(KITSUNE_QTHREADS_LIBRARY_DIR);
-	  } else
-	    CmdArgs.push_back("-rpath=" KITSUNE_QTHREADS_LIBRARY_DIR);	    
-	  ExtractArgsFromString(KITSUNE_QTHREADS_LINK_LIBS, CmdArgs, Args);
-	} else {
-	  getDriver().Diag(diag::warn_qthreads_missing_build_params);
-	}
-      } else if (Name == "realm") {
-	if (KITSUNE_ENABLE_REALM) { 
-	  CmdArgs.push_back("-L" KITSUNE_REALM_LIBRARY_DIR);
-	  if (Triple.isOSDarwin()) {
-	    CmdArgs.push_back("-rpath");
-	    CmdArgs.push_back(KITSUNE_REALM_LIBRARY_DIR);
-	  } else
-	    CmdArgs.push_back("-rpath=" KITSUNE_REALM_LIBRARY_DIR);	    
-	  ExtractArgsFromString(KITSUNE_REALM_LINK_LIBS, CmdArgs, Args);
-	} else {
-	  getDriver().Diag(diag::warn_realm_missing_build_params);	  
-	}
-      } else if (Name == "cuda") { 
-	if (KITSUNE_ENABLE_CUDA) { 
-	  CmdArgs.push_back("-L" KITSUNE_CUDA_LIBRARY_DIR);
-	  if (Triple.isOSDarwin()) {
-	    CmdArgs.push_back("-rpath");
-	    CmdArgs.push_back(KITSUNE_CUDA_LIBRARY_DIR);	    
-	  } else
-	    CmdArgs.push_back("-rpath=" KITSUNE_CUDA_LIBRARY_DIR);	    
-	  ExtractArgsFromString(KITSUNE_CUDA_LINK_LIBS, CmdArgs, Args);
-	} else {
-	  getDriver().Diag(diag::warn_cuda_missing_build_params);
-	}
-      } else {
-	// no-op -- FIXME -- probably want a warning here but we 
-	// can fall back to user-specified command line arguments 
-	// in unsupported/missing configurations... 
-	;
-      }
-    }
-  }
-}
-
 void ToolChain::AddFilePathLibArgs(const ArgList &Args,
                                    ArgStringList &CmdArgs) const {
   for (const auto &LibPath : getFilePaths())
@@ -1763,14 +1678,82 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
   }
   case TapirTargetID::Cilk:
-    CmdArgs.push_back("-lcilkrts");
+	  
+    if (KITSUNE_ENABLE_CILKRTS_TARGET) {
+	    CmdArgs.push_back("-L" KITSUNE_CILKRTS_LIBRARY_DIR);
+	    if (Triple.isOSDarwin()) {
+	      CmdArgs.push_back("-rpath");
+	      CmdArgs.push_back(KITSUNE_CILKRTS_LIBRARY_DIR);
+	    } else {
+	      CmdArgs.push_back("-rpath=" KITSUNE_CILKRTS_LIBRARY_DIR);
+      } 
+	    ExtractArgsFromString(KITSUNE_CILKRTS_LINK_LIBS, CmdArgs, Args);
+     } else { 
+	     getDriver().Diag(diag::warn_cilkrts_missing_build_params);
+       CmdArgs.push_back("-lcilkrts");
+     }
     break;
   case TapirTargetID::OpenMP:
-    CmdArgs.push_back("-lomp");
+    if (KITSUNE_ENABLE_OPENMP_TARGET) { 
+      //CmdArgs.push_back("-L" KITSUNE_OPENMP_LIBRARY_DIR);
+      //if (Triple.isOSDarwin()) { 
+      //  CmdArgs.push_back("-rpath");
+      //  CmdArgs.push_back(KITSUNE_OPENMP_LIBRARY_DIR);	    
+      //} else {
+      //  CmdArgs.push_back("-rpath=" KITSUNE_OPENMP_LIBRARY_DIR);
+      //ExtractArgsFromString(KITSUNE_OPENMP_LINK_LIBS, CmdArgs, Args);
+      CmdArgs.push_back("-lomp");
+    }
     break;
+
   case TapirTargetID::Qthreads:
-    CmdArgs.push_back("-lqthread");
+    if (KITSUNE_ENABLE_QTHREADS_TARGET) { 
+	    CmdArgs.push_back("-L" KITSUNE_QTHREADS_LIBRARY_DIR);
+	    if (Triple.isOSDarwin()) {
+	      CmdArgs.push_back("-rpath");
+	      CmdArgs.push_back(KITSUNE_QTHREADS_LIBRARY_DIR);
+	    } else {
+	      CmdArgs.push_back("-rpath=" KITSUNE_QTHREADS_LIBRARY_DIR);
+      }
+  	  ExtractArgsFromString(KITSUNE_QTHREADS_LINK_LIBS, CmdArgs, Args);
+	  } else {
+	    getDriver().Diag(diag::warn_qthreads_missing_build_params);
+      CmdArgs.push_back("-lqthread");
+    }
+	  break;
+
+  case TapirTargetID::Realm:
+    if (KITSUNE_ENABLE_REALM_TARGET) { 
+	    CmdArgs.push_back("-L" KITSUNE_REALM_LIBRARY_DIR);
+	    if (Triple.isOSDarwin()) {
+	      CmdArgs.push_back("-rpath");
+	      CmdArgs.push_back(KITSUNE_REALM_LIBRARY_DIR);
+	    } else {
+	      CmdArgs.push_back("-rpath=" KITSUNE_REALM_LIBRARY_DIR);	    
+      }
+	    ExtractArgsFromString(KITSUNE_REALM_LINK_LIBS, CmdArgs, Args);
+	  } else {
+	    getDriver().Diag(diag::warn_realm_missing_build_params);
+      CmdArgs.push_back("-lrealm");
+    }
     break;
+
+  case TapirTargetID::Cuda:
+	  if (KITSUNE_ENABLE_CUDA_TARGET) { 
+	    CmdArgs.push_back("-L" KITSUNE_CUDA_LIBRARY_DIR);
+	    if (Triple.isOSDarwin()) {
+	      CmdArgs.push_back("-rpath");
+	      CmdArgs.push_back(KITSUNE_CUDA_LIBRARY_DIR);	    
+	    } else {
+	      CmdArgs.push_back("-rpath=" KITSUNE_CUDA_LIBRARY_DIR);
+      }
+	    ExtractArgsFromString(KITSUNE_CUDA_LINK_LIBS, CmdArgs, Args);
+	  } else {
+	    getDriver().Diag(diag::warn_cuda_missing_build_params);
+      CmdArgs.push_back("-lcuda");
+    }
+	  break;
+
   default:
     break;
   }

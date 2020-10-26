@@ -2828,12 +2828,13 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
       // kitsune FIXME: Not sure that everything we are doing here is
       // sound...
       if (InKokkosConstruct) {
+	VD = VD->getCanonicalDecl();	
         auto I = LocalDeclMap.find(VD);
         assert(I != LocalDeclMap.end());
-	      if (VD->getType()->isReferenceType())
-	        return EmitLoadOfReferenceLValue(I->second, VD->getType(),
+	if (VD->getType()->isReferenceType())
+	  return EmitLoadOfReferenceLValue(I->second, VD->getType(),
 					   AlignmentSource::Decl);
-	      return MakeAddrLValue(I->second, T);
+	return MakeAddrLValue(I->second, T);
       }
 
       VD = VD->getCanonicalDecl();

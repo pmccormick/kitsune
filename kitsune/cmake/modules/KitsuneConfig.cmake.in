@@ -1,0 +1,14 @@
+# This file allows users to call find_package(Kitsune) and pick up our targets.
+
+@KITSUNE_CONFIG_CODE@
+
+find_package(LLVM REQUIRED CONFIG
+             HINTS "@KITSUNE_CONFIG_LLVM_CMAKE_DIR@")
+
+set(KITSUNE_EXPORTED_TARGETS "@KITSUNE_EXPORTS@")
+set(KITSUNE_CMAKE_DIR "KITSUNE_CONFIG_CMAKE_DIR@")
+set(KITSUNE_INCLUDE_DIRS "@KITSUNE_CONFIG_INCLUDE_DIRS@")
+
+# Provide all our library targets to users.
+include("@KITSUNE_CONFIG_EXPORTS_FILE@")
+

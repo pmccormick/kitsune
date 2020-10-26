@@ -1,17 +1,21 @@
-project (kitcudaart)
+# Copyright (c) 2020 Triad National Security, LLC
+#                         All rights reserved.
+#
+# This file is part of the kitsune/llvm project.  It is released under 
+# the LLVM license.
+#
+# 
+# project (kitcudaart)
 
-find_package(CUDA REQUIRED)
+include_directories(SYSTEM ${CUDAToolkit_INCLUDE_DIRS})
+include_directories(${KITSUNE_SOURCE_DIR}/include)
+include_directories(${LLVM_BINARY_DIR}/include})
 
-include_directories(
-  ${KITSUNE_INCLUDE_DIR}
-  ${CUDA_INCLUDE_DIRS}
+add_kitsune_library(kitcudart
+  cudart.cpp
+  LINK_LIBS
+  cuda
 )
-
-file(GLOB kit_cudart_srcs
-  *.cpp
-)
-
-add_library(kitcudart SHARED ${kit_cudart_srcs})
 
 set_target_properties(kitcudart
   PROPERTIES
@@ -19,10 +23,5 @@ set_target_properties(kitcudart
   COMPILE_FLAGS  "-fPIC"
 )
 
-link_directories(${CUDA_LIBRARY_DIR} ${CUDA_RTLIBRARY_DIR})
-
-install(TARGETS kitcudart
-        DESTINATION lib
-)
 
 
