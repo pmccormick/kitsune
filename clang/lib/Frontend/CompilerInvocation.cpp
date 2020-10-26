@@ -4730,6 +4730,10 @@ bool CompilerInvocation::CreateFromArgsImpl(
       LangOpts.Tapir = TapirTargetID::Qthreads;
     else if (Name == "cuda")
       LangOpts.Tapir = TapirTargetID::Cuda;
+    else if (Name == "realm")
+      LangOpts.Tapir = TapirTargetID::Realm;
+    else if (Name == "opencl")
+      LangOpts.Tapir = TapirTargetID::OpenCL;    
     else if (Name == "serial")
       LangOpts.Tapir = TapirTargetID::Serial;
     else

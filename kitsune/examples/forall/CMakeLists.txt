@@ -24,14 +24,13 @@ foreach(src_file IN ITEMS ${forall_examples})
   foreach(rt IN ITEMS ${tapir_args})
     set(target_name forall-${base}-${rt})
     message(STATUS "    example: ${target_name}")
-    add_executable(${target_name} ${src_file})
+    add_kitsune_example(${target_name} ${src_file})
     set_target_properties(${target_name} 
       PROPERTIES
         COMPILE_FLAGS "-ftapir=${rt}"
         LINK_FLAGS "-ftapir=${rt}"
 	    INSTALL_NAME_DIR ${CMAKE_INSTALL_PREFIX}/kitsune/examples/forall
     )
-    add_dependencies(${target_name} clang)
   endforeach()
   
 endforeach()

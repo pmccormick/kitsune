@@ -1720,7 +1720,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
 	    getDriver().Diag(diag::warn_qthreads_missing_build_params);
       CmdArgs.push_back("-lqthread");
     }
-	  break;
+    break;
 
   case TapirTargetID::Realm:
     if (KITSUNE_ENABLE_REALM_TARGET) { 
@@ -1739,20 +1739,36 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
 
   case TapirTargetID::Cuda:
-	  if (KITSUNE_ENABLE_CUDA_TARGET) { 
-	    CmdArgs.push_back("-L" KITSUNE_CUDA_LIBRARY_DIR);
-	    if (Triple.isOSDarwin()) {
-	      CmdArgs.push_back("-rpath");
-	      CmdArgs.push_back(KITSUNE_CUDA_LIBRARY_DIR);	    
-	    } else {
-	      CmdArgs.push_back("-rpath=" KITSUNE_CUDA_LIBRARY_DIR);
+    if (KITSUNE_ENABLE_CUDA_TARGET) { 
+      CmdArgs.push_back("-L" KITSUNE_CUDA_LIBRARY_DIR);
+      if (Triple.isOSDarwin()) {
+	CmdArgs.push_back("-rpath");
+	CmdArgs.push_back(KITSUNE_CUDA_LIBRARY_DIR);	    
+      } else {
+	CmdArgs.push_back("-rpath=" KITSUNE_CUDA_LIBRARY_DIR);
       }
-	    ExtractArgsFromString(KITSUNE_CUDA_LINK_LIBS, CmdArgs, Args);
-	  } else {
-	    getDriver().Diag(diag::warn_cuda_missing_build_params);
+      ExtractArgsFromString(KITSUNE_CUDA_LINK_LIBS, CmdArgs, Args);
+    } else {
+      getDriver().Diag(diag::warn_cuda_missing_build_params);
       CmdArgs.push_back("-lcuda");
     }
-	  break;
+    break;
+
+  case TapirTargetID::OpenCL:
+    if (KITSUNE_ENABLE_OPENCL_TARGET) { 
+      CmdArgs.push_back("-L" KITSUNE_OPENCL_LIBRARY_DIR);
+      if (Triple.isOSDarwin()) {
+	CmdArgs.push_back("-rpath");
+	CmdArgs.push_back(KITSUNE_OPENCL_LIBRARY_DIR);	    
+      } else {
+	CmdArgs.push_back("-rpath=" KITSUNE_OPENCL_LIBRARY_DIR);
+      }
+      ExtractArgsFromString(KITSUNE_OPENCL_LINK_LIBS, CmdArgs, Args);
+    } else {
+      getDriver().Diag(diag::warn_opencl_missing_build_params);
+      CmdArgs.push_back("-lcl");
+    }
+    break;    
 
   default:
     break;

@@ -744,6 +744,11 @@ def warn_realm_missing_build_params : Warning<
 def warn_cuda_missing_build_params : Warning<
   "'-ftapir=cuda' enabled but build configuration missing details for "
   "automatic argument generation. Target-centric link arguments must be"
+  "provided on command line.">, InGroup<UnknownRuntime>;
+
+def warn_opencl_missing_build_params : Warning<
+  "'-ftapir=opencl' enabled but build configuration missing details for "
+  "automatic argument generation. Target-centric link arguments must be"
   "provided on command line.">, InGroup<UnknownRuntime>; 
   
 // -----+
