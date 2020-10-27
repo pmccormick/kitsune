@@ -133,19 +133,19 @@ __Internal/ECP Release Milestone__: STNS01-11
     }
     ```
 
-* __Kokkos Support__: This release has support for recognizing Kokkos ``parallel_for`` 
-  statements and lowering them to the parallel IR (Tapir). This path will actually 
-  disable all template-based mechanisms (disabling all Kokkos library functionality) 
+* __Kokkos Support__: This release has support for recognizing Kokkos ``parallel_for``
+  statements and lowering them to the parallel IR (Tapir). This path will actually
+  disable all template-based mechanisms (disabling all Kokkos library functionality)
   and replace the lambda form with an intermediate representation that matches a
   more traditional loop construct.  This is essentially the same path taken by
   the ``forall`` constructs mentioned above.
 
-    * The supported Kokkos constructs are a minimal set of all possible approaches.
-      At present only lambda-based (within a single compilation unit) are supported
-      and match this basic form:
+  * The supported Kokkos constructs are a minimal set of all possible approaches.
+    At present only lambda-based (within a single compilation unit) are supported
+    and match this basic form:
 
-      ```c++
-        Kokkos::parallel_for(N, KOKKOS_LAMBDA(const int i) {
-          C[i] = A[i] + B[i];
-        });
-      ```
+    ```c++
+      Kokkos::parallel_for(N, KOKKOS_LAMBDA(const int i) {
+        C[i] = A[i] + B[i];
+      });
+    ```
