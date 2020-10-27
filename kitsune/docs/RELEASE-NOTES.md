@@ -113,41 +113,39 @@ __Internal/ECP Release Milestone__: STNS01-11
       application code -- this overcomes the limitations of a single target support
       when using the ``-ftapir=runtime-target`` argument on the command line.  
 
-    * __``spawn`` and ``sync`` Statements__:
-      Although primarily used for development testing two new statements are also
-      enabled in the ``-fkitsune`` mode of Clang.  The ``spawn`` and ``sync``
-      constructs support non-nested concurrency -- thus allowing interleaved tasks.  
-      Conceptually a construct similar to ``forall`` can be captured via this
-      construct:
+* __``spawn`` and ``sync`` Statements__:
+  Although primarily used for development testing two new statements are also
+  enabled in the ``-fkitsune`` mode of Clang.  The ``spawn`` and ``sync``
+  constructs support non-nested concurrency -- thus allowing interleaved tasks.  
+  Conceptually a construct similar to ``forall`` can be captured via this
+  construct:
+
+  ```c++
+    #include <kitsune.h> // required to avoid naming collisons...
+    #include <stdio.h>
+
+    int main() {
+      for(int i = 0; i < 10; i++) spawn pl {
+        printf("Hello %d\n", i);
+      }
+      printf("Done with the loop.\n");
+      sync pl;
+    }
+    ```
+
+* __Kokkos Support__: This release has support for recognizing Kokkos ``parallel_for`` 
+  statements and lowering them to the parallel IR (Tapir). This path will actually 
+  disable all template-based mechanisms (disabling all Kokkos library functionality) 
+  and replace the lambda form with an intermediate representation that matches a
+  more traditional loop construct.  This is essentially the same path taken by
+  the ``forall`` constructs mentioned above.
+
+    * The supported Kokkos constructs are a minimal set of all possible approaches.
+      At present only lambda-based (within a single compilation unit) are supported
+      and match this basic form:
 
       ```c++
-        #include <kitsune.h> // required to avoid naming collisons...
-        #include <stdio.h>
-
-        int main() {
-          for(int i = 0; i < 10; i++) spawn pl {
-            printf("Hello %d\n", i);
-          }
-          printf("Done with the loop.\n");
-          sync pl;
-        }
-        ```
-
-    * __Kokkos Support__
-
-      * This release has support for recognizing Kokkos ``parallel_for`` statements
-        and lowering them to the parallel IR (Tapir). This path will actually disable
-        all template-based mechanisms (disabling all Kokkos library functionality) and
-        replace the lambda form with an intermediate representation that matches a
-        more traditional loop construct.  This is essentially the same path taken by
-        the ``forall`` constructs mentioned above.
-
-      * The supported Kokkos constructs are a minimal set of all possible approaches.
-        At present only lambda-based (within a single compilation unit) are supported
-        and match this basic form:
-
-        ```c++
-          Kokkos::parallel_for(N, KOKKOS_LAMBDA(const int i) {
-            C[i] = A[i] + B[i];
-          });
-        ```
+        Kokkos::parallel_for(N, KOKKOS_LAMBDA(const int i) {
+          C[i] = A[i] + B[i];
+        });
+      ```
