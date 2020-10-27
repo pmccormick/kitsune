@@ -1331,3 +1331,34 @@ endif()
 if (LLVM_INCLUDE_UTILS AND LLVM_INCLUDE_TOOLS)
   add_subdirectory(utils/llvm-locstats)
 endif()
+
+if(LLVM_TOOL_KITSUNE_RT_BUILD)
+  add_llvm_external_project(kitsune-rt)
+endif()
+
+# If kitsune is being built with the realm backend enabled, then kitsune-rt needs to be built before clang
+if(TARGET clang AND TARGET kitsunerealm AND KITSUNE_ENABLE_REALM)
+  add_dependencies(clang kitsunerealm)
+  message(STATUS "kitsune: ADDED clang dependency on kitsunerealm")  
+else()
+  message(STATUS "kitsune: DID NOT ADD clang dependency on kitsunerealm")
+
+  if(TARGET clang)
+    message(STATUS "kitsune: TARGET clang is TRUE")
+  else()
+    message(STATUS "kitsune: TARGET clang is FALSE")
+  endif()
+
+  if(TARGET kitsunerealm)
+    message(STATUS "kitsune: TARGET kitsunerealm is TRUE")
+  else()
+    message(STATUS "kitsune: TARGET kitsunerealm is FALSE")
+  endif()
+
+  if(KITSUNE_ENABLE_REALM)
+    message(STATUS "kitsune: KITSUNE_ENABLE_REALM is TRUE")
+  else()
+    message(STATUS "kitsune: KITSUNE_ENABLE_REALM is FALSE")
+  endif()
+
+endif()

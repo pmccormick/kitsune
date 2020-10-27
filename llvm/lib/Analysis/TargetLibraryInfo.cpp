@@ -53,6 +53,8 @@ static cl::opt<TapirTargetID> ClTapirTarget(
                           "openmp", "OpenMP"),
                clEnumValN(TapirTargetID::Qthreads,
                           "qthreads", "Qthreads"),
+               clEnumValN(TapirTargetID::Realm,
+                          "realm", "Realm"),
                clEnumValN(TapirTargetID::Cheetah,
                           "cheetah", "Cheetah"),
                clEnumValN(TapirTargetID::OpenCilk,
