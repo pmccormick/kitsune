@@ -291,7 +291,6 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 
   // VERIFY: If we're using realmSpawn, we don't need a separate helper
   // function to manage the allocation of the argument structure.
-
 }
 
 void RealmABI::preProcessFunction(Function &F, TaskInfo &TI,
