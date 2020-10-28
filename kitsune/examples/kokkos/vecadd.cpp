@@ -20,22 +20,17 @@ int main (int argc, char* argv[]) {
   float *B = new float[VEC_SIZE];
   float *C = new float[VEC_SIZE];
 
-  //random_fill(A, VEC_SIZE);
-  //random_fill(B, VEC_SIZE);
+  random_fill(A, VEC_SIZE);
+  random_fill(B, VEC_SIZE);
   
   Kokkos::initialize (argc, argv);
   {
     Kokkos::parallel_for(VEC_SIZE, KOKKOS_LAMBDA(const int i) {
-      A[i] = rand() / (float)RAND_MAX;
-      B[i] = rand() / (float)RAND_MAX;
-    });
-    
-    Kokkos::parallel_for(VEC_SIZE, KOKKOS_LAMBDA(const int i) {
         C[i] = A[i] + B[i];
     });
-
   }
-
+  Kokkos::finalize ();
+  
   // Verify correct result (taking some floating point nuances into
   // play)...
   size_t i = 0;
@@ -49,8 +44,5 @@ int main (int argc, char* argv[]) {
   delete []A;
   delete []B;
   delete []C;
-  
-  Kokkos::finalize ();
-  
   return 0;
 }

@@ -309,7 +309,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
       LocalDeclMap.erase(LoopVar);
       IVDeclMap.insert({LoopVar, OuterLoc}); 
       QualType type = LoopVar->getType();
-      LValue OuterLV = MakeAddrLValue(OuterLoc, type); 
+      LValue OuterLV = MakeAddrLValue(OuterLoc, type);
       RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
       ivs.push_back({LoopVar, OuterRV}); 
     }
@@ -342,7 +342,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
         EmitAutoVarCleanups(LVEmission);
         QualType type = LoopVar->getType();
         Address Loc = LVEmission.getObjectAddress(*this);
-        LValue LV = MakeAddrLValue(Loc, type);
+        LValue LV = MakeAddrLValue(Loc, type);	
         LV.setNonGC(true);
 
         EmitStoreThroughLValue(OuterRV, LV, true);
@@ -471,7 +471,7 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
     LocalDeclMap.erase(LoopVar);
     IVDeclMap.insert({LoopVar, OuterLoc}); 
     QualType type = LoopVar->getType();
-    LValue OuterLV = MakeAddrLValue(OuterLoc, type); 
+    LValue OuterLV = MakeAddrLValue(OuterLoc, type);
     RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
     ivs.push_back({LoopVar, OuterRV}); 
   }

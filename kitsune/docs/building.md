@@ -76,3 +76,4 @@ specifics of Kitsune.  This page is a good starting point:
         -DLLVM_PARALLEL_COMPILE_JOBS=14 -DLLVM_PARALLEL_LINK_JOBS=4 \
         ../llvm
     ```
+* __Kitsune-centric build options__: 

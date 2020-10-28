@@ -7,13 +7,18 @@
 # the LLVM license.
 #
 
-set(forall_examples 
-  vecadd.cpp 
+# Note: Since we borrow LLVM functionality here we
+# need to use LLVM_OPTIONAL_SOURCES here to avoid
+# a error from the LLVM cmake infrastructure...
+# FIXME: This is annoying... 
+set(LLVM_OPTIONAL_SOURCES
+  vecadd.cpp
+  std_vecadd.cpp
 )
 
 get_kitsune_tapir_rt_flags(tapir_args)
 
-foreach(src_file IN ITEMS ${forall_examples})
+foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
   message(STATUS "  forall example: ${src_file}")
   get_filename_component(base ${src_file} NAME_WLE)
   string(TOLOWER ${base} ${src_file})
@@ -21,11 +26,11 @@ foreach(src_file IN ITEMS ${forall_examples})
   # Add a kitsune-centric executable per enabled runtime. 
   foreach(rt IN ITEMS ${tapir_args})
     set(target_name forall-${base}-${rt})
-    message(STATUS "    ${rt} example: ${target_name}")
+    message(STATUS "      ${rt} example: ${src_file} ---> ${target_name}")
     add_kitsune_example(${target_name} ${src_file})
     set_target_properties(${target_name} 
       PROPERTIES
-        COMPILE_FLAGS "-ftapir=${rt}"
+        COMPILE_FLAGS "-ftapir=${rt} -Rpass-analysis=loop-spawning-ti"
         LINK_FLAGS "-ftapir=${rt}"
     )
   endforeach()

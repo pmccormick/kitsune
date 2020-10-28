@@ -7,13 +7,17 @@
 # the LLVM license.
 #
 
-set(examples 
+# Note: Since we borrow LLVM functionality here we
+# need to use LLVM_OPTIONAL_SOURCES here to avoid
+# a error from the LLVM cmake infrastructure...
+# FIXME: This is annoying... 
+set(LLVM_OPTIONAL_SOURCES 
   vecadd.cpp 
 )
 
 get_kitsune_tapir_rt_flags(tapir_args)
 
-foreach(src_file IN ITEMS ${examples}) 
+foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES}) 
   message(STATUS "  kokkos example: ${src_file}")
   get_filename_component(base ${src_file} NAME_WLE)
   string(TOLOWER ${base} ${src_file})
