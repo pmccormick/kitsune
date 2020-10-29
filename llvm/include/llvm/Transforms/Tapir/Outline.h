@@ -62,7 +62,7 @@ void CloneIntoFunction(
 ///
 /// TODO: Fix the std::vector part of the type of this function.
 Function *
-CreateHelper(const ValueSet &Args, const ValueSet &Inputs, const ValueSet &Outputs,
+CreateHelper(const ValueSet &Inputs, const ValueSet &Outputs,
              std::vector<BasicBlock *> Blocks, BasicBlock *Header,
              const BasicBlock *OldEntry, const BasicBlock *OldExit,
              ValueToValueMapTy &VMap, Module *DestM, bool ModuleLevelChanges,

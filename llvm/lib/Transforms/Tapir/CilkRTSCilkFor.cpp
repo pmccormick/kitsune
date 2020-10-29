@@ -236,7 +236,7 @@ void RuntimeCilkFor::processOutlinedLoopCall(TapirLoopInfo &TL,
   ValueToValueMapTy VMap;
   Twine NameSuffix = ".shelper";
   Function *SpawnHelper =
-      CreateHelper(SHInputs, SHInputs, Outputs, BlocksToClone, CallBlock, DetBlock,
+      CreateHelper(SHInputs, Outputs, BlocksToClone, CallBlock, DetBlock,
                    CallCont, VMap, &M, Parent->getSubprogram() != nullptr,
                    Returns, NameSuffix.str(), nullptr, nullptr, nullptr,
                    UnwindDest);
