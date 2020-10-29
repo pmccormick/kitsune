@@ -1,10 +1,11 @@
-// Very simple example of using forall for a parallel vector sum.  
+// Very simple test of kokkos with two common forms of the 
+// parallel_for construct.  We should be able to transform 
+// all constructs from lambda into simple loops... 
 #include <cstdio>
 #include <cstddef>
 #include <cstdlib>
 #include <cmath>
 #include <vector>
-#include <kitsune.h>
 
 using namespace std;
 
@@ -18,24 +19,30 @@ int main (int argc, char* argv[]) {
 
   for(auto i : A) {
     A[i] = rand() / (float)RAND_MAX;
-    B[i] = rand() / (float)RAND_MAX;    
-  }
+  } 
 
-  forall(auto i : C) {
+  for(auto i : B) {
+    B[i] = rand() / (float)RAND_MAX;
+  } 
+
+  for(auto i : C) {
     C[i] = A[i] + B[i];
   }
 
   size_t ti = 0;
   for(; ti < VEC_SIZE; ++ti) {
     float sum = A[ti] + B[ti];
-    if (fabs(C[ti] - sum) > 1e-7f) 
+    float delta = fabs(C[ti] - sum);
+    if (delta > 1e-7f) {
+      printf("delta error: %f\n", delta);
       break; // whoops...
+    }
   }
  
   fprintf(stdout, "Result = %s (%ld, %ld)\n",
 	  (ti == VEC_SIZE) ? "PASS" : "FAIL",
 	  ti, VEC_SIZE);
-  
+
   return 0;
 }
 
