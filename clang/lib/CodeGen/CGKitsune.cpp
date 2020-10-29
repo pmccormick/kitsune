@@ -475,38 +475,38 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
     LocalDeclMap.erase(LoopVar);
     IVDeclMap.insert({LoopVar, OuterLoc}); 
     QualType type = LoopVar->getType();
-      ivs.push_back(
+    ivs.push_back(
           {LoopVar, std::make_unique<llvm::SmallVector<llvm::Value *, 4>>()});
     switch (getEvaluationKind(type)) {
-    case TEK_Scalar: {
-      LValue OuterLV = MakeAddrLValue(OuterLoc, type);
-      RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc());
-      ivs.back().second->push_back(OuterRV.getScalarVal());
-      break;
-    }
-    case TEK_Complex: {
-      ComplexPairTy Val =
-        EmitLoadOfComplex(MakeAddrLValue(OuterLoc, type), DI->getBeginLoc());
-      ivs.back().second->push_back(Val.first);
-      ivs.back().second->push_back(Val.second);
-      break;
-    }
-    case TEK_Aggregate: {
-      if (const llvm::StructType *STy =
-              dyn_cast<llvm::StructType>(OuterLoc.getElementType())) {
-	// Load each element of the structure
-        for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
-          Address EltPtr = Builder.CreateStructGEP(OuterLoc, i);
-          llvm::Value *Elt = Builder.CreateLoad(EltPtr);
-          ivs.back().second->push_back(Elt);
-        }
-      } else {
+      case TEK_Scalar: {
         LValue OuterLV = MakeAddrLValue(OuterLoc, type);
         RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc());
         ivs.back().second->push_back(OuterRV.getScalarVal());
+        break;
       }
-      break;
-    }
+      case TEK_Complex: {
+        ComplexPairTy Val =
+          EmitLoadOfComplex(MakeAddrLValue(OuterLoc, type), DI->getBeginLoc());
+        ivs.back().second->push_back(Val.first);
+        ivs.back().second->push_back(Val.second);
+        break;
+      }
+      case TEK_Aggregate: {
+        if (const llvm::StructType *STy =
+          dyn_cast<llvm::StructType>(OuterLoc.getElementType())) {
+          // Load each element of the structure
+          for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
+            Address EltPtr = Builder.CreateStructGEP(OuterLoc, i);
+            llvm::Value *Elt = Builder.CreateLoad(EltPtr);
+            ivs.back().second->push_back(Elt);
+          }
+        } else {
+          LValue OuterLV = MakeAddrLValue(OuterLoc, type);
+          RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc());
+          ivs.back().second->push_back(OuterRV.getScalarVal());
+        }
+        break;
+      }
     }
   }
   /*
