@@ -464,16 +464,50 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
                                              Detach);
   
   DeclMapTy IVDeclMap; 
-  llvm::SmallVector<std::pair<VarDecl*, RValue>, 4> ivs;  
-  for (auto *DI : DS->decls()){
+  llvm::SmallVector<
+      std::pair<VarDecl *,
+                std::unique_ptr<llvm::SmallVector<llvm::Value *, 4>>>,
+      4>
+      ivs;
+  for (auto *DI : DS->decls()) {
     auto *LoopVar = dyn_cast<VarDecl>(DI);
     Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
     LocalDeclMap.erase(LoopVar);
     IVDeclMap.insert({LoopVar, OuterLoc}); 
     QualType type = LoopVar->getType();
-    LValue OuterLV = MakeAddrLValue(OuterLoc, type);
-    RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
-    ivs.push_back({LoopVar, OuterRV}); 
+      ivs.push_back(
+          {LoopVar, std::make_unique<llvm::SmallVector<llvm::Value *, 4>>()});
+    switch (getEvaluationKind(type)) {
+    case TEK_Scalar: {
+      LValue OuterLV = MakeAddrLValue(OuterLoc, type);
+      RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc());
+      ivs.back().second->push_back(OuterRV.getScalarVal());
+      break;
+    }
+    case TEK_Complex: {
+      ComplexPairTy Val =
+        EmitLoadOfComplex(MakeAddrLValue(OuterLoc, type), DI->getBeginLoc());
+      ivs.back().second->push_back(Val.first);
+      ivs.back().second->push_back(Val.second);
+      break;
+    }
+    case TEK_Aggregate: {
+      if (const llvm::StructType *STy =
+              dyn_cast<llvm::StructType>(OuterLoc.getElementType())) {
+	// Load each element of the structure
+        for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
+          Address EltPtr = Builder.CreateStructGEP(OuterLoc, i);
+          llvm::Value *Elt = Builder.CreateLoad(EltPtr);
+          ivs.back().second->push_back(Elt);
+        }
+      } else {
+        LValue OuterLV = MakeAddrLValue(OuterLoc, type);
+        RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc());
+        ivs.back().second->push_back(OuterRV.getScalarVal());
+      }
+      break;
+    }
+    }
   }
   /*
   for (auto *DI : DS->decls()){
@@ -503,17 +537,41 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   {
     // Create a separate cleanup scope for the loop variable and body.
     RunCleanupsScope BodyScope(*this);
-    for (auto &ivp : ivs){
-      auto* LoopVar = ivp.first; 
-      auto OuterRV = ivp.second; 
+    for (auto &ivp : ivs) {
+      auto *LoopVar = ivp.first;
+      auto &LoadedVals = ivp.second;
       AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
       EmitAutoVarCleanups(LVEmission);
       QualType type = LoopVar->getType();
       Address Loc = LVEmission.getObjectAddress(*this);
       LValue LV = MakeAddrLValue(Loc, type);
       LV.setNonGC(true);
+      switch (getEvaluationKind(type)) {
+      case TEK_Scalar: {
+        EmitStoreOfScalar(LoadedVals->back(), LV, /*isInit*/ true);
+        break;
+      }
+      case TEK_Complex: {
+	ComplexPairTy Val = {(*LoadedVals)[0], (*LoadedVals)[1]};
+	EmitStoreOfComplex(Val, LV, /*isInit*/ true);
+        break;
+      }
+      case TEK_Aggregate: {
+        if (const llvm::StructType *STy =
+                dyn_cast<llvm::StructType>(Loc.getElementType())) {
+	  // Store the previously-loaded value into the new structure
+          for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
+            Address EltPtr = Builder.CreateStructGEP(Loc, i);
+            llvm::Value *Elt = (*LoadedVals)[i];
+            Builder.CreateStore(Elt, EltPtr);
+          }
+        } else {
+          EmitStoreOfScalar(LoadedVals->back(), LV, /*isInit*/ true);
+        }
+        break;
+      }
+      }
 
-      EmitStoreThroughLValue(OuterRV, LV, true);
     }
     EmitStmt(S.getLoopVarStmt());
     EmitStmt(S.getBody());
