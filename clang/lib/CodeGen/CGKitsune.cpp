@@ -416,6 +416,8 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   EmitStmt(S.getRangeStmt());
   EmitStmt(S.getBeginStmt());
   EmitStmt(S.getEndStmt());
+  EmitStmt(S.getIndexStmt());
+  EmitStmt(S.getIndexEndStmt());
 
   // create the sync region
   PushSyncRegion();
@@ -455,7 +457,7 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   EmitBlock(Detach);
 
   // Extract the DeclStmt from the statement init
-  const DeclStmt *DS = cast<DeclStmt>(S.getBeginStmt());
+  const DeclStmt *DS = cast<DeclStmt>(S.getIndexStmt());
   
   // Set up IVs to be copied as firstprivate 
   auto OldAllocaInsertPt = AllocaInsertPt;

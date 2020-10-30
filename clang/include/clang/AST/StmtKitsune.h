@@ -168,7 +168,19 @@ public:
 /// can be extracted using getLoopVariable and getRangeInit.
 class CXXForallRangeStmt : public Stmt {
   SourceLocation ForLoc;
-  enum { INIT, RANGE, BEGINSTMT, ENDSTMT, COND, INC, LOOPVAR, BODY, END };
+  enum {
+    INIT,
+    RANGE,
+    BEGINSTMT,
+    ENDSTMT,
+    INDEXSTMT,
+    INDEXENDSTMT,
+    COND,
+    INC,
+    LOOPVAR,
+    BODY,
+    END
+  };
   // SubExprs[RANGE] is an expression or declstmt.
   // SubExprs[COND] and SubExprs[INC] are expressions.
   Stmt *SubExprs[END];
@@ -179,10 +191,11 @@ class CXXForallRangeStmt : public Stmt {
   friend class ASTStmtReader;
 public:
   CXXForallRangeStmt(Stmt *InitStmt, DeclStmt *Range, DeclStmt *Begin,
-                  DeclStmt *End, Expr *Cond, Expr *Inc, DeclStmt *LoopVar,
-                  Stmt *Body, SourceLocation FL, SourceLocation CAL,
-                  SourceLocation CL, SourceLocation RPL);
-  CXXForallRangeStmt(EmptyShell Empty) : Stmt(CXXForallRangeStmtClass, Empty) { }
+                     DeclStmt *End, DeclStmt *Index, DeclStmt *IndexEnd,
+                     Expr *Cond, Expr *Inc, DeclStmt *LoopVar, Stmt *Body,
+                     SourceLocation FL, SourceLocation CAL, SourceLocation CL,
+                     SourceLocation RPL);
+  CXXForallRangeStmt(EmptyShell Empty) : Stmt(CXXForallRangeStmtClass, Empty) {}
 
   Stmt *getInit() { return SubExprs[INIT]; }
   VarDecl *getLoopVariable();
@@ -198,6 +211,12 @@ public:
     return cast_or_null<DeclStmt>(SubExprs[BEGINSTMT]);
   }
   DeclStmt *getEndStmt() { return cast_or_null<DeclStmt>(SubExprs[ENDSTMT]); }
+  DeclStmt *getIndexStmt() {
+    return cast_or_null<DeclStmt>(SubExprs[INDEXSTMT]);
+  }
+  DeclStmt *getIndexEndStmt() {
+    return cast_or_null<DeclStmt>(SubExprs[INDEXENDSTMT]);
+  }
   Expr *getCond() { return cast_or_null<Expr>(SubExprs[COND]); }
   Expr *getInc() { return cast_or_null<Expr>(SubExprs[INC]); }
   DeclStmt *getLoopVarStmt() { return cast<DeclStmt>(SubExprs[LOOPVAR]); }
@@ -211,6 +230,12 @@ public:
   }
   const DeclStmt *getEndStmt() const {
     return cast_or_null<DeclStmt>(SubExprs[ENDSTMT]);
+  }
+  const DeclStmt *getIndexStmt() const {
+    return cast_or_null<DeclStmt>(SubExprs[INDEXSTMT]);
+  }
+  const DeclStmt *getIndexEndStmt() const {
+    return cast_or_null<DeclStmt>(SubExprs[INDEXENDSTMT]);
   }
   const Expr *getCond() const {
     return cast_or_null<Expr>(SubExprs[COND]);
@@ -228,6 +253,8 @@ public:
   void setRangeStmt(Stmt *S) { SubExprs[RANGE] = S; }
   void setBeginStmt(Stmt *S) { SubExprs[BEGINSTMT] = S; }
   void setEndStmt(Stmt *S) { SubExprs[ENDSTMT] = S; }
+  void setIndexStmt(Stmt *S) { SubExprs[INDEXSTMT] = S; }
+  void setIndexEndStmt(Stmt *S) { SubExprs[INDEXENDSTMT] = S; }
   void setCond(Expr *E) { SubExprs[COND] = reinterpret_cast<Stmt*>(E); }
   void setInc(Expr *E) { SubExprs[INC] = reinterpret_cast<Stmt*>(E); }
   void setLoopVarStmt(Stmt *S) { SubExprs[LOOPVAR] = S; }

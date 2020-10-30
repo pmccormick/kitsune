@@ -84,19 +84,21 @@ const VarDecl *CXXForRangeStmt::getLoopVariable() const {
   return const_cast<CXXForRangeStmt *>(this)->getLoopVariable();
 }
 
-
 CXXForallRangeStmt::CXXForallRangeStmt(Stmt *Init, DeclStmt *Range,
-                                 DeclStmt *BeginStmt, DeclStmt *EndStmt,
-                                 Expr *Cond, Expr *Inc, DeclStmt *LoopVar,
-                                 Stmt *Body, SourceLocation FL,
-                                 SourceLocation CAL, SourceLocation CL,
-                                 SourceLocation RPL)
+                                       DeclStmt *BeginStmt, DeclStmt *EndStmt,
+                                       DeclStmt *IndexStmt,
+                                       DeclStmt *IndexEndStmt, Expr *Cond,
+                                       Expr *Inc, DeclStmt *LoopVar, Stmt *Body,
+                                       SourceLocation FL, SourceLocation CAL,
+                                       SourceLocation CL, SourceLocation RPL)
     : Stmt(CXXForallRangeStmtClass), ForLoc(FL), CoawaitLoc(CAL), ColonLoc(CL),
       RParenLoc(RPL) {
   SubExprs[INIT] = Init;
   SubExprs[RANGE] = Range;
   SubExprs[BEGINSTMT] = BeginStmt;
   SubExprs[ENDSTMT] = EndStmt;
+  SubExprs[INDEXSTMT] = IndexStmt;
+  SubExprs[INDEXENDSTMT] = IndexEndStmt;
   SubExprs[COND] = Cond;
   SubExprs[INC] = Inc;
   SubExprs[LOOPVAR] = LoopVar;

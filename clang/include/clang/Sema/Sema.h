@@ -5113,15 +5113,11 @@ public:
                                   SourceLocation ColonLoc, Expr *Collection,
                                   SourceLocation RParenLoc,
                                   BuildForRangeKind Kind);
-  StmtResult BuildCXXForallRangeStmt(SourceLocation ForLoc,
-                                  SourceLocation CoawaitLoc,
-                                  Stmt *InitStmt,
-                                  SourceLocation ColonLoc,
-                                  Stmt *RangeDecl, Stmt *Begin, Stmt *End,
-                                  Expr *Cond, Expr *Inc,
-                                  Stmt *LoopVarDecl,
-                                  SourceLocation RParenLoc,
-                                  BuildForRangeKind Kind);
+  StmtResult BuildCXXForallRangeStmt(
+      SourceLocation ForLoc, SourceLocation CoawaitLoc, Stmt *InitStmt,
+      SourceLocation ColonLoc, Stmt *RangeDecl, Stmt *Begin, Stmt *End,
+      Stmt *Index, Stmt *IndexEnd, Expr *Cond, Expr *Inc, Stmt *LoopVarDecl,
+      SourceLocation RParenLoc, BuildForRangeKind Kind);
   StmtResult FinishCXXForallRangeStmt(Stmt *ForRange, Stmt *Body);
 
   StmtResult ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
