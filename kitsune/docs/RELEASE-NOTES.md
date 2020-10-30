@@ -17,6 +17,11 @@ __Internal/ECP Release Milestone__: ST-NS-01-1330 (__tagged__)
 
 * Rebased to LLVM 10.0.1.
 
+* Squashed a nasty bug related to avoiding race conditions and type-based alias analysis.
+
+* Updates to some configuration details for different (new) runtime targets (e.g., OpenCL 
+  and a wrapper around CUDA for simplifying code generation implementation).
+
 * Improved __``forall``__ support and bug fixes (traditional and range-based):
 
   * Fixed a couple of race condition in generated code -- specifically moved
