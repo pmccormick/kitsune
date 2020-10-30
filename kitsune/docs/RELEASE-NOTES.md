@@ -17,7 +17,9 @@ __Internal/ECP Release Milestone__: ST-NS-01-1330 (__tagged__)
 
 * Rebased to LLVM 10.0.1.
 
-* Squashed a nasty bug related to avoiding race conditions and type-based alias analysis.
+* Squashed a nasty bug related to avoiding race conditions and type-based alias analysis 
+  (TBAA). Added some code to support early TBAA verification to make similar errors appear 
+  earlier in the compilation stages (easier bug tracing).
 
 * Updates to some configuration details for different (new) runtime targets (e.g., OpenCL 
   and a wrapper around CUDA for simplifying code generation implementation).
