@@ -1,4 +1,4 @@
-#include <CL/cl.hpp>
+#include <CL/cl2.hpp>
 #include<iostream>
 #include<stdint.h>
 #include<stdbool.h>
