@@ -47,9 +47,9 @@
  * the Realm runtime backend target (via -ftapir=realm).
  */ 
 #cmakedefine01 KITSUNE_ENABLE_REALM_TARGET
-#define REALM_LIBRARY_DIR        "${Realm_LIBRARY_DIR}"
-#define REALM_LINK_LIBS          "${Realm_LINK_LIBS}"
-#define REALM_EXTRA_LINK_LIBS    "${REALM_EXTRA_LINK_LIBS}"
+#define KITSUNE_REALM_LIBRARY_DIR        "${Realm_LIBRARY_DIR}"
+#define KITSUNE_REALM_WRAPPER_LIBRARY_DIR  "${Realm_WRAPPER_LIBRARY_DIR}"
+#define KITSUNE_REALM_LINK_LIBS          "${Realm_LINK_LIBS} ${KITSUNE_EXTRA_REALM_LINK_LIBS}"
 
 /* Automatic command line arguments to add when compiling with
  * the OpenMP runtime backend target (via -ftapir=omp).
