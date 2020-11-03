@@ -718,8 +718,8 @@ public:
   /// AddKitsuneLibArgs - Add some kitsune-centric linker arguments to use 
   /// given the special modes of operation (kitsune, kokkos, backend runtime 
   /// arguments, etc.). 
-  //virtual void AddKitsuneLibArgs(const llvm::opt::ArgList &Args, 
-  //			 llvm::opt::ArgStringList &CmdArgs) const;
+  virtual void AddKitsuneLibArgs(const llvm::opt::ArgList &Args, 
+  			 llvm::opt::ArgStringList &CmdArgs) const;
   
   /// AddFilePathLibArgs - Add each thing in getFilePaths() as a "-L" option.
   void AddFilePathLibArgs(const llvm::opt::ArgList &Args,
