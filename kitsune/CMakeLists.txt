@@ -50,20 +50,36 @@ option(KITSUNE_ENABLE_WERROR
 
 find_package(CUDAToolkit)
 option(KITSUNE_ENABLE_CUDA
-  "Enable PTX+CUDART backend target." ${CUDAToolkit_FOUND})
-if (KITSUNE_ENABLE_CUDA_TARGET)
-  set(KITSUNE_EXTRA_CUDART_LINK_LIBS "-lkitcudart"
-    CACHE
-    STRING "Extra link libraries for CUDA runtime target."
-  )
-  add_subdirectory(lib/CudaRT)
+  "Enable Kitsune-centric CUDA support." ${CUDAToolkit_FOUND})
+if (KITSUNE_ENABLE_CUDA) 
+  option(KITSUNE_ENABLE_CUDA_TARGET 
+    "Enable the CUDA runtime ABI target." ${CUDAToolkit_FOUND})
+  if (KITSUNE_ENABLE_CUDA_TARGET)
+    option(KITSUNE_CUDA_LIBRARY_DIR 
+    "Enable the CUDA runtime ABI target." ${CUDAToolkit_LIBRARY_DIR})
+    set(KITSUNE_EXTRA_CUDA_LINK_LIBS ""
+      CACHE
+      STRING "Extra link libraries for CUDA ABI runtime target."
+    )
+  endif()
+
+  option(KITSUNE_ENABLE_KITCUDA_TARGET 
+    "Enable Kitsune's CUDA runtime ABI target." ${CUDAToolkit_FOUND})
+  if (KITSUNE_ENABLE_KITCUDA_TARGET)
+    set(KITSUNE_EXTRA_KITCUDA_LINK_LIBS ""
+      CACHE
+      STRING "Extra link libraries for Kitsune's CUDA ABI runtime target."
+    )
+    add_subdirectory(lib/CudaRT)  
+  endif()
 endif()
 
 find_package(OpenCL)
+# FIXME: Re-enable OpenCL default once code gen pieces are complete. 
 option(KITSUNE_ENABLE_OPENCL_TARGET
-  "Enable SPIRV+OpenCL backend target." ${OpenCL_FOUND})
+  "Enable SPIRV+OpenCL backend target." FALSE) # ${OpenCL_FOUND}
 if (KITSUNE_ENABLE_OPENCL_TARGET)
-  set(KITSUNE_EXTRA_OPENCL_LINK_LIBS "-lkitopencl"
+  set(OPENCL_EXTRA_LINK_LIBS "-lkitopencl"
     CACHE
     STRING "Extra link libraries for OpenCL runtime target."
   )
@@ -74,7 +90,7 @@ find_package(CilkRTS)
 option(KITSUNE_ENABLE_CILKRTS_TARGET
   "Enable Cilk runtime backend target." ${CilkRTS_FOUND})
 if (KITSUNE_ENABLE_CILKRTS_TARGET) 
-  set(KITSUNE_EXTRA_CILK_LINK_LIBS ""
+  set(CILKRTS_EXTRA_LINK_LIBS ""
     CACHE 
     STRING "Extra link libraries for the Cilk runtime target."
   )
@@ -84,7 +100,10 @@ find_package(Qthreads)
 option(KITSUNE_ENABLE_QTHREADS_TARGET
   "Enable Qthreads runtime backend target." ${Qthreads_FOUND})
 if (Qthreads_FOUND)
-  set(KITSUNE_EXTRA_QTHREADS_LINK_LIBS "")
+  message(STATUS "Qthreads runtime target enabled.")
+  option(QTHREADS_EXTRA_LINK_LIBS
+    "Additional libraries needed by Qthreads backend runtime."
+    "")
 endif()
 
 find_package(Realm)
@@ -92,14 +111,16 @@ option(KITSUNE_ENABLE_REALM_TARGET
   "Enable Realm runtime backend target." ${Realm_FOUND})
 if (Realm_FOUND)
   message(STATUS "Realm runtime target enabled.")
-  set(KITSUNE_EXTRA_REALM_LINK_LIBS "-ldl -lrt")
+  option(REALM_EXTRA_LINK_LIBS
+    "Additional libraries needed by Realm backend runtime."
+    "-ldl -lrt")
   add_subdirectory(lib/Realm)
 endif()
 
 if ("openmp" IN_LIST LLVM_ENABLE_PROJECTS)
   message(STATUS "adding support for libomp target code generation...")
   option(KITSUNE_ENABLE_OPENMP "Enable OpenMP/libomp runtime backend target." ON)
-  set(KITSUNE_EXTRA_OPENMP_LINK_LIBS "")
+  set(OPENMP_EXTRA_LINK_LIBS "")
 else()
   option(KITSUNE_ENABLE_OPENMP_TARGET "Enable OpenMP/libomp runtime backend target." OFF)
 endif()
@@ -109,7 +130,7 @@ find_package(Kokkos)
 option(KITSUNE_ENABLE_KOKKOS
   "Enable Kokkos support." ${Kokkos_FOUND})
 if (Kokkos_FOUND)
-  set(KITSUNE_EXTRA_KOKKOS_LINK_LIBS "")
+  set(KOKKOS_EXTRA_LINK_LIBS "-ldl")
 endif()
 
 if (KITSUNE_INCLUDE_TESTS)

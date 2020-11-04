@@ -1102,7 +1102,7 @@ void ToolChain::AddKitsuneIncludeArgs(const ArgList &Args,
 				      ArgStringList &CmdArgs) const {
   if (D.CCCIsCXX() && Args.hasArg(options::OPT_fkokkos)) {
     if (KITSUNE_ENABLE_KOKKOS) {
-      CmdArgs.push_back("-I" KITSUNE_KOKKOS_INCLUDE_DIR);
+      CmdArgs.push_back("-I" KOKKOS_INCLUDE_DIR);
     } else {
       getDriver().Diag(diag::warn_kokkos_missing_build_params);
     }
@@ -1680,18 +1680,19 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
   case TapirTargetID::Cilk:
 	  
     if (KITSUNE_ENABLE_CILKRTS_TARGET) {
-	    CmdArgs.push_back("-L" KITSUNE_CILKRTS_LIBRARY_DIR);
-	    if (Triple.isOSDarwin()) {
-	      CmdArgs.push_back("-rpath");
-	      CmdArgs.push_back(KITSUNE_CILKRTS_LIBRARY_DIR);
-	    } else {
-	      CmdArgs.push_back("-rpath=" KITSUNE_CILKRTS_LIBRARY_DIR);
+      CmdArgs.push_back("-L" CILKRTS_LIBRARY_DIR);
+      if (Triple.isOSDarwin()) {
+	CmdArgs.push_back("-rpath");
+	CmdArgs.push_back(CILKRTS_LIBRARY_DIR);
+      } else {
+	CmdArgs.push_back("-rpath=" CILKRTS_LIBRARY_DIR);
       } 
-	    ExtractArgsFromString(KITSUNE_CILKRTS_LINK_LIBS, CmdArgs, Args);
-     } else { 
-	     getDriver().Diag(diag::warn_cilkrts_missing_build_params);
-       CmdArgs.push_back("-lcilkrts");
-     }
+      ExtractArgsFromString(CILKRTS_EXTRA_LINK_LIBS, CmdArgs, Args);
+      CmdArgs.push_back("-lcilkrts");      
+    } else {
+      // FIXME: we should hard error here if cilkrts support was not built-in.
+      getDriver().Diag(diag::warn_cilkrts_missing_build_params);
+    }
     break;
   case TapirTargetID::OpenMP:
     if (KITSUNE_ENABLE_OPENMP_TARGET) { 
@@ -1708,69 +1709,110 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
 
   case TapirTargetID::Qthreads:
     if (KITSUNE_ENABLE_QTHREADS_TARGET) { 
-	    CmdArgs.push_back("-L" KITSUNE_QTHREADS_LIBRARY_DIR);
-	    if (Triple.isOSDarwin()) {
-	      CmdArgs.push_back("-rpath");
-	      CmdArgs.push_back(KITSUNE_QTHREADS_LIBRARY_DIR);
-	    } else {
-	      CmdArgs.push_back("-rpath=" KITSUNE_QTHREADS_LIBRARY_DIR);
+      CmdArgs.push_back("-L" QTHREADS_LIBRARY_DIR);
+      if (Triple.isOSDarwin()) {
+	CmdArgs.push_back("-rpath");
+	CmdArgs.push_back(QTHREADS_LIBRARY_DIR);
+      } else {
+	CmdArgs.push_back("-rpath="  QTHREADS_LIBRARY_DIR);
       }
-  	  ExtractArgsFromString(KITSUNE_QTHREADS_LINK_LIBS, CmdArgs, Args);
-	  } else {
-	    getDriver().Diag(diag::warn_qthreads_missing_build_params);
-      CmdArgs.push_back("-lqthread");
+      CmdArgs.push_back("-lqthread");            
+      ExtractArgsFromString(QTHREADS_EXTRA_LINK_LIBS, CmdArgs, Args);
+    } else {
+      // FIXME: we should hard error here if qthreads support was not built-in.
+      getDriver().Diag(diag::warn_qthreads_missing_build_params);
     }
     break;
 
   case TapirTargetID::Realm:
     if (KITSUNE_ENABLE_REALM_TARGET) { 
-	    CmdArgs.push_back("-L" KITSUNE_REALM_LIBRARY_DIR);
-	    if (Triple.isOSDarwin()) {
-	      CmdArgs.push_back("-rpath");
-	      CmdArgs.push_back(KITSUNE_REALM_LIBRARY_DIR);
-	    } else {
-	      CmdArgs.push_back("-rpath=" KITSUNE_REALM_LIBRARY_DIR);	    
+      CmdArgs.push_back("-L" REALM_LIBRARY_DIR);
+      if (Triple.isOSDarwin()) {
+	CmdArgs.push_back("-rpath");
+	CmdArgs.push_back(REALM_LIBRARY_DIR);
+      } else {
+	CmdArgs.push_back("-rpath=" REALM_LIBRARY_DIR);	    
       }
-	    ExtractArgsFromString(KITSUNE_REALM_LINK_LIBS, CmdArgs, Args);
-	  } else {
-	    getDriver().Diag(diag::warn_realm_missing_build_params);
       CmdArgs.push_back("-lrealm");
+      ExtractArgsFromString(REALM_EXTRA_LINK_LIBS, CmdArgs, Args);
+    } else {
+      // FIXME: we should hard error here if realm support was not built-in.
+      getDriver().Diag(diag::warn_realm_missing_build_params);
     }
     break;
 
   case TapirTargetID::Cuda:
     if (KITSUNE_ENABLE_CUDA_TARGET) { 
-      CmdArgs.push_back("-L" KITSUNE_CUDA_LIBRARY_DIR);
+      CmdArgs.push_back("-L" CUDA_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
-	CmdArgs.push_back("-rpath");
-	CmdArgs.push_back(KITSUNE_CUDA_LIBRARY_DIR);	    
+        CmdArgs.push_back("-rpath");
+        CmdArgs.push_back(CUDA_LIBRARY_DIR);	    
       } else {
-	CmdArgs.push_back("-rpath=" KITSUNE_CUDA_LIBRARY_DIR);
+        CmdArgs.push_back("-rpath=" CUDA_LIBRARY_DIR);
       }
-      ExtractArgsFromString(KITSUNE_CUDA_LINK_LIBS, CmdArgs, Args);
+      ExtractArgsFromString(CUDA_EXTRA_LINK_LIBS, CmdArgs, Args);
+      CmdArgs.push_back("-lcuda");      
     } else {
+      // FIXME: We should hard error here if cuda support was not built-in.
       getDriver().Diag(diag::warn_cuda_missing_build_params);
+    }
+    break;
+
+  case TapirTargetID::KitCuda:
+    if (KITSUNE_ENABLE_KITCUDA_TARGET) { 
+      CmdArgs.push_back("-L" KITCUDA_LIBRARY_DIR);
+      if (Triple.isOSDarwin()) {
+        CmdArgs.push_back("-rpath");
+        CmdArgs.push_back(KITCUDA_LIBRARY_DIR);	    
+      } else {
+        CmdArgs.push_back("-rpath=" KITCUDA_LIBRARY_DIR);
+      }
+      ExtractArgsFromString(KITCUDA_EXTRA_LINK_LIBS, CmdArgs, Args);
+      CmdArgs.push_back("-lkitcudart");
+      CmdArgs.push_back("-lcuda");
+    } else {
+      // FIXME: We should hard error here if kitcuda support was not configured.
+      getDriver().Diag(diag::warn_cuda_missing_build_params);
+      CmdArgs.push_back("-lkitcudart");
       CmdArgs.push_back("-lcuda");
     }
     break;
 
   case TapirTargetID::OpenCL:
     if (KITSUNE_ENABLE_OPENCL_TARGET) { 
-      CmdArgs.push_back("-L" KITSUNE_OPENCL_LIBRARY_DIR);
+      CmdArgs.push_back("-L" OPENCL_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
-	CmdArgs.push_back("-rpath");
-	CmdArgs.push_back(KITSUNE_OPENCL_LIBRARY_DIR);	    
+        CmdArgs.push_back("-rpath");
+        CmdArgs.push_back(OPENCL_LIBRARY_DIR);	    
       } else {
-	CmdArgs.push_back("-rpath=" KITSUNE_OPENCL_LIBRARY_DIR);
+        CmdArgs.push_back("-rpath=" OPENCL_LIBRARY_DIR);
       }
-      ExtractArgsFromString(KITSUNE_OPENCL_LINK_LIBS, CmdArgs, Args);
-    } else {
-      getDriver().Diag(diag::warn_opencl_missing_build_params);
+      ExtractArgsFromString(OPENCL_EXTRA_LINK_LIBS, CmdArgs, Args);
       CmdArgs.push_back("-lcl");
+    } else {
+      // FIXME: We should hard error here if opencl support was not configured.
+      getDriver().Diag(diag::warn_opencl_missing_build_params);
     }
     break;    
 
   default:
     break;
+  }
+
+  if (D.CCCIsCXX() && Args.hasArg(options::OPT_fkokkos)) {
+    if (KITSUNE_ENABLE_KOKKOS) {
+      CmdArgs.push_back("-L" KOKKOS_LIBRARY_DIR);
+      if (Triple.isOSDarwin()) {
+        CmdArgs.push_back("-rpath");
+        CmdArgs.push_back(KOKKOS_LIBRARY_DIR);	    
+      } else {
+        CmdArgs.push_back("-rpath=" KOKKOS_LIBRARY_DIR);
+      }
+      CmdArgs.push_back("-lkokkoscore");
+      ExtractArgsFromString(KOKKOS_EXTRA_LINK_LIBS, CmdArgs, Args);
+    }
+  } else {
+    // FIXME: We should hard error here if kokkos support was not configured. 
+    getDriver().Diag(diag::warn_kokkos_missing_build_params);
   }
 }

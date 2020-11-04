@@ -6,7 +6,7 @@
 
 using namespace std;
 
-const size_t VEC_SIZE = 1024 * 1024 * 256;
+const size_t VEC_SIZE = 256;
 
 void random_fill(float *data, size_t N) {
   for(size_t i = 0; i < N; ++i) 
