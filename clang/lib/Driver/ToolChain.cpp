@@ -1810,9 +1810,9 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       }
       CmdArgs.push_back("-lkokkoscore");
       ExtractArgsFromString(KOKKOS_EXTRA_LINK_LIBS, CmdArgs, Args);
+    } else {
+      // FIXME: We should hard error here if kokkos support was not configured. 
+      getDriver().Diag(diag::warn_kokkos_missing_build_params);
     }
-  } else {
-    // FIXME: We should hard error here if kokkos support was not configured. 
-    getDriver().Diag(diag::warn_kokkos_missing_build_params);
   }
 }
