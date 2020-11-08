@@ -463,7 +463,7 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   auto OldAllocaInsertPt = AllocaInsertPt;
   llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
   AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
-                                             Detach);
+                                             ForBody);
   
   DeclMapTy IVDeclMap; 
   llvm::SmallVector<

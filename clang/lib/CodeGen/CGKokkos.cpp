@@ -329,22 +329,24 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
 
   auto OldAllocaInsertPt = AllocaInsertPt;
   llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
-  AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "", Detach);
+  AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "", PForBody);
 
   llvm::Value *GInductionVar = GetAddrOfLocalVar(InductionVarDecl).getPointer();
   llvm::Value *GInductionVal = Builder.CreateLoad(GetAddrOfLocalVar(InductionVarDecl));
 
   QualType RefType = InductionVarDecl->getType();
-  llvm::AllocaInst *TLInductionVar = Builder.CreateAlloca(
-    getTypes().ConvertType(RefType), nullptr, InductionVarDecl->getName() + ".detach");
-  Builder.CreateAlignedStore(GInductionVal, TLInductionVar, 
-                getContext().getTypeAlignInChars(RefType));
   
   // Create the detach terminator 
   Builder.CreateDetach(PForBody, Increment, SRStart);
 
   EmitBlock(PForBody);
   incrementProfileCounter(CE);
+
+  llvm::AllocaInst *TLInductionVar =
+      Builder.CreateAlloca(getTypes().ConvertType(RefType), nullptr,
+                           InductionVarDecl->getName() + ".detach");
+  Builder.CreateAlignedStore(GInductionVal, TLInductionVar,
+                             getContext().getTypeAlignInChars(RefType));
   {
     // Create a separate cleanup scope for the body, in case it is not
     // a compound statement.
@@ -353,7 +355,7 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     EmitStmt(Lambda->getBody());
     InKokkosConstruct = false;
   }
-  
+
   auto tmp = AllocaInsertPt; 
   AllocaInsertPt = OldAllocaInsertPt; 
   tmp->removeFromParent(); 
