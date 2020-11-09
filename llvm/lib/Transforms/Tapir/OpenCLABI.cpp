@@ -87,10 +87,6 @@ SPIRVLoop::SPIRVLoop(Module &M)
                                           SPIRVInt64Ty, SPIRVInt32Ty);
   Function* getid = SPIRVM.getFunction("_Z13get_global_idj"); 
   getid->setCallingConv(CallingConv::SPIR_FUNC); 
-  //GetBlockIdx = SPIRVM.getOrInsertFunction("get_local_id",
-   //                                      SPIRVInt32Ty, SPIRVInt32Ty);
-  //GetBlockDim = SPIRVM.getOrInsertFunction("get_local_size",
-  //                                      SPIRVInt32Ty, SPIRVInt32Ty);
 
   Type *VoidTy = Type::getVoidTy(M.getContext());
   Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
@@ -156,14 +152,7 @@ void SPIRVLoop::setupLoopOutlineArgs(
 
   // Add the loop control inputs.
   for (Value *V : TLInputsFixed) {
-    if (auto *VTy = dyn_cast<PointerType>(V->getType())){
-      auto gty = PointerType::get(VTy->getPointerElementType(), 1); 
-      auto *arg = new Argument(gty, V->getName()); 
-      //arg->addAttr(Attribute::NoCapture); 
-      HelperArgs.insert(arg); 
-    } else {
-      HelperArgs.insert(V); 
-    }
+    HelperArgs.insert(V); 
     HelperInputs.push_back(V);
   }
 
@@ -230,7 +219,6 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   Task *T = TL.getTask();
   Loop *L = TL.getLoop();
 
-  Function *Helper = Out.Outline;
 
   BasicBlock *Entry = cast<BasicBlock>(VMap[L->getLoopPreheader()]);
   BasicBlock *Header = cast<BasicBlock>(VMap[L->getHeader()]);
@@ -244,9 +232,6 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   ClonedSyncReg->eraseFromParent();
 
   // Set the helper function to have external linkage.
-  //Helper->setLinkage(Function::ExternalLinkage);
-  Helper->setCallingConv(CallingConv::SPIR_KERNEL); 
-  Helper->setName("kitsune_spirv_kernel"); 
 
   // Get the thread ID for this invocation of Helper.
   IRBuilder<> B(Entry->getTerminator());
@@ -254,6 +239,49 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   //Value *BlockIdx = B.CreateCall(GetBlockIdx, ConstantInt::get(Int32Ty, 0));
   //Value *BlockDim = B.CreateCall(GetBlockDim, ConstantInt::get(Int32Ty, 0));
   Value *ThreadID = B.CreateIntCast(ThreadIdx, PrimaryIV->getType(), false);
+
+  Function *Helper = Out.Outline;
+  //Helper->setName("kitsune_spirv_kernel"); 
+  // Fix argument pointer types to global, nocapture
+  // TODO: read/write attributes?
+  SmallVector<Type*, 8> paramTys; 
+  for(auto &arg : Helper->args()){
+    if (auto *apty = dyn_cast<PointerType>(arg.getType())){
+      paramTys.push_back(PointerType::get(apty->getPointerElementType(), 1)); 
+    } else {
+      paramTys.push_back(arg.getType()); 
+    }
+  }
+  ArrayRef<Type*> newParams(paramTys); 
+  if(auto *fpty = dyn_cast<PointerType>(Helper->getType())){
+    if(auto *fty = dyn_cast<FunctionType>(fpty->getPointerElementType())){
+      LLVM_DEBUG(dbgs() << "Helper is pointer to function " << *Helper->getType() << "\n"); 
+      auto *NewHelper = Function::Create(
+          FunctionType::get(fty->getReturnType(), newParams, false), 
+          GlobalValue::ExternalLinkage, 
+          "kitsune_spirv_kernel", 
+          SPIRVM);
+
+      ValueToValueMapTy VMap;
+      auto argit = NewHelper->arg_begin();
+      for (auto &arg : Helper->args()) {
+        VMap[&arg] = argit++; 
+      }
+      SmallVector< ReturnInst *,5> retinsts;
+      CloneFunctionInto(NewHelper, Helper, VMap, false, retinsts);
+      //Helper->mutateType(PointerType::get(FunctionType::get(fty->getReturnType(), newParams, false), 0)); 
+      NewHelper->setCallingConv(CallingConv::SPIR_KERNEL); 
+      for(auto &arg : NewHelper->args()){
+        if (auto *apty = dyn_cast<PointerType>(arg.getType())){
+          arg.addAttr(Attribute::NoCapture);
+        }
+      }
+      Helper = NewHelper; 
+    }
+  }
+
+  LLVM_DEBUG(dbgs() << "Function type after globalization of argument pointers << " << *Helper->getType() << "\n"); 
+  LLVM_DEBUG(dbgs() << "SPIRVM after globalization of argument pointers << " << *Helper->getParent() << "\n"); 
 
   // Verify that the Thread ID corresponds to a valid iteration.  Because Tapir
   // loops use canonical induction variables, valid iterations range from 0 to
@@ -295,38 +323,39 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
          "End argument not used in condition");
   ClonedCond->setOperand(TripCountIdx, ThreadEnd);
   */
-  // Fix argument pointer types to global, nocapture
-  // TODO: read/write attributes?
-  for(auto &arg : Helper->args()){
-    if (auto *apty = dyn_cast<PointerType>(arg.getType())){
-      arg.mutateType(PointerType::get(apty->getPointerElementType(), 1)); 
-      arg.addAttr(Attribute::NoCapture); 
-    }
-  }
-  SmallVector<Type*, 8> paramTys; 
-  for(auto &arg : Helper->args()){
-    paramTys.push_back(arg.getType()); 
-  }
-  ArrayRef<Type*> newParams(paramTys); 
-  if(auto *fpty = dyn_cast<PointerType>(Helper->getType())){
-    LLVM_DEBUG(dbgs() << "Helper is pointer" << *Helper->getType() << "\n"); 
-    if(auto *fty = dyn_cast<FunctionType>(fpty->getPointerElementType())){
-      LLVM_DEBUG(dbgs() << "Helper is pointer to function" << *Helper->getType() << "\n"); 
-      Helper->mutateType(PointerType::get(FunctionType::get(fty->getReturnType(), newParams, false), 0)); 
-    }
-  }
-  LLVM_DEBUG(dbgs() << "Function type after globalization of argument pointers << " << *Helper->getType() << "\n"); 
-  LLVM_DEBUG(dbgs() << "SPIRVM after globalization of argument pointers << " << *Helper->getParent() << "\n"); 
 
   fixAddressSpaces(Helper); 
 
+}
+
+void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
+                                      DominatorTree &DT) {
+  LLVMContext &Ctx = M.getContext();
+  Type *Int8Ty = Type::getInt8Ty(Ctx);
+  Type *Int32Ty = Type::getInt32Ty(Ctx);
+  //Type *Int64Ty = Type::getInt64Ty(Ctx);
+  Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+
+  //Task *T = TL.getTask();
+  //Instruction *ReplCall = cast<CallBase>(TOI.ReplCall);
+  LLVM_DEBUG(dbgs() << "Running processOutlinedLoopCall: " << M);
+  Function *Parent = TOI.ReplCall->getFunction();
+  Value *TripCount = OrderedInputs[0];
+  BasicBlock* RCBB = TOI.ReplCall->getParent(); 
+  BasicBlock* NBB = RCBB->splitBasicBlock(TOI.ReplCall); 
+  TOI.ReplCall->eraseFromParent(); 
+  IRBuilder<> B(&NBB->front());
+
+  // Compile the kernel 
+  //SPIRVM.getFunctionList().remove(TOI.Outline); 
+  TOI.Outline->eraseFromParent(); 
   LLVMContext &SPIRVCtx = SPIRVM.getContext();
 
   SmallVector<Metadata *, 3> AV;
-  AV.push_back(ValueAsMetadata::get(Helper));
-  AV.push_back(MDString::get(SPIRVCtx, "kernel"));
-  AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(SPIRVCtx),
-                                                     1)));
+  //AV.push_back(ValueAsMetadata::get(Helper));
+  //AV.push_back(MDString::get(SPIRVCtx, "kernel"));
+  //AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(SPIRVCtx),
+  //                                                   1)));
   //Annotations->addOperand(MDNode::get(Ctx, AV));
 
   legacy::PassManager *PassManager = new legacy::PassManager;
@@ -366,29 +395,13 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   Constant *SPIRV = ConstantDataArray::getRaw(s, s.length(), Int8Ty);
   SPIRVGlobal = new GlobalVariable(M, SPIRV->getType(), true,
                                  GlobalValue::PrivateLinkage, SPIRV,
-                                 "spirv_" + Twine(Helper->getName()));
-
-}
-
-void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
-                                      DominatorTree &DT) {
-  LLVMContext &Ctx = M.getContext();
-  //Type *Int8Ty = Type::getInt8Ty(Ctx);
-  Type *Int32Ty = Type::getInt32Ty(Ctx);
-  //Type *Int64Ty = Type::getInt64Ty(Ctx);
-  Type *VoidPtrTy = Type::getInt8PtrTy(Ctx);
-
-  //Task *T = TL.getTask();
-  //Instruction *ReplCall = cast<CallBase>(TOI.ReplCall);
-  Function *Parent = TOI.ReplCall->getFunction();
+                                 "spirv_" + Twine("kitsune_spirv_kernel"));
 
   //Value* TripCount = isSRetInput(TOI.InputSet[0]) ? TOI.InputSet[1] : TOI.InputSet[0]; 
   //Value *RunStart = ReplCall->getArgOperand(getIVArgIndex(*Parent,
   //                                                        TOI.InputSet));
   //Value *TripCount = ReplCall->getArgOperand(getLimitArgIndex(*Parent,
   //                                                            TOI.InputSet));
-  Value *TripCount = OrderedInputs[0];
-  IRBuilder<> B(TOI.ReplCall);
 
   Value *KernelID = ConstantInt::get(Int32Ty, MyKernelID);
   Value *SPIRVPtr = B.CreateBitCast(SPIRVGlobal, VoidPtrTy);
@@ -400,8 +413,8 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   EB.CreateCall(KitsuneOpenCLInit, {});
   EB.CreateCall(KitsuneGPUInitKernel, { KernelID, kernelSize, SPIRVPtr });
 
+  SmallVector<std::tuple<Value*, Value*, Value*>, 4> memreads; 
   DataLayout DL(Parent->getParent());
-  IRBuilder<> RB(TOI.ReplCall->getParent()->getTerminator()); 
   int ArgID = 0; 
   for (Value *V : OrderedInputs) {
     //Value *ElementSize = nullptr;
@@ -424,7 +437,7 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
         }
       }
       CallInst *mmap_marker = nullptr;  
-      for(auto &BB : *Parent) if(DT.dominates(&BB, TOI.ReplCall->getParent())){
+      for(auto &BB : *Parent) if(DT.dominates(&BB, RCBB)){
         for(auto &I : BB){
           if(auto *CI = dyn_cast<CallInst>(&I)){
             if(Function *fun = CI->getCalledFunction()){
@@ -453,9 +466,9 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
       Type *VElemType = VPTy->getElementType(); 
       Value *VElemSize = MMB.getInt64(DL.getTypeAllocSize(VElemType)); 
       Value *VArrSize = MMB.CreateMul(VElemSize, N); 
-      Value *VPtr = B.CreateBitCast(V, VoidPtrTy);
-      V = MMB.CreateCall(KitsuneGPUMemWrite, { B.getInt32(MyKernelID), VPtr, VArrSize, mval }); 
-      if(m & 2) RB.CreateCall(KitsuneGPUMemRead, {B.getInt32(MyKernelID), VPtr, V, VArrSize }); 
+      Value *VPtr = MMB.CreateBitCast(V, VoidPtrTy);
+      V = B.CreateCall(KitsuneGPUMemWrite, { B.getInt32(MyKernelID), VPtr, VArrSize, mval }); 
+      if(m & 2) memreads.push_back(std::make_tuple(VPtr, V, VArrSize));  
     }
     Value *VPtr = B.CreateAlloca(V->getType()); 
     B.CreateStore(V, VPtr); 
@@ -471,8 +484,13 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   B.CreateCall(KitsuneGPURunKernel, { KernelID });
 
-  RB.CreateCall(KitsuneGPUFinish, {});
+  for(auto vs : memreads){
+    auto [Vptr, V, VarrSize] = vs;
+    B.CreateCall(KitsuneGPUMemRead, {B.getInt32(MyKernelID), Vptr, V, VarrSize});
+  }
 
-  //TOI.ReplCall->eraseFromParent();
+  B.CreateCall(KitsuneGPUFinish, {});
+
+  LLVM_DEBUG(dbgs() << "Finished processOutlinedLoopCall: " << M);
 }
 
