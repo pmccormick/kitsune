@@ -24,7 +24,9 @@
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Vectorize.h"
 #include "llvm/Support/TargetRegistry.h"
+#ifdef KITSUNE_ENABLE_OPENCL_RUNTIME
 #include <LLVMSPIRVLib/LLVMSPIRVLib.h>
+#endif
 #include <sstream>
 
 using namespace llvm;
@@ -382,6 +384,7 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   LLVM_DEBUG(dbgs() << "SPIRV Module: " << SPIRVM);
 
+#ifdef KITSUNE_ENABLE_OPENCL_RUNTIME
 
   // generate spirv kernel code
   std::ostringstream str; 
@@ -396,6 +399,7 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   SPIRVGlobal = new GlobalVariable(M, SPIRV->getType(), true,
                                  GlobalValue::PrivateLinkage, SPIRV,
                                  "spirv_" + Twine("kitsune_spirv_kernel"));
+#endif
 
   //Value* TripCount = isSRetInput(TOI.InputSet[0]) ? TOI.InputSet[1] : TOI.InputSet[0]; 
   //Value *RunStart = ReplCall->getArgOperand(getIVArgIndex(*Parent,
