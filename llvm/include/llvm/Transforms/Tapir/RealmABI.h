@@ -31,6 +31,8 @@ class RealmABI : public TapirTarget {
   FunctionCallee RealmSync = nullptr;
   FunctionCallee RealmInitRuntime = nullptr;
   FunctionCallee RealmFinalize = nullptr;
+  FunctionCallee CreateBar = nullptr;
+  FunctionCallee DestroyBar = nullptr; 
 
   //Accessors for opaque Realm RTS functions
   FunctionCallee get_realmGetNumProcs();
@@ -38,12 +40,15 @@ class RealmABI : public TapirTarget {
   FunctionCallee get_realmSync();
   FunctionCallee get_realmInitRuntime();
   FunctionCallee get_realmFinalize();
+  FunctionCallee get_createRealmBarrier();
+  FunctionCallee get_destroyRealmBarrier();
 
 public:
   RealmABI(Module &M);
   ~RealmABI();
 
   Value * lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
+  Value *getOrCreateBarrier(Value *SyncRegion, Function *F); 
   void lowerSync(SyncInst &inst) override final;
   void processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT)
     override final;

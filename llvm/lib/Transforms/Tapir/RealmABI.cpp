@@ -43,6 +43,31 @@ FunctionCallee RealmABI::get_realmGetNumProcs() {
   return RealmGetNumProcs;
 }
 
+static StructType* getBarrierType(LLVMContext &C){
+  auto eventTy = StructType::get(Type::getInt64Ty(C));
+  return StructType::get(eventTy, Type::getInt64Ty(C));
+}
+
+FunctionCallee RealmABI::get_createRealmBarrier(){
+  if(CreateBar) return CreateBar; 
+  LLVMContext &C = M.getContext(); 
+
+  AttributeList AL; 
+  FunctionType *FTy = FunctionType::get(
+    getBarrierType(C), {}, false);
+  CreateBar = M.getOrInsertFunction("createRealmBarrier", FTy, AL);
+}
+
+FunctionCallee RealmABI::get_destroyRealmBarrier(){
+  if(DestroyBar) return DestroyBar; 
+  LLVMContext &C = M.getContext(); 
+
+  AttributeList AL; 
+  FunctionType *FTy = FunctionType::get(
+    Type::getInt8Ty(C), {getBarrierType(C)}, false);
+  DestroyBar = M.getOrInsertFunction("destroyRealmBarrier", FTy, AL);
+}
+
 FunctionCallee RealmABI::get_realmSpawn() {
   if(RealmSpawn)
     return RealmSpawn;
@@ -73,9 +98,9 @@ FunctionCallee RealmABI::get_realmSync() {
   LLVMContext &C = M.getContext(); 
   AttributeList AL;
   
-  std::vector<Type*> TypeArray;
+  Type* TypeArray[] = { getBarrierType(C) };
   // TODO: Set appropriate function attributes.
-  FunctionType *FTy = FunctionType::get(Type::getInt32Ty(C), 
+  FunctionType *FTy = FunctionType::get(Type::getInt8Ty(C), 
 					TypeArray, 
 					false);
   RealmSync = M.getOrInsertFunction("realmSync", FTy, AL);
@@ -173,6 +198,29 @@ Value *RealmABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   return Grainsize;
 }
 
+Value *RealmABI::getOrCreateBarrier(Value *SyncRegion, Function *F) {
+  LLVMContext &C = M.getContext();
+  Value* barrier;
+  if((barrier = SyncRegionToBarrier[SyncRegion]))
+    return barrier;
+  else {
+    barrier = CallInst::Create(get_createRealmBarrier(), {}, "",
+                            F->getEntryBlock().getTerminator());
+    SyncRegionToBarrier[SyncRegion] = barrier;
+
+    // Make sure we destroy the barrier at all exit points to prevent memory leaks
+    for(BasicBlock &BB : *F) {
+      if(isa<ReturnInst>(BB.getTerminator())){
+        CallInst::Create(get_destroyRealmBarrier(), {barrier}, "",
+                         BB.getTerminator());
+      }
+    }
+
+    return barrier;
+  }
+}
+
+#if 0
 void RealmABI::lowerSync(SyncInst &SI) {
   IRBuilder<> builder(&SI); 
 
@@ -180,6 +228,21 @@ void RealmABI::lowerSync(SyncInst &SI) {
   auto sincwait = REALM_FUNC(realmSync);
   //auto sincwait = get_realmSync();  // why don't we just do this? no macro
   builder.CreateCall(sincwait, args);
+
+  BranchInst *PostSync = BranchInst::Create(SI.getSuccessor(0));
+  ReplaceInstWithInst(&SI, PostSync);
+  return;
+}
+#endif
+
+void RealmABI::lowerSync(SyncInst &SI) {
+  IRBuilder<> builder(&SI); 
+  auto F = SI.getParent()->getParent(); 
+  auto& C = M.getContext(); 
+  Value* SR = SI.getSyncRegion(); 
+  auto barrier = getOrCreateBarrier(SR, F); 
+  std::vector<Value *> args = {barrier}; 
+  builder.CreateCall(get_realmSync(), args);
 
   BranchInst *PostSync = BranchInst::Create(SI.getSuccessor(0));
   ReplaceInstWithInst(&SI, PostSync);

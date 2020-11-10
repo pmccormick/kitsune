@@ -34,7 +34,7 @@ extern "C" {
   int realmInitRuntime(int argc, char** argv);
   //NOTE: realmSpawn declared and defined in wrapper.cc
   //int realmSpawn();
-  int realmSync();
+  //int realmSync();
   size_t realmGetNumProcs();
   void realmFinalize();
 
