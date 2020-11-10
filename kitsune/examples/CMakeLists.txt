@@ -19,7 +19,7 @@ list(APPEND KITSUNE_EXAMPLE_DEPS
 add_kitsune_subdirectory(forall)
 
 if (KITSUNE_ENABLE_KOKKOS) 
-  add_kitsune_subdirectory(kokkos)
+  add_subdirectory(kokkos)
 endif()
 
 

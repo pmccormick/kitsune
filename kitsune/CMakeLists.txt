@@ -101,9 +101,10 @@ option(KITSUNE_ENABLE_QTHREADS_TARGET
   "Enable Qthreads runtime backend target." ${Qthreads_FOUND})
 if (Qthreads_FOUND)
   message(STATUS "Qthreads runtime target enabled.")
-  option(QTHREADS_EXTRA_LINK_LIBS
-    "Additional libraries needed by Qthreads backend runtime."
-    "")
+  set(QTHREADS_EXTRA_LINK_LIBS "-ldl"
+    CACHE 
+    STRING "Additional libraries needed by Qthreads backend runtime."
+  )
 endif()
 
 find_package(Realm)
