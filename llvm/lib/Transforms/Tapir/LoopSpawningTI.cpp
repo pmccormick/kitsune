@@ -418,9 +418,6 @@ public:
     TapirLoops.clear();
     TaskToTapirLoop.clear();
     LoopToTapirLoop.clear();
-    // Delete any loop outline processors we're managing.
-    for (LoopOutlineProcessor *ManagedLOP : ManagedOutlineProcessors)
-      delete ManagedLOP;
   }
 
   bool run();
@@ -469,7 +466,8 @@ private:
   // Get the LoopOutlineProcessor for handling Tapir loop \p TL.
   LoopOutlineProcessor *getOutlineProcessor(TapirLoopInfo *TL);
 
-  using LOPMapTy = DenseMap<TapirLoopInfo *, LoopOutlineProcessor *>;
+  using LOPMapTy = DenseMap<TapirLoopInfo *,
+                            std::unique_ptr<LoopOutlineProcessor>>;
 
   // For all recorded Tapir loops, determine the function arguments and inputs
   // for the outlined helper functions for those loops.
@@ -533,7 +531,6 @@ private:
   DenseMap<Task *, TapirLoopInfo *> TaskToTapirLoop;
   DenseMap<Loop *, TapirLoopInfo *> LoopToTapirLoop;
   LOPMapTy OutlineProcessors;
-  SmallVector<LoopOutlineProcessor *, 16> ManagedOutlineProcessors;
 };
 } // end anonymous namespace
 
@@ -912,17 +909,10 @@ LoopOutlineProcessor *LoopSpawningImpl::getOutlineProcessor(TapirLoopInfo *TL) {
   Loop *L = TL->getLoop();
   TapirLoopHints Hints(L);
 
-  LoopOutlineProcessor *ManagedLOP;
   switch (Hints.getStrategy()) {
-  case TapirLoopHints::ST_DAC:
-    ManagedLOP = new DACSpawning(M);
-    break;
-  default:
-    ManagedLOP = new DefaultLoopOutlineProcessor(M);
-    break;
+  case TapirLoopHints::ST_DAC: return new DACSpawning(M);
+  default: return new DefaultLoopOutlineProcessor(M);
   }
-  ManagedOutlineProcessors.push_back(ManagedLOP);
-  return ManagedLOP;
 }
 
 /// Associate tasks with Tapir loops that enclose them.
@@ -1232,10 +1222,10 @@ namespace {
 // ValueMaterializer to manage remapping uses of the tripcount in the helper
 // function for the loop, when the only uses of tripcount occur in the condition
 // for the loop backedge and, possibly, in metadata.
-class ArgEndMaterializer final : public OutlineMaterializer {
+class ArgEndMaterializer final : public ValueMaterializer {
 private:
-  Value *TripCount = nullptr;
-  Value *ArgEnd = nullptr;
+  Value *TripCount;
+  Value *ArgEnd;
 public:
   ArgEndMaterializer(const Instruction *SrcSyncRegion, Value *TripCount,
                      Value *ArgEnd)
@@ -1449,7 +1439,8 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
       }
 
       // Get an outline processor for each Tapir loop.
-      OutlineProcessors[TL] = getOutlineProcessor(TL);
+      OutlineProcessors[TL] =
+        std::unique_ptr<LoopOutlineProcessor>(getOutlineProcessor(TL));
     }
   }
 

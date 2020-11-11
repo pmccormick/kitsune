@@ -1076,8 +1076,10 @@ void CodeGenModule::DecorateInstructionWithTBAA(llvm::Instruction *Inst,
                                                 TBAAAccessInfo TBAAInfo) {
   if (llvm::MDNode *Tag = getTBAAAccessTagInfo(TBAAInfo)) {
     Inst->setMetadata(llvm::LLVMContext::MD_tbaa, Tag);
-    llvm::TBAAVerifier V;
-    assert(V.visitTBAAMetadata(*Inst, Tag) && "invalid TBAA metadata!");
+    /* A good sanity check for TBAA issues but slows down compilation...  
+     * llvm::TBAAVerifier V;
+     * assert(V.visitTBAAMetadata(*Inst, Tag) && "invalid TBAA metadata!");
+     */
   }
 }
 

@@ -379,6 +379,48 @@ static cl::opt<bool> DoFunctionSpecialize("function-specialize",
 static const Regex DefaultAliasRegex(
     "^(default|thinlto-pre-link|thinlto|lto-pre-link|lto)<(O[0123sz])>$");
 
+/// Flag to enable inline deferral during PGO.
+static cl::opt<bool>
+    EnablePGOInlineDeferral("enable-npm-pgo-inline-deferral", cl::init(true),
+                            cl::Hidden,
+                            cl::desc("Enable inline deferral during PGO"));
+
+static cl::opt<bool> EnableMemProfiler("enable-mem-prof", cl::init(false),
+                                       cl::Hidden, cl::ZeroOrMore,
+                                       cl::desc("Enable memory profiler"));
+
+static cl::opt<bool> PerformMandatoryInliningsFirst(
+    "mandatory-inlining-first", cl::init(true), cl::Hidden, cl::ZeroOrMore,
+    cl::desc("Perform mandatory inlinings module-wide, before performing "
+             "inlining."));
+
+static cl::opt<bool> EnableO3NonTrivialUnswitching(
+    "enable-npm-O3-nontrivial-unswitch", cl::init(true), cl::Hidden,
+    cl::ZeroOrMore, cl::desc("Enable non-trivial loop unswitching for -O3"));
+
+static cl::opt<bool>
+    VerifyTapirLowering("verify-tapir-lowering-npm", cl::init(false),
+                        cl::Hidden,
+                        cl::desc("Verify IR after Tapir lowering steps"));
+
+static cl::opt<bool>
+    VerifyTapirLowering("verify-tapir-lowering-npm", cl::init(false),
+                        cl::Hidden,
+                        cl::desc("Verify IR after Tapir lowering steps"));
+
+PipelineTuningOptions::PipelineTuningOptions() {
+  LoopInterleaving = true;
+  LoopVectorization = true;
+  SLPVectorization = false;
+  LoopStripmine = true;
+  LoopUnrolling = true;
+  ForgetAllSCEVInLoopUnroll = ForgetSCEVInLoopUnroll;
+  LicmMssaOptCap = SetLicmMssaOptCap;
+  LicmMssaNoAccForPromotionCap = SetLicmMssaNoAccForPromotionCap;
+  CallGraphProfile = true;
+  MergeFunctions = false;
+}
+
 namespace llvm {
 cl::opt<bool> PrintPipelinePasses(
     "print-pipeline-passes",
