@@ -22,16 +22,16 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
   get_filename_component(base ${src_file} NAME_WLE)
   string(TOLOWER ${base} ${src_file})
 
-  add_kitsune_example(${base}-kokkos
+  add_kitsune_example(kokkos-${base}
       ${src_file}
       )
 
-  set_target_properties(${base}-kokkos 
+  set_target_properties(kokkos-${base} 
       PROPERTIES
-        COMPILE_FLAGS "-frtti"
+        COMPILE_FLAGS "-frtti -Rpass=vectorize -Rpass-missed=loop-vectorize"
         INCLUDE_DIRECTORIES ${Kokkos_INCLUDE_DIR}
         LINK_DIRECTORIES ${Kokkos_LIBRARY_DIR}
-        LINK_LIBRARIES ${Kokkos_LINK_LIBS}      
+        LINK_LIBRARIES ${Kokkos_LINK_LIBS}
   )
 
   # Add a executable per enabled runtime target. 
@@ -45,7 +45,7 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
     set_target_properties(${target_name}       
       PROPERTIES
         INCLUDE_DIRECTORIES ${Kokkos_INCLUDE_DIR}
-        COMPILE_FLAGS "-fkokkos -fkokkos-no-init -ftapir=${rt}"
+        COMPILE_FLAGS "-fkokkos -fkokkos-no-init -Rpass=vectorize -Rpass-missed=loop-vectorize -ftapir=${rt}"
         LINK_FLAGS "-ftapir=${rt}"		
         LINK_DIRECTORIES ${Kokkos_LIBRARY_DIR}
         LINK_LIBRARIES ${Kokkos_LINK_LIBS}      

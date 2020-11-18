@@ -4006,6 +4006,7 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
   
   // Check if -fkokkos is specified. 
   Opts.Kokkos = Args.hasArg(options::OPT_fkokkos) ? 1 : 0;
+  Opts.KokkosNoInit = Args.hasArg(options::OPT_fkokkos_no_init) ? 1: 0;
 
   // Check if -fflecsi is specified. 
   Opts.FleCSI = Args.hasArg(options::OPT_fflecsi) ? 1 : 0;
@@ -4724,6 +4725,8 @@ bool CompilerInvocation::CreateFromArgsImpl(
       LangOpts.Tapir = TapirTargetID::None;
     else if (Name == "cilk") 
       LangOpts.Tapir = TapirTargetID::Cilk;
+    else if (Name == "opencilk")
+      LangOpts.Tapir = TapirTargetID::OpenCilk; 
     else if (Name == "openmp")
       LangOpts.Tapir = TapirTargetID::OpenMP;
     else if (Name == "qthreads")

@@ -136,8 +136,8 @@ macro(get_kitsune_tapir_rt_flags arglist)
   # The list of possible runtime targets for the compiler (via tapir).
   # These are expanded to match the ENABLE options in the kitsune cmake
   # configuration (and thus we match capitalization here). 
-  set(_kitsune_rt_names CILKRTS;QTHREADS;REALM;OPENMP;CUDART;OPENCL)
-  set(_kitsune_rt_flags cilk;qthreads;realm;omp;cuda;opencl)  
+  set(_kitsune_rt_names CILKRTS;OPENCILK;QTHREADS;REALM;OPENMP;CUDART;OPENCL)
+  set(_kitsune_rt_flags cilk;opencilk;qthreads;realm;omp;cuda;opencl)  
   foreach(rt IN ITEMS ${_kitsune_rt_names})
     set(_ENABLE_VAR "KITSUNE_ENABLE_${rt}_TARGET")
     if (${_ENABLE_VAR})

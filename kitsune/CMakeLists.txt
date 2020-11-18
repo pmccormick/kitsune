@@ -96,6 +96,16 @@ if (KITSUNE_ENABLE_CILKRTS_TARGET)
   )
 endif()
 
+find_package(OpenCilk)
+option(KITSUNE_ENABLE_OPENCILK_TARGET
+  "Enable OpenCilk runtime backend target." ${OpenCilk_FOUND})
+if (KITSUNE_ENABLE_OPENCILK_TARGET) 
+  set(OPENCILK_EXTRA_LINK_LIBS ""
+    CACHE 
+    STRING "Extra link libraries for the OpenCilk runtime target."
+  )
+endif()
+
 find_package(Qthreads)
 option(KITSUNE_ENABLE_QTHREADS_TARGET
   "Enable Qthreads runtime backend target." ${Qthreads_FOUND})

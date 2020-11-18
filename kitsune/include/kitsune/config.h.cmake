@@ -28,6 +28,14 @@
 #define CILKRTS_EXTRA_LINK_LIBS  "${CILKRTS_EXTRA_LINK_LIBS}"
 
 /* Automatic command line arguments to add when compiling with
+ * the OpenCilk runtime backend target (via -ftapir=opencilk).
+ */ 
+#cmakedefine01 KITSUNE_ENABLE_OPENCILK_TARGET 
+#define OPENCILK_LIBRARY_DIR      "${OpenCilk_LIBRARY_DIR}"
+#define OPENCILK_LINK_LIBS        "${OpenCilk_LINK_LIBS}"
+#define OPENCILK_EXTRA_LINK_LIBS  "${OPENCILK_EXTRA_LINK_LIBS}"
+
+/* Automatic command line arguments to add when compiling with
  * the Qthreads runtime backend target (via -ftapir=qthreads).
  */ 
 #cmakedefine01 KITSUNE_ENABLE_QTHREADS_TARGET   

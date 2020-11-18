@@ -29,7 +29,6 @@ int main (int argc, char* argv[]) {
         C[i] = A[i] + B[i];
     });
   }
-  Kokkos::finalize ();
   
   // Verify correct result (taking some floating point nuances into
   // play)...
@@ -44,5 +43,6 @@ int main (int argc, char* argv[]) {
   delete []A;
   delete []B;
   delete []C;
+  Kokkos::finalize ();
   return 0;
 }
