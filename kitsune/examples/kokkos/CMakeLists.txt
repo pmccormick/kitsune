@@ -28,7 +28,7 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
 
   set_target_properties(kokkos-${base} 
       PROPERTIES
-        COMPILE_FLAGS "-frtti -Rpass=vectorize -Rpass-missed=loop-vectorize"
+        COMPILE_FLAGS "-Bstatic -frtti -Rpass=vectorize -Rpass-missed=loop-vectorize"
         INCLUDE_DIRECTORIES ${Kokkos_INCLUDE_DIR}
         LINK_DIRECTORIES ${Kokkos_LIBRARY_DIR}
         LINK_LIBRARIES ${Kokkos_LINK_LIBS}
@@ -45,7 +45,7 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
     set_target_properties(${target_name}       
       PROPERTIES
         INCLUDE_DIRECTORIES ${Kokkos_INCLUDE_DIR}
-        COMPILE_FLAGS "-fkokkos -fkokkos-no-init -Rpass=vectorize -Rpass-missed=loop-vectorize -ftapir=${rt}"
+        COMPILE_FLAGS "-Bstatic -fkokkos -fkokkos-no-init -Rpass=vectorize -Rpass-missed=loop-vectorize -ftapir=${rt}"
         LINK_FLAGS "-ftapir=${rt}"		
         LINK_DIRECTORIES ${Kokkos_LIBRARY_DIR}
         LINK_LIBRARIES ${Kokkos_LINK_LIBS}      
