@@ -18,7 +18,7 @@ add_kitsune_subdirectory(forall)
 
 if (KITSUNE_ENABLE_KOKKOS) 
   add_subdirectory(kokkos)
-  add_subdirectory(stats)
+  #add_subdirectory(stats)
 endif()
 
 
