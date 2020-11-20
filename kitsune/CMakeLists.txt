@@ -30,8 +30,13 @@ set(KITSUNE_ENABLED TRUE
 )
     
 set(KITSUNE_SOURCE_DIR  ${CMAKE_CURRENT_SOURCE_DIR})
+set(KITSUNE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(KITSUNE_BINARY_DIR  ${CMAKE_CURRENT_BINARY_DIR})
-set(KITSUNE_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
+
+
+message(STATUS "Kitsune source directory: ${KITSUNE_SOURCE_DIR}")
+message(STATUS "Kitsune include directory: ${KITSUNE_INCLUDE_DIR}")
+message(STATUS "Kitsune binary directory: ${KITSUNE_BINARY_DIR}")
 
 option(KITSUNE_INCLUDE_TESTS
   "Enable Kitsune tests." ${LLVM_INCLUDE_TESTS})

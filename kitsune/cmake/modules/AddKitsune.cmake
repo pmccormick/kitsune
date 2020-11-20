@@ -73,6 +73,18 @@ macro(add_kitsune_executable name)
   add_llvm_executable(${name} ${ARGN})
 endmacro(add_kitsune_executable)
 
+macro(add_cxx_llvmir_file name flags)
+  get_filename_component(target ${name} NAME_WE)
+  message(STATUS "added custom target: ${target}.ll")
+  message(STATUS "   compile flags: ${flags}")
+  add_custom_target(${target}.ll
+	${CMAKE_CXX_COMPILER} ${flags} -S -emit-llvm ${name} -o ${target}.ll
+	COMMENT "generating IR file: ${target}.ll..."
+	DEPENDS ${name}
+	)
+  add_dependencies(${target}.ll clang)
+
+endmacro(add_cxx_llvmir_file) 
 
 macro(add_kitsune_example name)
   if ( NOT KITSUNE_BUILD_EXAMPLES )

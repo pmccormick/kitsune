@@ -10,8 +10,6 @@ if (NOT KITSUNE_BUILD_EXAMPLES)
   set(EXCLUDE_FROM_ALL ON)
 endif()
 
-message(STATUS "Adding kitsune examples to the configuration and build...")
-
 list(APPEND KITSUNE_EXAMPLE_DEPS
   clang
 )
@@ -20,6 +18,7 @@ add_kitsune_subdirectory(forall)
 
 if (KITSUNE_ENABLE_KOKKOS) 
   add_subdirectory(kokkos)
+  add_subdirectory(stats)
 endif()
 
 

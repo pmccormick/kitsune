@@ -1,4 +1,3 @@
-
 #
 # Copyright (c) 2020 Triad National Security, LLC
 #                         All rights reserved.
@@ -7,15 +6,19 @@
 # the LLVM license.
 #
 
+set(CMAKE_BUILD_TYPE Release)
+
 # Note: Since we borrow LLVM functionality here we
 # need to use LLVM_OPTIONAL_SOURCES here to avoid
 # a error from the LLVM cmake infrastructure...
 # FIXME: This is annoying... 
-set(LLVM_OPTIONAL_SOURCES 
+set(LLVM_OPTIONAL_SOURCES
+  normalize.cpp 
   vecadd.cpp 
 )
 
 get_kitsune_tapir_rt_flags(tapir_args)
+
 
 foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES}) 
   message(STATUS "  kokkos example: ${src_file}")
@@ -26,10 +29,12 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
       ${src_file}
       )
 
+  target_include_directories(kokkos-${base}
+     PRIVATE ${KITSUNE_INCLUDE_DIR} ${Kokkos_INCLUDE_DIR})
+     
   set_target_properties(kokkos-${base} 
       PROPERTIES
-        COMPILE_FLAGS "-Bstatic -frtti -Rpass=vectorize -Rpass-missed=loop-vectorize"
-        INCLUDE_DIRECTORIES ${Kokkos_INCLUDE_DIR}
+        COMPILE_FLAGS "-frtti -Rpass=\".*\""
         LINK_DIRECTORIES ${Kokkos_LIBRARY_DIR}
         LINK_LIBRARIES ${Kokkos_LINK_LIBS}
   )
@@ -41,11 +46,13 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
     add_kitsune_example(${target_name}
       ${src_file}
       )
-      
+
+  target_include_directories(${target_name}
+     PRIVATE ${KITSUNE_INCLUDE_DIR})
+
     set_target_properties(${target_name}       
       PROPERTIES
-        INCLUDE_DIRECTORIES ${Kokkos_INCLUDE_DIR}
-        COMPILE_FLAGS "-Bstatic -fkokkos -fkokkos-no-init -Rpass=vectorize -Rpass-missed=loop-vectorize -ftapir=${rt}"
+        COMPILE_FLAGS "-frtti -fkokkos -fkokkos-no-init -ftapir=${rt}"
         LINK_FLAGS "-ftapir=${rt}"		
         LINK_DIRECTORIES ${Kokkos_LIBRARY_DIR}
         LINK_LIBRARIES ${Kokkos_LINK_LIBS}      
