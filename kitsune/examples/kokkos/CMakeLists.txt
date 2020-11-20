@@ -13,6 +13,7 @@ set(CMAKE_BUILD_TYPE Release)
 # a error from the LLVM cmake infrastructure...
 # FIXME: This is annoying... 
 set(LLVM_OPTIONAL_SOURCES
+  matmult-1.cpp 
   normalize.cpp 
   vecadd.cpp 
 )

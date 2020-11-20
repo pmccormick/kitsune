@@ -7,14 +7,14 @@
 using namespace std;
 using namespace kitsune;
 
-const size_t VEC_SIZE = 4096 * 10;
+const size_t VEC_SIZE = 1024 * 1024 * 1024;
 
 void random_fill(double *data, size_t N) {
   for(size_t i = 0; i < N; ++i)
     data[i] = (rand() / (double)RAND_MAX) * 10.0;
 }
 
-__attribute__((const)) double norm(const double *in, size_t N) {
+__attribute__((const, noinline)) double norm(const double *in, size_t N) {
   double sum = 0.0;
   for(size_t i = 0; i < N; ++i)
     sum += in[i] * in[i];
