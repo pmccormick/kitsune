@@ -50,7 +50,7 @@ macro(add_kitsune_library name)
         ${export_to_kitsunetargets}
         LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
         ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-        RUNTIME DESTINATION bin)
+        RUNTIME DESTINATION examples)
 
       if (NOT LLVM_ENABLE_IDE)
         add_llvm_install_targets(install-${name}
@@ -96,11 +96,6 @@ macro(add_kitsune_example name)
   add_kitsune_executable(${name} 
                          ${ARGN}
                          DEPENDS clang)
-
-  if ( KITSUNE_BUILD_EXAMPLES )
-    install(TARGETS ${name} RUNTIME DESTINATION kitsune/examples)
-  endif()
-
 endmacro(add_kitsune_example)
 
 macro(add_kitsune_tool name)

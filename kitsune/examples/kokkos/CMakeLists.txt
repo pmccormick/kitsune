@@ -13,7 +13,8 @@ set(CMAKE_BUILD_TYPE Release)
 # a error from the LLVM cmake infrastructure...
 # FIXME: This is annoying... 
 set(LLVM_OPTIONAL_SOURCES
-  matmult-1.cpp 
+  complex.cpp 
+  matmult1.cpp 
   normalize.cpp 
   vecadd.cpp 
 )
@@ -26,27 +27,31 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
   get_filename_component(base ${src_file} NAME_WLE)
   string(TOLOWER ${base} ${src_file})
 
-  add_kitsune_example(kokkos-${base}
+  add_kitsune_example(${base}.kokkos
       ${src_file}
       )
 
-  target_include_directories(kokkos-${base}
+  install(TARGETS ${base}.kokkos RUNTIME DESTINATION kitsune/examples/kokkos)
+
+
+  target_include_directories(${base}.kokkos
      PRIVATE ${KITSUNE_INCLUDE_DIR} ${Kokkos_INCLUDE_DIR})
      
-  set_target_properties(kokkos-${base} 
+  set_target_properties(${base}.kokkos 
       PROPERTIES
-        COMPILE_FLAGS "-frtti -Rpass=\".*\""
+        COMPILE_FLAGS "-frtti" #  -Rpass=\".*\""
         LINK_DIRECTORIES ${Kokkos_LIBRARY_DIR}
         LINK_LIBRARIES ${Kokkos_LINK_LIBS}
   )
 
   # Add a executable per enabled runtime target. 
   foreach(rt IN ITEMS ${tapir_args})
-    set(target_name kokkos-${base}-${rt})
+    set(target_name ${base}.${rt})
     message(STATUS "    ${rt} example: ${target_name}")
     add_kitsune_example(${target_name}
       ${src_file}
       )
+    install(TARGETS ${target_name} RUNTIME DESTINATION kitsune/examples/kokkos)
 
   target_include_directories(${target_name}
      PRIVATE ${KITSUNE_INCLUDE_DIR})
@@ -62,4 +67,7 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
   
 endforeach()
 
-
+configure_file(
+  ${KITSUNE_SOURCE_DIR}/examples/kokkos/run-kokkos-examples.sh.in
+  ${CMAKE_INSTALL_PREFIX}/kitsune/examples/kokkos/run-kokkos-examples.sh
+)

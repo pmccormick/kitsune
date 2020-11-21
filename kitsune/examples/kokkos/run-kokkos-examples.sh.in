@@ -1,0 +1,16 @@
+#/bin/bash
+
+for exe in complex matmult1 normalize vecadd; do 
+  for ncores in 1 2 4 6 8 10 12 14 16; do  
+    echo -n "$exe.kokkos, kokkos, $ncores, " >> $exe.kokkos.log 
+    ${CMAKE_INSTALL_PREFIX}/kitsune/examples/kokkos/$exe.kokkos --kokkos-threads=$ncores >> $exe.kokkos.log 
+    # FIXME: really need to extra rt targets from build configuration...
+    for rt in opencilk qthreads; do 
+      echo -n "$exe.$rt,$rt, $ncores, " >> $exe.$rt.log 
+      export CILK_NWORKERS=$ncores
+      export QTHREAD_NUM_SHEPHERDS=$ncores
+      ${CMAKE_INSTALL_PREFIX}/kitsune/examples/kokkos/$exe.$rt >> $exe.$rt.log 
+    done   
+  done 
+done 
+

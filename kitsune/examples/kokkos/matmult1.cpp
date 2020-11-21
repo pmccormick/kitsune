@@ -1,4 +1,14 @@
 // 
+// Non-square matrix multiplication example. To enable 
+// kitsune+tapir compilation add the flags to a standard 
+// clang compilation: 
+//
+//    * -fkokkos : enable specialized Kokkos recognition and 
+//                 compilation (lower to Tapir).
+//    * -fkokkos-no-init : disable Kokkos initialization and 
+//                 finalization calls to avoid conflicts with
+//                 target runtime operation. 
+//    * -ftapir=rt-target : the runtime ABI to target. 
 // 
 #include <cstdio>
 #include <kitsune/timer.h>
@@ -22,7 +32,9 @@ void zero_fill(float *data, size_t N) {
 }
 
 int main (int argc, char* argv[]) {
-  timer t;  
+
+  fprintf(stderr, "**** kitsune+tapir kokkos example: matrix multiply\n");
+
   float *A = new float[N*K];
   float *B = new float[K*M];
   float *C = new float[N*M];
@@ -32,10 +44,7 @@ int main (int argc, char* argv[]) {
   zero_fill(C, N*M);
   
   Kokkos::initialize (argc, argv);
-  double secs = t.seconds();
-  fprintf(stdout, "initialization time: %lf seconds.\n", secs);
-
-  t.reset();
+  timer t;  
   {
     Kokkos::parallel_for(N, KOKKOS_LAMBDA(const int i) {
       for(size_t k = 0; k < K; ++k) 
@@ -44,14 +53,15 @@ int main (int argc, char* argv[]) {
     });
   }
   double loop_secs = t.seconds();
-  
-  secs = t.seconds();
+  Kokkos::finalize();
 
-  fprintf(stdout, "seconds = %lf\n", loop_secs);
+  fprintf(stderr, "(%s) %lf, %lf, %lf, %lf\n", 
+         argv[0], C[0], C[(N*M)/4], C[(N*M)/2], C[(N*M)-1]);     
+  fprintf(stdout, "%lf\n", loop_secs);
+
   delete []A;
   delete []B;
   delete []C;
 
-  Kokkos::finalize();
   return 0;
 }
