@@ -210,7 +210,7 @@ void fixAddressSpaces(Function *F){
 
 
 void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
-                                 ValueToValueMapTy &VMap) {
+                                   ValueToValueMapTy &VMap) {
   LLVMContext &Ctx = M.getContext();
   Type *Int8Ty = Type::getInt8Ty(Ctx);
   Type *Int32Ty = Type::getInt32Ty(Ctx);
@@ -367,6 +367,7 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   PassManager->add(createReassociatePass());
   PassManager->add(createGVNPass());
   PassManager->add(createCFGSimplificationPass());
+  PassManager->add(createLoopVectorizePass());
   PassManager->add(createSLPVectorizerPass());
   //PassManager->add(createBreakCriticalEdgesPass());
   PassManager->add(createConstantPropagationPass());
@@ -477,7 +478,15 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   }
 
 
-  Value *RunSize = B.CreateSub(TripCount, ConstantInt::get(TripCount->getType(), 1));
+  Value *Grainsize = TL.getGrainsize() ?  
+    ConstantInt::get(TripCount->getType(), TL.getGrainsize()) :
+    OrderedInputs[2]; 
+
+  Value *RunSizeQ = B.CreateUDiv(TripCount, Grainsize);
+  Value *RunRem = B.CreateURem(TripCount, Grainsize);
+  Value *IsRem = B.CreateICmp(ICmpInst::ICMP_UGT, RunRem, ConstantInt::get(RunRem->getType(), 0)); 
+  Value *IsRemAdd = B.CreateZExt(IsRem, RunSizeQ->getType()); 
+  Value *RunSize = B.CreateAdd(RunSizeQ, IsRemAdd);  
   
   B.CreateCall(KitsuneGPUSetRunSize, { KernelID, RunSize });
 
