@@ -14,6 +14,7 @@
 #ifndef LLVM_CLANG_BASIC_LANGOPTIONS_H
 #define LLVM_CLANG_BASIC_LANGOPTIONS_H
 
+#include "clang/Basic/Cilk.h"
 #include "clang/Basic/CommentOptions.h"
 #include "clang/Basic/LLVM.h"
 #include "clang/Basic/LangStandard.h"
@@ -496,6 +497,9 @@ public:
 
   /// \brief Runtime target for Tapir.
   TapirTargetID TapirTarget = TapirTargetID::Last_TapirTargetID;
+
+  /// Set of enabled Cilk options.
+  CilkOptionSet CilkOptions;
 
   LangOptions();
 
