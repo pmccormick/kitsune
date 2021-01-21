@@ -49,23 +49,27 @@ static StructType* getBarrierType(LLVMContext &C){
 }
 
 FunctionCallee RealmABI::get_createRealmBarrier(){
-  if(CreateBar) return CreateBar; 
+  if(CreateBar) 
+    return CreateBar; 
   LLVMContext &C = M.getContext(); 
 
   AttributeList AL; 
   FunctionType *FTy = FunctionType::get(
     getBarrierType(C), {}, false);
   CreateBar = M.getOrInsertFunction("createRealmBarrier", FTy, AL);
+  return CreateBar;
 }
 
 FunctionCallee RealmABI::get_destroyRealmBarrier(){
-  if(DestroyBar) return DestroyBar; 
+  if(DestroyBar) 
+    return DestroyBar; 
   LLVMContext &C = M.getContext(); 
 
   AttributeList AL; 
   FunctionType *FTy = FunctionType::get(
     Type::getInt8Ty(C), {getBarrierType(C)}, false);
   DestroyBar = M.getOrInsertFunction("destroyRealmBarrier", FTy, AL);
+  return DestroyBar;
 }
 
 FunctionCallee RealmABI::get_realmSpawn() {

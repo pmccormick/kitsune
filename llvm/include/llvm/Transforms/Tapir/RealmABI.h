@@ -23,6 +23,8 @@ namespace llvm {
 
 class RealmABI : public TapirTarget {
 
+  ValueToValueMapTy SyncRegionToBarrier;
+
   Type *TaskFuncPtrTy = nullptr;
 
   //Opaque Realm RTS functions
