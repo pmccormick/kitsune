@@ -36,7 +36,7 @@
 #####
 #
 
-set(LLVM_ENABLE_PACKAGES
+set(LLVM_ENABLE_PROJECTS
   clang;clang-tools-extra;openmp
   CACHE STRING "")
 
@@ -50,6 +50,7 @@ set(CMAKE_BUILD_TYPE
   CACHE STRING "")
 
 set(KITSUNE_ENABLED ON CACHE BOOL "") # not sure this is really needed these days...
+set(KITSUNE_BUILD_EXAMPLES OFF CACHE BOOL "") # this is broken right now... 
 
 if (DEFINED ENV{OPENCILKRT_BASE_DIR})
   set(KITSUNE_ENABLE_OPENCILK ON CACHE BOOL "")
