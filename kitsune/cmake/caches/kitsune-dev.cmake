@@ -133,9 +133,10 @@ set(CLANG_PLUGIN_SUPPORT ON CACHE BOOL "")
 execute_process(
   COMMAND /bin/bash --norc --noprofile -c "dirname \$(dirname `which gcc`)"
   OUTPUT_VARIABLE _gcc_prefix
-  #ECHO_OUTPUT_VARIABLE
+  ECHO_OUTPUT_VARIABLE
   )
 string(LENGTH ${_gcc_prefix} _gcc_prefix_len)
 if (_gcc_prefix_len GREATER 0)
+  string(REGEX REPLACE "\n$" "" _gcc_prefix "${_gcc_prefix}")
   set(GCC_INSTALL_PREFIX ${_gcc_prefix} CACHE STRING "")
 endif()
