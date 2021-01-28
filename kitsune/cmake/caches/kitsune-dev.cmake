@@ -50,7 +50,7 @@ set(CMAKE_BUILD_TYPE
   CACHE STRING "")
 
 set(KITSUNE_ENABLED ON CACHE BOOL "") # not sure this is really needed these days...
-set(KITSUNE_BUILD_EXAMPLES OFF CACHE BOOL "") # this is broken right now... 
+set(KITSUNE_BUILD_EXAMPLES OFF CACHE BOOL "") # this is broken right now...
 
 if (DEFINED ENV{OPENCILKRT_BASE_DIR})
   set(KITSUNE_ENABLE_OPENCILK ON CACHE BOOL "")
@@ -130,3 +130,12 @@ set(CLANG_BUILD_TOOLS ON CACHE BOOL "")
 set(CLANG_INCLUDE_TESTS ON CACHE BOOL "")
 set(CLANG_PLUGIN_SUPPORT ON CACHE BOOL "")
 
+execute_process(
+  COMMAND /bin/bash --norc --noprofile -c "dirname \$(dirname `which gcc`)"
+  OUTPUT_VARIABLE _gcc_prefix
+  #ECHO_OUTPUT_VARIABLE
+  )
+string(LENGTH ${_gcc_prefix} _gcc_prefix_len)
+if (_gcc_prefix_len GREATER 0)
+  set(GCC_INSTALL_PREFIX ${_gcc_prefix} CACHE STRING "")
+endif()
