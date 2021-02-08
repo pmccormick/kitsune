@@ -1,10 +1,12 @@
 // Written by Alexis Perry-Holby for use with Tapir-LLVM
 
-#include "kitsune_realm_c.h"
-#include "realm.h"
+#include <kitsune_realm_c.h>
+#include <realm.h>
+#include <realm/threads.h>
 #include <set>
 #include <vector>
 #include <atomic>
+#include <iostream>
 
 extern "C" {
   
@@ -79,13 +81,11 @@ extern "C" {
     b.arrive(); 
   }
 
-  void realmSpawn(Realm::Processor::TaskFuncPtr func, const void* args, size_t arglen, void* user_data, size_t user_data_len);
+  void realmSpawn(Realm::Processor::TaskFuncPtr func, const void* args, size_t argsize);
 
   void realmSpawn(Realm::Processor::TaskFuncPtr func, 
 		  const void* args, 
-		  size_t arglen, 
-		  void* user_data, 
-		  size_t user_data_len){ 
+		  size_t argsize) { 
     /* take a function pointer to the task you want to run, 
        creates a CodeDescriptor from it directly
        needs pointer to user data and arguments (NULL for void?)
@@ -122,7 +122,7 @@ extern "C" {
     //std::cout << "      done_yet complete" << std::endl;
     
     //register the task with the runtime
-    Realm::Event e1 = p.register_task(taskID, cd, prs, user_data, user_data_len);
+    Realm::Event e1 = p.register_task(taskID, cd, prs, nullptr, 0);
     std::cout << "     registered task: " << taskID << std::endl;
     ctx->events.insert(e1); //might not actually need to keep track of this one
     std::cout << "      inserted e1" << std::endl;
@@ -130,7 +130,7 @@ extern "C" {
     //std::cout << "      e1 complete" << std::endl;
 
     //spawn the task
-    Realm::Event e2 = p.spawn(taskID, args, arglen, e1, 0); //predicated on the completion of the task's registration
+    Realm::Event e2 = p.spawn(taskID, args, argsize, e1, 0); //predicated on the completion of the task's registration
     std::cout << "       spawned task: " << taskID << std::endl;
     ctx->events.insert(e2);
     std::cout << "        inserted e2" << std::endl;
@@ -146,7 +146,7 @@ extern "C" {
     Realm::Event e;
 
     if (!(ctx->events).empty()) {
-      e.merge_events(ctx->events); 
+      e = Realm::Event::merge_events(ctx->events);
       std::cout << "  merged events" << std::endl;
       //can clear the events in the list now and insert only the sync event
       ctx->events.clear();
@@ -159,7 +159,10 @@ extern "C" {
     }      
 
     // Do not return until sync is complete
-    e.wait();
+    if (Realm::Thread::self())
+      e.wait();
+    else
+      e.external_wait();
     std::cout << "e.wait() has completed" << std::endl;
     
     //while (!e.has_triggered()) {

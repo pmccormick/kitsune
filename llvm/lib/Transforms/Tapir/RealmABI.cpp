@@ -81,10 +81,8 @@ FunctionCallee RealmABI::get_realmSpawn() {
   AttributeList AL;
 
   Type* TypeArray[] = { TaskFuncPtrTy,         // TaskFuncPtr fxn
-			Type::getInt8PtrTy(C), // const void *args
-			DL.getIntPtrType(C),   // size_t arglen
-			Type::getInt8PtrTy(C), // void *user_data
-			DL.getIntPtrType(C)};  // size_t user_data_len
+			Type::getInt8PtrTy(C), // void *args
+			DL.getIntPtrType(C)};  // size_t argsize
   
   // TODO: Set appropriate function attributes.
   FunctionType *FTy = FunctionType::get(
@@ -320,6 +318,7 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 
   // Caller code
   IRBuilder<> CallerIRBuilder(ReplCall);
+  CallerIRBuilder.SetInsertPoint(ReplStart);
   AllocaInst *CallerArgStruct = CallerIRBuilder.CreateAlloca(ArgsTy); 
   std::vector<Value*> LoadedCapturedArgs;
   CallInst *cal = dyn_cast<CallInst>(ReplCall); //could also be TOI.ReplCall
@@ -343,14 +342,13 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
                                         RealmFn, TaskFuncPtrTy);
   ConstantInt *ArgSize = ConstantInt::get(DL.getIntPtrType(C), ArgsTy->getNumElements()); 
   ConstantInt *ArgDataSize = ConstantInt::get(DL.getIntPtrType(C), DL.getTypeAllocSize(ArgsTy)); 
-  Value *ArgsStructVoidPtr = CallerIRBuilder.CreateBitCast(CallerArgStruct, Type::getInt8PtrTy(C)); 
-
+  
   CallerIRBuilder.SetInsertPoint(ReplStart);
   CallerIRBuilder.CreateLifetimeStart(CallerArgStruct, ArgDataSize);
 
+  Value *ArgsStructVoidPtr = CallerIRBuilder.CreateBitCast(CallerArgStruct, Type::getInt8PtrTy(C)); 
+
   std::vector<Value*> callerArgs = { RealmFnPtr, 
-				     ArgsStructVoidPtr, 
-				     ArgSize, 
 				     ArgsStructVoidPtr, 
 				     ArgDataSize}; 
 

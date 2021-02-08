@@ -19,8 +19,8 @@
 #ifndef KITSUNE_REALM_C_H
 #define KITSUNE_REALM_C_H
 
-#include "realm/realm_c.h"
-#include "realm.h"
+#include <realm/realm_c.h>
+#include <realm.h>
 
 // for size_t
 #include <stddef.h>
