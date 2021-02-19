@@ -80,13 +80,13 @@ FunctionCallee RealmABI::get_realmSpawn() {
   const DataLayout &DL = M.getDataLayout();
   AttributeList AL;
 
-  Type* TypeArray[] = { TaskFuncPtrTy,         // TaskFuncPtr fxn
+  Type* TypeArray[] = { RealmFTy,              // RealmFTy fxn
 			Type::getInt8PtrTy(C), // void *args
 			DL.getIntPtrType(C)};  // size_t argsize
-  
+
   // TODO: Set appropriate function attributes.
   FunctionType *FTy = FunctionType::get(
-      Type::getInt32Ty(C),     // returns int 
+      Type::getInt32Ty(C),     // returns int
       TypeArray,
       false);
   RealmSpawn = M.getOrInsertFunction("realmSpawn", FTy, AL);
@@ -151,16 +151,9 @@ RealmABI::RealmABI(Module &M) : TapirTarget(M) {
   LLVMContext &C = M.getContext();
   const DataLayout &DL = M.getDataLayout();
   // Initialize any types we need for lowering.
-  Type* TypeArray[] = { Type::getInt8PtrTy(C),   // const void *args
-			DL.getIntPtrType(C),     // size_t arglen 
-			Type::getInt8PtrTy(C),   // const void *user_data
-			DL.getIntPtrType(C),     // size_t user_data_len
-			DL.getIntPtrType(C)};    // unsigned long long proc
-
-  TaskFuncPtrTy = PointerType::getUnqual(
-      FunctionType::get(Type::getInt8Ty(C),      // returns void 
-			TypeArray,
-			false));
+  // NOTE: RealmFTy is NOT the same as a Realm::Processor::TaskFuncPtr
+  RealmFTy = PointerType::getUnqual(
+      FunctionType::get(Type::getInt64Ty(C), { Type::getInt8PtrTy(C) }, false));
 }
 
 RealmABI::~RealmABI() {
@@ -179,8 +172,7 @@ Value *RealmABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   IRBuilder<> Builder(GrainsizeCall);
 
   // Get 8 * workers
-  Value *Workers = Builder.CreateCall(REALM_FUNC(realmGetNumProcs));
-  //Value *Workers = Builder.CreateCall(get_realmGetNumProcs()); // no macro
+  Value *Workers = Builder.CreateCall(get_realmGetNumProcs());
   Value *WorkersX8 = Builder.CreateIntCast(
       Builder.CreateMul(Workers, ConstantInt::get(Workers->getType(), 8)),
       Limit->getType(), false);
@@ -223,6 +215,7 @@ Value *RealmABI::getOrCreateBarrier(Value *SyncRegion, Function *F) {
 }
 
 #if 0
+//old sync (non-barrier)
 void RealmABI::lowerSync(SyncInst &SI) {
   IRBuilder<> builder(&SI); 
 
@@ -235,7 +228,7 @@ void RealmABI::lowerSync(SyncInst &SI) {
   ReplaceInstWithInst(&SI, PostSync);
   return;
 }
-#endif
+#endif //old sync
 
 void RealmABI::lowerSync(SyncInst &SI) {
   IRBuilder<> builder(&SI); 
@@ -260,163 +253,34 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   LLVMContext &C = M.getContext();
   const DataLayout &DL = M.getDataLayout();
 
-  //Create the canonical TaskFuncPtr
-  //trying int64 as stand-in for Realm::Processor because a ::realm_id_t is ultimately an unsigned long long
-  Type* typeArray[] = {Type::getInt8PtrTy(C), // const void*
-		       DL.getIntPtrType(C),   // size_t
-		       Type::getInt8PtrTy(C), // const void*
-		       DL.getIntPtrType(C),   // size_t
-		       DL.getIntPtrType(C)};  // unsigned long long
-
-  FunctionType *RealmFnTy = FunctionType::get(
-      Type::getInt8Ty(C), 
-      typeArray,
-      false);
-
-  Function *RealmFn = Function::Create(
-      RealmFnTy, GlobalValue::InternalLinkage, ".realm_outlined.", M);
-  RealmFn->addFnAttr(Attribute::AlwaysInline);
-  RealmFn->addFnAttr(Attribute::NoUnwind);
-  RealmFn->addFnAttr(Attribute::UWTable);
-
-  //get the argument types
-  std::vector<Type*> FnParams = Outlined->getFunctionType()->params();
-  StructType *ArgsTy = StructType::create(FnParams, "realm_arg_struct");
-  PointerType *ArgsPtrTy = PointerType::getUnqual(ArgsTy);
-
-  std::vector<Value*> out_args;
-  for (auto &Arg : RealmFn->args()) {
-    Arg.setName("");
-    out_args.push_back(&Arg);
-  }
-
-  // Entry Code for newly-minted Function
-  BasicBlock *EntryBB = BasicBlock::Create(C, "entry", RealmFn, nullptr);
-  IRBuilder<> EntryBuilder(EntryBB);
-  Value *argStructPtr = EntryBuilder.CreateBitCast(out_args[0], ArgsPtrTy); 
-  ValueToValueMapTy valmap;
-
-  unsigned int argc = 0;
-  for (auto& arg : Outlined->args()) {
-    auto *DataAddrEP = EntryBuilder.CreateStructGEP(ArgsTy, argStructPtr, argc); 
-    auto *DataAddr = EntryBuilder.CreateAlignedLoad(
-        DataAddrEP,
-        DL.getTypeAllocSize(DataAddrEP->getType()->getPointerElementType()));
-    valmap.insert(std::pair<Value*,Value*>(&arg,DataAddr));
-    argc++;
-  }
-
-  // Replace return values with return zero 
-  SmallVector< ReturnInst *,5> retinsts;
-  CloneFunctionInto(RealmFn, Outlined, valmap, true, retinsts);
-  EntryBuilder.CreateBr(RealmFn->getBasicBlockList().getNextNode(*EntryBB));
-
-  for (auto& ret : retinsts) {
-    auto retzero = ReturnInst::Create(C, ConstantInt::get(Type::getInt8Ty(C), 0));
-    ReplaceInstWithInst(ret, retzero);
-  }
-
-  // Caller code
-  IRBuilder<> CallerIRBuilder(ReplCall);
-  CallerIRBuilder.SetInsertPoint(ReplStart);
-  AllocaInst *CallerArgStruct = CallerIRBuilder.CreateAlloca(ArgsTy); 
-  std::vector<Value*> LoadedCapturedArgs;
-  CallInst *cal = dyn_cast<CallInst>(ReplCall); //could also be TOI.ReplCall
-
-  for(auto& a:cal->arg_operands()) {
-    LoadedCapturedArgs.push_back(a);
-  }
-
-  unsigned int cArgc = 0;
-  for (auto& arg : LoadedCapturedArgs) {
-    auto *DataAddrEP2 = CallerIRBuilder.CreateStructGEP(ArgsTy, CallerArgStruct, cArgc); 
-    CallerIRBuilder.CreateAlignedStore(
-        LoadedCapturedArgs[cArgc], DataAddrEP2,
-        DL.getTypeAllocSize(arg->getType()));
-    cArgc++;
-  }
-
-  assert(argc == cArgc && "Wrong number of arguments passed to outlined function"); 
-
-  Value *RealmFnPtr = CallerIRBuilder.CreatePointerBitCastOrAddrSpaceCast(
-                                        RealmFn, TaskFuncPtrTy);
-  ConstantInt *ArgSize = ConstantInt::get(DL.getIntPtrType(C), ArgsTy->getNumElements()); 
-  ConstantInt *ArgDataSize = ConstantInt::get(DL.getIntPtrType(C), DL.getTypeAllocSize(ArgsTy)); 
-  
-  CallerIRBuilder.SetInsertPoint(ReplStart);
-  CallerIRBuilder.CreateLifetimeStart(CallerArgStruct, ArgDataSize);
-
-  Value *ArgsStructVoidPtr = CallerIRBuilder.CreateBitCast(CallerArgStruct, Type::getInt8PtrTy(C)); 
-
-  std::vector<Value*> callerArgs = { RealmFnPtr, 
-				     ArgsStructVoidPtr, 
-				     ArgDataSize}; 
-
-  CallInst *Call = CallerIRBuilder.CreateCall(REALM_FUNC(realmSpawn), callerArgs); 
-  Call->setDebugLoc(ReplCall->getDebugLoc());
-
-  CallerIRBuilder.SetInsertPoint(CallBlock, ++Call->getIterator());
-  CallerIRBuilder.CreateLifetimeEnd(CallerArgStruct, ArgDataSize);
-
-  TOI.replaceReplCall(Call);
-  ReplCall->eraseFromParent();
-
-  if (TOI.ReplUnwind)
-    // We assume that realmSpawn dealt with the exception.  But
-    // replacing the invocation of the helper function with the call to
-    // realmSpawn will remove the terminator from CallBlock.  Restore
-    // that terminator here.
-    BranchInst::Create(TOI.ReplRet, CallBlock);
-
-  //LLVM_DEBUG(RealmFn->dump()); 
-
-#if 0
-  // NOTE: the code from here through the end of processSubTaskCall is only
-  // retained for reference purposes and because things are undergoing
-  // development.  It should be deleted if not used once debugging is complete.
-  Function *RealmFnPtr = formatFunctionToRealmF(Outlined, ReplStart);
-
   // At this point, we have a call in the parent to a function containing the
   // task body.  That function takes as its argument a pointer to a structure
   // containing the inputs to the task body.  This structure is initialized in
   // the parent immediately before the call.
 
-  // To match the Realm ABI, we replace the existing call with a call to
-  // realmSync from the kitsune-rt realm wrapper.
+  // To match the kitsune-rt Realm wrapper, we replace the existing call with
+  // a call to realmSpawn
   IRBuilder<> CallerIRBuilder(ReplCall);
   Value *OutlinedFnPtr = CallerIRBuilder.CreatePointerBitCastOrAddrSpaceCast(
-      Outlined, TaskFuncPtrTy);
+      Outlined, RealmFTy);
   AllocaInst *CallerArgStruct = cast<AllocaInst>(ReplCall->getArgOperand(0));
   Type *ArgsTy = CallerArgStruct->getAllocatedType();
-
   Value *ArgStructPtr = CallerIRBuilder.CreateBitCast(CallerArgStruct,
-  						      Type::getInt8PtrTy(C));
+                                                      Type::getInt8PtrTy(C));
   ConstantInt *ArgSize = ConstantInt::get(DL.getIntPtrType(C),
                                           DL.getTypeAllocSize(ArgsTy));
-  ConstantInt *ArgNum = ConstantInt::get(DL.getIntPtrType(C),
-    					 ArgsTy->getNumContainedTypes());
-
-  CallerIRBuilder.SetInsertPoint(ReplStart);
-  CallerIRBuilder.CreateLifetimeStart(CallerArgStruct, ArgSize);
-
-  Value* CallArgs[] = { OutlinedFnPtr, 
-			ArgStructPtr, 
-			ArgNum,
-			ArgStructPtr,
-			ArgSize};
-
-  CallInst *Call = CallerIRBuilder.CreateCall(REALM_FUNC(realmSpawn), CallArgs); 
+  CallInst *Call = CallerIRBuilder.CreateCall(
+      get_realmSpawn(), { OutlinedFnPtr, ArgStructPtr, ArgSize});
   Call->setDebugLoc(ReplCall->getDebugLoc());
+  TOI.replaceReplCall(Call);
+  ReplCall->eraseFromParent();
 
   // Add lifetime intrinsics for the argument struct.  TODO: Move this logic
   // into underlying LoweringUtils routines?
-  //CallerIRBuilder.SetInsertPoint(ReplStart);
-  //CallerIRBuilder.CreateLifetimeStart(CallerArgStruct, ArgSize);
+  CallerIRBuilder.SetInsertPoint(ReplStart);
+  CallerIRBuilder.CreateLifetimeStart(CallerArgStruct, ArgSize);
   CallerIRBuilder.SetInsertPoint(CallBlock, ++Call->getIterator());
   CallerIRBuilder.CreateLifetimeEnd(CallerArgStruct, ArgSize);
-
-  TOI.replaceReplCall(Call);
-  ReplCall->eraseFromParent();
 
   if (TOI.ReplUnwind)
     // We assume that realmSpawn dealt with the exception.  But
@@ -427,7 +291,7 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 
   // VERIFY: If we're using realmSpawn, we don't need a separate helper
   // function to manage the allocation of the argument structure.
-#endif
+
 }
 
 void RealmABI::preProcessFunction(Function &F, TaskInfo &TI,

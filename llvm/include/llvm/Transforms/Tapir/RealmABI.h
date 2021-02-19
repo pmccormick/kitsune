@@ -25,7 +25,7 @@ class RealmABI : public TapirTarget {
 
   ValueToValueMapTy SyncRegionToBarrier;
 
-  Type *TaskFuncPtrTy = nullptr;
+  Type *RealmFTy = nullptr;
 
   //Opaque Realm RTS functions
   FunctionCallee RealmGetNumProcs = nullptr;
