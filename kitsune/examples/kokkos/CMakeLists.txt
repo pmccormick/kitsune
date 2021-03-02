@@ -69,5 +69,5 @@ endforeach()
 
 configure_file(
   ${KITSUNE_SOURCE_DIR}/examples/kokkos/run-kokkos-examples.sh.in
-  ${CMAKE_INSTALL_PREFIX}/kitsune/examples/kokkos/run-kokkos-examples.sh
+  ${KITSUNE_BINARY_DIR}/run-kokkos-examples.sh
 )
