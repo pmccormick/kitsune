@@ -10,7 +10,7 @@ export REALM_BASE_DIR=/projects/kitsune/x86_64
 # and point it at the kitsune-dev.cmake cache file.
 #
 #    $ mkdir -p build && cd build
-#    $ cmake -G Ninja -C kitsune-dev-var.sh -DCMAKE_INSTALL_PREFIX=inst-dir-path ../llvm
+#    $ cmake -G Ninja -C kitsune-dev.cmake -DCMAKE_INSTALL_PREFIX=inst-dir-path ../llvm
 #    $ ninja
 #
 # Consider setting LLVM_PARALLEL_COMPILE_JOBS and LLVM_PARALLEL_LINK_JOBS when using
@@ -19,9 +19,10 @@ export REALM_BASE_DIR=/projects/kitsune/x86_64
 # llvm build starts linking (in this case you probably want LLVM_PARALLEL_COMPILE_JOBS
 # to be greater than LLVM_PARALLEL_LINK_JOBS).
 #
-#    $ cmake -G Ninja -C kitsune-dev-var.sh -DCMAKE_INSTALL_PREFIX=inst-dir-path \
+#    $ cmake -G Ninja -C kitsune-dev.cmake -DCMAKE_INSTALL_PREFIX=inst-dir-path \
 #      -DLLVM_PARALLEL_COMPILE_JOBS=32 \
 #      -DLLVM_PARALLEL_LINK_JOBS=12 \
 #      ../llvm
+#
 #######
 #
