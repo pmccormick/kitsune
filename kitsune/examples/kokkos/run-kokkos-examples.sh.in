@@ -9,7 +9,7 @@ for exe in complex matmult1 normalize vecadd; do
       echo -n "$exe.$rt,$rt, $ncores, " >> $exe.$rt.log 
       export CILK_NWORKERS=$ncores
       export QTHREAD_NUM_SHEPHERDS=$ncores
-      ${CMAKE_INSTALL_PREFIX}/kitsune/examples/kokkos/$exe.$rt >> $exe.$rt.log 
+      ${KITSUNE_BINARY_DIR}/$exe.$rt >> $exe.$rt.log 
     done   
   done 
 done 
