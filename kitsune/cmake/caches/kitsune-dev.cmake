@@ -19,19 +19,19 @@
 #  2. This file uses a set of enviornment variables to configure runtime
 #     targets for code generation in the mid-stage of the compiler (via Tapir
 #     to llvm transformation).  Although there are several the runtime targets
-#     will be enabled if the RT_BASE_DIR for each runtime is specified.  For
-#     example:
+#     will be enabled if the path for each runtime's base install location is
+#     specified.  For example:
 #
-#         $ export OPENCILKRT_BASE_DIR=/projects/kitsune/x86_64/
-#         $ export QTHREADS_BASE_DIR=/projects/kitsune/x86_64/
-#         $ export REALM_BASE_DIR=/projects/kitsune/x86_64/
+#         $ export OPENCILKRTS_PATH=/projects/kitsune/x86_64/
+#         $ export QTHREADS_PATH=/projects/kitsune/x86_64/
+#         $ export REALM_PATH=/projects/kitsune/x86_64/
 #
-#     in each of these cases the BASE_DIR is the base directory for the installed
+#     in each of these cases the base dir is the base directory for the installed
 #     location for each (i.e., includes header files, libraries, etc.).
 #
 #     Kokkos is handled in the same fashion:
 #
-#         $ export KOKKOS_BASE_DIR=/projects/kitsune/x86_64/
+#         $ export KOKKOS_PATH=/projects/kitsune/x86_64/
 #
 #####
 #
@@ -49,27 +49,15 @@ set(CMAKE_BUILD_TYPE
   RelWithDebInfo
   CACHE STRING "")
 
+
 set(KITSUNE_ENABLED ON CACHE BOOL "") # not sure this is really needed these days...
-set(KITSUNE_BUILD_EXAMPLES OFF CACHE BOOL "") # this is broken right now...
-
-if (DEFINED ENV{OPENCILKRT_BASE_DIR})
-  set(KITSUNE_ENABLE_OPENCILK ON CACHE BOOL "")
-  set(OpenCilk_INCLUDE_DIR $ENV{OPENCILKRT_BASE_DIR}/include CACHE STRING "")
-  set(OpenCilk_LIBRARY_DIR $ENV{OPENCILKRT_BASE_DIR}/lib CACHE STRING "")
-  if (DEFINED ENV{OPENCILK_LINK_LIBS})
-    set(OpenCilk_LINK_LIBS $ENV{OPENCILK_LINK_LIBS} CACHE STRING "")
-  else()
-    set(OpenCilk_LINK_LIBS "-lopencilk -lopencilk-personality-cpp" CACHE STRING "")
-  endif()
-else()
-  set(KITSUNE_ENABLE_OPENCILK OFF CACHE BOOL "")
-endif()
+set(KITSUNE_BUILD_EXAMPLES ON CACHE BOOL "")
 
 
-if (DEFINED ENV{KOKKOS_BASE_DIR})
+if (DEFINED ENV{KOKKOS_PATH})
   set(KITSUNE_ENABLE_KOKKOS ON CACHE BOOL "")
-  set(Kokkos_INCLUDE_DIR $ENV{KOKKOS_BASE_DIR}/include CACHE STRING "")
-  set(Kokkos_LIBRARY_DIR $ENV{KOKKOS_BASE_DIR}/lib CACHE STRING "")
+  set(Kokkos_INCLUDE_DIR $ENV{KOKKOS_PATH}/include CACHE STRING "")
+  set(Kokkos_LIBRARY_DIR $ENV{KOKKOS_PATH}/lib CACHE STRING "")
   if (DEFINED ENV{KOKKOS_LINK_LIBS})
     set(Kokkos_LINK_LIBS $ENV{KOKKOS_LINK_LIBS} CACHE STRING "")
   else()
@@ -80,10 +68,24 @@ else()
 endif()
 
 
-if (DEFINED ENV{QTHREADS_BASE_DIR})
-  set(KITSUNE_ENABLE_QTHREADS ON CACHE BOOL "")
-  set(Qthreads_INCLUDE_DIR $ENV{QTHREADS_BASE_DIR}/include CACHE STRING "")
-  set(Qthreads_LIBRARY_DIR $ENV{QTHREADS_BASE_DIR}/lib CACHE STRING "")
+if (DEFINED ENV{OPENCILKRTS_PATH})
+  set(KITSUNE_ENABLE_OPENCILKRTS_TARGET ON CACHE BOOL "")
+  set(OpenCilkRTS_INCLUDE_DIR $ENV{OPENCILKRTS_PATH}/include CACHE STRING "")
+  set(OpenCilkRTS_LIBRARY_DIR $ENV{OPENCILKRTS_PATH}/lib CACHE STRING "")
+  if (DEFINED ENV{OPENCILKRTS_LINK_LIBS})
+    set(OpenCilkRTS_LINK_LIBS $ENV{OPENCILKRTS_LINK_LIBS} CACHE STRING "")
+  else()
+    set(OpenCilkRTS_LINK_LIBS "-lopencilk -lopencilk-personality-cpp" CACHE STRING "")
+  endif()
+else()
+  set(KITSUNE_ENABLE_OPENCILKRTS OFF CACHE BOOL "")
+endif()
+
+
+if (DEFINED ENV{QTHREADS_PATH})
+  set(KITSUNE_ENABLE_QTHREADS_TARGET ON CACHE BOOL "")
+  set(Qthreads_INCLUDE_DIR $ENV{QTHREADS_PATH}/include CACHE STRING "")
+  set(Qthreads_LIBRARY_DIR $ENV{QTHREADS_PATH}/lib CACHE STRING "")
   if (DEFINED ENV{QTHREADS_LINK_LIBS})
     set(Qthreads_LINK_LIBS $ENV{QTHREADS_LINK_LIBS} CACHE STRING "")
   else()
@@ -94,17 +96,17 @@ else()
 endif()
 
 
-if (DEFINED ENV{REALM_BASE_DIR})
-  set(KITSUNE_ENABLE_REALM ON CACHE BOOL "")
-  set(Realm_INCLUDE_DIR $ENV{REALM_BASE_DIR}/include CACHE STRING "")
-  set(Realm_LIBRARY_DIR $ENV{REALM_BASE_DIR}/lib CACHE STRING "")
+if (DEFINED ENV{REALM_PATH})
+  set(KITSUNE_ENABLE_REALM_TARGET ON CACHE BOOL "")
+  set(Realm_INCLUDE_DIR $ENV{REALM_PATH}/include CACHE STRING "")
+  set(Realm_LIBRARY_DIR $ENV{REALM_PATH}/lib CACHE STRING "")
   if (DEFINED ENV{REALM_LINK_LIBS})
     set(Realm_LINK_LIBS $ENV{REALM_LINK_LIBS} CACHE STRING "")
   else()
     set(Realm_LINK_LIBS "-lrealm -ldl -lpthread" CACHE STRING "")
   endif()
 else()
-  set(KITSUNE_ENABLE_REALM ON CACHE BOOL "")
+  set(KITSUNE_ENABLE_REALM OFF CACHE BOOL "")
 endif()
 
 # Defaults for NVIDIA GPU targets are old...  Let's bump it up

@@ -1,0 +1,29 @@
+#%Module1.0
+##
+##
+## OpenCilk RT
+##
+
+proc ModulesHelp { } {
+	puts stderr "This is the OpenCilk RT beta enviornment."
+	puts stderr "modifies: PATH, LD_LIBRARY_PATH"
+}
+
+conflict opencilkrt
+
+module-whatis 	"load opencilkrt beta3 enviornment"
+module-whatis   "modifies: LD_LIBRARY_PATH"
+
+set version release
+
+set mach [string tolower [uname machine]]
+
+set opencilkrt_root  "/projects/kitsune/rt-targets/$mach/opencilkrt/$version"
+set libdir	$opencilkrt_root/lib
+set incldir	$opencilkrt_root/include
+set bindir      $opencilkrt_root/bin
+
+setenv 		OPENCILKRTS_PATH	"$opencilkrt_root"
+setenv 		OPENCILKRTS_LIBDIR	"$libdir"
+setenv 		OPENCILKRTS_INCLUDE 	"$incldir"
+prepend-path	LD_LIBRARY_PATH		"$libdir"

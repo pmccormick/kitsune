@@ -1,0 +1,32 @@
+#%Module1.0 
+##
+##
+## Kokkos 
+##
+
+proc ModulesHelp { } { 
+	puts stderr "This is the Kokkos 3.3.01 enviornment."
+	puts stderr "modifies: PATH, LD_LIBRARY_PATH" 
+}
+
+conflict kokkos
+
+module-whatis 	"load kokkos 3.3.01 enviornment"
+module-whatis   "modifies: PATH, LD_LIBRARY_PATH"
+
+set version 3.3.01
+
+set mach [string tolower [uname machine]]
+
+set kokkos_root  "/projects/kitsune/rt-targets/$mach/kokkos/$version"
+set libdir	$kokkos_root/lib
+set incldir	$kokkos_root/include 
+set bindir      $kokkos_root/bin 
+
+setenv 		KOKKOS_PATH		"$kokkos_root"
+setenv 		KOKKOS_LIBDIR		"$libdir"
+setenv 		KOKKOS_INCLUDE 		"$incldir"
+setenv 		KOKKOS_BIN		"$bindir"
+prepend-path	PATH			"$bindir"
+prepend-path	LD_LIBRARY_PATH		"$libdir"
+

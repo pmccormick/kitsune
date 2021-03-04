@@ -1086,8 +1086,8 @@ void ToolChain::AddFortranStdlibLibArgs(const ArgList &Args,
 /// libraries (e.g. "-lkokkos -ldl -lrt") do not work well for direct
 /// use as arguments.  This helper extracts them into individal
 /// arguments.
-void ToolChain::ExtractArgsFromString(const char *s, 
-				      ArgStringList &CmdArgs, 
+void ToolChain::ExtractArgsFromString(const char *s,
+				      ArgStringList &CmdArgs,
 				      const ArgList &Args,
 				      const char delimiter) const {
   std::string ArgString(s);
@@ -1773,17 +1773,17 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       CmdArgs.push_back("-Bdynamic");
     CmdArgs.push_back("-lpthread");
 
-    if (KITSUNE_ENABLE_OPENCILK_TARGET) {
-      CmdArgs.push_back("-L" OPENCILK_LIBRARY_DIR);
+    if (KITSUNE_ENABLE_OPENCILKRTS_TARGET) {
+      CmdArgs.push_back("-L" OPENCILKRTS_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
-	CmdArgs.push_back("-rpath");
-	CmdArgs.push_back(OPENCILK_LIBRARY_DIR);
+        CmdArgs.push_back("-rpath");
+        CmdArgs.push_back(OPENCILKRTS_LIBRARY_DIR);
       } else {
-	CmdArgs.push_back("-rpath=" OPENCILK_LIBRARY_DIR);
-      } 
-      ExtractArgsFromString(CILKRTS_EXTRA_LINK_LIBS, CmdArgs, Args);
-      // This was done above... 
-      //CmdArgs.push_back("-lopencilk");      
+        CmdArgs.push_back("-rpath=" OPENCILKRTS_LIBRARY_DIR);
+      }
+      ExtractArgsFromString(OPENCILKRTS_EXTRA_LINK_LIBS, CmdArgs, Args);
+      // This was done above...
+      //CmdArgs.push_back("-lopencilk");
     } else {
       // FIXME: we should hard error here if cilkrts support was not built-in.
       getDriver().Diag(diag::warn_cilkrts_missing_build_params);
@@ -1791,28 +1791,28 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
   }
   case TapirTargetID::Cilk:
-	  
+
     if (KITSUNE_ENABLE_CILKRTS_TARGET) {
       CmdArgs.push_back("-L" CILKRTS_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
-	CmdArgs.push_back("-rpath");
-	CmdArgs.push_back(CILKRTS_LIBRARY_DIR);
+        CmdArgs.push_back("-rpath");
+        CmdArgs.push_back(CILKRTS_LIBRARY_DIR);
       } else {
-	CmdArgs.push_back("-rpath=" CILKRTS_LIBRARY_DIR);
-      } 
+        CmdArgs.push_back("-rpath=" CILKRTS_LIBRARY_DIR);
+      }
       ExtractArgsFromString(CILKRTS_EXTRA_LINK_LIBS, CmdArgs, Args);
-      CmdArgs.push_back("-lcilkrts");      
+      CmdArgs.push_back("-lcilkrts");
     } else {
       // FIXME: we should hard error here if cilkrts support was not built-in.
       getDriver().Diag(diag::warn_cilkrts_missing_build_params);
     }
     break;
   case TapirTargetID::OpenMP:
-    if (KITSUNE_ENABLE_OPENMP_TARGET) { 
+    if (KITSUNE_ENABLE_OPENMP_TARGET) {
       //CmdArgs.push_back("-L" KITSUNE_OPENMP_LIBRARY_DIR);
-      //if (Triple.isOSDarwin()) { 
+      //if (Triple.isOSDarwin()) {
       //  CmdArgs.push_back("-rpath");
-      //  CmdArgs.push_back(KITSUNE_OPENMP_LIBRARY_DIR);	    
+      //  CmdArgs.push_back(KITSUNE_OPENMP_LIBRARY_DIR);
       //} else {
       //  CmdArgs.push_back("-rpath=" KITSUNE_OPENMP_LIBRARY_DIR);
       //ExtractArgsFromString(KITSUNE_OPENMP_LINK_LIBS, CmdArgs, Args);
@@ -1821,15 +1821,15 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
 
   case TapirTargetID::Qthreads:
-    if (KITSUNE_ENABLE_QTHREADS_TARGET) { 
+    if (KITSUNE_ENABLE_QTHREADS_TARGET) {
       CmdArgs.push_back("-L" QTHREADS_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
-	CmdArgs.push_back("-rpath");
-	CmdArgs.push_back(QTHREADS_LIBRARY_DIR);
+        CmdArgs.push_back("-rpath");
+        CmdArgs.push_back(QTHREADS_LIBRARY_DIR);
       } else {
-	CmdArgs.push_back("-rpath="  QTHREADS_LIBRARY_DIR);
+        CmdArgs.push_back("-rpath="  QTHREADS_LIBRARY_DIR);
       }
-      CmdArgs.push_back("-lqthread");            
+      CmdArgs.push_back("-lqthread");
       ExtractArgsFromString(QTHREADS_EXTRA_LINK_LIBS, CmdArgs, Args);
     } else {
       // FIXME: we should hard error here if qthreads support was not built-in.
@@ -1838,13 +1838,13 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
 
   case TapirTargetID::Realm:
-    if (KITSUNE_ENABLE_REALM_TARGET) { 
+    if (KITSUNE_ENABLE_REALM_TARGET) {
       CmdArgs.push_back("-L" REALM_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
-	CmdArgs.push_back("-rpath");
-	CmdArgs.push_back(REALM_LIBRARY_DIR);
+        CmdArgs.push_back("-rpath");
+        CmdArgs.push_back(REALM_LIBRARY_DIR);
       } else {
-	CmdArgs.push_back("-rpath=" REALM_LIBRARY_DIR);	    
+        CmdArgs.push_back("-rpath=" REALM_LIBRARY_DIR);
       }
       CmdArgs.push_back("-lrealm");
       ExtractArgsFromString(REALM_EXTRA_LINK_LIBS, CmdArgs, Args);
@@ -1855,16 +1855,16 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
 
   case TapirTargetID::Cuda:
-    if (KITSUNE_ENABLE_CUDA_TARGET) { 
+    if (KITSUNE_ENABLE_CUDA_TARGET) {
       CmdArgs.push_back("-L" CUDA_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
         CmdArgs.push_back("-rpath");
-        CmdArgs.push_back(CUDA_LIBRARY_DIR);	    
+        CmdArgs.push_back(CUDA_LIBRARY_DIR);
       } else {
         CmdArgs.push_back("-rpath=" CUDA_LIBRARY_DIR);
       }
       ExtractArgsFromString(CUDA_EXTRA_LINK_LIBS, CmdArgs, Args);
-      CmdArgs.push_back("-lcuda");      
+      CmdArgs.push_back("-lcuda");
     } else {
       // FIXME: We should hard error here if cuda support was not built-in.
       getDriver().Diag(diag::warn_cuda_missing_build_params);
@@ -1872,11 +1872,11 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
 
   case TapirTargetID::KitCuda:
-    if (KITSUNE_ENABLE_KITCUDA_TARGET) { 
+    if (KITSUNE_ENABLE_KITCUDA_TARGET) {
       CmdArgs.push_back("-L" KITCUDA_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
         CmdArgs.push_back("-rpath");
-        CmdArgs.push_back(KITCUDA_LIBRARY_DIR);	    
+        CmdArgs.push_back(KITCUDA_LIBRARY_DIR);
       } else {
         CmdArgs.push_back("-rpath=" KITCUDA_LIBRARY_DIR);
       }
@@ -1892,11 +1892,11 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
 
   case TapirTargetID::OpenCL:
-    if (KITSUNE_ENABLE_OPENCL_TARGET) { 
+    if (KITSUNE_ENABLE_OPENCL_TARGET) {
       CmdArgs.push_back("-L" OPENCL_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
         CmdArgs.push_back("-rpath");
-        CmdArgs.push_back(OPENCL_LIBRARY_DIR);	    
+        CmdArgs.push_back(OPENCL_LIBRARY_DIR);
       } else {
         CmdArgs.push_back("-rpath=" OPENCL_LIBRARY_DIR);
       }
@@ -1906,7 +1906,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       // FIXME: We should hard error here if opencl support was not configured.
       getDriver().Diag(diag::warn_opencl_missing_build_params);
     }
-    break;    
+    break;
 
   default:
     break;
@@ -1917,14 +1917,14 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       CmdArgs.push_back("-L" KOKKOS_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
         CmdArgs.push_back("-rpath");
-        CmdArgs.push_back(KOKKOS_LIBRARY_DIR);	    
+        CmdArgs.push_back(KOKKOS_LIBRARY_DIR);
       } else {
         CmdArgs.push_back("-rpath=" KOKKOS_LIBRARY_DIR);
       }
       CmdArgs.push_back("-lkokkoscore");
       ExtractArgsFromString(KOKKOS_EXTRA_LINK_LIBS, CmdArgs, Args);
     } else {
-      // FIXME: We should hard error here if kokkos support was not configured. 
+      // FIXME: We should hard error here if kokkos support was not configured.
       getDriver().Diag(diag::warn_kokkos_missing_build_params);
     }
   }

@@ -15,7 +15,7 @@ macro(add_kitsune_library name)
       ADDITIONAL_HEADERS
       ${srcs}
       ${ARG_ADDITIONAL_HEADERS}) # It may contain unparsed unknown args.
-      
+
   endif()
 
   if (ARG_SHARED)
@@ -25,11 +25,11 @@ macro(add_kitsune_library name)
     # so we need to handle it here.
     if (BUILD_SHARED_LIBS)
       set(LIBTYPE SHARED OBJECT)
-    else()
+    else ()
       set(LIBTYPE STATIC OBJECT)
-    endif()
+    endif ()
     set_property(GLOBAL APPEND PROPERTY KITSUNE_STATIC_LIBS ${name})
-  endif()
+  endif ()
 
   llvm_add_library(${name} ${LIBTYPE} ${ARG_UNPARSED_ARGUMENTS} ${srcs})
 
@@ -84,16 +84,16 @@ macro(add_cxx_llvmir_file name flags)
 	)
   add_dependencies(${target}.ll clang)
 
-endmacro(add_cxx_llvmir_file) 
+endmacro(add_cxx_llvmir_file)
 
 macro(add_kitsune_example name)
   if ( NOT KITSUNE_BUILD_EXAMPLES )
     set(EXCLUDE_FROM_ALL ON)
   endif()
-  
+
   set(CMAKE_C_COMPILER ${LLVM_BINARY_DIR}/bin/clang)
   set(CMAKE_CXX_COMPILER ${LLVM_BINARY_DIR}/bin/clang++)
-  add_kitsune_executable(${name} 
+  add_kitsune_executable(${name}
                          ${ARGN}
                          DEPENDS clang)
 endmacro(add_kitsune_example)
@@ -142,9 +142,9 @@ macro(get_kitsune_tapir_rt_flags arglist)
 
   # The list of possible runtime targets for the compiler (via tapir).
   # These are expanded to match the ENABLE options in the kitsune cmake
-  # configuration (and thus we match capitalization here). 
-  set(_kitsune_rt_names CILKRTS;OPENCILK;QTHREADS;REALM;OPENMP;CUDART;OPENCL)
-  set(_kitsune_rt_flags cilk;opencilk;qthreads;realm;omp;cuda;opencl)  
+  # configuration (and thus we match capitalization here).
+  set(_kitsune_rt_names OPENCILKRTS;QTHREADS;REALM;OPENMP;CUDART;OPENCL)
+  set(_kitsune_rt_flags opencilk;qthreads;realm;omp;cuda;opencl)
   foreach(rt IN ITEMS ${_kitsune_rt_names})
     set(_ENABLE_VAR "KITSUNE_ENABLE_${rt}_TARGET")
     if (${_ENABLE_VAR})
@@ -153,6 +153,6 @@ macro(get_kitsune_tapir_rt_flags arglist)
         list(GET _kitsune_rt_flags ${rtindex} flag)
         list(APPEND ${arglist} ${flag})
       endif()
-    endif()  
+    endif()
   endforeach()
 endmacro()

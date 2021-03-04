@@ -1,0 +1,33 @@
+#%Module1.0
+##
+##
+## Legion/Realm
+##
+
+proc ModulesHelp { } {
+	puts stderr "This is the Legion/Realm stable enviornment."
+	puts stderr "modifies: PATH, LD_LIBRARY_PATH"
+}
+
+conflict legion
+
+module-whatis 	"load legion stable enviornment"
+module-whatis   "modifies: PATH, LD_LIBRARY_PATH"
+
+set version stable
+
+set mach [string tolower [uname machine]]
+
+set legion_root  "/projects/kitsune/rt-targets/$mach/legion/$version"
+set libdir	$legion_root/lib
+set incldir	$legion_root/include
+set bindir  $legion_root/bin
+
+setenv 		LEGION_PATH	"$legion_root"
+setenv 		LEGION_LIBDIR	"$libdir"
+setenv 		LEGION_INCLUDE 	"$incldir"
+setenv 		REALM_PATH	"$legion_root"
+setenv 		REALM_LIBDIR	"$libdir"
+setenv 		REALM_INCLUDE 	"$incldir"
+prepend-path	LD_LIBRARY_PATH	"$libdir"
+prepend-path	PATH            "$bindir"

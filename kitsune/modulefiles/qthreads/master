@@ -1,0 +1,29 @@
+#%Module1.0
+##
+##
+## Qthreads
+##
+
+proc ModulesHelp { } {
+	puts stderr "This is the Qthreads beta enviornment."
+	puts stderr "modifies: LD_LIBRARY_PATH"
+}
+
+conflict qthreads
+
+module-whatis 	"load qthreads master enviornment"
+module-whatis   "modifies: LD_LIBRARY_PATH"
+
+set version master
+
+set mach [string tolower [uname machine]]
+
+set qthreads_root  "/projects/kitsune/rt-targets/$mach/qthreads/$version"
+set libdir	$qthreads_root/lib
+set incldir	$qthreads_root/include
+set bindir  	$qthreads_root/bin
+
+setenv 		QTHREADS_PATH	 "$qthreads_root"
+setenv 		QTHREADS_LIBDIR	 "$libdir"
+setenv 		QTHREADS_INCLUDE "$incldir"
+prepend-path	LD_LIBRARY_PATH	 "$libdir"
