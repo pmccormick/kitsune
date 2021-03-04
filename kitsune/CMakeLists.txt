@@ -127,9 +127,10 @@ option(KITSUNE_ENABLE_REALM_TARGET
   "Enable Realm runtime backend target." ${Realm_FOUND})
 if (Realm_FOUND)
   message(STATUS "Realm runtime target enabled.")
-  option(REALM_EXTRA_LINK_LIBS
-    "Additional libraries needed by Realm backend runtime."
-    "-ldl -lrt")
+  set(REALM_EXTRA_LINK_LIBS "-ldl -lrt"
+    CACHE
+    STRING "Additional libraries needed by Realm backend runtime."
+    )
   add_subdirectory(lib/Realm)
 endif()
 
