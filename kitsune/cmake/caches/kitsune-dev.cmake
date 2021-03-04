@@ -106,7 +106,7 @@ if (DEFINED ENV{REALM_PATH})
     set(Realm_LINK_LIBS "-lrealm -ldl -lpthread" CACHE STRING "")
   endif()
 else()
-  set(KITSUNE_ENABLE_REALM OFF CACHE BOOL "")
+  set(KITSUNE_ENABLE_REALM_TARGET OFF CACHE BOOL "")
 endif()
 
 # Defaults for NVIDIA GPU targets are old...  Let's bump it up
