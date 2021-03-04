@@ -23,7 +23,7 @@ if (KITSUNE_ENABLE_REALM_TARGET)
   file(GLOB realm_srcs Realm/*.cc)
   file(GLOB realm_incs Realm/*.h)
 
-  add_library(kitsunerealm STATIC ${realm_srcs} ${realm_incs})
+  add_library(kitsunerealm SHARED ${realm_srcs} ${realm_incs})
 
   target_link_libraries(kitsunerealm PUBLIC realm pthread dl rt)
 
