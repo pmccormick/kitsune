@@ -2,7 +2,7 @@
 # Copyright (c) 2020 Triad National Security, LLC
 #                         All rights reserved.
 #
-# This file is part of the kitsune/llvm project.  It is released under 
+# This file is part of the kitsune/llvm project.  It is released under
 # the LLVM license.
 #
 cmake_minimum_required(VERSION 3.13.4)
@@ -28,7 +28,7 @@ set(KITSUNE_ENABLED TRUE
     BOOL
     "Enable Kitsune and Tapir features to the LLVM infrastructure."
 )
-    
+
 set(KITSUNE_SOURCE_DIR  ${CMAKE_CURRENT_SOURCE_DIR})
 set(KITSUNE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set(KITSUNE_BINARY_DIR  ${CMAKE_CURRENT_BINARY_DIR})
@@ -41,7 +41,7 @@ message(STATUS "Kitsune binary directory: ${KITSUNE_BINARY_DIR}")
 option(KITSUNE_INCLUDE_TESTS
   "Enable Kitsune tests." ${LLVM_INCLUDE_TESTS})
 option(KITSUNE_BUILD_EXAMPLES
-  "Build Kitsune example programs by default." ${KITSUNE_INCLUDE_TESTS}) 
+  "Build Kitsune example programs by default." ${KITSUNE_INCLUDE_TESTS})
 
 # Add Kitsune-centric modules to cmake path.
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -51,16 +51,16 @@ include(AddKitsune)
 option(KITSUNE_ENABLE_WERROR
   "Fail kitsune builds if a warning is triggered." OFF)
 
-# Runtime backend targets.  
+# Runtime backend targets.
 
 find_package(CUDAToolkit)
 option(KITSUNE_ENABLE_CUDA
   "Enable Kitsune-centric CUDA support." ${CUDAToolkit_FOUND})
-if (KITSUNE_ENABLE_CUDA) 
-  option(KITSUNE_ENABLE_CUDA_TARGET 
+if (KITSUNE_ENABLE_CUDA)
+  option(KITSUNE_ENABLE_CUDA_TARGET
     "Enable the CUDA runtime ABI target." ${CUDAToolkit_FOUND})
   if (KITSUNE_ENABLE_CUDA_TARGET)
-    option(KITSUNE_CUDA_LIBRARY_DIR 
+    option(KITSUNE_CUDA_LIBRARY_DIR
     "Enable the CUDA runtime ABI target." ${CUDAToolkit_LIBRARY_DIR})
     set(KITSUNE_EXTRA_CUDA_LINK_LIBS ""
       CACHE
@@ -68,19 +68,19 @@ if (KITSUNE_ENABLE_CUDA)
     )
   endif()
 
-  option(KITSUNE_ENABLE_KITCUDA_TARGET 
+  option(KITSUNE_ENABLE_KITCUDA_TARGET
     "Enable Kitsune's CUDA runtime ABI target." ${CUDAToolkit_FOUND})
   if (KITSUNE_ENABLE_KITCUDA_TARGET)
     set(KITSUNE_EXTRA_KITCUDA_LINK_LIBS ""
       CACHE
       STRING "Extra link libraries for Kitsune's CUDA ABI runtime target."
     )
-    add_subdirectory(lib/CudaRT)  
+    add_subdirectory(lib/CudaRT)
   endif()
 endif()
 
 find_package(OpenCL)
-# FIXME: Re-enable OpenCL default once code gen pieces are complete. 
+# FIXME: Re-enable OpenCL default once code gen pieces are complete.
 option(KITSUNE_ENABLE_OPENCL_TARGET
   "Enable SPIRV+OpenCL backend target." FALSE) # ${OpenCL_FOUND}
 if (KITSUNE_ENABLE_OPENCL_TARGET)
@@ -94,9 +94,9 @@ endif()
 find_package(CilkRTS)
 option(KITSUNE_ENABLE_CILKRTS_TARGET
   "Enable Cilk runtime backend target." ${CilkRTS_FOUND})
-if (KITSUNE_ENABLE_CILKRTS_TARGET) 
+if (KITSUNE_ENABLE_CILKRTS_TARGET)
   set(CILKRTS_EXTRA_LINK_LIBS ""
-    CACHE 
+    CACHE
     STRING "Extra link libraries for the Cilk runtime target."
   )
 endif()
@@ -104,9 +104,9 @@ endif()
 find_package(OpenCilk)
 option(KITSUNE_ENABLE_OPENCILK_TARGET
   "Enable OpenCilk runtime backend target." ${OpenCilk_FOUND})
-if (KITSUNE_ENABLE_OPENCILK_TARGET) 
+if (KITSUNE_ENABLE_OPENCILK_TARGET)
   set(OPENCILK_EXTRA_LINK_LIBS ""
-    CACHE 
+    CACHE
     STRING "Extra link libraries for the OpenCilk runtime target."
   )
 endif()
@@ -117,7 +117,7 @@ option(KITSUNE_ENABLE_QTHREADS_TARGET
 if (Qthreads_FOUND)
   message(STATUS "Qthreads runtime target enabled.")
   set(QTHREADS_EXTRA_LINK_LIBS "-ldl"
-    CACHE 
+    CACHE
     STRING "Additional libraries needed by Qthreads backend runtime."
   )
 endif()
@@ -127,10 +127,9 @@ option(KITSUNE_ENABLE_REALM_TARGET
   "Enable Realm runtime backend target." ${Realm_FOUND})
 if (Realm_FOUND)
   message(STATUS "Realm runtime target enabled.")
-  set(REALM_EXTRA_LINK_LIBS "-ldl -lrt"
-    CACHE
-    STRING "Additional libraries needed by Realm backend runtime."
-    )
+  option(REALM_EXTRA_LINK_LIBS
+    "Additional libraries needed by Realm runtime target."
+    "-ldl -lrt")
   add_subdirectory(lib/Realm)
 endif()
 
@@ -142,7 +141,7 @@ else()
   option(KITSUNE_ENABLE_OPENMP_TARGET "Enable OpenMP/libomp runtime backend target." OFF)
 endif()
 
-# Special kitsune modes for clang. 
+# Special kitsune modes for clang.
 find_package(Kokkos)
 option(KITSUNE_ENABLE_KOKKOS
   "Enable Kokkos support." ${Kokkos_FOUND})
@@ -155,7 +154,7 @@ if (KITSUNE_INCLUDE_TESTS)
 endif()
 
 if (KITSUNE_BUILD_EXAMPLES)
-  add_kitsune_subdirectory(examples) 
+  add_kitsune_subdirectory(examples)
 endif()
 
 message(STATUS "building kitsune configuration header...")
