@@ -25,23 +25,24 @@ extern "C" {
   static bool initCalled = false; //global variable
 
   context * getRealmCTX() {
-    //std::cout << "  getRealmCTX" << std::endl;
-    if ( _globalCTX)
+    std::cout << "  getRealmCTX" << std::endl;
+    if ( _globalCTX) 
       return _globalCTX;
     else
       return NULL;
   }
-
+  
   Realm::Barrier createRealmBarrier(){
     return Realm::Barrier::create_barrier(1);
   }
 
   void destroyRealmBarrier(Realm::Barrier& b){
-    b.destroy_barrier();
+    b.destroy_barrier();  
   }
 
+  
   int realmInitRuntime(int argc, char** argv) {
-    //std::cout << "realmInitRuntime" << std::endl;
+    std::cout << "realmInitRuntime" << std::endl;
     if (initCalled)
       return 0;
 
@@ -71,67 +72,71 @@ extern "C" {
   }
 
   size_t realmGetNumProcs() {
+    std::cout << "realmGetNumProcs" << std::endl;
     if ( _globalCTX)
       return _globalCTX->numprocs;
     else
       return 0;
   }
-
+    
   void realmArrive(Realm::Barrier& b){
-    b.arrive();
+    b.arrive(); 
   }
 
-  // void realmSpawn(void (*func)(void *), const void* args, size_t argsize);
-
-  void realmSpawn(void (*func)(void *), const void* args, size_t argsize) {
-    /* take a function pointer to the task you want to run,
-       cast it to the appropriate function type and create a
+  void realmSpawn(void (*func)(void *), 
+		  const void* args, 
+		  size_t argsize) { 
+    /* take a function pointer to the task you want to run, 
+       cast it to the appropriate function type and create a 
        CodeDescriptor from it
        needs pointer to user data and arguments (NULL for void?)
        needs size_t for len (0 for void?)
     */
-    //std::cout << " realmSpawn" << std::endl;
+    std::cout << " realmSpawn" << std::endl;
 
     context *ctx = getRealmCTX();
     assert(ctx);
 
-    Realm::Processor::TaskFuncID taskID = ctx->cur_task++; // (ctx->cur_task).load();
+    Realm::Processor::TaskFuncID taskID = (ctx->cur_task).load();
+    std::cout << "   accessed cur_task" << std::endl;
+    ctx->cur_task++;
+    std::cout << "    incremented cur_task" << std::endl;
 
     //get a processor to run on
     Realm::Processor p = ctx->procgroup; //spawn on the group to enable Realm's magic load-balancing
     //Realm::Processor p = (ctx->procs)[i]; //do round-robin spawning on the vector of procs (needs i calculated)
-    //std::cout << "    accessed ctx->procgroup" << std::endl;
+    std::cout << "    accessed ctx->procgroup" << std::endl;
     assert(p.exists());
     assert(p != Realm::Processor::NO_PROC);
 
     // Create a CodeDescriptor from the TaskFuncPtr
-    // cast func to be the TaskFuncPtr type
+    // cast func to be the TaskFuncPtr type 
     // (func is passed as a RealmFTy (= QthreadFTy) initially)
     Realm::CodeDescriptor cd = Realm::CodeDescriptor((Realm::Processor::TaskFuncPtr)func);
-    //std::cout << "    got a CodeDescriptor" << std::endl;
+    std::cout << "    got a CodeDescriptor" << std::endl;
 
     const Realm::ProfilingRequestSet prs;  //We don't care what it is for now, the default is fine
-    //std::cout << "    got a default ProfilingRequestSet" << std::endl;
+    std::cout << "    got a default ProfilingRequestSet" << std::endl;
 
     //register the task with the runtime
     Realm::Event e1 = p.register_task(taskID, cd, prs, nullptr, 0);
-    //std::cout << "     registered task: " << taskID << std::endl;
-    //ctx->events.insert(e1); //might not actually need to keep track of this one
-    //std::cout << "      inserted e1" << std::endl;
+    std::cout << "     registered task: " << taskID << std::endl;
+    ctx->events.insert(e1); //might not actually need to keep track of this one
+    std::cout << "      inserted e1" << std::endl;
     //e1.wait();
     //std::cout << "      e1 complete" << std::endl;
 
     //spawn the task
     Realm::Event e2 = p.spawn(taskID, args, argsize, e1, 0); //predicated on the completion of the task's registration
-    //std::cout << "       spawned task: " << taskID << std::endl;
+    std::cout << "       spawned task: " << taskID << std::endl;
     ctx->events.insert(e2);
-    //std::cout << "        inserted e2" << std::endl;
+    std::cout << "        inserted e2" << std::endl;
     return;
   }
 
-#if 0 //the old realmSync (non-barrier)
+#if 0 //the old realmSync (non-barrier)  
   int realmSync() {
-    //std::cout << " realmSync" << std::endl;
+    std::cout << " realmSync" << std::endl;
     context *ctx = getRealmCTX();
     assert(ctx);
     //create an event that does not trigger until all previous events have triggered
@@ -139,40 +144,40 @@ extern "C" {
 
     if (!(ctx->events).empty()) {
       e = Realm::Event::merge_events(ctx->events);
-      //std::cout << "  merged events" << std::endl;
+      std::cout << "  merged events" << std::endl;
       //can clear the events in the list now and insert only the sync event
       ctx->events.clear();
-      //std::cout << "   cleared events" << std::endl;
+      std::cout << "   cleared events" << std::endl;
       //ctx->events.insert(e);
     }
     else {
-      //std::cout << "ctx->events is empty" << std::endl;
+      std::cout << "ctx->events is empty" << std::endl;
       e = Realm::Event::NO_EVENT;
-    }
+    }      
 
     // Do not return until sync is complete
     if (Realm::Thread::self())
       e.wait();
     else
       e.external_wait();
-    //std::cout << "e.wait() has completed" << std::endl;
-
+    std::cout << "e.wait() has completed" << std::endl;
+    
     //while (!e.has_triggered()) {
     //std::cout << "not done yet" << std::endl;
     //continue;
     //}
     //std:: cout << "done waiting" << std::endl;
-
+    
     return 0;
   }
 #endif //old sync
-
+  
   void realmSync(Realm::Barrier& b) {
-    b.arrive();
+    b.arrive(); 
     if(Realm::Thread::self())
-      b.wait();
-    else
-      b.external_wait();
+      b.wait(); 
+    else 
+      b.external_wait(); 
   }
 
   void realmFinalize() {

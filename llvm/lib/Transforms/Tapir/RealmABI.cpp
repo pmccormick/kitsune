@@ -213,6 +213,7 @@ Value *RealmABI::getOrCreateBarrier(Value *SyncRegion, Function *F) {
                          BB.getTerminator());
       }
     }
+    
     return barrier;
   }
 }
