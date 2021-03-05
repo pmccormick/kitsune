@@ -18,12 +18,12 @@ include_directories(${Realm_INCLUDE_DIR})
 file(GLOB realm_srcs *.cpp)
 file(GLOB realm_incs Realm/*.h)
 
-add_kitsune_library(kitrealm
+add_kitsune_library(kitsunerealm
   ${realm_srcs}
   LINK_LIBS
   realm pthread dl rt)
 
-set_target_properties(kitrealm
+set_target_properties(kitsunerealm
   PROPERTIES
   POSITION_INDEPENDENT_CODE   1
   COMPILE_FLAGS "-fPIC"

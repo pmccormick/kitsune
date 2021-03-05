@@ -58,7 +58,7 @@ FunctionCallee QthreadsABI::get_qthread_fork_copyargs() {
         DL.getIntPtrType(C),   // size_t arg_size
         Type::getInt64PtrTy(C) // aligned_t *ret
       }, false);
-  
+
   QthreadForkCopyargs = M.getOrInsertFunction("qthread_fork_copyargs", FTy, AL);
   return QthreadForkCopyargs;
 }
@@ -72,7 +72,7 @@ FunctionCallee QthreadsABI::get_qthread_initialize() {
   // TODO: Set appropriate function attributes.
   FunctionType *FTy = FunctionType::get(
       Type::getInt32Ty(C), {}, false);
-  
+
   QthreadInitialize = M.getOrInsertFunction("qthread_initialize", FTy, AL);
   return QthreadInitialize;
 }
@@ -93,7 +93,7 @@ FunctionCallee QthreadsABI::get_qt_sinc_create() {
         DL.getIntPtrType(C)    // size_t expect
       },
       false);
-  
+
   QtSincCreate = M.getOrInsertFunction("qt_sinc_create", FTy, AL);
   return QtSincCreate;
 }
@@ -112,7 +112,7 @@ FunctionCallee QthreadsABI::get_qt_sinc_expect() {
         DL.getIntPtrType(C)    // size_t incr
       },
       false);
-  
+
   QtSincExpect = M.getOrInsertFunction("qt_sinc_expect", FTy, AL);
   return QtSincExpect;
 }
@@ -130,7 +130,7 @@ FunctionCallee QthreadsABI::get_qt_sinc_submit() {
         Type::getInt8PtrTy(C)  // void *val
       },
       false);
-  
+
   QtSincSubmit = M.getOrInsertFunction("qt_sinc_submit", FTy, AL);
   return QtSincSubmit;
 }
@@ -148,7 +148,7 @@ FunctionCallee QthreadsABI::get_qt_sinc_wait() {
         Type::getInt8PtrTy(C)  // void *target
       },
       false);
-  
+
   QtSincWait = M.getOrInsertFunction("qt_sinc_wait", FTy, AL);
   return QtSincWait;
 }
@@ -165,7 +165,7 @@ FunctionCallee QthreadsABI::get_qt_sinc_destroy() {
       { Type::getInt8PtrTy(C), // sync_t *s
       },
       false);
-  
+
   QtSincDestroy = M.getOrInsertFunction("qt_sinc_destroy", FTy, AL);
   return QtSincDestroy;
 }
@@ -235,14 +235,14 @@ Value *QthreadsABI::getOrCreateSinc(Value *SyncRegion, Function *F) {
 }
 
 void QthreadsABI::lowerSync(SyncInst &SI) {
-  IRBuilder<> builder(&SI); 
-  auto F = SI.getParent()->getParent(); 
-  auto& C = M.getContext(); 
-  auto null = Constant::getNullValue(Type::getInt8PtrTy(C)); 
-  Value* SR = SI.getSyncRegion(); 
-  auto sinc = getOrCreateSinc(SR, F); 
-  std::vector<Value *> args = {sinc, null}; 
-  auto sincwait = get_qt_sinc_wait(); 
+  IRBuilder<> builder(&SI);
+  auto F = SI.getParent()->getParent();
+  auto& C = M.getContext();
+  auto null = Constant::getNullValue(Type::getInt8PtrTy(C));
+  Value* SR = SI.getSyncRegion();
+  auto sinc = getOrCreateSinc(SR, F);
+  std::vector<Value *> args = {sinc, null};
+  auto sincwait = get_qt_sinc_wait();
   builder.CreateCall(sincwait, args);
   BranchInst *PostSync = BranchInst::Create(SI.getSuccessor(0));
   ReplaceInstWithInst(&SI, PostSync);
@@ -311,7 +311,7 @@ void QthreadsABI::preProcessFunction(Function &F, TaskInfo &TI,
       continue;
     DetachInst *Detach = T->getDetach();
     BasicBlock *detB = Detach->getParent();
-    Value *SR = Detach->getSyncRegion(); 
+    Value *SR = Detach->getSyncRegion();
     Value *sinc = getOrCreateSinc(SR, &F);
 
     // Add an expect increment before spawning
@@ -327,8 +327,8 @@ void QthreadsABI::preProcessFunction(Function &F, TaskInfo &TI,
           IRBuilder<> footerB(B->getTerminator());
           Value* SR = T->getDetach()->getSyncRegion();
           auto sinc = getOrCreateSinc(SR, &F);
-          auto null = Constant::getNullValue(Type::getInt8PtrTy(C)); 
-          footerB.CreateCall(get_qt_sinc_submit(), {sinc, null}); 
+          auto null = Constant::getNullValue(Type::getInt8PtrTy(C));
+          footerB.CreateCall(get_qt_sinc_submit(), {sinc, null});
         }
       }
     }
@@ -345,4 +345,3 @@ void QthreadsABI::postProcessFunction(Function &F, bool ProcessingTapirLoops) {
 }
 
 void QthreadsABI::postProcessHelper(Function &F) {}
-

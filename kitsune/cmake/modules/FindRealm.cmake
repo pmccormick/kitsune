@@ -44,7 +44,7 @@ if (Realm_FOUND)
 
   # Basic set of libraries -- will potenitally need additional
   # libraries based on Realm is built.
-  set(Realm_LINK_LIBS "-lrealm"
+  set(Realm_LINK_LIBS "-lrealm -lpthread -ldl -lrt"
     CACHE
     STRING "List of libraries needed for Realm linking.")
 

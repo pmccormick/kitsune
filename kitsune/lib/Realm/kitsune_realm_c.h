@@ -19,7 +19,8 @@
 #ifndef KITSUNE_REALM_C_H
 #define KITSUNE_REALM_C_H
 
-#include "realm/realm_c.h"
+#include <realm/realm_c.h>
+#include <realm.h>
 
 // for size_t
 #include <stddef.h>
@@ -28,15 +29,14 @@
 extern "C" {
 #endif
 
-typedef struct context context;
-//context* getRealmCTX();
-int realmInitRuntime(int argc, char** argv);
-//NOTE: realmSpawn declared and defined in wrapper.cc
-//int realmSpawn();
-int realmSync();
-size_t realmGetNumProcs();
-//void* realmCreateRegion_int(int* data);
-//void realmDestroyRegion(void *region);
+  //typedef struct context context;
+  struct context* getRealmCTX();
+  int realmInitRuntime(int argc, char** argv);
+  //NOTE: realmSpawn declared and defined in wrapper.cc
+  //int realmSpawn();
+  //int realmSync();
+  size_t realmGetNumProcs();
+  void realmFinalize();
 
 #ifdef __cplusplus
 }

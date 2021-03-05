@@ -1757,6 +1757,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       } else {
         CmdArgs.push_back("-rpath=" REALM_LIBRARY_DIR);
       }
+      CmdArgs.push_back("-lkitsunerealm");
       CmdArgs.push_back("-lrealm");
       ExtractArgsFromString(REALM_EXTRA_LINK_LIBS, CmdArgs, Args);
     } else {

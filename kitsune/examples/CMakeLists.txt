@@ -14,6 +14,9 @@ list(APPEND KITSUNE_EXAMPLE_DEPS
   clang
 )
 
+set(RUNTIME_OUTPUT_DIRECTORY ${LLVM_BINARY_DIR}/kitsune-examples)
+
+
 add_kitsune_subdirectory(forall)
 
 if (KITSUNE_ENABLE_KOKKOS) 
