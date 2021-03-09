@@ -1,17 +1,41 @@
-## Kitsune Release Notes
+## Kitsune+Tapir Release Notes
 
 Kitsune follows the LLVM version numbering scheme and thus adopts the base
 functionality of the corresponding LLVM release.  In the sections below each
 release includes this version number for reference and a pointer to the corresponding 
 set of LLVM release notes.
 
-### Release 10.0.1
+
+
+### Release 10.0.1 (03-2021 update)
+
+__Date__: March 9, 2021 
+__Internal/ECP Release Milestone__: ST_NS-XX-YYYY (__tagged__)
+[__LLVM 10 Release Notes__](https://releases.llvm.org/10.0.0/docs/ReleaseNotes.html)
+
+
+*Note: Due to late bugs in LLVM 11.x and a delay of 12.x the default branch remains at ``release/10.x``*
+
+### What's New
+
+  * Build and configuration bug fixes for various search paths libaries. 
+
+  * New CMake cache file for simplifying building for end-users and developers (helping to establish a fixed configuration set for release, testing, and reporting). 
+
+  * New module files support for end-users and developers not leveraging Spack. 
+
+  * Initial Realm ABI lowering is present but should be considered unstable for this release.  Note the Realm ABI will require some updates to Legion/Realm to squash some bugs that were discovered during development and testing. 
+
+  * NVIDIA/CUDA/PTX, AMD/HIP, Intel/LevelZero support is awaiting attribute support for data movement operations.  
+
+
+### Release 10.0.1 
 
 __Date__: October 28, 2020
 __Internal/ECP Release Milestone__: ST-NS-01-1330 (__tagged__)
 [__LLVM 10 Release Notes__](https://releases.llvm.org/10.0.0/docs/ReleaseNotes.html)
 
-*Note: Updated default branch to ``release/10.x``*.
+*Note: Updated default branch to ``release/10.x``*
 
 #### What's New
 

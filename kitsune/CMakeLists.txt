@@ -102,10 +102,10 @@ if (KITSUNE_ENABLE_CILKRTS_TARGET)
 endif()
 
 find_package(OpenCilk)
-option(KITSUNE_ENABLE_OPENCILK_TARGET
+option(KITSUNE_ENABLE_OPENCILKRTS_TARGET
   "Enable OpenCilk runtime backend target." ${OpenCilk_FOUND})
-if (KITSUNE_ENABLE_OPENCILK_TARGET)
-  set(OPENCILK_EXTRA_LINK_LIBS ""
+if (KITSUNE_ENABLE_OPENCILKRTS_TARGET)
+  set(OPENCILKRTS_EXTRA_LINK_LIBS "-lopencilk-personality-cpp"
     CACHE
     STRING "Extra link libraries for the OpenCilk runtime target."
   )

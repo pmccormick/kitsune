@@ -22,19 +22,17 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
   message(STATUS "  forall example: ${src_file}")
   get_filename_component(base ${src_file} NAME_WLE)
   string(TOLOWER ${base} ${src_file})
-
   # Add a kitsune-centric executable per enabled runtime.
   foreach(rt IN ITEMS ${tapir_args})
     set(target_name forall-${base}-${rt})
-    message(STATUS "      ${rt} example: ${src_file} ---> ${target_name}")
-    add_kitsune_example(${target_name} ${src_file})
+    add_kitsune_example(${target_name} ${src_file}
+      DEPENDS kitsunerealm)
     set_target_properties(${target_name}
       PROPERTIES
-        COMPILE_FLAGS "-ftapir=${rt} -Rpass-analysis=loop-spawning-ti"
-        LINK_FLAGS "-ftapir=${rt}"
-        )
-
-      install(TARGETS ${target_name} RUNTIME DESTINATION ${LLVM_BINARY_DIR}/kitsune/examples/forall)
+      COMPILE_FLAGS "-ftapir=${rt} -Rpass-analysis=loop-spawning-ti"
+      LINK_FLAGS "-ftapir=${rt}"
+      )
+    install(TARGETS ${target_name} RUNTIME DESTINATION ${LLVM_BINARY_DIR}/kitsune/examples/forall)
   endforeach()
 
 endforeach()

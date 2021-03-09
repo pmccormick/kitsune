@@ -52,8 +52,14 @@ However, we have some suggestions and time saving steps below that can be helpfu
   build mode.  For example, ``LLVM_ENABLE_DUMP=ON`` will enable the ``dump()``
   method in non-debug builds.
 
+* __Parallel Builds__: Along with Ninja some tweaking of the values used for parallel compilation and linking jobs can help reduce build issues (e.g., running out of memory/swapping during builds).  There are two flags to control this within LLVM's CMake infrastureu: 
 
-## Using a CMake Cache 
+  * ``LLVM_PARALLEL_COMPILE_JOBS``: Controls the number of parallel compilation threads that run.  For systems with plenty of memory you can leave this unset to run as wide a possible, or you can drop off to a count a few less than the number of processors/cores you have available. 
+  * ``LLVM_PARALLEL_LINK_JOBS``: Linking can be an extremely memory intensive stage of building the infrastructure.  In most cases setting this to be a value less than ``LLVM_PARALLEL_COMPILE_JOBS`` will result in the quickest build times.  If you have a system with **boatloads** of RAM you can get by without setting this but on more modest system configurations using a quarter to half of the number of compile jobs is a good starting point. 
+
+* __NFS File Systems__: A fast local disk (e.g., NVME) is strongly encouraged for building.  Network attached storage can signifiacntly impact build times -- this can be a reduction in time from hours to minutes.  
+
+## Using a CMake Cache & Module Files
 
 The Kitsune+Tapir release comes with an example CMake cache file that contains 
 some configuration examples for a basic installation.  This cache file is located 
@@ -84,8 +90,7 @@ would like to enable:
       ../llvm 
   ``` 
 
-**NOTE**: You will need to tailor the details of the provided module 
-files to match the details of your target system. 
+**NOTE**: You will need to tailor the details of the provided module files to match the details (e.g., install paths) of your target system. 
 
 
 
