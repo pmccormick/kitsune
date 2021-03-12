@@ -78,6 +78,9 @@ struct TaskOutlineInfo {
   // of the original detach instruction.  For an outlined Tapir loop, this
   // block corresponds to the normal exit block after the loop latch.
   BasicBlock *ReplRet = nullptr;
+  
+  // Task that corresponds to the task outline
+  Value* SR = nullptr; 
 
   // Basic block denoting the unwind destination of an invocation of the
   // outlined helper function.  This block corresponds to the unwind block of
@@ -99,7 +102,7 @@ struct TaskOutlineInfo {
                   BasicBlock *ReplUnwind = nullptr)
       : Outline(Outline), DetachPt(DetachPt), TaskFrameCreate(TaskFrameCreate),
         InputSet(InputSet), ReplStart(ReplStart), ReplCall(ReplCall),
-        ReplRet(ReplRet), ReplUnwind(ReplUnwind),
+        ReplRet(ReplRet), SR(SR), ReplUnwind(ReplUnwind),
         OriginalTFEntry(OriginalTFEntry) {}
 
   // Replaces the stored call or invoke instruction to the outlined function

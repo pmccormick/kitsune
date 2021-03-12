@@ -1538,7 +1538,7 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
         dyn_cast_or_null<Instruction>(VMap[T->getTaskFrameUsed()]),
         LoopInputSets[L], LoopArgStarts[L],
         L->getLoopPreheader()->getTerminator(), TL->getExitBlock(),
-        TL->getUnwindDest());
+        T->getDetach()->getSyncRegion(), TL->getUnwindDest());
 
     // Do ABI-dependent processing of each outlined Tapir loop.
     {
