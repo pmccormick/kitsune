@@ -1355,10 +1355,10 @@ else()
     message(STATUS "kitsune: TARGET kitsunerealm is FALSE")
   endif()
 
-  if(KITSUNE_ENABLE_REALM)
-    message(STATUS "kitsune: KITSUNE_ENABLE_REALM is TRUE")
+  if(KITSUNE_ENABLE_REALM_TARGET)
+    message(STATUS "kitsune: KITSUNE_ENABLE_REALM_TARGET is TRUE")
   else()
-    message(STATUS "kitsune: KITSUNE_ENABLE_REALM is FALSE")
+    message(STATUS "kitsune: KITSUNE_ENABLE_REALM_TARGET is FALSE")
   endif()
 
 endif()
