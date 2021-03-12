@@ -46,7 +46,7 @@ FunctionCallee RealmABI::get_realmGetNumProcs() {
 
 static StructType* getBarrierType(LLVMContext &C){
   auto eventTy = StructType::get(Type::getInt64Ty(C));
-  return StructType::get(eventTy, Type::getInt64Ty(C));
+  return StructType::get(eventTy, Type::getInt64Ty(C)); 
 }
 
 FunctionCallee RealmABI::get_createRealmBarrier(){
@@ -68,7 +68,7 @@ FunctionCallee RealmABI::get_destroyRealmBarrier(){
 
   AttributeList AL; 
   FunctionType *FTy = FunctionType::get(
-    Type::getInt8Ty(C), {getBarrierType(C)}, false);
+    Type::getInt8Ty(C), {PointerType::getUnqual(getBarrierType(C))}, false);
   DestroyBar = M.getOrInsertFunction("destroyRealmBarrier", FTy, AL);
   return DestroyBar;
 }
@@ -81,7 +81,9 @@ FunctionCallee RealmABI::get_realmSpawn() {
   const DataLayout &DL = M.getDataLayout();
   AttributeList AL;
 
-  Type* TypeArray[] = { RealmFTy,              // RealmFTy fxn
+  Type* TypeArray[] = { 
+      PointerType::getUnqual(getBarrierType(C)), 
+      RealmFTy,              // RealmFTy fxn
 			Type::getInt8PtrTy(C), // void *args
 			DL.getIntPtrType(C)};  // size_t argsize
 
@@ -101,7 +103,7 @@ FunctionCallee RealmABI::get_realmSync() {
   LLVMContext &C = M.getContext(); 
   AttributeList AL;
   
-  Type* TypeArray[] = { getBarrierType(C) };
+  Type* TypeArray[] = { PointerType::getUnqual(getBarrierType(C)) };
   // TODO: Set appropriate function attributes.
   FunctionType *FTy = FunctionType::get(Type::getInt8Ty(C), 
 					TypeArray, 
@@ -199,7 +201,7 @@ Value *RealmABI::getOrCreateBarrier(Value *SyncRegion, Function *F) {
   if((barrier = SyncRegionToBarrier[SyncRegion]))
     return barrier;
   else {
-    IRBuilder<> builder(F->getEntryBlock().getTerminator());
+    IRBuilder<> builder(F->getEntryBlock().getFirstNonPHIOrDbg());
     AllocaInst* ab = builder.CreateAlloca(getBarrierType(C)); 
     barrier = ab; 
     Value *barrierVal = builder.CreateCall(get_createRealmBarrier(), {}, "");
@@ -253,7 +255,9 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Instruction *ReplStart = TOI.ReplStart;
   CallBase *ReplCall = cast<CallBase>(TOI.ReplCall);
   BasicBlock *CallBlock = ReplStart->getParent();
-
+  Value* SR = TOI.SR; 
+  assert(SR && "cannot realm spawn on taskframe without corresponding task"); 
+  auto barrier = getOrCreateBarrier(SR, CallBlock->getParent()); 
   LLVMContext &C = M.getContext();
   const DataLayout &DL = M.getDataLayout();
 
@@ -274,17 +278,19 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   ConstantInt *ArgSize = ConstantInt::get(DL.getIntPtrType(C),
                                           DL.getTypeAllocSize(ArgsTy));
   CallInst *Call = CallerIRBuilder.CreateCall(
-      get_realmSpawn(), { OutlinedFnPtr, ArgStructPtr, ArgSize});
+      get_realmSpawn(), { barrier, OutlinedFnPtr, ArgStructPtr, ArgSize});
   Call->setDebugLoc(ReplCall->getDebugLoc());
   TOI.replaceReplCall(Call);
   ReplCall->eraseFromParent();
 
   // Add lifetime intrinsics for the argument struct.  TODO: Move this logic
   // into underlying LoweringUtils routines?
+  /*
   CallerIRBuilder.SetInsertPoint(ReplStart);
   CallerIRBuilder.CreateLifetimeStart(CallerArgStruct, ArgSize);
   CallerIRBuilder.SetInsertPoint(CallBlock, ++Call->getIterator());
   CallerIRBuilder.CreateLifetimeEnd(CallerArgStruct, ArgSize);
+  */
 
   if (TOI.ReplUnwind)
     // We assume that realmSpawn dealt with the exception.  But
@@ -299,44 +305,6 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 
 void RealmABI::preProcessFunction(Function &F, TaskInfo &TI,
 				  bool OutliningTapirLoops) {
-#if 0  
-  // NOTE: the code from here through the end of preProcessFunction is only
-  // retained for reference purposes and because things are undergoing
-  // development.  It should be deleted if not used once debugging is complete.
-  if (OutliningTapirLoops)
-    // Don't do any preprocessing when outlining Tapir loops.
-    return;
-
-  LLVMContext &C = M.getContext();
-  Task *T = TI.getRootTask();
-  Spindle *endSpindle = *(std::prev(T->spindle_end()));
-  BasicBlock *endBlock = *(std::prev(endSpindle->block_end())); //(T->spindle_end())->block_end();
-  IRBuilder<> footerB(endBlock->getTerminator());
-  std::vector<Value*> submitArgs; //realmSync takes no args
-  footerB.CreateCall(REALM_FUNC(realmSync), submitArgs);
-
-#if 0
-  for (Task *T : post_order(TI.getRootTask())) {
-    if (T->isRootTask()) {
-      BasicBlock *Spawned = T->getEntry();
-      //Value *SR = Detach->getSyncRegion(); 
-
-      // Add a submit to end of task body
-      //
-      // TB: I would interpret the above comment to mean we want qt_sinc_submit()
-      // before the task terminates.  But the code I see for inserting
-      // qt_sinc_submit just inserts the call at the end of the entry block of the
-      // task, which is not necessarily the end of the task.  I kept the code I
-      // found, but I'm not sure if it is correct.
-      IRBuilder<> footerB(Spawned->getTerminator());
-      std::vector<Value*> submitArgs; //realmSync takes no args
-      footerB.CreateCall(REALM_FUNC(realmSync), submitArgs);
-    }
-    else
-      continue;
-  }
-#endif
-#endif
 }
 
 void RealmABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {

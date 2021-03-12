@@ -1,6 +1,5 @@
 // Written by Alexis Perry-Holby for use with Tapir-LLVM
 
-#include <kitsune_realm_c.h>
 #include <realm.h>
 #include <realm/threads.h>
 #include <set>
@@ -83,54 +82,20 @@ extern "C" {
     b.arrive(); 
   }
 
-  void realmSpawn(void (*func)(void *), 
-		  const void* args, 
-		  size_t argsize) { 
-    /* take a function pointer to the task you want to run, 
-       cast it to the appropriate function type and create a 
-       CodeDescriptor from it
-       needs pointer to user data and arguments (NULL for void?)
-       needs size_t for len (0 for void?)
-    */
-    std::cout << " realmSpawn" << std::endl;
-
+  void realmSpawn(Realm::Barrier& b,
+      Realm::Processor::TaskFuncPtr func,
+		  const void* args,
+		  size_t arglen
+    ){
     context *ctx = getRealmCTX();
-    assert(ctx);
-
-    Realm::Processor::TaskFuncID taskID = (ctx->cur_task).load();
-    std::cout << "   accessed cur_task" << std::endl;
-    ctx->cur_task++;
-    std::cout << "    incremented cur_task" << std::endl;
-
-    //get a processor to run on
+    Realm::Processor::TaskFuncID taskID = ctx->cur_task++;
     Realm::Processor p = ctx->procgroup; //spawn on the group to enable Realm's magic load-balancing
-    //Realm::Processor p = (ctx->procs)[i]; //do round-robin spawning on the vector of procs (needs i calculated)
-    std::cout << "    accessed ctx->procgroup" << std::endl;
-    assert(p.exists());
-    assert(p != Realm::Processor::NO_PROC);
-
-    // Create a CodeDescriptor from the TaskFuncPtr
-    // cast func to be the TaskFuncPtr type 
-    // (func is passed as a RealmFTy (= QthreadFTy) initially)
-    Realm::CodeDescriptor cd = Realm::CodeDescriptor((Realm::Processor::TaskFuncPtr)func);
-    std::cout << "    got a CodeDescriptor" << std::endl;
-
+    Realm::CodeDescriptor cd = Realm::CodeDescriptor(func);
     const Realm::ProfilingRequestSet prs;  //We don't care what it is for now, the default is fine
-    std::cout << "    got a default ProfilingRequestSet" << std::endl;
-
-    //register the task with the runtime
-    Realm::Event e1 = p.register_task(taskID, cd, prs, nullptr, 0);
-    std::cout << "     registered task: " << taskID << std::endl;
-    ctx->events.insert(e1); //might not actually need to keep track of this one
-    std::cout << "      inserted e1" << std::endl;
-    //e1.wait();
-    //std::cout << "      e1 complete" << std::endl;
-
-    //spawn the task
-    Realm::Event e2 = p.spawn(taskID, args, argsize, e1, 0); //predicated on the completion of the task's registration
-    std::cout << "       spawned task: " << taskID << std::endl;
-    ctx->events.insert(e2);
-    std::cout << "        inserted e2" << std::endl;
+    Realm::Event e1 = p.register_task(taskID, cd, prs);
+    b.alter_arrival_count(1);
+    Realm::Event e2 = p.spawn(taskID, args, arglen, e1); //predicated on the completion of the task's registration
+    b.arrive(1, e2); 
     return;
   }
 
@@ -173,7 +138,7 @@ extern "C" {
 #endif //old sync
   
   void realmSync(Realm::Barrier& b) {
-    b.arrive(); 
+    b.arrive(1); 
     if(Realm::Thread::self())
       b.wait(); 
     else 
