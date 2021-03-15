@@ -256,7 +256,10 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   CallBase *ReplCall = cast<CallBase>(TOI.ReplCall);
   BasicBlock *CallBlock = ReplStart->getParent();
   Value* SR = TOI.SR; 
-  assert(SR && "cannot realm spawn on taskframe without corresponding task"); 
+  if(!SR){
+    // If there's no syncregion, we leave it as a function call
+    return;
+  }
   auto barrier = getOrCreateBarrier(SR, CallBlock->getParent()); 
   LLVMContext &C = M.getContext();
   const DataLayout &DL = M.getDataLayout();
