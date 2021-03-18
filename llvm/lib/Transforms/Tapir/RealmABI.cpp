@@ -165,30 +165,18 @@ RealmABI::~RealmABI() {
 
 /// Lower a call to get the grainsize of this Tapir loop.
 ///
-/// The grainsize is computed by the following equation:
-///
-///     Grainsize = min(2048, ceil(Limit / (8 * workers)))
+///     Grainsize = ceil(limit / workers)
 ///
 /// This computation is inserted into the preheader of the loop.
 Value *RealmABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Limit = GrainsizeCall->getArgOperand(0);
   IRBuilder<> Builder(GrainsizeCall);
 
-  // Get 8 * workers
   Value *Workers = Builder.CreateCall(get_realmGetNumProcs());
-  Value *WorkersX8 = Builder.CreateIntCast(
-      Builder.CreateMul(Workers, ConstantInt::get(Workers->getType(), 8)),
-      Limit->getType(), false);
-  // Compute ceil(limit / 8 * workers) =
-  //           (limit + 8 * workers - 1) / (8 * workers)
-  Value *SmallLoopVal =
-    Builder.CreateUDiv(Builder.CreateSub(Builder.CreateAdd(Limit, WorkersX8),
+  Value *Grainsize = Builder.CreateUDiv(Builder.CreateSub(Builder.CreateAdd(Limit, Workers),
                                          ConstantInt::get(Limit->getType(), 1)),
-                       WorkersX8);
-  // Compute min
-  Value *LargeLoopVal = ConstantInt::get(Limit->getType(), 2048);
-  Value *Cmp = Builder.CreateICmpULT(LargeLoopVal, SmallLoopVal);
-  Value *Grainsize = Builder.CreateSelect(Cmp, LargeLoopVal, SmallLoopVal);
+                       Workers);
+
 
   // Replace uses of grainsize intrinsic call with this grainsize value.
   GrainsizeCall->replaceAllUsesWith(Grainsize);
