@@ -16,6 +16,19 @@ on:
     paths:
       - 'clang/**'
       - '.github/workflows/libclang-abi-tests.yml'
+# TODO: Enable this test based on OpenCilk Clang changes.
+
+# on:
+#   push:
+#     branches:
+#       - 'release/**'
+#     paths:
+#       - 'clang/**'
+#       - '.github/workflows/libclang-abi-tests.yml'
+#   pull_request:
+#     paths:
+#       - 'clang/**'
+#       - '.github/workflows/libclang-abi-tests.yml'
 
 concurrency:
   # Skip intermediate builds: always.
