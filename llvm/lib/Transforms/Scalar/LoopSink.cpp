@@ -40,6 +40,8 @@
 #include "llvm/Analysis/MemorySSA.h"
 #include "llvm/Analysis/MemorySSAUpdater.h"
 #include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/ScalarEvolutionAliasAnalysis.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/InitializePasses.h"
@@ -265,9 +267,8 @@ static bool sinkInstruction(
 static bool sinkLoopInvariantInstructions(Loop &L, AAResults &AA, LoopInfo &LI,
                                           DominatorTree &DT,
                                           BlockFrequencyInfo &BFI,
-                                          ScalarEvolution *SE,
-                                          AliasSetTracker *CurAST,
                                           MemorySSA &MSSA,
+                                          ScalarEvolution *SE,
                                           TaskInfo *TI) {
   BasicBlock *Preheader = L.getLoopPreheader();
   assert(Preheader && "Expected loop to have preheader");
@@ -311,8 +312,8 @@ static bool sinkLoopInvariantInstructions(Loop &L, AAResults &AA, LoopInfo &LI,
     // No need to check for instruction's operands are loop invariant.
     assert(L.hasLoopInvariantOperands(&I) &&
            "Insts in a loop's preheader should have loop invariant operands!");
-    if (!canSinkOrHoistInst(I, &AA, &DT, &L, CurAST, MSSAU.get(), false,
-                            LICMFlags.get(), TI))
+    if (!canSinkOrHoistInst(I, &AA, &DT, &L, MSSAU, false,
+                            TI, LICMFlags))
       continue;
     if (sinkInstruction(L, I, ColdLoopBBs, LoopBlockNumber, LI, DT, BFI,
                         &MSSAU))
@@ -401,21 +402,11 @@ struct LegacyLoopSinkPass : public LoopPass {
     MemorySSA &MSSA = getAnalysis<MemorySSAWrapperPass>().getMSSA();
     auto *SE = getAnalysisIfAvailable<ScalarEvolutionWrapperPass>();
     auto *TI = getAnalysisIfAvailable<TaskInfoWrapperPass>();
-    std::unique_ptr<AliasSetTracker> CurAST;
-    MemorySSA *MSSA = nullptr;
-    if (EnableMSSAInLegacyLoopSink)
-      MSSA = &getAnalysis<MemorySSAWrapperPass>().getMSSA();
-    else {
-      CurAST = std::make_unique<AliasSetTracker>(AA);
-      computeAliasSet(*L, *Preheader, *CurAST.get());
-    }
-
     bool Changed = sinkLoopInvariantInstructions(
         *L, AA, getAnalysis<LoopInfoWrapperPass>().getLoopInfo(),
         getAnalysis<DominatorTreeWrapperPass>().getDomTree(),
         getAnalysis<BlockFrequencyInfoWrapperPass>().getBFI(),
-        SE ? &SE->getSE() : nullptr, CurAST.get(), MSSA,
-        TI ? &TI->getTaskInfo() : nullptr);
+        MSSA, SE ? &SE->getSE() : nullptr, TI ? &TI->getTaskInfo() : nullptr);
 
     if (VerifyMemorySSA)
       MSSA.verifyMemorySSA();

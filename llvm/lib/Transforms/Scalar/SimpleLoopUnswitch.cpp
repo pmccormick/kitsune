@@ -28,6 +28,7 @@
 #include "llvm/Analysis/MustExecute.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constant.h"
@@ -2050,7 +2051,7 @@ static void unswitchNontrivialInvariants(
     SmallVectorImpl<BasicBlock *> &ExitBlocks, IVConditionInfo &PartialIVInfo,
     DominatorTree &DT, LoopInfo &LI, AssumptionCache &AC,
     function_ref<void(bool, bool, ArrayRef<Loop *>)> UnswitchCB,
-    ScalarEvolution *SE, MemorySSAUpdater *MSSAU,
+    ScalarEvolution *SE, TaskInfo *TaskI, MemorySSAUpdater *MSSAU,
     function_ref<void(Loop &, StringRef)> DestroyLoopCB) {
   auto *ParentBB = TI.getParent();
   BranchInst *BI = dyn_cast<BranchInst>(&TI);
@@ -2208,7 +2209,7 @@ static void unswitchNontrivialInvariants(
       // guaranteed no reach implicit null check after following this branch.
       ICFLoopSafetyInfo SafetyInfo;
       SafetyInfo.computeLoopSafetyInfo(&L);
-      if (!SafetyInfo.isGuaranteedToExecute(TI, &DT, &L))
+      if (!SafetyInfo.isGuaranteedToExecute(TI, &DT, TaskI, &L))
         TI.setMetadata(LLVMContext::MD_make_implicit, nullptr);
     }
   }
@@ -2726,7 +2727,7 @@ static bool unswitchBestCondition(
     Loop &L, DominatorTree &DT, LoopInfo &LI, AssumptionCache &AC,
     AAResults &AA, TargetTransformInfo &TTI,
     function_ref<void(bool, bool, ArrayRef<Loop *>)> UnswitchCB,
-    ScalarEvolution *SE, MemorySSAUpdater *MSSAU,
+    ScalarEvolution *SE, TaskInfo *TaskI, MemorySSAUpdater *MSSAU,
     function_ref<void(Loop &, StringRef)> DestroyLoopCB) {
   // Collect all invariant conditions within this loop (as opposed to an inner
   // loop which would be handled when visiting that inner loop).
@@ -3013,7 +3014,7 @@ static bool unswitchBestCondition(
                     << "\n");
   unswitchNontrivialInvariants(L, *BestUnswitchTI, BestUnswitchInvariants,
                                ExitBlocks, PartialIVInfo, DT, LI, AC,
-                               UnswitchCB, SE, MSSAU, DestroyLoopCB);
+                               UnswitchCB, SE, TaskI, MSSAU, DestroyLoopCB);
   return true;
 }
 
@@ -3043,7 +3044,7 @@ unswitchLoop(Loop &L, DominatorTree &DT, LoopInfo &LI, AssumptionCache &AC,
              AAResults &AA, TargetTransformInfo &TTI, bool Trivial,
              bool NonTrivial,
              function_ref<void(bool, bool, ArrayRef<Loop *>)> UnswitchCB,
-             ScalarEvolution *SE, MemorySSAUpdater *MSSAU,
+             ScalarEvolution *SE, TaskInfo *TaskI, MemorySSAUpdater *MSSAU,
              function_ref<void(Loop &, StringRef)> DestroyLoopCB) {
   assert(L.isRecursivelyLCSSAForm(DT, LI) &&
          "Loops must be in LCSSA form before unswitching.");
@@ -3092,8 +3093,8 @@ unswitchLoop(Loop &L, DominatorTree &DT, LoopInfo &LI, AssumptionCache &AC,
 
   // Try to unswitch the best invariant condition. We prefer this full unswitch to
   // a partial unswitch when possible below the threshold.
-  if (unswitchBestCondition(L, DT, LI, AC, AA, TTI, UnswitchCB, SE, MSSAU,
-                            DestroyLoopCB))
+  if (unswitchBestCondition(L, DT, LI, AC, AA, TTI, UnswitchCB, SE, TaskI,
+                            MSSAU, DestroyLoopCB))
     return true;
 
   // No other opportunities to unswitch.
@@ -3151,7 +3152,8 @@ PreservedAnalyses SimpleLoopUnswitchPass::run(Loop &L, LoopAnalysisManager &AM,
       AR.MSSA->verifyMemorySSA();
   }
   if (!unswitchLoop(L, AR.DT, AR.LI, AR.AC, AR.AA, AR.TTI, Trivial, NonTrivial,
-                    UnswitchCB, &AR.SE, MSSAU ? MSSAU.getPointer() : nullptr,
+                    UnswitchCB, &AR.SE, &AR.TI,
+                    MSSAU ? MSSAU.getPointer() : nullptr,
                     DestroyLoopCB))
     return PreservedAnalyses::all();
 
@@ -3227,9 +3229,7 @@ bool SimpleLoopUnswitchLegacyPass::runOnLoop(Loop *L, LPPassManager &LPM) {
   auto &TTI = getAnalysis<TargetTransformInfoWrapperPass>().getTTI(F);
   MemorySSA *MSSA = &getAnalysis<MemorySSAWrapperPass>().getMSSA();
   MemorySSAUpdater MSSAU(MSSA);
-
-  auto *TIWP = getAnalysisIfAvailable<TaskInfoWrapperPass>();
-  auto *TI = TIWP ? &TIWP->getTaskInfo() : nullptr;
+  auto &TI = getAnalysis<TaskInfoWrapperPass>().getTaskInfo();
 
   auto *SEWP = getAnalysisIfAvailable<ScalarEvolutionWrapperPass>();
   auto *SE = SEWP ? &SEWP->getSE() : nullptr;
@@ -3261,7 +3261,7 @@ bool SimpleLoopUnswitchLegacyPass::runOnLoop(Loop *L, LPPassManager &LPM) {
     MSSA->verifyMemorySSA();
 
   bool Changed = unswitchLoop(*L, DT, LI, AC, AA, TTI, true, NonTrivial,
-                              UnswitchCB, SE, &MSSAU, DestroyLoopCB);
+                              UnswitchCB, SE, &TI, &MSSAU, DestroyLoopCB);
 
   if (VerifyMemorySSA)
     MSSA->verifyMemorySSA();
@@ -3270,11 +3270,11 @@ bool SimpleLoopUnswitchLegacyPass::runOnLoop(Loop *L, LPPassManager &LPM) {
   // in asserts builds.
   assert(DT.verify(DominatorTree::VerificationLevel::Fast));
 
-  if (TI && Changed)
+  if (Changed)
     // Recompute task info.
     // FIXME: Figure out a way to update task info that is less computationally
     // wasteful.
-    TI->recalculate(F, DT);
+    TI.recalculate(F, DT);
 
   return Changed;
 }

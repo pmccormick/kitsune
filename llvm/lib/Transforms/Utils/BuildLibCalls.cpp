@@ -1283,6 +1283,7 @@ static void markRegisterParameterAttributes(Function *F) {
   }
 }
 
+<<<<<<< HEAD
 FunctionCallee llvm::getOrInsertLibFunc(Module *M, const TargetLibraryInfo &TLI,
                                         LibFunc TheLibFunc, FunctionType *T,
                                         AttributeList AttributeList) {
@@ -1381,6 +1382,20 @@ bool llvm::isLibFuncEmittable(const Module *M, const TargetLibraryInfo *TLI,
   LibFunc TheLibFunc;
   return TLI->getLibFunc(Name, TheLibFunc) &&
          isLibFuncEmittable(M, TLI, TheLibFunc);
+}
+
+bool llvm::inferTapirTargetLibFuncAttributes(Function &F,
+                                             const TargetLibraryInfo &TLI) {
+  if (!TLI.isTapirTargetLibFunc(F))
+    return false;
+
+  bool Changed = false;
+  // FIXME: For now, we just set generic properties on Tapir-target library
+  // functions.
+  Changed |= setDoesNotFreeMemory(F);
+  Changed |= setWillReturn(F);
+
+  return Changed;
 }
 
 bool llvm::hasFloatFn(const Module *M, const TargetLibraryInfo *TLI, Type *Ty,
