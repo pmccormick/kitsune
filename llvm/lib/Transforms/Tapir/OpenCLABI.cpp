@@ -24,7 +24,9 @@
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Vectorize.h"
 #include "llvm/Support/TargetRegistry.h"
+#ifdef KITSUNE_ENABLE_OPENCL_TARGET
 #include <LLVMSPIRVLib/LLVMSPIRVLib.h>
+#endif
 #include <sstream>
 
 using namespace llvm;
@@ -386,11 +388,13 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // generate spirv kernel code
   std::ostringstream str; 
   std::string ErrMsg; 
+#ifdef KITSUNE_ENABLE_OPENCL_TARGET
   bool success = writeSpirv(&SPIRVM, str, ErrMsg); 
   if(!success){
     std::cerr << "Failed to compile to spirv: " << ErrMsg << std::endl; 
     exit(1); 
   }
+#endif
   auto s = str.str(); 
   Constant *SPIRV = ConstantDataArray::getRaw(s, s.length(), Int8Ty);
   SPIRVGlobal = new GlobalVariable(M, SPIRV->getType(), true,

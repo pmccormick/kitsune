@@ -44,3 +44,6 @@ add_llvm_component_library(LLVMTapirOpts
   LINK_LIBS LLVMSPIRVLib
   )
 
+if(KITSUNE_ENABLE_OPENCL_TARGET)
+  target_link_libraries(LLVMTapirOpts LLVMSPIRVLib)
+endif()

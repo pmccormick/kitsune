@@ -84,6 +84,7 @@ find_package(OpenCL)
 option(KITSUNE_ENABLE_OPENCL_TARGET
   "Enable SPIRV+OpenCL backend target." FALSE) # ${OpenCL_FOUND}
 if (KITSUNE_ENABLE_OPENCL_TARGET)
+	add_definitions(-DKITSUNE_ENABLE_OPENCL_TARGET)
   set(OPENCL_EXTRA_LINK_LIBS "-lkitopencl"
     CACHE
     STRING "Extra link libraries for OpenCL runtime target."
