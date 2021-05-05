@@ -83,7 +83,7 @@ FunctionCallee RealmABI::get_realmSpawn() {
 
   Type* TypeArray[] = { 
       PointerType::getUnqual(getBarrierType(C)), 
-      RealmFTy,              // RealmFTy fxn
+                        RealmFTy,              // RealmFTy fxn
 			Type::getInt8PtrTy(C), // void *args
 			DL.getIntPtrType(C)};  // size_t argsize
 
@@ -208,22 +208,6 @@ Value *RealmABI::getOrCreateBarrier(Value *SyncRegion, Function *F) {
   }
 }
 
-#if 0
-//old sync (non-barrier)
-void RealmABI::lowerSync(SyncInst &SI) {
-  IRBuilder<> builder(&SI); 
-
-  std::vector<Value *> args;  //realmSync takes no arguments
-  auto sincwait = REALM_FUNC(realmSync);
-  //auto sincwait = get_realmSync();  // why don't we just do this? no macro
-  builder.CreateCall(sincwait, args);
-
-  BranchInst *PostSync = BranchInst::Create(SI.getSuccessor(0));
-  ReplaceInstWithInst(&SI, PostSync);
-  return;
-}
-#endif //old sync
-
 void RealmABI::lowerSync(SyncInst &SI) {
   IRBuilder<> builder(&SI); 
   auto F = SI.getParent()->getParent(); 
@@ -273,15 +257,6 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Call->setDebugLoc(ReplCall->getDebugLoc());
   TOI.replaceReplCall(Call);
   ReplCall->eraseFromParent();
-
-  // Add lifetime intrinsics for the argument struct.  TODO: Move this logic
-  // into underlying LoweringUtils routines?
-  /*
-  CallerIRBuilder.SetInsertPoint(ReplStart);
-  CallerIRBuilder.CreateLifetimeStart(CallerArgStruct, ArgSize);
-  CallerIRBuilder.SetInsertPoint(CallBlock, ++Call->getIterator());
-  CallerIRBuilder.CreateLifetimeEnd(CallerArgStruct, ArgSize);
-  */
 
   if (TOI.ReplUnwind)
     // We assume that realmSpawn dealt with the exception.  But
