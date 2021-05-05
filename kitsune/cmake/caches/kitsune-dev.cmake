@@ -51,7 +51,7 @@ set(CMAKE_BUILD_TYPE
 
 
 set(KITSUNE_ENABLED ON CACHE BOOL "") # not sure this is really needed these days...
-set(KITSUNE_BUILD_EXAMPLES OFF CACHE BOOL "")
+set(KITSUNE_BUILD_EXAMPLES ON CACHE BOOL "")
 
 
 if (DEFINED ENV{KOKKOS_PATH})
