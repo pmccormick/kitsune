@@ -5,7 +5,7 @@
 # the LLVM license.
 #
 #
-# project (kitsuunerealm)
+# project (kitsunerealm)
 
 
 # Realm uses RTTI -- shutdown LLVM's global configuration of enabling
