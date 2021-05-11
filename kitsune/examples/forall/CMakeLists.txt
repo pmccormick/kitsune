@@ -24,9 +24,16 @@ foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
   string(TOLOWER ${base} ${src_file})
   # Add a kitsune-centric executable per enabled runtime.
   foreach(rt IN ITEMS ${tapir_args})
+    message(STATUS "     runtime target: ${rt}")
     set(target_name forall-${base}-${rt})
-    add_kitsune_example(${target_name} ${src_file}
+
+    if (${rt} EQUAL "realm")
+      add_kitsune_example(${target_name} ${src_file}
       DEPENDS kitsunerealm)
+    else()
+      add_kitsune_example(${target_name} ${src_file})
+    endif()
+
     set_target_properties(${target_name}
       PROPERTIES
       COMPILE_FLAGS "-ftapir=${rt} -Rpass-analysis=loop-spawning-ti"
