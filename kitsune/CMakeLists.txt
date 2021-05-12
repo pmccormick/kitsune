@@ -39,7 +39,7 @@ message(STATUS "Kitsune include directory: ${KITSUNE_INCLUDE_DIR}")
 message(STATUS "Kitsune binary directory: ${KITSUNE_BINARY_DIR}")
 
 option(KITSUNE_INCLUDE_TESTS
-  "Enable Kitsune tests." ${LLVM_INCLUDE_TESTS})
+  "Enable Kitsune tests." FALSE) # TODO: temp patch ${LLVM_INCLUDE_TESTS})
 option(KITSUNE_BUILD_EXAMPLES
   "Build Kitsune example programs by default." ${KITSUNE_INCLUDE_TESTS})
 
