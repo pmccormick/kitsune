@@ -145,6 +145,11 @@ namespace {
       curArgIndex++;
       OE = CE->getArg(curArgIndex);
       SE = SimplifyExpr(OE);
+    } else if (SE->getStmtClass() == Expr::CXXTemporaryObjectExprClass) {
+      BE = SE;
+      curArgIndex++;
+      OE = CE->getArg(curArgIndex);
+      SE = SimplifyExpr(OE);
     } else {
       SE->dump();
       BE = nullptr;
@@ -208,6 +213,17 @@ void CodeGenFunction::EmitKokkosParallelForCond(const Expr *BoundsExpr,
   if (BoundsExpr->getStmtClass() == Expr::BinaryOperatorClass) {
     RValue RV = EmitAnyExpr(BoundsExpr);
     LoopEnd = RV.getScalarVal();
+  } else if (BoundsExpr->getStmtClass() == Expr::CXXTemporaryObjectExprClass) {
+    const CXXTemporaryObjectExpr *CXXTO = dyn_cast<CXXTemporaryObjectExpr>(BoundsExpr);
+    const InitListExpr *UpperBounds = dyn_cast<InitListExpr>(CXXTO->getArg(1)->IgnoreImplicit());
+    
+    // Create a multiply statement to computer the proper upper bound
+    const Expr *lval = UpperBounds->getInit(0)->IgnoreImplicit();
+    const Expr *rval = UpperBounds->getInit(1)->IgnoreImplicit();
+    
+    llvm::Value *lvalue = EmitScalarExpr(lval);
+    llvm::Value *rvalue = EmitScalarExpr(rval);
+    LoopEnd = Builder.CreateMul(lvalue, rvalue);
   } else { 
     LoopEnd = EmitScalarExpr(BoundsExpr);
   }
@@ -262,6 +278,20 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     Diags.Report(CE->getExprLoc(), diag::warn_kokkos_unknown_bounds_expr);
     return false;
   }
+  
+  // Handle a potential multi-dimensional array
+  /*if (BE->getStmtClass() == Expr::CXXTemporaryObjectExprClass) {
+    const CXXTemporaryObjectExpr *CXXTO = dyn_cast<CXXTemporaryObjectExpr>(BE);
+    const InitListExpr *UpperBounds = dyn_cast<InitListExpr>(CXXTO->getArg(1)->IgnoreImplicit());
+    
+    // Create a multiply statement to computer the proper upper bound
+    const Expr *lval = UpperBounds->getInit(0)->IgnoreImplicit();
+    const Expr *rval = UpperBounds->getInit(1)->IgnoreImplicit();
+    
+    llvm::Value *lvalue = EmitScalarExpr(lval);
+    llvm::Value *rvalue = EmitScalarExpr(rval);
+    BE = Builder.CreateMul(lvalue, rvalue);
+  }*/
 
   // Create all jump destinations and basic blocks in the order they 
   // appear in the IR. 
