@@ -46,6 +46,8 @@
 #include "llvm/Transforms/Utils/SanitizerStats.h"
 #include "llvm/IR/ValueMap.h"
 
+#include <queue>
+
 namespace llvm {
 class BasicBlock;
 class LLVMContext;
@@ -3942,6 +3944,10 @@ public:
                                  llvm::BasicBlock *ExitBlock,
 				 JumpDest &Sync);
   bool EmitKokkosParallelFor(const CallExpr *CE, ArrayRef<const Attr *> Attrs);
+  bool EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
+            llvm::BasicBlock *TopBlock,
+            std::queue<const Expr*> DimQueue,
+            std::vector<const ParmVarDecl*> params);
   bool EmitKokkosParallelReduce(const CallExpr *CE, ArrayRef<const Attr *> Attrs);
   bool InKokkosConstruct = false; // FIXME: Should/can we refactor this away?
 

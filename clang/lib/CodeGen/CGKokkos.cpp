@@ -192,17 +192,6 @@ std::vector<const ParmVarDecl*>
 CodeGenFunction::EmitKokkosParallelForInductionVar(const LambdaExpr *Lambda) {
   const CXXMethodDecl *MD = Lambda->getCallOperator();
   assert(MD && "EmitKokkosParallelFor() -- bad method decl from labmda call.");
-  /*const ParmVarDecl *InductionVarDecl = MD->getParamDecl(0);
-  assert(InductionVarDecl && "EmitKokkosParallelFor() -- bad loop variable decl!");
-  
-  printf("PARAM COUNT: %d\n\n", MD->getNumParams());
-
-  EmitVarDecl(*InductionVarDecl);
-  Address Addr = GetAddrOfLocalVar(InductionVarDecl);
-  llvm::Value *Zero = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
-  Builder.CreateStore(Zero, Addr);
-
-  return InductionVarDecl;*/
   
   std::vector<const ParmVarDecl*> params;
   
@@ -231,17 +220,6 @@ void CodeGenFunction::EmitKokkosParallelForCond(const Expr *BoundsExpr,
   if (BoundsExpr->getStmtClass() == Expr::BinaryOperatorClass) {
     RValue RV = EmitAnyExpr(BoundsExpr);
     LoopEnd = RV.getScalarVal();
-  } else if (BoundsExpr->getStmtClass() == Expr::CXXTemporaryObjectExprClass) {
-    const CXXTemporaryObjectExpr *CXXTO = dyn_cast<CXXTemporaryObjectExpr>(BoundsExpr);
-    const InitListExpr *UpperBounds = dyn_cast<InitListExpr>(CXXTO->getArg(1)->IgnoreImplicit());
-    
-    // Create a multiply statement to computer the proper upper bound
-    const Expr *lval = UpperBounds->getInit(0)->IgnoreImplicit();
-    const Expr *rval = UpperBounds->getInit(1)->IgnoreImplicit();
-    
-    llvm::Value *lvalue = EmitScalarExpr(lval);
-    llvm::Value *rvalue = EmitScalarExpr(rval);
-    LoopEnd = Builder.CreateMul(lvalue, rvalue);
   } else { 
     LoopEnd = EmitScalarExpr(BoundsExpr);
   }
@@ -296,6 +274,30 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     Diags.Report(CE->getExprLoc(), diag::warn_kokkos_unknown_bounds_expr);
     return false;
   }
+  
+  // Build the queue of dimensions (upper bounds)
+  std::queue<const Expr *> DimQueue;
+  
+  if (BE->getStmtClass() == Expr::CXXTemporaryObjectExprClass) {
+    const CXXTemporaryObjectExpr *CXXTO = dyn_cast<CXXTemporaryObjectExpr>(BE);
+    const InitListExpr *UpperBounds = dyn_cast<InitListExpr>(CXXTO->getArg(1)->IgnoreImplicit());
+    
+    for (int i = 0; i<UpperBounds->getNumInits(); i++) {
+      const Expr *val = UpperBounds->getInit(i)->IgnoreImplicit();
+      DimQueue.push(val);
+    }
+  } else {
+    DimQueue.push(BE);
+  }
+  
+  // Get the induction varaibles
+  std::vector<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
+  
+  // These are extra steps that we can probably optimize away
+  BE = DimQueue.front();
+  DimQueue.pop();
+  
+  const ParmVarDecl *InductionVarDecl = params.at(0);
 
   // Create all jump destinations and basic blocks in the order they 
   // appear in the IR. 
@@ -327,9 +329,6 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   // 
   // TODO: Do we need to "relax" these assumptions to support broader code coverage?
   // This is 'equivalent' to the Init statement in a traditional for loop (e.g. int i = 0). 
-  /*const ParmVarDecl *InductionVarDecl; 
-  InductionVarDecl = EmitKokkosParallelForInductionVar(Lambda);*/
-  std::vector<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
 
    // Create the sync region. 
   PushSyncRegion();
@@ -352,7 +351,6 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   LexicalScope ConditionScope(*this, R);
 
   // Create the conditional.
-  const ParmVarDecl *InductionVarDecl = params.at(0);
   EmitKokkosParallelForCond(BE, InductionVarDecl, Detach, End, Sync);
 
   if (PForScope.requiresCleanups()) {
@@ -384,12 +382,16 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   Builder.CreateAlignedStore(GInductionVal, TLInductionVar,
                              getContext().getTypeAlignInChars(RefType));
   {
-    // Create a separate cleanup scope for the body, in case it is not
-    // a compound statement.
-    InKokkosConstruct = true;
-    RunCleanupsScope BodyScope(*this);
-    EmitStmt(Lambda->getBody());
-    InKokkosConstruct = false;
+    if (DimQueue.size() == 0) {
+      // Create a separate cleanup scope for the body, in case it is not
+      // a compound statement.
+      InKokkosConstruct = true;
+      RunCleanupsScope BodyScope(*this);
+      EmitStmt(Lambda->getBody());
+      InKokkosConstruct = false;
+    } else {
+      EmitKokkosInnerLoop(CE, Lambda, nullptr, DimQueue, params);
+    }
   }
 
   auto tmp = AllocaInsertPt; 
@@ -413,12 +415,10 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   Builder.CreateReattach(Increment, SRStart);
 
   EmitBlock(Increment);
-  for (const ParmVarDecl* IVD : params) {
-    llvm::Value *IncVal = Builder.CreateLoad(GetAddrOfLocalVar(IVD));
-    llvm::Value *One = llvm::ConstantInt::get(ConvertType(IVD->getType()), 1);
-    IncVal = Builder.CreateAdd(IncVal, One);
-    Builder.CreateStore(IncVal, GetAddrOfLocalVar(IVD));
-  }
+  llvm::Value *IncVal = Builder.CreateLoad(GetAddrOfLocalVar(InductionVarDecl));
+  llvm::Value *One = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 1);
+  IncVal = Builder.CreateAdd(IncVal, One);
+  Builder.CreateStore(IncVal, GetAddrOfLocalVar(InductionVarDecl));
 
   BreakContinueStack.pop_back();
   ConditionScope.ForceCleanup();
@@ -432,6 +432,68 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   Builder.CreateSync(End, SRStart);
   EmitBlock(End, true);
   return true;
+}
+
+// This is in charge of building an inner loop
+bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
+            llvm::BasicBlock *TopBlock,
+            std::queue<const Expr*> DimQueue,
+            std::vector<const ParmVarDecl*> params) {
+  // Get arguments
+  int pos = DimQueue.size();
+  const Expr *BE = DimQueue.front();
+  DimQueue.pop();
+  
+  const ParmVarDecl *InductionVarDecl = params.at(pos);
+  
+  llvm::BasicBlock *Zero = createBasicBlock("kokkos.forall.zero" + std::to_string(pos));
+  JumpDest Condition = getJumpDestInCurrentScope("kokkos.forall.cond" + std::to_string(pos));
+  llvm::BasicBlock *LoopBody = createBasicBlock("kokkos.forall.body" + std::to_string(pos));
+  llvm::BasicBlock *Increment = createBasicBlock("kokkos.forall.inc" + std::to_string(pos));
+  JumpDest EndDest = getJumpDestInCurrentScope("kokkos.forall.endlbl" + std::to_string(pos));
+  llvm::BasicBlock *End = createBasicBlock("kokkos.forall.end" + std::to_string(pos));
+  
+  // Zero out the induction variable
+  EmitBlock(Zero);
+  llvm::Value *ZeroVal = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
+  Builder.CreateStore(ZeroVal, GetAddrOfLocalVar(InductionVarDecl));
+  
+  // Create the conditional.
+  llvm::BasicBlock *ConditionBlock = Condition.getBlock();
+  EmitBlock(ConditionBlock);
+  
+  EmitKokkosParallelForCond(BE, InductionVarDecl, LoopBody, nullptr, EndDest);
+  EmitBlock(LoopBody);
+  
+  {
+    if (DimQueue.size() == 0) {
+      // Create a separate cleanup scope for the body, in case it is not
+      // a compound statement.
+      InKokkosConstruct = true;
+      RunCleanupsScope BodyScope(*this);
+      EmitStmt(Lambda->getBody());
+      InKokkosConstruct = false;
+    } else {
+      EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, DimQueue, params);
+    }
+  }
+  
+  EmitBlock(Increment);
+  llvm::Value *IncVal = Builder.CreateLoad(GetAddrOfLocalVar(InductionVarDecl));
+  llvm::Value *One = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 1);
+  IncVal = Builder.CreateAdd(IncVal, One);
+  Builder.CreateStore(IncVal, GetAddrOfLocalVar(InductionVarDecl));
+  
+  EmitBranch(ConditionBlock);
+  
+  if (TopBlock != nullptr) {
+    EmitBranch(TopBlock);
+  }
+  
+  EmitBlock(EndDest.getBlock());
+  EmitBlock(End, true);
+  
+  return true;           
 }
 
 bool CodeGenFunction::EmitKokkosParallelReduce(const CallExpr *CE,
