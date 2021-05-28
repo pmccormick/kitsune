@@ -3936,7 +3936,7 @@ public:
 
   // Kitsune support for Kokkos.  
   bool EmitKokkosConstruct(const CallExpr *CE, ArrayRef<const Attr *> Attrs = ArrayRef<const Attr *>());
-  const ParmVarDecl *EmitKokkosParallelForInductionVar(const LambdaExpr* Lambda);
+  std::vector<const ParmVarDecl*> EmitKokkosParallelForInductionVar(const LambdaExpr* Lambda);
   void EmitKokkosParallelForCond(const Expr *BoundsExpr, const ParmVarDecl *LoopVar,
                                  llvm::BasicBlock *DetachBlock,
                                  llvm::BasicBlock *ExitBlock,

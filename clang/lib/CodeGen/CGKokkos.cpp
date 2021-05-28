@@ -188,19 +188,37 @@ bool CodeGenFunction::EmitKokkosConstruct(const CallExpr *CE,
 }  // hidden/local namespace 
 
 
-const ParmVarDecl*
+std::vector<const ParmVarDecl*>
 CodeGenFunction::EmitKokkosParallelForInductionVar(const LambdaExpr *Lambda) {
   const CXXMethodDecl *MD = Lambda->getCallOperator();
   assert(MD && "EmitKokkosParallelFor() -- bad method decl from labmda call.");
-  const ParmVarDecl *InductionVarDecl = MD->getParamDecl(0);
+  /*const ParmVarDecl *InductionVarDecl = MD->getParamDecl(0);
   assert(InductionVarDecl && "EmitKokkosParallelFor() -- bad loop variable decl!");
+  
+  printf("PARAM COUNT: %d\n\n", MD->getNumParams());
 
   EmitVarDecl(*InductionVarDecl);
   Address Addr = GetAddrOfLocalVar(InductionVarDecl);
   llvm::Value *Zero = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
   Builder.CreateStore(Zero, Addr);
 
-  return InductionVarDecl;
+  return InductionVarDecl;*/
+  
+  std::vector<const ParmVarDecl*> params;
+  
+  for (int i = 0; i<MD->getNumParams(); i++) {
+    const ParmVarDecl *InductionVarDecl = MD->getParamDecl(i);
+    assert(InductionVarDecl && "EmitKokkosParallelFor() -- bad loop variable decl!");
+    
+    EmitVarDecl(*InductionVarDecl);
+    Address Addr = GetAddrOfLocalVar(InductionVarDecl);
+    llvm::Value *Zero = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
+    Builder.CreateStore(Zero, Addr);
+    
+    params.push_back(InductionVarDecl);
+  }
+  
+  return params;
 }
 
 void CodeGenFunction::EmitKokkosParallelForCond(const Expr *BoundsExpr, 
@@ -278,20 +296,6 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     Diags.Report(CE->getExprLoc(), diag::warn_kokkos_unknown_bounds_expr);
     return false;
   }
-  
-  // Handle a potential multi-dimensional array
-  /*if (BE->getStmtClass() == Expr::CXXTemporaryObjectExprClass) {
-    const CXXTemporaryObjectExpr *CXXTO = dyn_cast<CXXTemporaryObjectExpr>(BE);
-    const InitListExpr *UpperBounds = dyn_cast<InitListExpr>(CXXTO->getArg(1)->IgnoreImplicit());
-    
-    // Create a multiply statement to computer the proper upper bound
-    const Expr *lval = UpperBounds->getInit(0)->IgnoreImplicit();
-    const Expr *rval = UpperBounds->getInit(1)->IgnoreImplicit();
-    
-    llvm::Value *lvalue = EmitScalarExpr(lval);
-    llvm::Value *rvalue = EmitScalarExpr(rval);
-    BE = Builder.CreateMul(lvalue, rvalue);
-  }*/
 
   // Create all jump destinations and basic blocks in the order they 
   // appear in the IR. 
@@ -323,8 +327,9 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   // 
   // TODO: Do we need to "relax" these assumptions to support broader code coverage?
   // This is 'equivalent' to the Init statement in a traditional for loop (e.g. int i = 0). 
-  const ParmVarDecl *InductionVarDecl; 
-  InductionVarDecl = EmitKokkosParallelForInductionVar(Lambda);
+  /*const ParmVarDecl *InductionVarDecl; 
+  InductionVarDecl = EmitKokkosParallelForInductionVar(Lambda);*/
+  std::vector<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
 
    // Create the sync region. 
   PushSyncRegion();
@@ -347,6 +352,7 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   LexicalScope ConditionScope(*this, R);
 
   // Create the conditional.
+  const ParmVarDecl *InductionVarDecl = params.at(0);
   EmitKokkosParallelForCond(BE, InductionVarDecl, Detach, End, Sync);
 
   if (PForScope.requiresCleanups()) {
@@ -407,10 +413,12 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   Builder.CreateReattach(Increment, SRStart);
 
   EmitBlock(Increment);
-  llvm::Value *IncVal = Builder.CreateLoad(GetAddrOfLocalVar(InductionVarDecl));
-  llvm::Value *One = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 1);
-  IncVal = Builder.CreateAdd(IncVal, One);
-  Builder.CreateStore(IncVal, GetAddrOfLocalVar(InductionVarDecl));
+  for (const ParmVarDecl* IVD : params) {
+    llvm::Value *IncVal = Builder.CreateLoad(GetAddrOfLocalVar(IVD));
+    llvm::Value *One = llvm::ConstantInt::get(ConvertType(IVD->getType()), 1);
+    IncVal = Builder.CreateAdd(IncVal, One);
+    Builder.CreateStore(IncVal, GetAddrOfLocalVar(IVD));
+  }
 
   BreakContinueStack.pop_back();
   ConditionScope.ForceCleanup();
