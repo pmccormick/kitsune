@@ -195,7 +195,7 @@ CodeGenFunction::EmitKokkosParallelForInductionVar(const LambdaExpr *Lambda) {
   
   std::queue<const ParmVarDecl*> params;
   
-  for (int i = 0; i<MD->getNumParams(); i++) {
+  for (unsigned int i = 0; i<MD->getNumParams(); i++) {
     const ParmVarDecl *InductionVarDecl = MD->getParamDecl(i);
     assert(InductionVarDecl && "EmitKokkosParallelFor() -- bad loop variable decl!");
     
@@ -280,12 +280,12 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     const InitListExpr *StartingBounds = dyn_cast<InitListExpr>(CXXTO->getArg(0)->IgnoreImplicit());
     const InitListExpr *UpperBounds = dyn_cast<InitListExpr>(CXXTO->getArg(1)->IgnoreImplicit());
     
-    for (int i = 0; i<StartingBounds->getNumInits(); i++) {
+    for (unsigned int i = 0; i<StartingBounds->getNumInits(); i++) {
         const Expr *val = StartingBounds->getInit(i)->IgnoreImplicit();
         StartQueue.push(val);
     }
     
-    for (int i = 0; i<UpperBounds->getNumInits(); i++) {
+    for (unsigned int i = 0; i<UpperBounds->getNumInits(); i++) {
       const Expr *val = UpperBounds->getInit(i)->IgnoreImplicit();
       DimQueue.push(val);
     }
@@ -315,11 +315,16 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   const ParmVarDecl *InductionVarDecl = params.front();
   params.pop();
   
-  const Expr *SE = StartQueue.front();
-  StartQueue.pop();
-  
-  llvm::Value *LoopStart = EmitScalarExpr(SE);
-  Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));
+  if (StartQueue.size() == 0) {
+    llvm::Value *Zero = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
+    Builder.CreateStore(Zero, GetAddrOfLocalVar(InductionVarDecl));
+  } else {
+    const Expr *SE = StartQueue.front();
+    StartQueue.pop();
+    
+    llvm::Value *LoopStart = EmitScalarExpr(SE);
+    Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));
+  }
 
   // Extract a conveince block and setup the lexical scope based on 
   // the lambda's source range. 
