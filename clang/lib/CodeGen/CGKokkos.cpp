@@ -188,12 +188,12 @@ bool CodeGenFunction::EmitKokkosConstruct(const CallExpr *CE,
 }  // hidden/local namespace 
 
 
-std::vector<const ParmVarDecl*>
+std::queue<const ParmVarDecl*>
 CodeGenFunction::EmitKokkosParallelForInductionVar(const LambdaExpr *Lambda) {
   const CXXMethodDecl *MD = Lambda->getCallOperator();
   assert(MD && "EmitKokkosParallelFor() -- bad method decl from labmda call.");
   
-  std::vector<const ParmVarDecl*> params;
+  std::queue<const ParmVarDecl*> params;
   
   for (int i = 0; i<MD->getNumParams(); i++) {
     const ParmVarDecl *InductionVarDecl = MD->getParamDecl(i);
@@ -204,7 +204,7 @@ CodeGenFunction::EmitKokkosParallelForInductionVar(const LambdaExpr *Lambda) {
     llvm::Value *Zero = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
     Builder.CreateStore(Zero, Addr);
     
-    params.push_back(InductionVarDecl);
+    params.push(InductionVarDecl);
   }
   
   return params;
@@ -291,13 +291,14 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   }
   
   // Get the induction varaibles
-  std::vector<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
+  std::queue<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
   
   // These are extra steps that we can probably optimize away
   BE = DimQueue.front();
   DimQueue.pop();
   
-  const ParmVarDecl *InductionVarDecl = params.at(0);
+  const ParmVarDecl *InductionVarDecl = params.front();
+  params.pop();
 
   // Create all jump destinations and basic blocks in the order they 
   // appear in the IR. 
@@ -438,13 +439,14 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
 bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
             llvm::BasicBlock *TopBlock,
             std::queue<const Expr*> DimQueue,
-            std::vector<const ParmVarDecl*> params) {
+            std::queue<const ParmVarDecl*> params) {
   // Get arguments
   int pos = DimQueue.size();
   const Expr *BE = DimQueue.front();
   DimQueue.pop();
   
-  const ParmVarDecl *InductionVarDecl = params.at(pos);
+  const ParmVarDecl *InductionVarDecl = params.front();
+  params.pop();
   
   llvm::BasicBlock *Zero = createBasicBlock("kokkos.forall.zero" + std::to_string(pos));
   JumpDest Condition = getJumpDestInCurrentScope("kokkos.forall.cond" + std::to_string(pos));
