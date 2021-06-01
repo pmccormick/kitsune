@@ -200,10 +200,6 @@ CodeGenFunction::EmitKokkosParallelForInductionVar(const LambdaExpr *Lambda) {
     assert(InductionVarDecl && "EmitKokkosParallelFor() -- bad loop variable decl!");
     
     EmitVarDecl(*InductionVarDecl);
-    Address Addr = GetAddrOfLocalVar(InductionVarDecl);
-    llvm::Value *Zero = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
-    Builder.CreateStore(Zero, Addr);
-    
     params.push(InductionVarDecl);
   }
   
@@ -277,10 +273,17 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   
   // Build the queue of dimensions (upper bounds)
   std::queue<const Expr *> DimQueue;
+  std::queue<const Expr *> StartQueue;
   
   if (BE->getStmtClass() == Expr::CXXTemporaryObjectExprClass) {
     const CXXTemporaryObjectExpr *CXXTO = dyn_cast<CXXTemporaryObjectExpr>(BE);
+    const InitListExpr *StartingBounds = dyn_cast<InitListExpr>(CXXTO->getArg(0)->IgnoreImplicit());
     const InitListExpr *UpperBounds = dyn_cast<InitListExpr>(CXXTO->getArg(1)->IgnoreImplicit());
+    
+    for (int i = 0; i<StartingBounds->getNumInits(); i++) {
+        const Expr *val = StartingBounds->getInit(i)->IgnoreImplicit();
+        StartQueue.push(val);
+    }
     
     for (int i = 0; i<UpperBounds->getNumInits(); i++) {
       const Expr *val = UpperBounds->getInit(i)->IgnoreImplicit();
@@ -290,15 +293,9 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     DimQueue.push(BE);
   }
   
-  // Get the induction varaibles
-  std::queue<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
-  
   // These are extra steps that we can probably optimize away
   BE = DimQueue.front();
   DimQueue.pop();
-  
-  const ParmVarDecl *InductionVarDecl = params.front();
-  params.pop();
 
   // Create all jump destinations and basic blocks in the order they 
   // appear in the IR. 
@@ -310,6 +307,19 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   JumpDest Cleanup = getJumpDestInCurrentScope("kokkos.forall.cond.cleanup");
   JumpDest Sync = getJumpDestInCurrentScope("kokkos.forall.sync");
   llvm::BasicBlock *End = createBasicBlock("kokkos.forall.end");
+  
+  // Get the induction variables, and set the first. If its a single-layer loop, this will be the only variable
+  // We do this here so we don't set any inner loop variable twice in a row
+  std::queue<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
+  
+  const ParmVarDecl *InductionVarDecl = params.front();
+  params.pop();
+  
+  const Expr *SE = StartQueue.front();
+  StartQueue.pop();
+  
+  llvm::Value *LoopStart = EmitScalarExpr(SE);
+  Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));
 
   // Extract a conveince block and setup the lexical scope based on 
   // the lambda's source range. 
@@ -391,7 +401,7 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
       EmitStmt(Lambda->getBody());
       InKokkosConstruct = false;
     } else {
-      EmitKokkosInnerLoop(CE, Lambda, nullptr, DimQueue, params);
+      EmitKokkosInnerLoop(CE, Lambda, nullptr, DimQueue, StartQueue, params);
     }
   }
 
@@ -439,16 +449,20 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
 bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
             llvm::BasicBlock *TopBlock,
             std::queue<const Expr*> DimQueue,
+            std::queue<const Expr*> StartQueue,
             std::queue<const ParmVarDecl*> params) {
-  // Get arguments
+  // Load the data we need
   int pos = DimQueue.size();
   const Expr *BE = DimQueue.front();
   DimQueue.pop();
   
+  const Expr *SE = StartQueue.front();
+  StartQueue.pop();
+  
   const ParmVarDecl *InductionVarDecl = params.front();
   params.pop();
   
-  llvm::BasicBlock *Zero = createBasicBlock("kokkos.forall.zero" + std::to_string(pos));
+  llvm::BasicBlock *InductionSet = createBasicBlock("kokkos.forall.set" + std::to_string(pos));
   JumpDest Condition = getJumpDestInCurrentScope("kokkos.forall.cond" + std::to_string(pos));
   llvm::BasicBlock *LoopBody = createBasicBlock("kokkos.forall.body" + std::to_string(pos));
   llvm::BasicBlock *Increment = createBasicBlock("kokkos.forall.inc" + std::to_string(pos));
@@ -456,9 +470,9 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   llvm::BasicBlock *End = createBasicBlock("kokkos.forall.end" + std::to_string(pos));
   
   // Zero out the induction variable
-  EmitBlock(Zero);
-  llvm::Value *ZeroVal = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
-  Builder.CreateStore(ZeroVal, GetAddrOfLocalVar(InductionVarDecl));
+  EmitBlock(InductionSet);
+  llvm::Value *LoopStart = EmitScalarExpr(SE);
+  Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));
   
   // Create the conditional.
   llvm::BasicBlock *ConditionBlock = Condition.getBlock();
@@ -476,7 +490,7 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
       EmitStmt(Lambda->getBody());
       InKokkosConstruct = false;
     } else {
-      EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, DimQueue, params);
+      EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, DimQueue, StartQueue, params);
     }
   }
   
