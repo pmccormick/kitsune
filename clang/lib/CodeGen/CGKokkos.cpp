@@ -450,7 +450,11 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   return true;
 }
 
-// This is in charge of building an inner loop
+// This is in charge of building an inner loop. It works as a recursive function to allow the loops
+// to actually end up being nested
+//
+// This should be usuable by any function that requires inner loops
+//
 bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
             llvm::BasicBlock *TopBlock,
             std::queue<const Expr*> DimQueue,
@@ -460,32 +464,31 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   int pos = DimQueue.size();
   const Expr *BE = DimQueue.front();
   DimQueue.pop();
-  
+
   const Expr *SE = StartQueue.front();
   StartQueue.pop();
-  
+
   const ParmVarDecl *InductionVarDecl = params.front();
   params.pop();
-  
+
   llvm::BasicBlock *InductionSet = createBasicBlock("kokkos.forall.set" + std::to_string(pos));
   JumpDest Condition = getJumpDestInCurrentScope("kokkos.forall.cond" + std::to_string(pos));
   llvm::BasicBlock *LoopBody = createBasicBlock("kokkos.forall.body" + std::to_string(pos));
   llvm::BasicBlock *Increment = createBasicBlock("kokkos.forall.inc" + std::to_string(pos));
   JumpDest EndDest = getJumpDestInCurrentScope("kokkos.forall.endlbl" + std::to_string(pos));
-  llvm::BasicBlock *End = createBasicBlock("kokkos.forall.end" + std::to_string(pos));
-  
-  // Zero out the induction variable
+
+  // Set the induction variable's starting point
   EmitBlock(InductionSet);
   llvm::Value *LoopStart = EmitScalarExpr(SE);
   Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));
-  
+
   // Create the conditional.
   llvm::BasicBlock *ConditionBlock = Condition.getBlock();
   EmitBlock(ConditionBlock);
-  
+
   EmitKokkosParallelForCond(BE, InductionVarDecl, LoopBody, nullptr, EndDest);
   EmitBlock(LoopBody);
-  
+
   {
     if (DimQueue.size() == 0) {
       // Create a separate cleanup scope for the body, in case it is not
@@ -498,21 +501,20 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
       EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, DimQueue, StartQueue, params);
     }
   }
-  
+
   EmitBlock(Increment);
   llvm::Value *IncVal = Builder.CreateLoad(GetAddrOfLocalVar(InductionVarDecl));
   llvm::Value *One = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 1);
   IncVal = Builder.CreateAdd(IncVal, One);
   Builder.CreateStore(IncVal, GetAddrOfLocalVar(InductionVarDecl));
-  
+
   EmitBranch(ConditionBlock);
-  
+
   if (TopBlock != nullptr) {
     EmitBranch(TopBlock);
   }
-  
+
   EmitBlock(EndDest.getBlock());
-  EmitBlock(End, true);
   
   return true;           
 }
