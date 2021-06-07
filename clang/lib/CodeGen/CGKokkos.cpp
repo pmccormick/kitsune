@@ -188,19 +188,19 @@ bool CodeGenFunction::EmitKokkosConstruct(const CallExpr *CE,
 }  // hidden/local namespace 
 
 
-std::queue<const ParmVarDecl*>
+std::vector<const ParmVarDecl*>
 CodeGenFunction::EmitKokkosParallelForInductionVar(const LambdaExpr *Lambda) {
   const CXXMethodDecl *MD = Lambda->getCallOperator();
   assert(MD && "EmitKokkosParallelFor() -- bad method decl from labmda call.");
   
-  std::queue<const ParmVarDecl*> params;
+  std::vector<const ParmVarDecl*> params;
   
   for (unsigned int i = 0; i<MD->getNumParams(); i++) {
     const ParmVarDecl *InductionVarDecl = MD->getParamDecl(i);
     assert(InductionVarDecl && "EmitKokkosParallelFor() -- bad loop variable decl!");
     
     EmitVarDecl(*InductionVarDecl);
-    params.push(InductionVarDecl);
+    params.push_back(InductionVarDecl);
   }
   
   return params;
@@ -272,8 +272,8 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   }
   
   // Build the queue of dimensions (upper bounds)
-  std::queue<const Expr *> DimQueue;
-  std::queue<const Expr *> StartQueue;
+  std::vector<const Expr *> DimQueue;
+  std::vector<const Expr *> StartQueue;
   
   if (BE->getStmtClass() == Expr::CXXTemporaryObjectExprClass) {
     const CXXTemporaryObjectExpr *CXXTO = dyn_cast<CXXTemporaryObjectExpr>(BE);
@@ -282,20 +282,20 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     
     for (unsigned int i = 0; i<StartingBounds->getNumInits(); i++) {
         const Expr *val = StartingBounds->getInit(i)->IgnoreImplicit();
-        StartQueue.push(val);
+        StartQueue.push_back(val);
     }
     
     for (unsigned int i = 0; i<UpperBounds->getNumInits(); i++) {
       const Expr *val = UpperBounds->getInit(i)->IgnoreImplicit();
-      DimQueue.push(val);
+      DimQueue.push_back(val);
     }
   } else {
-    DimQueue.push(BE);
+    DimQueue.push_back(BE);
   }
   
   // These are extra steps that we can probably optimize away
   BE = DimQueue.front();
-  DimQueue.pop();
+  DimQueue.erase(DimQueue.begin());
 
   // Create all jump destinations and basic blocks in the order they 
   // appear in the IR. 
@@ -310,17 +310,17 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   
   // Get the induction variables, and set the first. If its a single-layer loop, this will be the only variable
   // We do this here so we don't set any inner loop variable twice in a row
-  std::queue<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
+  std::vector<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
   
   const ParmVarDecl *InductionVarDecl = params.front();
-  params.pop();
+  params.erase(params.begin());
   
   if (StartQueue.size() == 0) {
     llvm::Value *Zero = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
     Builder.CreateStore(Zero, GetAddrOfLocalVar(InductionVarDecl));
   } else {
     const Expr *SE = StartQueue.front();
-    StartQueue.pop();
+    StartQueue.erase(StartQueue.begin());
     
     llvm::Value *LoopStart = EmitScalarExpr(SE);
     Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));
@@ -457,19 +457,19 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
 //
 bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
             llvm::BasicBlock *TopBlock,
-            std::queue<const Expr*> DimQueue,
-            std::queue<const Expr*> StartQueue,
-            std::queue<const ParmVarDecl*> params) {
+            std::vector<const Expr*> DimQueue,
+            std::vector<const Expr*> StartQueue,
+            std::vector<const ParmVarDecl*> params) {
   // Load the data we need
   int pos = DimQueue.size();
   const Expr *BE = DimQueue.front();
-  DimQueue.pop();
+  DimQueue.erase(DimQueue.begin());
 
   const Expr *SE = StartQueue.front();
-  StartQueue.pop();
+  StartQueue.erase(StartQueue.begin());
 
   const ParmVarDecl *InductionVarDecl = params.front();
-  params.pop();
+  params.erase(params.begin());
 
   llvm::BasicBlock *InductionSet = createBasicBlock("kokkos.forall.set" + std::to_string(pos));
   JumpDest Condition = getJumpDestInCurrentScope("kokkos.forall.cond" + std::to_string(pos));
