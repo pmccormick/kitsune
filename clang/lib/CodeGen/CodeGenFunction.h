@@ -3942,6 +3942,10 @@ public:
                                  llvm::BasicBlock *ExitBlock,
 				 JumpDest &Sync);
   bool EmitKokkosParallelFor(const CallExpr *CE, ArrayRef<const Attr *> Attrs);
+  bool EmitKokkosParallelForMD(const CallExpr *CE, std::string PFName,
+            const Expr *BE,
+            const LambdaExpr *Lambda,
+            ArrayRef<const Attr *> ForallAttrs);
   bool EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
             llvm::BasicBlock *TopBlock,
             std::vector<const Expr*> DimQueue,
