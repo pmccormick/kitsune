@@ -3950,7 +3950,8 @@ public:
             llvm::BasicBlock *TopBlock,
             std::vector<const Expr*> DimQueue,
             std::vector<const Expr*> StartQueue,
-            std::vector<const ParmVarDecl*> params);
+            std::vector<const ParmVarDecl*> params,
+            ArrayRef<const Attr *> ForallAttrs);
   bool EmitKokkosParallelReduce(const CallExpr *CE, ArrayRef<const Attr *> Attrs);
   bool InKokkosConstruct = false; // FIXME: Should/can we refactor this away?
 
