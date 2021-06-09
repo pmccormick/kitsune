@@ -3951,6 +3951,7 @@ public:
             std::vector<const Expr*> DimQueue,
             std::vector<const Expr*> StartQueue,
             std::vector<const ParmVarDecl*> params,
+            std::vector<std::pair<llvm::Value*, llvm::AllocaInst*>> TLIVarList,
             ArrayRef<const Attr *> ForallAttrs);
   bool EmitKokkosParallelReduce(const CallExpr *CE, ArrayRef<const Attr *> Attrs);
   bool InKokkosConstruct = false; // FIXME: Should/can we refactor this away?
