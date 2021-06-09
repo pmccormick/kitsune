@@ -199,7 +199,7 @@ CodeGenFunction::EmitKokkosParallelForInductionVar(const LambdaExpr *Lambda) {
     const ParmVarDecl *InductionVarDecl = MD->getParamDecl(i);
     assert(InductionVarDecl && "EmitKokkosParallelFor() -- bad loop variable decl!");
     
-    EmitVarDecl(*InductionVarDecl);
+    //EmitVarDecl(*InductionVarDecl);
     params.push_back(InductionVarDecl);
   }
   
@@ -315,6 +315,7 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   // This is 'equivalent' to the Init statement in a traditional for loop (e.g. int i = 0). 
   const ParmVarDecl *InductionVarDecl; 
   InductionVarDecl = EmitKokkosParallelForInductionVar(Lambda).at(0);
+  EmitVarDecl(*InductionVarDecl);
 
    // Create the sync region. 
   PushSyncRegion();
@@ -447,7 +448,8 @@ bool CodeGenFunction::EmitKokkosParallelForMD(const CallExpr *CE, std::string PF
   std::vector<const ParmVarDecl*> params = EmitKokkosParallelForInductionVar(Lambda);
   
   // Build the inner loops, and eventually the body
-  return EmitKokkosInnerLoop(CE, Lambda, nullptr, DimQueue, StartQueue, params, ForallAttrs);
+  std::vector<std::pair<llvm::Value*, llvm::AllocaInst*>> TLIVarList;
+  return EmitKokkosInnerLoop(CE, Lambda, nullptr, DimQueue, StartQueue, params, TLIVarList, ForallAttrs);
 }
 
 // This is in charge of building an inner loop. It works as a recursive function to allow the loops
@@ -460,6 +462,7 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
             std::vector<const Expr*> DimQueue,
             std::vector<const Expr*> StartQueue,
             std::vector<const ParmVarDecl*> params,
+            std::vector<std::pair<llvm::Value*, llvm::AllocaInst*>> TLIVarList,
             ArrayRef<const Attr *> ForallAttrs) {
   // Load the data we need
   int pos = DimQueue.size();
@@ -482,10 +485,11 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   JumpDest Sync = getJumpDestInCurrentScope("kokkos.forall.sync" + std::to_string(pos));
   llvm::BasicBlock *End = createBasicBlock("kokkos.forall.end" + std::to_string(pos));
 
-  // Set the induction variable's starting point
+  /*// Set the induction variable's starting point
   EmitBlock(InductionSet);
+  EmitVarDecl(*InductionVarDecl);
   llvm::Value *LoopStart = EmitScalarExpr(SE);
-  Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));
+  Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));*/
   
   // Extract a conveince block and setup the lexical scope based on 
   // the lambda's source range. 
@@ -511,6 +515,12 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   PushSyncRegion();
   llvm::Instruction *SRStart = EmitSyncRegionStart();
   CurSyncRegion->setSyncRegionStart(SRStart);
+  
+  // Set the induction variable's starting point
+  EmitBlock(InductionSet);
+  EmitVarDecl(*InductionVarDecl);
+  llvm::Value *LoopStart = EmitScalarExpr(SE);
+  Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));
 
   // TODO: Need to check attributes for spawning strategy. 
   LoopStack.setSpawnStrategy(LoopAttributes::DAC);
@@ -558,6 +568,9 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
                            InductionVarDecl->getName() + ".detach");
   Builder.CreateAlignedStore(GInductionVal, TLInductionVar,
                              getContext().getTypeAlignInChars(RefType));
+                             
+  std::pair<llvm::Value*, llvm::AllocaInst*> pair(GInductionVar, TLInductionVar);
+  TLIVarList.push_back(pair);
   {
     if (DimQueue.size() == 0) {
       // Create a separate cleanup scope for the body, in case it is not
@@ -566,11 +579,29 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
       RunCleanupsScope BodyScope(*this);
       EmitStmt(Lambda->getBody());
       InKokkosConstruct = false;
+      
+      // Modify the body to use the ''detach''-local induction variable.
+      // At this point in the codegen, the body block has been emitted 
+      // and we can safely replace the ''sequential`` induction variable 
+      // within the detach basic block.
+      llvm::BasicBlock *CurrentBlock = Builder.GetInsertBlock();
+      for (int i = 0; i<TLIVarList.size(); i++) {
+        auto TLVar = TLIVarList.at(i).second;
+        auto GInductionVar = TLIVarList.at(i).first;
+        
+        for(llvm::Value::use_iterator UI = GInductionVar->use_begin(), UE = GInductionVar->use_end(); 
+            UI != UE; ) {
+          llvm::Use &U = *UI++;
+          llvm::Instruction *I = cast<llvm::Instruction>(U.getUser());
+          if (I->getParent() == CurrentBlock) 
+            U.set(TLVar);
+        }
+      }
     } else {
-      EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, DimQueue, StartQueue, params, ForallAttrs);
+      EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, DimQueue, StartQueue, params, TLIVarList, ForallAttrs);
     }
   }
-
+  
   auto tmp = AllocaInsertPt; 
   AllocaInsertPt = OldAllocaInsertPt; 
   tmp->removeFromParent(); 
@@ -579,14 +610,14 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   // At this point in the codegen, the body block has been emitted 
   // and we can safely replace the ''sequential`` induction variable 
   // within the detach basic block.
-  llvm::BasicBlock *CurrentBlock = Builder.GetInsertBlock();
+ /* llvm::BasicBlock *CurrentBlock = Builder.GetInsertBlock();
   for(llvm::Value::use_iterator UI = GInductionVar->use_begin(), UE = GInductionVar->use_end(); 
       UI != UE; ) {
     llvm::Use &U = *UI++;
     llvm::Instruction *I = cast<llvm::Instruction>(U.getUser());
     if (I->getParent() == CurrentBlock) 
       U.set(TLInductionVar);
-  }
+  }*/
 
   EmitBlock(Reattach.getBlock());
   Builder.CreateReattach(Increment, SRStart);
@@ -605,9 +636,9 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   PForScope.ForceCleanup();
   LoopStack.pop();
   
-  if (TopBlock != nullptr) {
+  /*if (TopBlock != nullptr) {
     EmitBranch(TopBlock);
-  }
+  }*/
 
   EmitBlock(Sync.getBlock());
   Builder.CreateSync(End, SRStart);
