@@ -584,18 +584,29 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
       // At this point in the codegen, the body block has been emitted 
       // and we can safely replace the ''sequential`` induction variable 
       // within the detach basic block.
+      //
+      // When Kokkos::Views (and likely some other structures) are used, we end up with extra blocks
+      // between the original for loop body block and the reattach block. Without the loop, it will
+      // only modify the last of these block. The loop iterates and updates all the blocks back to the
+      // original for loop body block to use the thread-local induction variables
+      //
       llvm::BasicBlock *CurrentBlock = Builder.GetInsertBlock();
-      for (int i = 0; i<TLIVarList.size(); i++) {
-        auto TLVar = TLIVarList.at(i).second;
-        auto GInductionVar = TLIVarList.at(i).first;
-        
-        for(llvm::Value::use_iterator UI = GInductionVar->use_begin(), UE = GInductionVar->use_end(); 
-            UI != UE; ) {
-          llvm::Use &U = *UI++;
-          llvm::Instruction *I = cast<llvm::Instruction>(U.getUser());
-          if (I->getParent() == CurrentBlock) 
-            U.set(TLVar);
+      for (;;) {
+        for (unsigned int i = 0; i<TLIVarList.size(); i++) {
+          auto TLVar = TLIVarList.at(i).second;
+          auto GInductionVar = TLIVarList.at(i).first;
+          
+          for(llvm::Value::use_iterator UI = GInductionVar->use_begin(), UE = GInductionVar->use_end(); 
+              UI != UE; ) {
+            llvm::Use &U = *UI++;
+            llvm::Instruction *I = cast<llvm::Instruction>(U.getUser());
+            if (I->getParent() == CurrentBlock) 
+              U.set(TLVar);
+          }
         }
+        
+        if (CurrentBlock == PForBody) break;
+        else CurrentBlock = CurrentBlock->getSinglePredecessor();
       }
     } else {
       EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, DimQueue, StartQueue, params, TLIVarList, ForallAttrs);
@@ -605,19 +616,6 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   auto tmp = AllocaInsertPt; 
   AllocaInsertPt = OldAllocaInsertPt; 
   tmp->removeFromParent(); 
-
-  // Modify the body to use the ''detach''-local induction variable.
-  // At this point in the codegen, the body block has been emitted 
-  // and we can safely replace the ''sequential`` induction variable 
-  // within the detach basic block.
- /* llvm::BasicBlock *CurrentBlock = Builder.GetInsertBlock();
-  for(llvm::Value::use_iterator UI = GInductionVar->use_begin(), UE = GInductionVar->use_end(); 
-      UI != UE; ) {
-    llvm::Use &U = *UI++;
-    llvm::Instruction *I = cast<llvm::Instruction>(U.getUser());
-    if (I->getParent() == CurrentBlock) 
-      U.set(TLInductionVar);
-  }*/
 
   EmitBlock(Reattach.getBlock());
   Builder.CreateReattach(Increment, SRStart);
@@ -635,10 +633,6 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   EmitBranch(ConditionBlock);
   PForScope.ForceCleanup();
   LoopStack.pop();
-  
-  /*if (TopBlock != nullptr) {
-    EmitBranch(TopBlock);
-  }*/
 
   EmitBlock(Sync.getBlock());
   Builder.CreateSync(End, SRStart);
