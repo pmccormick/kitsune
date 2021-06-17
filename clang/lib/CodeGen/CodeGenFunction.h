@@ -3948,8 +3948,7 @@ public:
             ArrayRef<const Attr *> ForallAttrs);
   bool EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
             llvm::BasicBlock *TopBlock,
-            std::vector<const Expr*> DimQueue,
-            std::vector<const Expr*> StartQueue,
+            std::vector<std::pair<const Expr*, const Expr*>> BoundsList,
             std::vector<const ParmVarDecl*> params,
             std::vector<std::pair<llvm::Value*, llvm::AllocaInst*>> TLIVarList,
             ArrayRef<const Attr *> ForallAttrs);

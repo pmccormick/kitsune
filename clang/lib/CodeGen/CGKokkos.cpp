@@ -434,14 +434,18 @@ bool CodeGenFunction::EmitKokkosParallelForMD(const CallExpr *CE, std::string PF
   const InitListExpr *StartingBounds = dyn_cast<InitListExpr>(CXXTO->getArg(0)->IgnoreImplicit());
   const InitListExpr *UpperBounds = dyn_cast<InitListExpr>(CXXTO->getArg(1)->IgnoreImplicit());
   
-  for (unsigned int i = 0; i<StartingBounds->getNumInits(); i++) {
-      const Expr *val = StartingBounds->getInit(i)->IgnoreImplicit();
-      StartQueue.push_back(val);
+  // The starting and ending bounds should be the same length
+  std::vector<std::pair<const Expr*, const Expr*>> BoundsList;
+  
+  if (StartingBounds->getNumInits() != UpperBounds->getNumInits()) {
+    return false;
   }
   
-  for (unsigned int i = 0; i<UpperBounds->getNumInits(); i++) {
-    const Expr *val = UpperBounds->getInit(i)->IgnoreImplicit();
-    DimQueue.push_back(val);
+  for (unsigned int i = 0; i<StartingBounds->getNumInits(); i++) {
+    const Expr *start = StartingBounds->getInit(i)->IgnoreImplicit();
+    const Expr *end = UpperBounds->getInit(i)->IgnoreImplicit();
+    std::pair<const Expr*, const Expr*> pair(start, end);
+    BoundsList.push_back(pair);
   }
   
   // Get the induction variables
@@ -449,7 +453,7 @@ bool CodeGenFunction::EmitKokkosParallelForMD(const CallExpr *CE, std::string PF
   
   // Build the inner loops, and eventually the body
   std::vector<std::pair<llvm::Value*, llvm::AllocaInst*>> TLIVarList;
-  return EmitKokkosInnerLoop(CE, Lambda, nullptr, DimQueue, StartQueue, params, TLIVarList, ForallAttrs);
+  return EmitKokkosInnerLoop(CE, Lambda, nullptr, BoundsList, params, TLIVarList, ForallAttrs);
 }
 
 // This is in charge of building an inner loop. It works as a recursive function to allow the loops
@@ -459,18 +463,15 @@ bool CodeGenFunction::EmitKokkosParallelForMD(const CallExpr *CE, std::string PF
 //
 bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
             llvm::BasicBlock *TopBlock,
-            std::vector<const Expr*> DimQueue,
-            std::vector<const Expr*> StartQueue,
+            std::vector<std::pair<const Expr*, const Expr*>> BoundsList,
             std::vector<const ParmVarDecl*> params,
             std::vector<std::pair<llvm::Value*, llvm::AllocaInst*>> TLIVarList,
             ArrayRef<const Attr *> ForallAttrs) {
   // Load the data we need
-  int pos = DimQueue.size();
-  const Expr *BE = DimQueue.front();
-  DimQueue.erase(DimQueue.begin());
-
-  const Expr *SE = StartQueue.front();
-  StartQueue.erase(StartQueue.begin());
+  int pos = BoundsList.size();
+  const Expr *BE = BoundsList.front().second;
+  const Expr *SE = BoundsList.front().first;
+  BoundsList.erase(BoundsList.begin());
 
   const ParmVarDecl *InductionVarDecl = params.front();
   params.erase(params.begin());
@@ -484,12 +485,6 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   JumpDest Cleanup = getJumpDestInCurrentScope("kokkos.forall.cond.cleanup" + std::to_string(pos));
   JumpDest Sync = getJumpDestInCurrentScope("kokkos.forall.sync" + std::to_string(pos));
   llvm::BasicBlock *End = createBasicBlock("kokkos.forall.end" + std::to_string(pos));
-
-  /*// Set the induction variable's starting point
-  EmitBlock(InductionSet);
-  EmitVarDecl(*InductionVarDecl);
-  llvm::Value *LoopStart = EmitScalarExpr(SE);
-  Builder.CreateStore(LoopStart, GetAddrOfLocalVar(InductionVarDecl));*/
   
   // Extract a conveince block and setup the lexical scope based on 
   // the lambda's source range. 
@@ -572,7 +567,7 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
   std::pair<llvm::Value*, llvm::AllocaInst*> pair(GInductionVar, TLInductionVar);
   TLIVarList.push_back(pair);
   {
-    if (DimQueue.size() == 0) {
+    if (BoundsList.size() == 0) {
       // Create a separate cleanup scope for the body, in case it is not
       // a compound statement.
       InKokkosConstruct = true;
@@ -609,7 +604,7 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
         else CurrentBlock = CurrentBlock->getSinglePredecessor();
       }
     } else {
-      EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, DimQueue, StartQueue, params, TLIVarList, ForallAttrs);
+      EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, BoundsList, params, TLIVarList, ForallAttrs);
     }
   }
   
