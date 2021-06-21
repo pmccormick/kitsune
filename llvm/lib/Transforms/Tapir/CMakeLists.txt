@@ -41,7 +41,6 @@ add_llvm_component_library(LLVMTapirOpts
   TransformUtils
   Vectorize
 
-  LINK_LIBS LLVMSPIRVLib
   )
 
 if(KITSUNE_ENABLE_OPENCL_TARGET)
