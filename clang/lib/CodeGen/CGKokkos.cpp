@@ -312,6 +312,10 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   const ParmVarDecl *InductionVarDecl; 
   InductionVarDecl = EmitKokkosParallelForInductionVar(Lambda).at(0);
   EmitVarDecl(*InductionVarDecl);
+  
+  Address Addr = GetAddrOfLocalVar(InductionVarDecl);
+  llvm::Value *Zero = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
+  Builder.CreateStore(Zero, Addr);
 
    // Create the sync region. 
   PushSyncRegion();
