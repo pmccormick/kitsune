@@ -305,7 +305,8 @@ option(LLVM_TOOL_LLVM_DRIVER_BUILD "Enables building the llvm multicall tool" OF
 
 set(PACKAGE_NAME LLVM)
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PACKAGE_VERSION}")
-set(PACKAGE_BUGREPORT "https://github.com/OpenCilk/opencilk-project/issues/")
+# set(PACKAGE_BUGREPORT "https://bugs.llvm.org/")
+set(PACKAGE_BUGREPORT "https://github.com/lanl/kitsune/issues")
 
 set(BUG_REPORT_URL "${PACKAGE_BUGREPORT}" CACHE STRING
   "Default URL where bug reports are to be submitted.")
@@ -1340,7 +1341,7 @@ endif()
 # If kitsune is being built with the realm backend enabled, then kitsune-rt needs to be built before clang
 if(TARGET clang AND TARGET kitsunerealm AND KITSUNE_ENABLE_REALM_TARGET)
   add_dependencies(clang kitsunerealm)
-  message(STATUS "kitsune: ADDED clang dependency on kitsunerealm")  
+  message(STATUS "kitsune: ADDED clang dependency on kitsunerealm")
 else()
   message(STATUS "kitsune: DID NOT ADD clang dependency on kitsunerealm")
 
