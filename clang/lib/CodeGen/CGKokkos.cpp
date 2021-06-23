@@ -604,8 +604,13 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
           }
         }
         
-        if (CurrentBlock == PForBody) break;
-        else CurrentBlock = CurrentBlock->getSinglePredecessor();
+        if (CurrentBlock == PForBody) {
+            break;
+        } else if (CurrentBlock->hasNPredecessorsOrMore(1) && CurrentBlock->getPrevNode()) {
+             CurrentBlock = CurrentBlock->getPrevNode();
+        } else { 
+             break; 
+        }
       }
     } else {
       EmitKokkosInnerLoop(CE, Lambda, ConditionBlock, BoundsList, params, TLIVarList, ForallAttrs);
