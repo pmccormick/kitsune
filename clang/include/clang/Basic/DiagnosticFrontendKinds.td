@@ -303,14 +303,20 @@ def warn_alias_with_section : Warning<
   InGroup<IgnoredAttributes>;
 
 def warn_kokkos_no_functor : Warning<
-    "kokkos - functors unsupported (reverting to C++ mode for construct).">,
+    "kokkos - parallel_for functors unsupported.\n"
+    "Falling back to standard C++ mode but executable could be unstable.">,
+    InGroup<BackendOptimizationFailure>;
+def warn_kokkos_unknown_stmt_class : Warning<
+    "kokkos - unrecognized/unsupported construct in parallel_for statement.\n"
+    "Failling back to standard C++ mode but executable could be unstable.">,
     InGroup<BackendOptimizationFailure>;
 def warn_kokkos_unknown_bounds_expr : Warning<
-    "kokkos - unrecognized bounds/limit expression (reverting to C++ mode for construct).">,
+    "kokkos - unrecognized bounds/limit expression.\n"
+    "Falling back to standard C++ mode but executable could be unstable.">,
     InGroup<BackendOptimizationFailure>;
 def warn_kokkos_reduce_unsupported : Warning<
     "kokkos - reduction constructs are currently unsupported.">,
-    InGroup<BackendOptimizationFailure>;    
+    InGroup<BackendOptimizationFailure>;
 def warn_kokkos_reduce_bad_intermediate_vardecl : Warning<
     "kokkos - failure determining intermediate reduction variable (reverting to C++ mode for construct).">,
     InGroup<BackendOptimizationFailure>;

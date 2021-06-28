@@ -2820,22 +2820,21 @@ LValue CodeGenFunction::EmitDeclRefLValue(const DeclRefExpr *E) {
 
     // Check for captured variables.
     if (E->refersToEnclosingVariableOrCapture()) {
-
       // kitsune: if we are generating a kokkos-based lambda construct
-      // we are likely going to eventually tarnsform it into a parallel 
-      // loop construct. Thus we have to carefully consider how we handle 
-      // captures within the lambda... 
-      // 
+      // we are likely going to eventually tarnsform it into a parallel
+      // loop construct. Thus we have to carefully consider how we handle
+      // captures within the lambda...
+      //
       // kitsune FIXME: Not sure that everything we are doing here is
       // sound...
       if (InKokkosConstruct) {
-	VD = VD->getCanonicalDecl();	
+        VD = VD->getCanonicalDecl();
         auto I = LocalDeclMap.find(VD);
         assert(I != LocalDeclMap.end());
-	if (VD->getType()->isReferenceType())
-	  return EmitLoadOfReferenceLValue(I->second, VD->getType(),
-					   AlignmentSource::Decl);
-	return MakeAddrLValue(I->second, T);
+        if (VD->getType()->isReferenceType())
+          return EmitLoadOfReferenceLValue(I->second, VD->getType(),
+                                           AlignmentSource::Decl);
+        return MakeAddrLValue(I->second, T);
       }
 
       VD = VD->getCanonicalDecl();
@@ -5030,31 +5029,28 @@ RValue CodeGenFunction::EmitRValueForField(LValue LV,
 RValue CodeGenFunction::EmitCallExpr(const CallExpr *E,
                                      ReturnValueSlot ReturnValue) {
   // kitsune: handle kokkos-centric details -- specifically we are
-  // dealing with a case where we transform a lambda construct into 
-  // a traditional loop construct -- thus our result is not a call expr 
-  // but essentially the removal of the call. 
-  // 
-  // FIXME: is this sound in all lambda use cases?  --PM 
-  // 
+  // dealing with a case where we transform a lambda construct into
+  // a traditional loop construct -- thus our result is not a call expr
+  // but essentially the removal of the call.
+  //
+  // TODO: is this path sound in all lambda use cases?  --PM
+  //
   if (getLangOpts().Kokkos) {
     const FunctionDecl *fdecl = E->getDirectCallee();
     if (fdecl) {
       std::string qname = fdecl->getQualifiedNameAsString();
-      if (qname == "Kokkos::parallel_for" || 
+      if (qname == "Kokkos::parallel_for" ||
           qname == "Kokkos::parallel_reduce") {
-	if (EmitKokkosConstruct(E))
-	  return RValue::get(nullptr);
-	// else fall through to standard C++ support. 
-      } else if (getLangOpts().KokkosNoInit &&
-		 (qname == "Kokkos::initialize" ||
-		  qname == "Kokkos::finalize"))
-	// In "no-init" mode we skip code generation for the
-	// Kokkos initialization entry (and finalize) points. 
-	return RValue::get(nullptr);
+	    if (EmitKokkosConstruct(E))
+	      return RValue::get(nullptr);
+    } else if (getLangOpts().KokkosNoInit &&
+		    (qname == "Kokkos::initialize" ||
+  		   qname == "Kokkos::finalize"))
+      return RValue::get(nullptr);
     }
   }
-  
-  
+
+
   // Builtins never have block type.
   if (E->getCallee()->getType()->isBlockPointerType())
     return EmitBlockCallExpr(E, ReturnValue);

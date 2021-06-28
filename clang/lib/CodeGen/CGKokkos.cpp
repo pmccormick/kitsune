@@ -1,7 +1,7 @@
 /**
  ***************************************************************************
- * TODO: Need to update LANL/Triad Copyright notice... 
- * 
+ * TODO: Need to update LANL/Triad Copyright notice...
+ *
  * Copyright (c) 2017, Los Alamos National Security, LLC.
  * All rights reserved.
  *
@@ -60,56 +60,57 @@ using namespace CodeGen;
 namespace {
 
   // Part of the challenge in unwinding all the Kokkos
-  // C++ details is getting through a bunch of implicit 
-  // goop in the AST. Fortunately Clang can help here 
-  // a lot as it has mechanisms to toss out implicit 
-  // constructs and get us closer to the underlying 
-  // expression.  Pulled out of inline code to allow 
-  // for more agressive simplications/modifications 
+  // C++ details is getting through a bunch of implicit
+  // goop in the AST. Fortunately Clang can help here
+  // a lot as it has mechanisms to toss out implicit
+  // constructs and get us closer to the underlying
+  // expression.  Pulled out of inline code to allow
+  // for more agressive simplications/modifications
   // if needed (and reuse across different constructs).
   static const Expr *SimplifyExpr(const Expr *E) {
     return E->IgnoreImplicit()->IgnoreImpCasts();
   }
 
-  // Break apart the various components of a Kokkos 
-  // parallel_for.  This boils down to tearing apart 
-  // a CallExpr.  It helps that at this point we've 
-  // already passed all the "goodness" in semantic 
-  // analysis and other frontend stages.  However, 
-  // there are aspects of what you can do generally 
+  // Break apart the various components of a Kokkos
+  // parallel_for.  This boils down to tearing apart
+  // a CallExpr.  It helps that at this point we've
+  // already passed all the "goodness" in semantic
+  // analysis and other frontend stages.  However,
+  // there are aspects of what you can do generally
   // in Kokkos and what we can tear apart here (both
-  // big picture and in terms of the state of the 
-  // current implementation).  A current set of 
+  // big picture and in terms of the state of the
+  // current implementation).  A current set of
   // limitations are:
-  // 
+  //
   //   - Functors are not supported (primarily given
   //     challenges around separate compilation units)
   //   - 'Named constructs', which Kokkos uses for profiling,
-  //     are extracted but unused. 
-  //   - There are likely many holes in types that are legal 
-  //     constructs but not yet captured/covered in the 
+  //     are extracted but unused.
+  //   - There are likely many holes in types that are legal
+  //     constructs but not yet captured/covered in the
   //     current set of transformations currently implemented.
   //     The code tries to avoid crashing/asserting and instead
   //     falls back to the standard C++ mechanisms. We will start
-  //     ramp up testing as we get more exposure to use cases. 
-  // 
-  static void 
+  //     ramp up testing as we get more exposure to use cases.
+  //
+  static void
   ExtractParallelForComponents(const CallExpr* CE,
-					   std::string &CN, const Expr *& BE, 
-					   const LambdaExpr *& LE)
+					   std::string &CN, const Expr *& BE,
+					   const LambdaExpr *& LE,
+             DiagnosticsEngine &Diags)
   {
-    // Recongized constructs: 
-    // 
+    // Recongized constructs:
+    //
     //   1. parallel_for(N, lambda_expr...);
     //
     //   2. parallel_for("name", N, lambda_expr...);
 
     unsigned int curArgIndex = 0;
 
-    // Check for a 'named' construct.  NOTE: we assume 
-    // this only comes in the form of a string literal. 
-    const Expr *OE = CE->getArg(curArgIndex); // Original expression 
-    const Expr *SE = SimplifyExpr(OE);        // Simplified expression. 
+    // Check for a 'named' construct.  NOTE: we assume
+    // this only comes in the form of a string literal.
+    const Expr *OE = CE->getArg(curArgIndex); // Original expression
+    const Expr *SE = SimplifyExpr(OE);        // Simplified expression.
 
     if (SE->getStmtClass() == Expr::CXXConstructExprClass) {
       const CXXConstructExpr *CXXCE = dyn_cast<CXXConstructExpr>(SE);
@@ -119,12 +120,12 @@ namespace {
         curArgIndex++;
         OE = CE->getArg(curArgIndex);
         SE = SimplifyExpr(OE);
-      } 
-    } 
+      }
+    }
 
-    // Check details of the bounds portion of the parallel_for. 
-    // Note: This can take several forms and it is likely we've 
-    // missed some cases... 
+    // Check details of the bounds portion of the parallel_for.
+    // Note: This can take several forms and it is likely we've
+    // missed some cases...
     if (SE->getStmtClass() == Expr::IntegerLiteralClass) {
       BE = OE;
       curArgIndex++;
@@ -140,7 +141,7 @@ namespace {
       curArgIndex++;
       OE = CE->getArg(curArgIndex);
       SE = SimplifyExpr(OE);
-    } else if (SE->getStmtClass() == Expr::CallExprClass) { 
+    } else if (SE->getStmtClass() == Expr::CallExprClass) {
       BE = OE;
       curArgIndex++;
       OE = CE->getArg(curArgIndex);
@@ -151,7 +152,8 @@ namespace {
       OE = CE->getArg(curArgIndex);
       SE = SimplifyExpr(OE);
     } else {
-      SE->dump();
+      Diags.Report(SE->getExprLoc(), diag::warn_kokkos_unknown_stmt_class);
+      //SE->dump();
       BE = nullptr;
       LE = nullptr;
       return;
@@ -160,6 +162,7 @@ namespace {
     if (SE->getStmtClass() == Expr::LambdaExprClass) {
       LE = dyn_cast<LambdaExpr>(SE);
     } else {
+      Diags.Report(CE->getExprLoc(), diag::warn_kokkos_no_functor);
       LE = nullptr;
       return;
     }
@@ -168,9 +171,9 @@ namespace {
 
 }
 
-// Sort through what sort of Kokkos construct we're looking at 
-// and work on transforming it into a Tapir-centric lowering.  
-// 
+// Sort through what sort of Kokkos construct we're looking at
+// and work on transforming it into a Tapir-centric lowering.
+//
 bool CodeGenFunction::EmitKokkosConstruct(const CallExpr *CE,
                 ArrayRef<const Attr *> Attrs) {
   assert(CE != 0 && "CodeGenFunction::EmitKokkosConstruct: null callexpr passed!");
@@ -185,7 +188,7 @@ bool CodeGenFunction::EmitKokkosConstruct(const CallExpr *CE,
   } else {
     return false;
   }
-}  // hidden/local namespace 
+}  // hidden/local namespace
 
 
 std::vector<const ParmVarDecl*>
@@ -206,8 +209,8 @@ CodeGenFunction::EmitKokkosParallelForInductionVar(const LambdaExpr *Lambda) {
   return params;
 }
 
-void CodeGenFunction::EmitKokkosParallelForCond(const Expr *BoundsExpr, 
-     const ParmVarDecl *InductionVarDecl, 
+void CodeGenFunction::EmitKokkosParallelForCond(const Expr *BoundsExpr,
+     const ParmVarDecl *InductionVarDecl,
      llvm::BasicBlock *DetachBlock,
      llvm::BasicBlock *ExitBlock,
      JumpDest &Sync) {
@@ -216,7 +219,7 @@ void CodeGenFunction::EmitKokkosParallelForCond(const Expr *BoundsExpr,
   if (BoundsExpr->getStmtClass() == Expr::BinaryOperatorClass) {
     RValue RV = EmitAnyExpr(BoundsExpr);
     LoopEnd = RV.getScalarVal();
-  } else { 
+  } else {
     LoopEnd = EmitScalarExpr(BoundsExpr);
   }
 
@@ -224,8 +227,8 @@ void CodeGenFunction::EmitKokkosParallelForCond(const Expr *BoundsExpr,
   unsigned NBits  = LoopEnd->getType()->getPrimitiveSizeInBits();
   unsigned LVBits = InductionVarTy->getPrimitiveSizeInBits();
 
-  // We may need to truncate/extend the range to get it to match 
-  // the type of loop variable. 
+  // We may need to truncate/extend the range to get it to match
+  // the type of loop variable.
   if (NBits > LVBits) {
     LoopEnd = Builder.CreateTrunc(LoopEnd, InductionVarTy);
   } else if (NBits < LVBits) {
@@ -241,29 +244,22 @@ void CodeGenFunction::EmitKokkosParallelForCond(const Expr *BoundsExpr,
 
 bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
               ArrayRef<const Attr *> ForallAttrs) {
-    
+
   // TODO: Need to add code to process any attributes (ForallAttrs).
 
-  // Tease apart the parallel_for into its various components. 
-  std::string      PFName; // construct name (for kokkos profiling)  
+  // Tease apart the parallel_for into its various components.
+  std::string      PFName; // construct name (for kokkos profiling)
   const Expr       *BE = nullptr; // "bounds" expression
-  const LambdaExpr *Lambda = nullptr; // the lambda  
-  ExtractParallelForComponents(CE, PFName, BE, Lambda);
-  
-  if (Lambda == nullptr) { 
-    // The parallel_for doesn't have a (recognizable) lambda expression.  
-    // 
-    // Functor support is problematic as it can live in a different 
-    // compilaton unit.  We always punt and go the pure C++ route in
-    // these cases. 
-    DiagnosticsEngine &Diags = CGM.getDiags();
-    // TODO: should reword this warning terminology. 
-    Diags.Report(CE->getExprLoc(), diag::warn_kokkos_no_functor);
+  const LambdaExpr *Lambda = nullptr; // the lambda
+  DiagnosticsEngine &Diags = CGM.getDiags();
+  ExtractParallelForComponents(CE, PFName, BE, Lambda, Diags);
+
+  if (Lambda == nullptr)
+    // The parallel_for doesn't have a (recognizable) lambda expression.
     return false;
-  }
 
   if (BE == nullptr) {
-    // We didn't get a known bounds expression back -- this is most likely 
+    // We didn't get a known bounds expression back -- this is most likely
     // due to some type of expression that we have yet to deal with.  We're
     // going to have to uncover these on a case-by-cases basis.
     DiagnosticsEngine &Diags = CGM.getDiags();
@@ -283,8 +279,8 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     }
   }
 
-  // Create all jump destinations and basic blocks in the order they 
-  // appear in the IR. 
+  // Create all jump destinations and basic blocks in the order they
+  // appear in the IR.
   JumpDest Condition = getJumpDestInCurrentScope("kokkos.forall.cond");
   llvm::BasicBlock *Detach = createBasicBlock("kokkos.forall.detach");
   llvm::BasicBlock *PForBody = createBasicBlock("kokkos.forall.body");
@@ -294,23 +290,23 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   JumpDest Sync = getJumpDestInCurrentScope("kokkos.forall.sync");
   llvm::BasicBlock *End = createBasicBlock("kokkos.forall.end");
 
-  // Extract a conveince block and setup the lexical scope based on 
-  // the lambda's source range. 
+  // Extract a conveince block and setup the lexical scope based on
+  // the lambda's source range.
   llvm::BasicBlock *ConditionBlock = Condition.getBlock();
-  
+
   const SourceRange &R = CE->getSourceRange();
   LexicalScope PForScope(*this, R);
 
-  // Now we can start the dirty work of transforming the lambda into a 
-  // for loop.  
+  // Now we can start the dirty work of transforming the lambda into a
+  // for loop.
 
 
-  // The first step is to extract the argument to the lambda and transform it into 
+  // The first step is to extract the argument to the lambda and transform it into
   // the loop induction variable.  As part of this we assume the following are true
   // about the parallel_for:
-  //    1. The iterator can be assigned a value of zero. 
+  //    1. The iterator can be assigned a value of zero.
   //    2. We ignore the details of what is captured by the lambda.
-  // 
+  //
   // TODO: Do we need to "relax" these assumptions to support broader code coverage?
   // This is 'equivalent' to the Init statement in a traditional for loop (e.g. int i = 0). 
   const ParmVarDecl *InductionVarDecl; 
@@ -321,24 +317,24 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   llvm::Value *Zero = llvm::ConstantInt::get(ConvertType(InductionVarDecl->getType()), 0);
   Builder.CreateStore(Zero, Addr);
 
-   // Create the sync region. 
+   // Create the sync region.
   PushSyncRegion();
   llvm::Instruction *SRStart = EmitSyncRegionStart();
   CurSyncRegion->setSyncRegionStart(SRStart);
 
-  // TODO: Need to check attributes for spawning strategy. 
+  // TODO: Need to check attributes for spawning strategy.
   LoopStack.setSpawnStrategy(LoopAttributes::DAC);
-  
+
   EmitBlock(ConditionBlock);
-  
+
   LoopStack.push(ConditionBlock, CGM.getContext(), ForallAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 
-  // Store the blocks to use for break and continue. 
+  // Store the blocks to use for break and continue.
   BreakContinueStack.push_back(BreakContinue(Reattach, Reattach));
 
-  // Create a scope for the condition variable cleanup. 
+  // Create a scope for the condition variable cleanup.
   LexicalScope ConditionScope(*this, R);
 
   // Create the conditional.
@@ -360,8 +356,8 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   llvm::Value *GInductionVal = Builder.CreateLoad(GetAddrOfLocalVar(InductionVarDecl));
 
   QualType RefType = InductionVarDecl->getType();
-  
-  // Create the detach terminator 
+
+  // Create the detach terminator
   Builder.CreateDetach(PForBody, Increment, SRStart);
 
   EmitBlock(PForBody);
@@ -381,20 +377,20 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
     InKokkosConstruct = false;
   }
 
-  auto tmp = AllocaInsertPt; 
-  AllocaInsertPt = OldAllocaInsertPt; 
-  tmp->removeFromParent(); 
+  auto tmp = AllocaInsertPt;
+  AllocaInsertPt = OldAllocaInsertPt;
+  tmp->removeFromParent();
 
   // Modify the body to use the ''detach''-local induction variable.
-  // At this point in the codegen, the body block has been emitted 
-  // and we can safely replace the ''sequential`` induction variable 
+  // At this point in the codegen, the body block has been emitted
+  // and we can safely replace the ''sequential`` induction variable
   // within the detach basic block.
   llvm::BasicBlock *CurrentBlock = Builder.GetInsertBlock();
-  for(llvm::Value::use_iterator UI = GInductionVar->use_begin(), UE = GInductionVar->use_end(); 
+  for(llvm::Value::use_iterator UI = GInductionVar->use_begin(), UE = GInductionVar->use_end();
       UI != UE; ) {
     llvm::Use &U = *UI++;
     llvm::Instruction *I = cast<llvm::Instruction>(U.getUser());
-    if (I->getParent() == CurrentBlock) 
+    if (I->getParent() == CurrentBlock)
       U.set(TLInductionVar);
   }
 
@@ -650,4 +646,3 @@ bool CodeGenFunction::EmitKokkosParallelReduce(const CallExpr *CE,
   Diags.Report(CE->getExprLoc(), diag::warn_kokkos_reduce_unsupported);
   return false;
 }
-
