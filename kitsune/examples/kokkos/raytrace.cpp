@@ -171,36 +171,34 @@ int main(int argc, char **argv) {
     int samplesCount = 1 << 7;
     if (argc > 1 ) {samplesCount = atoi(argv[1]);}
     //img.modify_device();
-    for(int t = 0; t < 4; t++) {
-      Kokkos::parallel_for(WIDTH*HEIGHT, KOKKOS_LAMBDA(const int i) {
-          const int x = i % WIDTH;
-          const int y = i / WIDTH;
-          unsigned int v = i;
-          //curand_init( x * y, 0, 0 , &states[y]);
-          const Vec position(-12.0f, 5.0f, 25.0f);
-          const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
-          const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / WIDTH);
-          // Cross-product to get the up vector
-          const Vec up(goal.y *left.z - goal.z * left.y, goal.z *left.x -
-                       goal.x * left.z, goal.x *left.y - goal.y * left.x);
-          Vec color;
-          for (int p = samplesCount; p--;) {
-            Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;
-            color = color + Trace(position, !((goal+rand_left) + left *
-                                              ((x+randomVal(v)) - WIDTH / 2.0f + randomVal(v)) + up *
-                                              ((y+randomVal(v)) - HEIGHT / 2.0f + randomVal(v))), v);
-          }
-          // Reinhard tone mapping
-          color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
-          Vec o = color + 1.0f;
-          color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
-          img.d_view(x,y,0) = color.x;
-          img.d_view(x,y,1) = color.y;
-          img.d_view(x,y,2) = color.z;
-        });
-    }
+    Kokkos::parallel_for(WIDTH*HEIGHT, KOKKOS_LAMBDA(const int i) {
+        const int x = i % WIDTH;
+        const int y = i / WIDTH;
+        unsigned int v = i;
+        //curand_init( x * y, 0, 0 , &states[y]);
+        const Vec position(-12.0f, 5.0f, 25.0f);
+        const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
+        const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / WIDTH);
+        // Cross-product to get the up vector
+        const Vec up(goal.y *left.z - goal.z * left.y, goal.z *left.x -
+                     goal.x * left.z, goal.x *left.y - goal.y * left.x);
+        Vec color;
+        for (int p = samplesCount; p--;) {
+          Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;
+          color = color + Trace(position, !((goal+rand_left) + left *
+                                            ((x+randomVal(v)) - WIDTH / 2.0f + randomVal(v)) + up *
+                                            ((y+randomVal(v)) - HEIGHT / 2.0f + randomVal(v))), v);
+        }
+        // Reinhard tone mapping
+        color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
+        Vec o = color + 1.0f;
+        color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
+        img.d_view(x,y,0) = color.x;
+        img.d_view(x,y,1) = color.y;
+        img.d_view(x,y,2) = color.z;
+      });
     double loop_secs = t.seconds();
-    std::cout << "running time: " << loop_secs/4.0 << std::endl;
+    std::cout << "running time: " << loop_secs << std::endl;
 
     std::ofstream myfile;
     myfile.open ("example.ppm");
