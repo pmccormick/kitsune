@@ -1629,10 +1629,12 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
                                                     << A->getValue();
 
   switch (TapirTarget) {
+
   case TapirTargetID::Cheetah:
     CmdArgs.push_back("-lcheetah");
     CmdArgs.push_back("-lpthread");
     break;
+
   case TapirTargetID::OpenCilk: {
     bool StaticOpenCilk = Args.hasArg(options::OPT_static_libopencilk) ||
                               Args.hasArg(options::OPT_static);
@@ -1684,6 +1686,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       CmdArgs.push_back("-Bdynamic");
     CmdArgs.push_back("-lpthread");
 
+    /*
     if (KITSUNE_ENABLE_OPENCILKRTS_TARGET) {
       CmdArgs.push_back("-L" OPENCILKRTS_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
@@ -1696,11 +1699,13 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
         CmdArgs.push_back("-lopencilk-personality-cpp");
       else
         CmdArgs.push_back("-lopencilk-personality-c");
+
       ExtractArgsFromString(OPENCILKRTS_EXTRA_LINK_LIBS, CmdArgs, Args);
     } else {
-      // FIXME: we should hard error here if cilkrts support was not built-in.
-      getDriver().Diag(diag::warn_cilkrts_missing_build_params);
+      // FIXME: we should hard error here if open cilkrts support was not built-in.
+      getDriver().Diag(diag::warn_opencilkrts_missing_build_params);
     }
+    */
     break;
   }
   case TapirTargetID::Cilk:
@@ -1806,6 +1811,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
 
   case TapirTargetID::OpenCL:
+    break;
     if (KITSUNE_ENABLE_OPENCL_TARGET) {
       CmdArgs.push_back("-L" OPENCL_LIBRARY_DIR);
       if (Triple.isOSDarwin()) {
