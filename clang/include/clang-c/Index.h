@@ -2662,7 +2662,11 @@ enum CXCursorKind {
    */
   CXCursor_CilkForStmt = 308,
 
-  CXCursor_LastStmt = CXCursor_CilkForStmt,
+  /** A _Cilk_scope statement.
+   */
+  CXCursor_CilkScopeStmt                 = 292,
+
+  CXCursor_LastStmt = CXCursor_CilkScopeStmt,
 
   /**
    * Cursor that represents the translation unit itself.

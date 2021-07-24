@@ -1401,6 +1401,7 @@ void ExprEngine::Visit(const Stmt *S, ExplodedNode *Pred,
     case Stmt::CilkSpawnStmtClass:
     case Expr::CilkSpawnExprClass:
     case Stmt::CilkSyncStmtClass:
+    case Stmt::CilkScopeStmtClass:
     case Stmt::CoroutineBodyStmtClass:
     case Stmt::CoawaitExprClass:
     case Stmt::DependentCoawaitExprClass:
