@@ -82,7 +82,7 @@ class Driver {
     CLMode,
     FlangMode,
     DXCMode
-    KitsuneMode, 
+    KitsuneMode,
     KokkosMode,
     FleCSIMode
   } Mode;
@@ -174,6 +174,9 @@ public:
   /// User directory for config files.
   std::string UserConfigDir;
 
+  /// Kitsune directory for config files.
+  std::string KitsuneConfigDir;
+
   /// A prefix directory used to emulate a limited subset of GCC's '-Bprefix'
   /// functionality.
   /// FIXME: This type of customization should be removed in favor of the
@@ -212,9 +215,9 @@ public:
   using InputList = SmallVector<InputTy, 16>;
 
   /// Whether the driver should follow g++ like behavior.
-  /// kitsune: Modified to reflect that Kokkos and FleCSI 
-  /// modes also imply GXXMode. 
-  bool CCCIsCXX() const { return Mode == GXXMode    || 
+  /// kitsune: Modified to reflect that Kokkos and FleCSI
+  /// modes also imply GXXMode.
+  bool CCCIsCXX() const { return Mode == GXXMode    ||
                                  Mode == KokkosMode ||
                                  Mode == FleCSIMode; }
 
@@ -240,7 +243,7 @@ public:
   /// Whether the driver should follow custom Kokkos behaviors.
   bool IsKokkosMode() const { return Mode == KokkosMode; }
 
-  /// kitsune: Whether the driver should follow custom FleCSI behaviors. 
+  /// kitsune: Whether the driver should follow custom FleCSI behaviors.
   bool isFleCSIMode() const { return Mode == FleCSIMode; }
 
   /// Only print tool bindings, don't build any jobs.

@@ -10,6 +10,6 @@ if (NOT KITSUNE_BUILD_TESTS)
   set(EXCLUDE_FROM_ALL ON)
 endif()
 
-if (KITSUNE_ENABLE_REALM_TARGET)
+if (TAPIR_ENABLE_REALM_TARGET)
   add_subdirectory(Realm)
 endif()

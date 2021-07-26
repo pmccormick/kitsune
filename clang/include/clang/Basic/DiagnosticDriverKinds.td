@@ -757,5 +757,28 @@ def warn_kokkos_missing_build_params : Warning<
   "'-fkokkos' mode enabled but build configuration did not include support.">,
   InGroup<UnknownRuntime>;
 
+def warn_missing_tapir_opencilk_config_opts : Warning<
+  "Unable to find configuration options file ('opencilk-opts.cfg') for "
+  "'-ftapir=opencilk' option.">, InGroup<UnknownRuntime>;
+
+def warn_missing_tapir_qthreads_config_opts : Warning<
+  "Unable to find configuration options file ('qtheads-opts.cfg') for "
+  "'-ftapir=qthreads' option.">, InGroup<UnknownRuntime>;
+
+def warn_missing_tapir_realm_config_opts : Warning<
+  "Unable to find configuration options file ('realm-opts.cfg') for "
+  "'-ftapir=realm' option.">, InGroup<UnknownRuntime>;
+
+def warn_missing_tapir_cuda_config_opts : Warning<
+  "Unable to find configuration options file ('cuda-opts.cfg') for "
+  "'-ftapir=cuda' option.">, InGroup<UnknownRuntime>;
+
+def warn_missing_tapir_opencl_config_opts : Warning<
+  "Unable to find configuration options file ('opencl-opts.cfg') for "
+  "'-ftapir=opencl' option.">, InGroup<UnknownRuntime>;
+
+def warn_missing_kitsune_kokkos_opts : Warning<
+  "'Unable to find configuration options file ('kokkos-opts.cfg') for "
+  "'-fkokkos' option.">, InGroup<UnknownRuntime>;
 // -----+
 }

@@ -7,13 +7,25 @@
 # build, see runtimes/CMakeLists.txt, except that we currently check whether
 # compiler-rt is being built to determine whether to first build builtins
 # or not so we need that information in this file as well.
-set(LLVM_ALL_RUNTIMES "cheetah;cilktools;compiler-rt;libc;libcxx;libcxxabi;libunwind;openmp")
+set(LLVM_ALL_RUNTIMES
+  "cheetah;cilktools;compiler-rt;libcxx;libcxxabi;libunwind;openmp;kitsune")
 set(LLVM_ENABLE_RUNTIMES "" CACHE STRING
   "Semicolon-separated list of runtimes to build (${LLVM_ALL_RUNTIMES}), or \"all\".")
 if(LLVM_ENABLE_RUNTIMES STREQUAL "all" )
   set(LLVM_ENABLE_RUNTIMES ${LLVM_ALL_RUNTIMES})
 endif()
 set(COMMON_CMAKE_ARGS "-DHAVE_LLVM_LIT=ON")
+
+if ("cheetah" IN_LIST LLVM_ENABLE_RUNTIMES)
+  message(STATUS "cheetah is in the enabled runtimes list.")
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../cheetah)
+  FetchContent_GetProperties(cheetahrt)
+  if (NOT cheetahrt_POPULATED)
+    message(STATUS "     NOTE: <<<< fetching cheetah runtime source via git... >>>>")
+    FetchContent_Populate(cheetahrt)
+  endif()
+endif()
+
 foreach(proj ${LLVM_ENABLE_RUNTIMES})
   set(proj_dir "${CMAKE_CURRENT_SOURCE_DIR}/../../${proj}")
   if(IS_DIRECTORY ${proj_dir} AND EXISTS ${proj_dir}/CMakeLists.txt)

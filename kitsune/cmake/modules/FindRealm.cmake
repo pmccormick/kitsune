@@ -6,8 +6,6 @@
 #  Realm_LIBRARY_DIR -- path to where the Realm library is installed.
 #  Realm_LINK_LIBS   -- set of link libraries (e.g. -lrealm)
 
-message(STATUS "Looking for Realm runtime...")
-
 find_path(Realm_INCLUDE_DIR realm.h
   PATHS /usr/local/include
         /opt/include
@@ -34,8 +32,6 @@ find_package_handle_standard_args(Realm DEFAULT_MSG
 
 if (Realm_FOUND)
 
-  message(STATUS "Found Realm runtime.")
-
   get_filename_component(Realm_LIBRARY_DIR
                          ${Realm_LIBRARY}
                          DIRECTORY
@@ -61,3 +57,4 @@ endif()
   message(WARNING "Could not find Realm runtime.")
 
 endif()
+

@@ -147,14 +147,14 @@ void OpenCilkABI::prepareModule() {
     Optional<std::string> path; 
     if("" == RuntimeBCPath){
       path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk-abi.bc");
-      assert(path.hasValue() &&
-             "Couldn't find OpenCilk runtime bitcode file in LD_LIBRARY_PATH.");
+      if (! path.hasValue())
+        report_fatal_error("Could not find OpenCilk runtime bitcode file " 
+                           "(libopencilk-abi.bc) in LD_LIBRARY_PATH.");
     } else {
       path = OpenCilkRuntimeBCPath.getValue();
     }
-
     LLVM_DEBUG(dbgs() << "Using external bitcode file for OpenCilk ABI: "
-                      << RuntimeBCPath << "\n");
+                      << path << "\n");
     SMDiagnostic SMD;
 
     // Parse the bitcode file.  This call imports structure definitions, but not

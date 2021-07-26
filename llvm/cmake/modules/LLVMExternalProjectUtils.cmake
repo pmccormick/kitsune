@@ -347,13 +347,13 @@ function(llvm_ExternalProject_Add name source_dir)
     EXCLUDE_FROM_MAIN 1
     USES_TERMINAL 1
     )
-  ExternalProject_Add_StepTargets(${name} clean)
+  #ExternalProject_Add_StepTargets(${name} clean)
 
-  if(ARG_USE_TOOLCHAIN)
-    add_dependencies(${name}-clean ${name}-clobber)
-    set_target_properties(${name}-clean PROPERTIES
-      SOURCES ${CMAKE_CURRENT_BINARY_DIR}/${name}-clobber-stamp)
-  endif()
+  #if(ARG_USE_TOOLCHAIN)
+  #  add_dependencies(${name}-clean ${name}-clobber)
+  #  set_target_properties(${name}-clean PROPERTIES
+  #    SOURCES ${CMAKE_CURRENT_BINARY_DIR}/${name}-clobber-stamp)
+  #endif()
 
   if(NOT ARG_NO_INSTALL)
     install(CODE "execute_process\(COMMAND \${CMAKE_COMMAND} -DCMAKE_INSTALL_PREFIX=\${CMAKE_INSTALL_PREFIX} -DCMAKE_INSTALL_DO_STRIP=\${CMAKE_INSTALL_DO_STRIP} -P ${BINARY_DIR}/cmake_install.cmake\)"

@@ -131,7 +131,6 @@ if(CLANG_BUILT_STANDALONE)
   endif()
 
   include_directories("${LLVM_BINARY_DIR}/include" "${LLVM_MAIN_INCLUDE_DIR}")
-  message(STATUS "kitsune dirs: ${KITSUNE_SOURCE_DIR} ${KITSUNE_BINARY_DIR}")
   link_directories("${LLVM_LIBRARY_DIR}")
 
   set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin )
@@ -214,8 +213,6 @@ list(INSERT CMAKE_MODULE_PATH 0
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules"
   "${LLVM_COMMON_CMAKE_UTILS}/Modules"
   )
-
-add_subdirectory(kitsune)
 
 if(LLVM_ENABLE_LIBXML2)
   # Don't look for libxml if we're using MSan, since uninstrumented third party
