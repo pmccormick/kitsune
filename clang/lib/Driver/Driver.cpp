@@ -1233,6 +1233,17 @@ bool Driver::loadConfigFile() {
     }
   }
 
+  #if defined(KITSUNE_CONFIG_FILE_DIR)
+  // If a config file is not specified explicity, make a pass over
+  // Kitsune-centric paths based on what modes we are running in.
+  if (CfgFileName.empty()) {
+    if (CLOptions->hasArg(options::options::OPT_fkokkos)) {
+
+    }
+  }
+  #endif
+
+
   // If config file is not specified explicitly, try to deduce configuration
   // from executable name. For instance, an executable 'armv7l-clang' will
   // search for config file 'armv7l-clang.cfg'.
