@@ -65,10 +65,9 @@
 /* Directories clang will search for headers */
 #define C_INCLUDE_DIRS "${C_INCLUDE_DIRS}"
 
-/* Directories clang will search for configuration files */
+/* Directories clang will search for configuration files w/ kitsune+tapir extensions */
 #cmakedefine CLANG_CONFIG_FILE_SYSTEM_DIR "${CLANG_CONFIG_FILE_SYSTEM_DIR}"
 #cmakedefine CLANG_CONFIG_FILE_USER_DIR "${CLANG_CONFIG_FILE_USER_DIR}"
-#cmakedefine KITSUNE_CONFIG_FILE_USER_DIR "${KITSUNE_CONFIG_FILE_DIR}"
 
 /* Default <path> to all compiler invocations for --sysroot=<path>. */
 #define DEFAULT_SYSROOT "${DEFAULT_SYSROOT}"
@@ -131,5 +130,10 @@
 #cmakedefine01 KITSUNE_ENABLE_CUDA
 #define KITSUNE_CUDA_LIBRARY_DIR         "${CUDA_LIBRARY_DIR}"
 #define KITSUNE_CUDA_LINK_LIBS           "${CUDA_LINK_LIBS}"
+
+#cmakedefine01 CLANG_ENABLE_KITSUNE 
+#if defined(CLANG_ENABLE_KITSUNE)
+#include "kitsune.h"
+#endif
 
 #endif

@@ -1,0 +1,6 @@
+# Flags for the Kokkos mode (-fkokkos).
+# CXX flags 
+${KITSUNE_KOKKOS_CXX_FLAGS}
+# Link flags and link libraries.
+${KITSUNE_KOKKOS_EXTRA_LINK_FLAGS} ${KITSUNE_KOKKOS_LINK_LIBS_FLAGS}
+

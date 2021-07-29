@@ -45,31 +45,13 @@ set(clang_option_files "")
 
 # add a set of compiler options to the given configuration file.
 # this file can be used via clang's --config command line argument.
-function(add_options_file OUT_FILE flags cfg_comment)
-  set(CONTENTS "")
-  if (EXISTS $OUT_FILE)
-    file(READ ${OUT_FILE} CONTENTS)
-  endif()
-  string(APPEND CONTENTS
-    "# ${cfg_comment}\n"
-    "${flags}\n\n"
-  )
-  file(CONFIGURE OUTPUT ${OUT_FILE}
-    CONTENT "${CONTENTS}"
-    )
-  if (NOT "${OUT_FILE}" IN_LIST option_files)
+function(create_cfg_file OUTFILE )
+  message(STATUS "creating clang configure file: ${OUTFILE}")
+  file(WRITE ${OUTFILE} ${ARGN})
+  if (NOT ${OUTFILE} IN_LIST option_files)
     set(option_files ${option_files} ${OUT_FILE} PARENT_SCOPE)
   endif()
 endfunction()
-
-# create a concatenated configuration file that includes both compile
-# and link configuration files.
-function(pair_cfg_files COMP_FILE LINK_FILE OUT_FILE)
-  file(WRITE ${OUT_FILE}
-    "@${COMP_FILE}\n@${LINK_FILE}"
-  )
-endfunction()
-
 
 # TODO: much of the code below can use some functions to clean it and avoid 
 # so much redundancy... 
@@ -110,73 +92,49 @@ if (KITSUNE_ENABLE_KOKKOS)
       message(STATUS "kitsune: A Kokkos installation was found.")
     endif()
 
-    add_options_file("${LLVM_BINARY_DIR}/kitsune/share/kokkos-clang-opts.cfg"
-      "-I${Kokkos_INCLUDE_DIR} -I${CMAKE_INSTALL_PREFIX}/include"
-      "kokkos compile flags."
-    )
-    add_options_file("${LLVM_BINARY_DIR}/kitsune/share/kokkos-link-opts.cfg"
-      "-L${Kokkos_LIBRARY_DIR} ${Kokkos_LINK_LIBS}"
-      "kokkos link flags."
-    )
-    pair_cfg_files(
-      "${LLVM_BINARY_DIR}/kitsune/share/kokkos-clang-opts.cfg"
-      "${LLVM_BINARY_DIR}/kitsune/share/kokkos-link-opts.cfg"
-      "${LLVM_BINARY_DIR}/kitsune/share/kokkos-opts.cfg"
+    # Generate a Clang configure (.cfg) file specifically tailored to
+    # support the -fkokkos flag.
+    set(_kokkos_cfg_filename ${LLVM_BINARY_DIR}/share/kitsune/kokkos.cfg)
+    create_cfg_file(${_kokkos_cfg_filename}
+      "# compile flags:\n"
+      "-I${Kokkos_INCLUDE_DIR} -I${CMAKE_INSTALL_PREFIX}/include\n"
+      "# link flags:\n"
+      "-L${Kokkos_LIBRARY_DIR} ${Kokkos_LINK_LIBS}\n"
     )
     install(FILES
-      ${LLVM_BINARY_DIR}/kitsune/share/kokkos-clang-opts.cfg
-      ${LLVM_BINARY_DIR}/kitsune/share/kokkos-link-opts.cfg
-      ${LLVM_BINARY_DIR}/kitsune/share/kokkos-opts.cfg
+      ${_kokkos_cfg_filename}
       DESTINATION 
       ${CMAKE_INSTALL_PREFIX}/share/kitsune/
     )
+    unset(_kokkos_cfg_filename)
   endif()  
 else()
   message(STATUS "kitsune: Kokkos support disabled.")
 endif()
 
-
 #
 # CUDA runtime support. 
 #
-option(KITSUNE_ENABLE_CUDA  "Enable CUDA code generation and library." ON)
-if (KITSUNE_ENABLE_CUDA)
-  if (DEFINED ENV{CUDA_PATH})
-    message("kitsune: CUDA root path found in users's environment.")
-    set(CUDA_INCLUDE_DIR $ENV{CUDA_PATH}/include CACHE STRING "CUDA runtime include path.")
-    set(CUDA_LIBRARY_DIR $ENV{CUDA_PATH}/lib CACHE STRING "CUDA runtime library path.")
-    set(CUDA_LINK_LIBS   "-lcudart" CACHE STRING "Link libraries for CUDA runtime and supporting libraries.")
-    set(KITSUNE_ENABLE_CUDACG ON "Enabled Kitsune+Tapir CUDA code generation target library.")
-  else()
-    message(STATUS "kitsune: Looking for a CUDA Toolkit installation...")
-    find_package(CUDAToolkit)
-    if (NOT CUDAToolkit_FOUND)
-      message(SEND_ERROR "kitsune: CUDA was not found -- but KITSUNE_ENABLE_CUDA is set.")
-    else()
-      # TODO: since our code generation occurs in the mid-stage of the compiler in kitsune+tapir 
-      # we really don't need to worry about include files... 
-      add_options_file("${LLVM_BINARY_DIR}/kitsune/share/cuda-clang-opts.cfg"
-        "-I${CUDAToolKit_INCLUDE_DIRS}"
-        "CUDA runtime target compile flags."
-      )
-      add_options_file("${LLVM_BINARY_DIR}/kitsune/share/realm-link-opts.cfg"
-        "-L${CUDAToolKit_LIBRARY_DIR}"
-        "Realm link libraries."
-      )
-      # careful pairing -- we need to point at the eventual installed files vs. 
-      # the local build.
-      pair_cfg_files(
-        "${CMAKE_INSTALL_PREFIX}/share/kitsune/cuda-clang-opts.cfg"
-        "${CMAKE_INSTALL_PREFIX}/share/kitsune/cuda-link-opts.cfg"
-        "${LLVM_BINARY_DIR}/kitsune/share/realm-opts.cfg"
-      )
+option(Kitsune_ENABLE_CUDATK  "Enable the CUDA support (codegen runtime + ABI transform)." ON)
+if (Kitsune_ENABLE_CUDAToolkit)
+  message(STATUS "kitsune: Cuda Toolkit support enabled. Configuring...")
+  # TODO: Enable CUDA language. 
+  find_package(CUDAToolkit 11 REQUIRED)
 
-      install(FILES 
-        ${LLVM_BINARY_DIR}/kitsune/share/cuda-clang-opts.cfg
-        ${LLVM_BINARY_DIR}/kitsune/share/cuda-link-opts.cfg
-        ${LLVM_BINARY_DIR}/kitsune/share/cuda-opts.cfg
+  
+
+
+    else()
+      set(_cuda_cfg_filename ${LLVM_BINARY_DIR}/share/kitsune/cuda.cfg)
+      create_cfg_file(${_cuda_cfg_filename}
+        "# NOTE: given cuda is an ABI target, we only need link-time flags.\n"
+        "-L${CUDAToolkit_LIBRARY_DIR} -lcudart\n"
+      )
+      install(FILES
+        ${_cuda_cfg_filename}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/share/kitsune/
       )
+      unset(_cuda_cfg_filename)
     endif()
   endif()
 endif()
@@ -215,28 +173,17 @@ if (KITSUNE_ENABLE_REALM)
     else()
       # TODO: since our code generation occurs in the mid-stage of the compiler in kitsune+tapir 
       # we really don't need to worry about include files... 
-      add_options_file("${LLVM_BINARY_DIR}/kitsune/share/realm-clang-opts.cfg"
-        "-I${Realm_INCLUDE_DIRS}"
-        "Realm runtime compile flags."
+      set(_realm_cfg_filename ${LLVM_BINARY_DIR}/share/kitsune/realm.cfg)
+      create_cfg_file(${_realm_cfg_filename}
+        "# NOTE: given realm is an ABI target, we only need link-time flags.\n"
+        "-L${Realm_LIBRARY_DIR} ${Realm_LINK_LIBS}\n"
       )
-      add_options_file("${LLVM_BINARY_DIR}/kitsune/share/realm-link-opts.cfg"
-        "-L${Realm_LIBRARY_DIR}"
-        "Realm link libraries."
-      )
-      # careful pairing -- we need to point at the eventual installed files vs. 
-      # the local build.
-      pair_cfg_files(
-        "${CMAKE_INSTALL_PREFIX}/share/kitsune/realm-clang-opts.cfg"
-        "${CMAKE_INSTALL_PREFIX}/share/kitsune/realm-link-opts.cfg"
-        "${LLVM_BINARY_DIR}/kitsune/share/realm-opts.cfg"
-      )
-
+ 
       install(FILES
-        ${LLVM_BINARY_DIR}/kitsune/share/realm-clang-opts.cfg
-        ${LLVM_BINARY_DIR}/kitsune/share/realm-link-opts.cfg
-        ${LLVM_BINARY_DIR}/kitsune/share/realm-opts.cfg
+        ${_realm_cfg_filename}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/share/kitsune/
       )
+      unset(_realm_cfg_filename)
     endif()
   endif()
 endif()
@@ -256,37 +203,22 @@ if (KITSUNE_ENABLE_QTHREADS)
     find_package(Qthreads)
     if (NOT Qthreads_FOUND)
       message(SEND_ERROR "kitsune: Qthreads was not found -- but KITSUNE_ENABLE_QTHREADS is set.")
-      # TODO: qthreads doesn't (last time I looked) a Cmake build option so we'll just punt here if it 
-      # becomes important to get a fetch+config+install of qthreads going... 
+      # TODO: qthreads doesn't neatly fit into an integrated Cmake build for now.  So, we'll punt 
+      # here and let the user hand-build the install... 
     else()
-      # TODO: since our code generation occurs in the mid-stage of the compiler in kitsune+tapir 
-      # we really don't need to worry about include files... 
-      add_options_file("${LLVM_BINARY_DIR}/kitsune/share/qthreads-clang-opts.cfg"
-        "-I${Qthreads_INCLUDE_DIRS}"
-        "Qthreads runtime compile flags."
+      set(_qthreads_cfg_filename ${LLVM_BINARY_DIR}/share/kitsune/qthreads.cfg)
+      create_cfg_file(${_qthreads_cfg_filename}
+        "# NOTE: given qthreads is an ABI target, we only need link-time flags.\n"
+        "-L${Qthreads_LIBRARY_DIR} ${Qthreads_LINK_LIBS}\n"
       )
-      add_options_file("${LLVM_BINARY_DIR}/kitsune/share/qthreads-link-opts.cfg"
-        "-L${Qthreads_LIBRARY_DIR} ${Qthreads_LINK_LIBS}"
-        "Qthreads link libraries."
-      )
-      # careful pairing -- we need to point at the eventual installed files vs. 
-      # the local build.
-      pair_cfg_files(
-        "${CMAKE_INSTALL_PREFIX}/share/kitsune/qthreads-clang-opts.cfg"
-        "${CMAKE_INSTALL_PREFIX}/share/kitsune/qthreads-link-opts.cfg"
-        "${LLVM_BINARY_DIR}/kitsune/share/qthreads-opts.cfg"
-      )
-
       install(FILES
-        ${LLVM_BINARY_DIR}/kitsune/share/qthreads-clang-opts.cfg
-        ${LLVM_BINARY_DIR}/kitsune/share/qthreads-link-opts.cfg
-        ${LLVM_BINARY_DIR}/kitsune/share/qthreads-opts.cfg
+        ${_qthreads_cfg_filename}
         DESTINATION ${CMAKE_INSTALL_PREFIX}/share/kitsune/
       )
+      unset(_qthreads_cfg_filename)
     endif()
   endif()
 endif()
-
 
 if (KITSUNE_INCLUDE_TESTS)
   add_subdirectory(tests)

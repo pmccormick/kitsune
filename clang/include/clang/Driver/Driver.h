@@ -176,6 +176,15 @@ public:
 
   /// Kitsune directory for config files.
   std::string KitsuneConfigDir;
+  std::string KitsuneKokkosCfgFile;
+  std::string TapirSerialCfgFile;
+  std::string TapirOpenCilkCfgFile;
+  std::string TapirCudaCfgFile;
+  std::string TapirRealmCfgFile;
+  std::string TapirOpenMPCfgFile;
+  std::string TapirQthreadsCfgFile;
+  std::string TapirOpenCLCfgFile;
+  std::string TapirHIPCfgFile;
 
   /// A prefix directory used to emulate a limited subset of GCC's '-Bprefix'
   /// functionality.
@@ -694,6 +703,11 @@ private:
 
   /// Tries to load options from configuration file.
   ///
+  /// \p DefaultMode (true) enables the driver's default mode 
+  /// for processing configuration files.  If set to false, extra 
+  /// steps will be taken to load a kitsune+tapir set of default 
+  /// configuration files (for kokkos, runtime targets, etc.). 
+  ///
   /// \returns true if error occurred.
   bool loadConfigFile();
 
@@ -706,6 +720,10 @@ private:
   /// Set the driver mode (cl, gcc, etc) from the value of the `--driver-mode`
   /// option.
   void setDriverMode(StringRef DriverModeValue);
+
+  //bool isCompileOnly();
+  //bool isLinkOnly();
+  //bool isCompileAndLink();
 
   /// Parse the \p Args list for LTO options and record the type of LTO
   /// compilation based on which -f(no-)?lto(=.*)? option occurs last.

@@ -1,0 +1,3 @@
+# Flags for the OpenCilk runtime ABI target.
+${KITSUNE_OPENCILK_TARGET_EXTRA_LINK_FLAGS} 
+

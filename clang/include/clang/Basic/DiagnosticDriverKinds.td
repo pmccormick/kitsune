@@ -781,4 +781,27 @@ def warn_missing_kitsune_kokkos_opts : Warning<
   "'Unable to find configuration options file ('kokkos-opts.cfg') for "
   "'-fkokkos' option.">, InGroup<UnknownRuntime>;
 // -----+
+
+def warn_drv_missing_cfg_file : Warning<
+  "cannot find clang configuration file, %0, in support of option: %1.">;
+def err_drv_cannot_read_kitsune_cfg_file : Error<
+  "cannot read clang configuration file, %0, in support of option: %1.">;
+
+// catching configuration issues at build is a pain w/out a ton of #ifdef 
+// litter.  we instead opt to warning users in cases where the options are
+// used but were not enabled at build time.  
+def warn_drv_kokkos_disabled : Warning<
+  "kokkos support was not enabled when clang was built.">;
+def warn_drv_openmp_rt_target_disabled : Warning<
+  "the openmp runtime ABI transform target was not enabled when clang was built.">;
+def warn_drv_qthreads_rt_target_disabled: Warning<
+  "the qthreads runtime ABI transform target was not enabled when clang was built.">;
+def warn_drv_realm_rt_target_disabled: Warning<
+  "the realm runtime ABI transform target was not enabled when clang was built.">;
+def warn_drv_cudatk_target_disabled: Warning<
+  "the cuda toolkit runtime ABI transform target was not enabled when clang was built.">;
+def warn_drv_hip_target_disabled: Warning<
+  "the hip runtime ABI transform target was not enabled when clang was built.">;
+def warn_drv_opencl_target_disabled: Warning<
+  "the opencl toolkit runtime ABI transform target was not enabled when clang was built.">;
 }
