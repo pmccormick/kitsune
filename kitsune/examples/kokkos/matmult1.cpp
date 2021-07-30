@@ -11,8 +11,8 @@
 //    * -ftapir=rt-target : the runtime ABI to target. 
 // 
 #include <cstdio>
-#include <kitsune/timer.h>
-#include <Kokkos_Core.hpp>
+#include "Kokkos_Core.hpp"
+#include "kitsune/timer.h"
 
 using namespace std;
 using namespace kitsune;

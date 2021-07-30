@@ -229,9 +229,10 @@ Driver::Driver(StringRef ClangExecutable, StringRef TargetTriple,
   UserConfigDir = CLANG_CONFIG_FILE_USER_DIR;
 #endif
 
-#if defined(KITSUNE_CONFIG_FILE_DIR)
-  KitsuneConfigDir = KITSUNE_CONFIG_FILE_DIR;
+#if defined(CLANG_CONFIG_FILE_KITSUNE_DIR)
+  KitsuneConfigDir = CLANG_CONFIG_FILE_KITSUNE_DIR;
 #endif
+
 #if defined(KITSUNE_KOKKOS_CFG_FILENAME)
   KitsuneKokkosCfgFile = KITSUNE_KOKKOS_CFG_FILENAME;
 #else 
@@ -1236,10 +1237,10 @@ bool Driver::loadConfigFile() {
           UserConfigDir = static_cast<std::string>(CfgDir);
       }
     }
-    if (CLOptions->hasArg(options::OPT_kitsune_config_dir_EQ)) {
+    if (CLOptions->hasArg(options::OPT_config_kitsune_dir_EQ)) {
       SmallString<128> CfgDir;
       CfgDir.append(
-          CLOptions->getLastArgValue(options::OPT_kitsune_config_dir_EQ));
+          CLOptions->getLastArgValue(options::OPT_config_kitsune_dir_EQ));
       if (!CfgDir.empty()) {
         if (llvm::sys::fs::make_absolute(CfgDir).value() != 0)
           KitsuneConfigDir.clear();
@@ -1296,15 +1297,16 @@ bool Driver::loadConfigFile() {
     llvm::SmallString<128> KokkosCfgFilePath;
     if (searchForFile(KokkosCfgFilePath, CfgFileSearchDirs,
                       KitsuneKokkosCfgFile)) {
-      if (readConfigFile(KokkosCfgFilePath)) {
+      if (readConfigFile(KokkosCfgFilePath))
         Diag(diag::err_drv_cannot_read_kitsune_cfg_file) 
            << KokkosCfgFilePath << "-fkokkos";
-        return true;
-      }
     } else {
       Diag(diag::warn_drv_missing_cfg_file) 
         << KitsuneKokkosCfgFile
         << "-fkokkos";
+      for (const std::string &SearchDir : CfgFileSearchDirs)
+        if (!SearchDir.empty())
+          Diag(diag::note_drv_config_file_searched_in) << SearchDir;
     }
   }
   
@@ -1331,11 +1333,13 @@ bool Driver::loadConfigFile() {
           if (readConfigFile(TapirTargetCfgFilePath)) {
             Diag(diag::err_drv_cannot_read_kitsune_cfg_file)
               << TapirTargetCfgFilePath << A->getValue();
-            return true;
           }
         } else {
           Diag(diag::warn_drv_missing_cfg_file)
             << TapirTargetCfgFileName << A->getValue();
+          for (const std::string &SearchDir : CfgFileSearchDirs)
+            if (!SearchDir.empty())
+              Diag(diag::note_drv_config_file_searched_in) << SearchDir;
         }
       }
     }

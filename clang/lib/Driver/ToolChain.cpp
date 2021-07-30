@@ -1697,28 +1697,31 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
   case TapirTargetID::OpenMP:
     if (! KITSUNE_ENABLE_OPENMP_TARGET)
-      getDriver().Diag(diag::warn_openmp_rt_target_disabled);
+      getDriver().Diag(diag::warn_drv_openmp_target_disabled);
     break;
 
   case TapirTargetID::Qthreads:
     if (! KITSUNE_ENABLE_QTHREADS_TARGET)
-      getDriver().Diag(daig::warn_qthreads_rt_target_disabled);
+      getDriver().Diag(diag::warn_drv_qthreads_target_disabled);
     break;
 
   case TapirTargetID::Realm:
     if (! KITSUNE_ENABLE_REALM_TARGET)
-      getDriver().Diag(daig::warn_realm_rt_target_disabled);
+      getDriver().Diag(diag::warn_drv_realm_target_disabled);
     break;
 
   case TapirTargetID::Cuda:
   case TapirTargetID::KitCuda:
     if (! KITSUNE_ENABLE_CUDATK_TARGET)
-      getDriver().Diag(diag::warn_cudatk_rt_target_disabled);
+      getDriver().Diag(diag::warn_drv_cudatk_target_disabled);
     break;
 
   case TapirTargetID::OpenCL:
     if (! KITSUNE_ENABLE_OPENCL_TARGET)
-      getDriver().Diag(diag::warn_opencl_rt_target_disabled);
+      getDriver().Diag(diag::warn_drv_opencl_target_disabled);
+    break;
+
+  case TapirTargetID::None:
     break;
 
   default:
@@ -1728,7 +1731,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
 
   if (D.CCCIsCXX() && Args.hasArg(options::OPT_fkokkos)) {
     if (! KITSUNE_ENABLE_KOKKOS_SUPPORT)
-      getDriver().Diag(diag::warn_kokkos_disabled);
+      getDriver().Diag(diag::warn_drv_kokkos_disabled);
 
   }
 }

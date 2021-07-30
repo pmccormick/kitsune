@@ -468,15 +468,9 @@ KEYWORD(_Cilk_sync                  , KEYALL)
 KEYWORD(_Cilk_for                   , KEYALL)
 KEYWORD(_Cilk_scope                 , KEYALL)
 // Kitsune Extensions
-#ifdef KITSUNE_MANGLE_PARALLEL_KEYWORDS
 KEYWORD(_kitsune_spawn              , KEYKITSUNE)
 KEYWORD(_kitsune_sync               , KEYKITSUNE)
 KEYWORD(_kitsune_forall             , KEYKITSUNE)
-#else
-KEYWORD(spawn                       , KEYKITSUNE)
-KEYWORD(sync                        , KEYKITSUNE)
-KEYWORD(forall                      , KEYKITSUNE)
-#endif
 
 // MSVC12.0 / VS2013 Type Traits
 TYPE_TRAIT_1(__is_destructible, IsDestructible, KEYMS)

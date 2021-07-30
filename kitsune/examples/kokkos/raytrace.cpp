@@ -4,16 +4,17 @@
 //   - https://fabiensanglard.net/revisiting_the_pathtracer/
 //
 //
+#include <iostream>
+#include <fstream>
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <float.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <kitsune/timer.h>
+
 #include "Kokkos_DualView.hpp"
-#include <iostream>
-#include <fstream>
+#include "kitsune/timer.h"
 
 #define WIDTH  1920
 #define HEIGHT 1080

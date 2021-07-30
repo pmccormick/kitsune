@@ -6,69 +6,103 @@
 # the LLVM license.
 #
 
-set(CMAKE_BUILD_TYPE Release)
 
-# Note: Since we borrow LLVM functionality here we
-# need to use LLVM_OPTIONAL_SOURCES here to avoid
-# a error from the LLVM cmake infrastructure...
-# FIXME: This is annoying...
-set(LLVM_OPTIONAL_SOURCES
+# A small collection of Kokkos examples.
+#
+# NOTE: Internal builds of these examples are not geared for 
+# benchmarking and performance comparisons for numerous reasons
+# (e.g., kokkos is only configure in the serial mode within the 
+# internal builds, compiler flags may not have all the desired 
+# impacts in how they are set vs. LLVM's overall build settings, 
+# etc.).
+# 
+project(KokkosExamples CXX)
+
+set(_ld_library_path "")
+set(_llvm_version "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH}")
+message(DEBUG "LLVM version: ${_llvm_version}")
+
+if (DEFINED ENV{LD_LIBRARY_PATH})
+  set(_ld_library_path $ENV{LD_LIBRARY_PATH})
+  string(PREPEND _ld_library_path ":")
+endif()
+string(PREPEND _ld_library_path 
+       ${LLVM_BINARY_DIR}/lib/clang/${_llvm_version}/lib/${LLVM_DEFAULT_TARGET_TRIPLE})
+set(ENV{LD_LIBRARY_PATH} ${_ld_library_path})
+message(DEBUG "setting LD_LIBRARY_PATH: ${_ld_library_path}.")
+unset(_ld_library_path)
+
+
+set(_example_srcs
   complex.cpp
   matmult1.cpp
   normalize.cpp
-  raytrace.cpp
+#  raytrace.cpp
   vecadd.cpp
 )
 
-get_kitsune_tapir_rt_flags(tapir_args)
-
-foreach(src_file IN ITEMS ${LLVM_OPTIONAL_SOURCES})
-  message(STATUS "  kokkos example: ${src_file}")
-  get_filename_component(base ${src_file} NAME_WLE)
-  string(TOLOWER ${base} ${src_file})
-
-  add_kitsune_example(kokkos-${base}
-      ${src_file}
-  )
-
-  install(TARGETS kokkos-${base} RUNTIME DESTINATION ${LLVM_BINARY_DIR}/kitsune/examples/kokkos)
-
-
-  target_include_directories(kokkos-${base}
-     PRIVATE ${KITSUNE_INCLUDE_DIR} ${Kokkos_INCLUDE_DIR})
-
-  set_target_properties(kokkos-${base}
-      PROPERTIES
-        COMPILE_FLAGS "-frtti" #  -Rpass=\".*\""
-        LINK_DIRECTORIES ${Kokkos_LIBRARY_DIR}
-        LINK_LIBRARIES ${Kokkos_LINK_LIBS}
-  )
-
-  # Add a executable per enabled runtime target.
-  foreach(rt IN ITEMS ${tapir_args})
-    set(target_name kokkos-${base}.${rt})
-    message(STATUS "    ${rt} example: ${target_name}")
-    add_kitsune_example(${target_name}
-      ${src_file}
-      )
-
-    install(TARGETS ${target_name} RUNTIME DESTINATION ${LLVM_BINARY_DIR}/kitsune/examples/kokkos)
-
-  target_include_directories(${target_name}
-     PRIVATE ${KITSUNE_INCLUDE_DIR})
-
-    set_target_properties(${target_name}
-      PROPERTIES
-        COMPILE_FLAGS "-frtti -fkokkos -fkokkos-no-init -ftapir=${rt}"
-        LINK_FLAGS "-ftapir=${rt}"
-        LINK_DIRECTORIES ${Kokkos_LIBRARY_DIR}
-        LINK_LIBRARIES ${Kokkos_LINK_LIBS}
-      )
-  endforeach()
-
+# Build the pure-kokkos serial target version of all the examples first.
+# NOTE: Do not build kokkos with parallel "back-ends" as part of the 
+# overall kitsune+tapir configure and build.  For performance comparisons 
+# and other related work you should use a separate kokkos build. 
+foreach(src_file IN ITEMS ${_example_srcs})
+  get_filename_component(exec_name ${src_file} NAME_WLE)
+  message(STATUS "  ${src_file} --> ${exec_name}")
+  add_executable(${exec_name} ${src_file})
+  target_include_directories(${exec_name} 
+    BEFORE 
+    PRIVATE 
+    # ugh... uninstalled kokkos paths are a bit painful... 
+    ${KITSUNE_INCLUDE_DIR}
+    ${KITSUNE_KOKKOS_SRC_DIR}/core/src
+    ${KITSUNE_KOKKOS_SRC_DIR}/containers/src)
+  target_link_libraries(${exec_name} PRIVATE kokkoscore)
+  set_target_properties(${exec_name} 
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY  ${LLVM_BINARY_DIR}/examples/kitsune/kokkos)
+  #
+  install(TARGETS ${exec_name} 
+          DESTINATION ${LLVM_BINARY_DIR}/kitsune/examples/kokkos)
 endforeach()
 
-configure_file(
-  ${KITSUNE_SOURCE_DIR}/examples/kokkos/run-kokkos-examples.sh.in
-  ${KITSUNE_BINARY_DIR}/run-kokkos-examples.sh
-)
+# Build a version of the example for each runtime target that has 
+# been enabled. We can get a list of all the support runtime targets
+# in a format that is compatible for use with -ftapir=target. 
+get_tapir_rt_targets(_tapir_rt_targets)
+message(STATUS "  enabled runtime targets: ${_tapir_rt_targets}")
+foreach(rt IN ITEMS ${_tapir_rt_targets})
+  foreach(src_file IN ITEMS ${_example_srcs})
+    get_filename_component(exec_name ${src_file} NAME_WLE)
+    set(exec_name "${exec_name}.${rt}")
+    message(STATUS "  ${src_file} --> ${exec_name}")
+    add_executable(${exec_name} ${src_file})
+    target_include_directories(${exec_name} 
+      BEFORE 
+      PRIVATE
+      ${KITSUNE_INCLUDE_DIR}
+      ${KITSUNE_KOKKOS_SRC_DIR}/core/src
+      ${KITSUNE_KOKKOS_SRC_DIR}/containers/src)
+    target_compile_options(${exec_name} 
+      PRIVATE
+      -v
+      -fkokkos
+      -fkokkos-no-init 
+      -ftapir=${rt}
+      --config ${LLVM_BINARY_DIR}/share/kitsune/${rt}.cfg)
+    target_link_options(${exec_name} 
+      PRIVATE 
+      -ftapir=${rt}
+      --config ${LLVM_BINARY_DIR}/share/kitsune/${rt}.cfg)
+    target_link_libraries(${exec_name} PRIVATE kokkoscore opencilk opencilk-personality-cpp)
+    set_target_properties(${exec_name}
+      PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY  ${LLVM_BINARY_DIR}/examples/kitsune/kokkos)
+    #  
+    install(TARGETS ${exec_name}
+      DESTINATION ${LLVM_BINARY_DIR}/kitsune/examples/kokkos)
+  endforeach()
+endforeach()
+
+# Do some clean up... 
+unset(_example_srcs)
+unset(_tapir_rt_targets)

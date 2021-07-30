@@ -1,4 +1,3 @@
-#
 # This file provides a basic configuration for developer's working
 # with the Kitsune+Tapir toolchain -- it is more designed for
 # active testing and development vs. general use.
@@ -12,17 +11,16 @@
 #
 #      $ cmake ...  --log-level=DEBUG ...
 #
-function(contains_project project project_list found)
-  list(FIND project_list project loc)
-  if (loc EQUAL -1)
-    set(found FALSE)
-  else()
-    set(found TRUE)
-  endif()
-endfunction()
-
 
 message(DEBUG "KITSUNE-DEV - loading example cache file...")
+cmake_policy(SET CMP0057 NEW)
+
+# Pick a path for the install location -- note you can use the 
+# build directory for in-tree testing but this is a nice way to
+# also check the install does the right things and can be tested
+# within the tree.
+set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/local CACHE STRING "")
+
 # Careful with a full debug build -- linking can be painfully slow
 # and you'll want to tweak the parallel 'width' of the compile and
 # link stages below to make sure all is within the capabilities of
@@ -34,15 +32,36 @@ set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
 # you are working on.  By default we provide the full suite of
 # clang+tools, openmp, lld, and a debugger via lldb.
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;openmp;lld;lldb
+  clang;openmp;
   CACHE STRING "")
 
-message(DEBUG
-  "  --> KITSUNE-DEV - enabled LLVM projects: ${LLVM_ENABLE_PROJECTS}")
+message(DEBUG "  --> KITSUNE-DEV - enabled LLVM projects: ${LLVM_ENABLE_PROJECTS}")
+
+# Keep the in-tree paths sound (i.e., no need for a full install to use these).
+set(CLANG_CONFIG_SYSTEM_DIR "${CMAKE_BINARY_DIR}/bin" CACHE STRING "")
+set(CLANG_CONFIG_FILE_KITSUNE_DIR "${CMAKE_BINARY_DIR}/share/kitsune" CACHE STRING "")
+set(CLANG_CONFIG_FILE_USER_DIR "~/.kitsune" CACHE STRING "")
+
+#if ("openmp" IN_LIST LLVM_ENABLE_PROJECTS)
+  # Disable this for now -- openmp backend needs to be udpated. 
+  #set(KITSUNE_ENABLE_OPENMP_TARGET ON CACHE BOOL "")
+
+  # The default nvidia architecture versions within the openmp project
+  # are a bit crufty and can be problematic -- we just blindly set 
+  # them to something a bit more modern so the build at least has a 
+  # chance.  You may have to tweak this depending upon what you are 
+  # doing. 
+  set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 70 CACHE STRING "")
+  set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_70 CACHE STRING "")
+
+  # CUDA/NVCC is really only happy with older host compilers.  You 
+  # may need to tweak this to make things happy but we typically 
+  # need to fall back to older compilers than what we use to build 
+  # LLVM/Clang/etc.  gcc 8.x and 9.x are typically safe here... 
+ set(CUDA_HOST_COMPILER "/usr/bin/gcc-8" CACHE STRING "")
+#endif()
 
 set(_runtimes_list "cheetah")
-set(LLVM_ENABLE_RUNTIMES
-  "cheetah" CACHE STRING "")
 
 # Various helpful LLVM-level settings for development/debugging.
 set(LLVM_ENABLE_BACKTRACES ON CACHE BOOL "")
@@ -65,15 +84,14 @@ set(CLANG_VENDOR_UTI "gov.lanl.kitsune" CACHE STRING "")
 # Build a minimal set of targets under the assumption the
 # build host is the appropriate platform.
 set(LLVM_TARGETS_TO_BUILD host;NVPTX;AMDGPU CACHE STRING "")
-message(DEBUG
-  "  --> kitsune-dev: enabled LLVM targets: ${LLVM_TARGETS_TO_BUILD}")
+message(DEBUG "  --> kitsune-dev: enabled LLVM targets: ${LLVM_TARGETS_TO_BUILD}")
 
 
 # You should carefully look at the parallel workload parameters as
 # LLVM builds can easily swamp systems if the amount of parallelism
 # exceeds system resources.
-set(LLVM_PARALLEL_COMPILE_JOBS 64 CACHE STRING "")
-set(LLVM_PARALLEL_LINK_JOBS 16 CACHE STRING "")
+set(LLVM_PARALLEL_COMPILE_JOBS 24 CACHE STRING "")
+set(LLVM_PARALLEL_LINK_JOBS 4 CACHE STRING "")
 
 # Enable Kitsune mode within the toolchain.
 set(CLANG_ENABLE_KITSUNE ON CACHE BOOL
@@ -84,39 +102,29 @@ set(KITSUNE_ENABLE_KOKKOS_SUPPORT ON CACHE BOOL
   "Enable custom recognition and compilation of Kokkos.")
 
 # NOTE: The OpenCilk runtime is always enabled within our builds
-# so it is no longer necessary to do separate work to make
-# this happen...
-set(_has_project FALSE)
-contains_project("openmp" LLVM_ENABLE_PROJECTS _has_project)
-if (_has_project)
-  set(KITSUNE_ENABLE_OPENMP_TARGET ON CACHE BOOL "")
-  # The nvidia architecture versions within the openmp project
-  # are crufty and problematic -- set them to something sane
-  # as the defaults can lead to a build failure.  Hopefully we
-  # can deprecate this check soon...
-  if (OPENMP_ENABLE_LIBOMPTARGET)
-    set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_70 CACHE STRING "")
-    set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 70 CACHE STRING "")
-    message(WARNING
-      "KITSUNE-DEV - openmp may need path to CUDA-supported GCC.")
-  endif()
-endif()
+# so it is no longer necessary to explicitly list it (the runtime
+# will be downloaded and built as part of the full llvm build 
+# process).
+
 
 set(KITSUNE_ENABLE_QTHREADS_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_REALM_TARGET OFF CACHE BOOL "")
-set(KITSUNE_ENABLE_CUDATK_TARGET ON CACHE BOOL "")
+set(KITSUNE_ENABLE_CUDATK_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_HIP_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_OPENCL_TARGET OFF CACHE BOOL "")
 
+
 if (KITSUNE_ENABLE_CUDATK_TARGET OR
-    KITSUNE_ENABLE_HIP_TARGET)
+    KITSUNE_ENABLE_HIP_TARGET OR 
+    KITSUNE_ENABLE_EXAMPLES OR 
+    KITSUNE_ENABLE_KOKKOS_SUPPORT)
   list(APPEND _runtimes_list "kitsune")
-  message(DEBUG "--> KITSUNE-DEV - adding kitsune to runtime list.")
 endif()
 
-set(LLVM_ENABLE_RUNTIMES ${_runtimes_list} CACHE STRING "" FORCE)
-message(DEBUG
-  "  --> KITSUNE-DEV - enabled LLVM runtimes: ${LLVM_ENABLE_RUNTIMES}")
+set(LLVM_ENABLE_RUNTIMES ${_runtimes_list} CACHE STRING "")
+message(DEBUG "  --> KITSUNE-DEV - enabled LLVM runtimes: ${LLVM_ENABLE_RUNTIMES}")
+
+set(KITSUNE_BUILD_EXAMPLES ON CACHE BOOL "")
 
 message(DEBUG "  --> KITSUNE-DEV: fixing gcc prefix path.")
 execute_process(

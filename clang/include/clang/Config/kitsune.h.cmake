@@ -10,33 +10,24 @@
 #else
 #define KITSUNE_CONFIG_H
 
-/* This should really never happen but just in case some 
- * old code sneaks in... 
- */
+/* This shouldn't happen but could help us catch config issues. */
 #ifndef CLANG_ENABLE_KITSUNE
-#error kitsune config included when CLANG_ENABLE_KITSUNE undefined. 
+#error kitsune config included when CLANG_ENABLE_KITSUNE undefined.
 #endif
-
-#cmakedefine01 KITSUNE_MANGLE_PARALEL_KEYWORDS 
 
 #cmakedefine01 KITSUNE_ENABLE_KOKKOS_SUPPORT
 
-#cmakedefine01 KITSUNE_ENABLE_OPENMP_TARGET 
-#camkedefine01 KITSUNE_ENABLE_QTHREADS_TARGET
-#cmakedefine01 KITSUNE_ENABLE_REALM_TARGET 
-#cmakedefine01 KITSUNE_ENABLE_CUDATK_TARGET 
-#cmakedefine01 KITSUNE_ENABLE_HIP_TARGET 
-#cmakedefine01 KITSUNE_ENABLE_OPENCL_TARGET
-
 /* kitsune-centric cfg file search location */
-#cmakedefine KITSUNE_CONFIG_FILE_DIR "${KITSUNE_CONFIG_FILE_DIR}"
+#cmakedefine CLANG_CONFIG_FILE_KITSUNE_DIR "${CLANG_CONFIG_FILE_KITSUNE_DIR}"
 
 /* kitsune+tapir ABI/runtime codegen targets */
 /* Note: The OpenCilk target is (now) always enabled */
-#cmakedefine01 KITSUNE_ENABLE_OPENMP_TARGET 
-#cmakedefine01 KITSUNE_ENABLE_QTHREADS_TARGET 
+#cmakedefine01 KITSUNE_ENABLE_OPENMP_TARGET
+#cmakedefine01 KITSUNE_ENABLE_QTHREADS_TARGET
 #cmakedefine01 KITSUNE_ENABLE_CUDATK_TARGET
-#cmakedefine01 KITSUNE_ENABLE_REALM_TARGET 
+#cmakedefine01 KITSUNE_ENABLE_REALM_TARGET
+#cmakedefine01 KITSUNE_ENABLE_OPENCL_TARGET
+#cmakedefine01 KITSUNE_ENABLE_HIP_TARGET
 
 /* kitsune+tapir default configuration filenames */
 #cmakedefine KITSUNE_KOKKOS_CFG_FILENAME "${KITSUNE_KOKKOS_CFG_FILENAME}"

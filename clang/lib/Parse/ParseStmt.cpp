@@ -452,7 +452,7 @@ Retry:
   case tok::kw__Cilk_sync:               // [CP] _Cilk_sync statement
     Res = ParseCilkSyncStatement();
     SemiError = "_Cilk_sync";
-    break; 
+    break;
 
   case tok::kw__kitsune_spawn:              // spawn statement
     return ParseSpawnStatement();
