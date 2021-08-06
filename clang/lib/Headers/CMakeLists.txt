@@ -235,7 +235,7 @@ set(files
   ${webassembly_files}
   ${windows_only_files}
   ${utility_files}
-  kitsune.h
+  kitsune_rt.h
   )
 
 set(cuda_wrapper_files
@@ -303,7 +303,7 @@ endfunction(clang_generate_header)
 
 
 # Copy header files from the source directory to the build directory
-foreach( f ${files} ${cuda_wrapper_files} ${ppc_wrapper_files} ${openmp_wrapper_files} ${cilk_header_files})
+foreach( f ${files} ${cuda_wrapper_files} ${ppc_wrapper_files} ${openmp_wrapper_files})
   copy_header_to_output_dir(${CMAKE_CURRENT_SOURCE_DIR} ${f})
 endforeach( f )
 
@@ -431,6 +431,9 @@ set(header_install_dir lib${LLVM_LIBDIR_SUFFIX}/clang/${CLANG_VERSION}/include)
 
 #############################################################
 # Install rules for the catch-all clang-resource-headers target
+configure_file(kitsune.h.cmake
+  ${LLVM_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX}/clang/${CLANG_VERSION}/include/kitsune.h)
+
 install(
   FILES ${files} ${generated_files}
   DESTINATION ${header_install_dir}

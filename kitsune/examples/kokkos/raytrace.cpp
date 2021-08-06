@@ -1,8 +1,13 @@
 //
+// Copyright(c) 2020 Triad National Security, LLC
+// All rights reserved.
+//
+// This file is part of the kitsune / llvm project.  It is released under
+// the LLVM license.
+//
 // Kokkos implementation of work inspired by:
 //
 //   - https://fabiensanglard.net/revisiting_the_pathtracer/
-//
 //
 #include <iostream>
 #include <fstream>

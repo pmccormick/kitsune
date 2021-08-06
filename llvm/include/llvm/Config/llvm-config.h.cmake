@@ -87,6 +87,12 @@
 /* Patch version of the Tapir API */
 #define TAPIR_VERSION_PATCH ${TAPIR_VERSION_PATCH}
 
+/* TODO: This is a quick fix for in-tree builds.  
+ * Needs to be a bit more robust to expand itself 
+ * to installed use cases.
+ */
+#define OPENCILK_BC_PATH "${LLVM_BINARY_DIR}/lib/clang/${PACKAGE_VERSION}/lib/${LLVM_DEFAULT_TARGET_TRIPLE}/libopencilk-abi.bc"
+
 /* Whether LLVM records statistics for use with GetStatistics(),
  * PrintStatistics() or PrintStatisticsJSON()
  */

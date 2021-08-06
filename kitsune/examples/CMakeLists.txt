@@ -27,6 +27,9 @@ if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
 
   set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "")
   FetchContent_MakeAvailable(kokkos)
-  
   add_subdirectory(kokkos)
 endif()
+
+add_subdirectory(forall)
+
+

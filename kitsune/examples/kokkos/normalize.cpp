@@ -1,21 +1,25 @@
-// 
-// The normalize example from the Tapir PPOP paper converted 
-// to Kokkos.  To enable kitsune+tapir compilation add the 
-// flags to a standard clang compilation: 
 //
-//    * -fkokkos : enable specialized Kokkos recognition and 
+// Copyright(c) 2020 Triad National Security, LLC
+// All rights reserved.
+//
+// This file is part of the kitsune / llvm project.  It is released under
+// the LLVM license.
+//
+// The normalize example from the Tapir PPOP paper converted
+// to Kokkos.  To enable kitsune+tapir compilation add the
+// flags to a standard clang compilation:
+//
+//    * -fkokkos : enable specialized Kokkos recognition and
 //                 compilation (lower to Tapir).
-//    * -fkokkos-no-init : disable Kokkos initialization and 
+//    * -fkokkos-no-init : disable Kokkos initialization and
 //                 finalization calls to avoid conflicts with
-//                 target runtime operation. 
-//    * -ftapir=rt-target : the runtime ABI to target. 
-// 
+//                 target runtime operation.
+//    * -ftapir=rt-target : the runtime ABI to target.
+//
 #include <cstdio>
 #include <cmath>
-
 #include "Kokkos_Core.hpp"
 #include "kitsune/timer.h"
-
 
 using namespace std;
 using namespace kitsune;

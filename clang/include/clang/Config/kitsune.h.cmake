@@ -29,8 +29,11 @@
 #cmakedefine01 KITSUNE_ENABLE_OPENCL_TARGET
 #cmakedefine01 KITSUNE_ENABLE_HIP_TARGET
 
-/* kitsune+tapir default configuration filenames */
+/* kitsune default kokkos configure (.cfg) filename */
 #cmakedefine KITSUNE_KOKKOS_CFG_FILENAME "${KITSUNE_KOKKOS_CFG_FILENAME}"
+
+/* tapir default target-specific configure (.cfg) filenames */
+#cmakedefine TAPIR_NONE_TARGET_CFG_FILENAME "${TAPIR_SERIAL_TARGET_CFG_FILENAME}"
 #cmakedefine TAPIR_SERIAL_TARGET_CFG_FILENAME "${TAPIR_SERIAL_TARGET_CFG_FILENAME}"
 #cmakedefine TAPIR_OPENCILK_TARGET_CFG_FILENAME "${TAPIR_OPENCILK_TARGET_CFG_FILENAME}"
 #cmakedefine TAPIR_CUDA_TARGET_CFG_FILENAME "${TAPIR_CUDA_TARGET_CFG_FILENAME}"

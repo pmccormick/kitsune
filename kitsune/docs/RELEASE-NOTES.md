@@ -5,7 +5,27 @@ functionality of the corresponding LLVM release.  In the sections below each
 release includes this version number for reference and a pointer to the corresponding 
 set of LLVM release notes.
 
+### Release 10.0.1 (08-XX-2021 update)
 
+__Date__: August XX, 2021 
+__Internal/ECP Release Milestone: ST_NS-XX-YYYY (__tagged__)
+
+**TODO**: Can we catch up (merge) with LLVM 12.x/13.x???
+
+[LLVM 10 Release Notes](https://releases.llvm.org/10.0.0/docs/ReleaseNotes.html)
+
+### What's New 
+
+  * Overhaul of the build configuration to account for new bitcode interfaces to runtime targets, better incorporation of using examples for testing across enabled architectures and runtime targets. 
+  * Support for some Kokkos MDRange constructs (nested loops).
+  * Updated progress on AMD GPU (HIP) code generation. 
+  * Significant update and overhaul to the libomp runtime ABI target. 
+  * Code refactoring to unify Kokoks and ``forall`` code generation infrastructure. 
+  * Exploring possibliities and restrictions of using NVIDIA's NVVM library with LLVM 10.x (and beyond).
+  * Improved internal error handling for bitcode loading cases that would previously crash the compiler. 
+  * Additional bug fixes and compiler introduced race conditions as part of the ABI rutnime target code generation.
+  * Improved flexbility by leveraging Clang's ``--config`` capabilities (should benefit advanced end users and developers by avoiding the need to rebuild the toolchain for certain use cases).
+  * Some updates to the documentation for building and using the toolchain. 
 
 ### Release 10.0.1 (03-2021 update)
 

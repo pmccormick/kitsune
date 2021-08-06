@@ -1721,6 +1721,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       getDriver().Diag(diag::warn_drv_opencl_target_disabled);
     break;
 
+  case TapirTargetID::Serial:
   case TapirTargetID::None:
     break;
 

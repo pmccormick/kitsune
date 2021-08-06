@@ -148,8 +148,13 @@ void OpenCilkABI::prepareModule() {
     if("" == RuntimeBCPath){
       path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk-abi.bc");
       if (! path.hasValue())
+        // TODO: This is an in-tree build solution for now... 
+        #if defined(OPENCILK_BC_PATH)
+        path = OPENCILK_BC_PATH;
+        #else  
         report_fatal_error("Could not find OpenCilk runtime bitcode file " 
                            "(libopencilk-abi.bc) in LD_LIBRARY_PATH.");
+        #endif 
     } else {
       path = OpenCilkRuntimeBCPath.getValue();
     }
