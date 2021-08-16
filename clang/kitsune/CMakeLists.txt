@@ -132,7 +132,7 @@ if (KITSUNE_ENABLE_REALM_TARGET)
       STRING "Link library flags (-L, -lxx) needed for the Realm runtime ABI target.")
   #
   configure_file(${CLANG_SOURCE_DIR}/kitsune/realm.cfg.in
-      ${LLVM_BINARY_DIR}/share/kitsune/${KITSUNE_REALM_TARGET_CFG_FILENAME})
+      ${LLVM_BINARY_DIR}/share/kitsune/${TAPIR_REALM_TARGET_CFG_FILENAME})
 endif()
 
 option(KITSUNE_ENABLE_CUDATK_TARGET

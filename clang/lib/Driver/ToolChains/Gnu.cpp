@@ -600,24 +600,7 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
   addCilktoolRuntime(ToolChain, Args, CmdArgs);
 
   ToolChain.AddTapirRuntimeLibArgs(Args, CmdArgs);
-  if (Args.hasArg(options::OPT_ftapir_EQ)) {
-    if (Arg *A = Args.getLastArg(options::OPT_ftapir_EQ)) {
-      StringRef Name = A->getValue();
-      if (Name == "cilk") 
-        CmdArgs.push_back("-lcilkrts");
-      else if (Name == "qthreads"){
-        CmdArgs.push_back("-lqthread");
-        CmdArgs.push_back("-lhwloc");
-        CmdArgs.push_back("-lnuma");
-        CmdArgs.push_back("-lpthread");
-      }
-      else if (Name == "realm"){
-	CmdArgs.push_back("-lrealm");
-	CmdArgs.push_back("-lkitsunerealm");
-      }
-    }
-  }
-
+  
   if (D.CCCIsCXX() &&
       !Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs,
                    options::OPT_r)) {

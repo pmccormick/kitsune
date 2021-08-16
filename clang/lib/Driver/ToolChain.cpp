@@ -1708,6 +1708,16 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
   case TapirTargetID::Realm:
     if (! KITSUNE_ENABLE_REALM_TARGET)
       getDriver().Diag(diag::warn_drv_realm_target_disabled);
+    else {
+      CmdArgs.push_back("-lrealm-abi");
+      CmdArgs.push_back("-lrealm");
+      CmdArgs.push_back("-lpthread");
+      CmdArgs.push_back("-ldl");
+      CmdArgs.push_back("-lrt");
+      #if defined(KITSUNE_REALM_EXTRA_LINK_LIBS)
+      ExtractArgsFromString(KITSUNE_KOKKOS_EXTRA_LINK_LIBS, CmdArgs, Args);
+      #endif
+    }
     break;
 
   case TapirTargetID::Cuda:

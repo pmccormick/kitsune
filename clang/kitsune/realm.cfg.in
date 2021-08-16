@@ -1,3 +1,11 @@
-# Flags for the Realm runtime ABI target.
-${KITSUNE_REALM_TARGET_EXTRA_LINK_FLAGS} ${KITSUNE_REALM_TARGET_LINK_LIBS_FLAGS}
+# Flags for -ftapir=realm.  Note that link libraries used here can end up
+# out of order and cause the associated symbols to be flagged as missing
+# at link time.  The driver should now add the realm libraries but we will
+# control the library search paths from here.
 
+# in-tree paths
+-L${LLVM_BINARY_DIR}/runtimes/runtimes-bins/kitsune/runtimes/realm/
+-L${LLVM_BINARY_DIR}/runtimes/runtimes-bins/_deps/realm-build/lib/
+
+# install paths
+-L${CMAKE_INSTALL_PREFIX}/lib

@@ -14,7 +14,7 @@
 # currently inherit build flags from the larger llvm 
 # configuration. 
 
-project(ForAllExamples C CXX)
+project(ForAllExamples CXX)
 
 set(_ld_library_path "")
 set(_llvm_version "${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}.${LLVM_VERSION_PATCH}")
@@ -38,13 +38,18 @@ unset(_ld_library_path)
 unset(_llvm_version)
 unset(_new_ld_lib_path)
 
+set(_example_srcs
+  complex.cpp
+  matmult.cpp
+  matvec.cpp 
+  normalize.cpp
+  std_vecadd.cpp
+  vecadd.cpp)
+
 # Build a version of the examples for each runtime target that has 
 # been enabled. We can get a list of all the support runtime targets
 # in a format that is compatible for use with -ftapir=target. 
 get_tapir_rt_targets(_tapir_rt_targets)
-
-# Manually add the serial target to our testing scope... 
-list(APPEND _tapir_rt_targets "serial") 
 
 message(STATUS "  enabled runtime targets: ${_tapir_rt_targets}")
 foreach(rt IN ITEMS ${_tapir_rt_targets})
@@ -60,23 +65,20 @@ foreach(rt IN ITEMS ${_tapir_rt_targets})
     target_compile_options(${exec_name} 
       PRIVATE
       -v
-      -ftapir=${rt}
-      --config ${LLVM_BINARY_DIR}/share/kitsune/${rt}.cfg)
+      -ftapir=${rt})
     target_link_options(${exec_name} 
       PRIVATE 
-      -ftapir=${rt}
-      --config ${LLVM_BINARY_DIR}/share/kitsune/${rt}.cfg)
-    # TODO: for runtimes build within the toolchain components we
-    # really need to add a set of libraries per runtime. Ideally 
-    # the configure files will pick this up but it seems to still 
-    # be a bit brittle. 
-    target_link_libraries(${exec_name})
+      -v
+      -ftapir=${rt})
+    set(dep_list "")
+    set(target_libs "")
+    add_tapir_dependency(${exec_name} ${rt})
+    message(STATUS "${exec_name} target libs + ${rt}: ${target_libs}")
+    message(STATUS "${exec_name} dependencies: ${dep_list}")
+    target_link_libraries(${exec_name} ${target_libs})
     set_target_properties(${exec_name}
       PROPERTIES
       RUNTIME_OUTPUT_DIRECTORY  ${LLVM_BINARY_DIR}/examples/kitsune)
-    #  
-    install(TARGETS ${exec_name}
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/kitsune/examples/)
   endforeach()
 endforeach()
 # Do some clean up... 

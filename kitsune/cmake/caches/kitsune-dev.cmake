@@ -37,6 +37,8 @@ set(LLVM_ENABLE_PROJECTS
 
 message(DEBUG "  --> KITSUNE-DEV - enabled LLVM projects: ${LLVM_ENABLE_PROJECTS}")
 
+
+
 # Keep the in-tree paths sound (i.e., no need for a full install to use these).
 set(CLANG_CONFIG_SYSTEM_DIR "${CMAKE_BINARY_DIR}/bin" CACHE STRING "")
 set(CLANG_CONFIG_FILE_KITSUNE_DIR "${CMAKE_BINARY_DIR}/share/kitsune" CACHE STRING "")
@@ -64,6 +66,8 @@ set(CLANG_CONFIG_FILE_USER_DIR "$ENV{HOME}/.kitsune" CACHE STRING "")
 set(_runtimes_list "cheetah")
 
 # Various helpful LLVM-level settings for development/debugging.
+set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "")    # sometimes errors get lost in all the warnings... 
+set(LLVM_ENABLE_ASSERTIONS ON CACHE BOOL "")
 set(LLVM_ENABLE_BACKTRACES ON CACHE BOOL "")
 set(LLVM_ENABLE_DUMP ON CACHE BOOL "")
 set(LLVM_ENABLE_TERMINFO ON CACHE BOOL "")
@@ -72,6 +76,19 @@ set(LLVM_INCLUDE_TESTS ON CACHE BOOL "")
 set(LLVM_INCLUDE_UTILS ON CACHE BOOL "")
 set(LLVM_INSTALL_UTILS ON CACHE BOOL "")
 set(LLVM_INSTALL_BINUTILS_SYMLINKS ON CACHE BOOL "")
+# You should carefully look at the parallel workload parameters as
+# LLVM builds can easily swamp systems if the level of parallelism
+# exceeds system resources -- especially memory during the linking
+# stages.  Also use care when building on network mounted file 
+# systems as parallel I/O operations can also bog down the 
+# scalability of the parallel build. 
+#
+# desktop: 
+set(LLVM_PARALLEL_COMPILE_JOBS 12 CACHE STRING "")
+set(LLVM_PARALLEL_LINK_JOBS 4 CACHE STRING "")
+# server-class:
+#set(LLVM_PARALLEL_COMPILE_JOBS 128 CACHE STRING "")
+#set(LLVM_PARALLEL_LINK_JOBS 32 CACHE STRING"")
 
 # Various helpful Clang-level settings for development/debugging.
 set(CLANG_BUILD_TOOLS ON CACHE BOOL "")
@@ -87,11 +104,6 @@ set(LLVM_TARGETS_TO_BUILD host;NVPTX;AMDGPU CACHE STRING "")
 message(DEBUG "  --> kitsune-dev: enabled LLVM targets: ${LLVM_TARGETS_TO_BUILD}")
 
 
-# You should carefully look at the parallel workload parameters as
-# LLVM builds can easily swamp systems if the amount of parallelism
-# exceeds system resources.
-set(LLVM_PARALLEL_COMPILE_JOBS 24 CACHE STRING "")
-set(LLVM_PARALLEL_LINK_JOBS 4 CACHE STRING "")
 
 # Enable Kitsune mode within the toolchain.
 set(CLANG_ENABLE_KITSUNE ON CACHE BOOL
@@ -106,9 +118,11 @@ set(KITSUNE_ENABLE_KOKKOS_SUPPORT ON CACHE BOOL
 # will be downloaded and built as part of the full llvm build 
 # process).
 
+set(KITSUNE_ENABLE_RUNTIME_ABIS ON CACHE BOOL "")
+set(KITSUNE_ENABLE_ABI_LIBRARIES realm CACHE STRING "")
 
 set(KITSUNE_ENABLE_QTHREADS_TARGET OFF CACHE BOOL "")
-set(KITSUNE_ENABLE_REALM_TARGET OFF CACHE BOOL "")
+set(KITSUNE_ENABLE_REALM_TARGET ON CACHE BOOL "")
 set(KITSUNE_ENABLE_CUDATK_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_HIP_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_OPENCL_TARGET OFF CACHE BOOL "")
@@ -116,6 +130,7 @@ set(KITSUNE_ENABLE_OPENCL_TARGET OFF CACHE BOOL "")
 
 if (KITSUNE_ENABLE_CUDATK_TARGET OR
     KITSUNE_ENABLE_HIP_TARGET OR 
+    KITSUNE_ENABLE_REALM_TARGET OR 
     KITSUNE_ENABLE_EXAMPLES OR 
     KITSUNE_ENABLE_KOKKOS_SUPPORT)
   list(APPEND _runtimes_list "kitsune")
