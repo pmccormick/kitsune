@@ -1730,9 +1730,24 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
   }
 
+  // NOTE: Due to ordering issues introduced by the .cfg files it 
+  // doesn't work to add the link libraries (e.g., -lkokkoscore)
+  // as they end up in the wrong order and the symbols will show as
+  // undefined when compiling/linking kokkos code.  As such we add
+  // the bare minimum kokkos libraries here so they can be left out
+  // of the .cfg files. 
   if (D.CCCIsCXX() && Args.hasArg(options::OPT_fkokkos)) {
     if (! KITSUNE_ENABLE_KOKKOS_SUPPORT)
       getDriver().Diag(diag::warn_drv_kokkos_disabled);
-
+    else {
+      #if defined(KITSUNE_KOKKOS_EXTRA_LINK_FLAGS)
+      ExtractArgsFromString(KITSUNE_KOKKOS_EXTRA_LINK_FLAGS, CmdArgs, Args);
+      #endif
+      CmdArgs.push_back("-lkokkoscore");
+      CmdArgs.push_back("-ldl");
+      #if defined(KITSUNE_KOKKOS_EXTRA_LINK_LIBS)
+      ExtractArgsFromString(KITSUNE_KOKKOS_EXTRA_LINK_LIBS, CmdArgs, Args);
+      #endif
+    }
   }
 }

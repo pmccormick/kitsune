@@ -29,6 +29,10 @@ if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
       ""
       CACHE
       STRING "Additional link flags needed for Kokkos applications.")
+  set(KITSUNE_KOKKOS_EXTRA_LINK_LIBS 
+     ""
+     CACHE 
+     STRING "Additional link libraries needed for Kokkos applications.")
   #
   configure_file(${CLANG_SOURCE_DIR}/kitsune/${KITSUNE_KOKKOS_CFG_FILENAME}.in
       ${LLVM_BINARY_DIR}/share/kitsune/${KITSUNE_KOKKOS_CFG_FILENAME})

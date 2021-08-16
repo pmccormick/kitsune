@@ -31,6 +31,8 @@
 
 /* kitsune default kokkos configure (.cfg) filename */
 #cmakedefine KITSUNE_KOKKOS_CFG_FILENAME "${KITSUNE_KOKKOS_CFG_FILENAME}"
+#cmakedefine KITSUNE_KOKKOS_EXTRA_LINK_FLAGS "${KITSUNE_KOKKOS_EXTRA_LINK_FLAGS}"
+#cmakedefine KITSUNE_KOKKOS_EXTRA_LINK_LIBS "${KITSUNE_KOKKOS_EXTRA_LINK_LIBS}"
 
 /* tapir default target-specific configure (.cfg) filenames */
 #cmakedefine TAPIR_NONE_TARGET_CFG_FILENAME "${TAPIR_SERIAL_TARGET_CFG_FILENAME}"

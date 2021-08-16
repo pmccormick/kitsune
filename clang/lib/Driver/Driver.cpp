@@ -1256,7 +1256,6 @@ bool Driver::loadConfigFile() {
           UserConfigDir = static_cast<std::string>(CfgDir);
       }
     }
-
   }
 
   // First try to find config file specified in command line.
@@ -1294,29 +1293,30 @@ bool Driver::loadConfigFile() {
     }
   }
 
-  // Prepare list of directories where config file is searched for.  Note that the directories 
-  // appear in the order they will be searched -- the first matched file will be used and the 
-  // search will stop from that point. 
+  // Prepare list of directories where config file is searched for.  Note that the directories
+  // appear in the order they will be searched -- the first matched file will be used and the
+  // search will stop from that point.
   StringRef CfgFileSearchDirs[] = {Dir, UserConfigDir, KitsuneConfigDir, SystemConfigDir};
 
   // kitsune: check for a kokkos configuration file.
   if (CLOptions->hasArg(options::OPT_fkokkos)) {
-    LLVM_DEBUG(llvm::dbgs()
-               << "looking for -fkokkos mode config file '" 
-               << KitsuneKokkosCfgFile.c_str() << "'.\n");
+    LLVM_DEBUG(llvm::dbgs() << "looking for -fkokkos mode config file '"
+                            << KitsuneKokkosCfgFile.c_str() << "'.\n");
     llvm::SmallString<128> KokkosCfgFilePath;
-    if (searchForFile(KokkosCfgFilePath, CfgFileSearchDirs, KitsuneKokkosCfgFile)) {
+    if (searchForFile(KokkosCfgFilePath, CfgFileSearchDirs,
+                      KitsuneKokkosCfgFile)) {
       if (readConfigFile(KokkosCfgFilePath))
         Diag(diag::err_drv_cannot_read_kitsune_cfg_file)
-           << KokkosCfgFilePath << "-fkokkos";
+            << KokkosCfgFilePath << "-fkokkos";
     } else {
-      Diag(diag::warn_drv_missing_cfg_file) << KitsuneKokkosCfgFile << "-fkokkos";
+      Diag(diag::warn_drv_missing_cfg_file)
+          << KitsuneKokkosCfgFile << "-fkokkos";
       for (const StringRef &SearchDir : CfgFileSearchDirs)
         if (!SearchDir.empty())
           Diag(diag::note_drv_config_file_searched_in) << SearchDir;
     }
   }
-
+  
   // tapir: check for a tapir target specific configuration file.
   if (CLOptions->hasArg(options::OPT_ftapir_EQ)) {
     if (const Arg *A = CLOptions->getLastArg(options::OPT_ftapir_EQ)) {
@@ -1339,7 +1339,7 @@ bool Driver::loadConfigFile() {
             Diag(diag::err_drv_cannot_read_kitsune_cfg_file)
               << TapirTargetCfgFilePath << A->getValue();
         } else {
-          Diag(diag::warn_drv_missing_cfg_file) 
+          Diag(diag::warn_drv_missing_cfg_file)
               << TapirTargetCfgFile << A->getValue();
           for (const StringRef &SearchDir : CfgFileSearchDirs)
             if (!SearchDir.empty())
@@ -1348,6 +1348,7 @@ bool Driver::loadConfigFile() {
       }
     }
   }
+
 
   // If config file is not specified explicitly, try to deduce configuration
   // from executable name. For instance, an executable 'armv7l-clang' will
