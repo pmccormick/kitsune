@@ -433,6 +433,7 @@ set(header_install_dir lib${LLVM_LIBDIR_SUFFIX}/clang/${CLANG_VERSION}/include)
 # Install rules for the catch-all clang-resource-headers target
 configure_file(kitsune.h.cmake
   ${LLVM_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX}/clang/${CLANG_VERSION}/include/kitsune.h)
+list(APPEND generated_files ${LLVM_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX}/clang/${CLANG_VERSION}/include/kitsune.h)
 
 install(
   FILES ${files} ${generated_files}
