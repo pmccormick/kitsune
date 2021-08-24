@@ -33,6 +33,7 @@
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
+#include "llvm/Support/Process.h"
 
 using namespace llvm;
 
@@ -143,8 +144,14 @@ void OpenCilkABI::prepareModule() {
     if ("" != ClOpenCilkRuntimeBCPath)
       RuntimeBCPath = ClOpenCilkRuntimeBCPath;
 
-    if ("" == RuntimeBCPath)
-      C.emitError("OpenCilkABI: No OpenCilk bitcode ABI file given.");
+    Optional<std::string> path; 
+    if("" == RuntimeBCPath){
+      path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk-abi.bc");
+      assert(path.hasValue() &&
+             "Couldn't find OpenCilk runtime bitcode file in LD_LIBRARY_PATH.");
+    } else {
+      path = OpenCilkRuntimeBCPath.getValue();
+    }
 
     LLVM_DEBUG(dbgs() << "Using external bitcode file for OpenCilk ABI: "
                       << RuntimeBCPath << "\n");
