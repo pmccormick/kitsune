@@ -64,11 +64,9 @@ foreach(rt IN ITEMS ${_tapir_rt_targets})
       ${KITSUNE_INCLUDE_DIR})
     target_compile_options(${exec_name} 
       PRIVATE
-      -v
       -ftapir=${rt})
     target_link_options(${exec_name} 
       PRIVATE 
-      -v
       -ftapir=${rt})
     set(dep_list "")
     set(target_libs "")

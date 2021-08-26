@@ -100,13 +100,11 @@ foreach(rt IN ITEMS ${_tapir_rt_targets})
       ${KITSUNE_KOKKOS_SRC_DIR}/containers/src)
     target_compile_options(${exec_name}
       PRIVATE
-      -v
       -fkokkos
       -fkokkos-no-init
       -ftapir=${rt})
     target_link_options(${exec_name}
       PRIVATE
-      -v
       -fkokkos
       -ftapir=${rt})
     set(dep_list kokkos kokkoscore)
