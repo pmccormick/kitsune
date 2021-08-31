@@ -22,6 +22,7 @@
 #include "llvm/Transforms/Tapir/OpenCilkABI.h"
 #include "llvm/Transforms/Tapir/OpenMPABI.h"
 #include "llvm/Transforms/Tapir/OpenCLABI.h"
+#include "llvm/Transforms/Tapir/GPUABI.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Tapir/QthreadsABI.h"
 #include "llvm/Transforms/Tapir/RealmABI.h"
@@ -55,6 +56,8 @@ TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
     return new OpenMPABI(M);
   case TapirTargetID::OpenCL:
     return new OpenCLABI(M);
+  case TapirTargetID::GPU:
+    return new GPUABI(M);
   case TapirTargetID::Qthreads:
     return new QthreadsABI(M);
   case TapirTargetID::Realm:

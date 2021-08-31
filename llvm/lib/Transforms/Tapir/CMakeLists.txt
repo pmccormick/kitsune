@@ -13,6 +13,7 @@ add_llvm_component_library(LLVMTapirOpts
   Outline.cpp
   QthreadsABI.cpp
   RealmABI.cpp
+  GPUABI.cpp
   SerialABI.cpp
   SerializeSmallTasks.cpp
   Tapir.cpp
