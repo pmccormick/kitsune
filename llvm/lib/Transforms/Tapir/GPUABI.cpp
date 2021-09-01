@@ -29,7 +29,7 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "openclabi"
+#define DEBUG_TYPE "gpuabi"
 
 Value *GPUABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Grainsize = ConstantInt::get(GrainsizeCall->getType(), 8);
@@ -72,7 +72,7 @@ LoopOutlineProcessor *GPUABI::getLoopOutlineProcessor(
 unsigned LLVMLoop::NextKernelID = 0;
 
 LLVMLoop::LLVMLoop(Module &M)
-    : LoopOutlineProcessor(M, LLVMM), LLVMM("spirvModule", M.getContext()) {
+    : LoopOutlineProcessor(M, LLVMM), LLVMM("kernelModule", M.getContext()) {
   // Assign an ID to this kernel.
   MyKernelID = NextKernelID++;
 
@@ -358,12 +358,15 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   ArrayType* arrayType = ArrayType::get(VoidPtrTy, OrderedInputs.size()); 
   Value* argArray = B.CreateAlloca(arrayType); 
+  int i=0;
   for (Value *V : OrderedInputs) {
     //Value *ElementSize = nullptr;
     LLVM_DEBUG(dbgs() << "Input set value: " << *V << "\n"); 
     Value *VPtr = B.CreateAlloca(V->getType()); 
     B.CreateStore(V, VPtr); 
     Value *VoidVPtr = B.CreateBitCast(VPtr, VoidPtrTy);
+    Value *argPtr = B.CreateConstInBoundsGEP1_32(VoidPtrTy, argArray, i++); 
+    B.CreateStore(VoidVPtr, argPtr); 
   }
 
   Value *Grainsize = TL.getGrainsize() ?  

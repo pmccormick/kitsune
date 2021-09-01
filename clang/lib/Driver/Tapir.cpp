@@ -51,6 +51,7 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
       // TODO: Deprecate non-opencilk support...
       .Case("cilk", TapirTargetID::Cilk)
       .Case("cilkr", TapirTargetID::CilkR)
+      .Case("gpu", TapirTargetID::GPU)
       .Default(TapirTargetID::Last_TapirTargetID);
 
   return TapirTarget;
