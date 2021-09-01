@@ -787,9 +787,9 @@ def warn_drv_missing_cfg_file : Warning<
 def err_drv_cannot_read_kitsune_cfg_file : Error<
   "cannot read clang configuration file, %0, in support of option: %1.">;
 
-// catching configuration issues at build is a pain w/out a ton of #ifdef 
+// catching configuration issues at build is a pain w/out a ton of #ifdef
 // litter.  we instead opt to warning users in cases where the options are
-// used but were not enabled at build time.  
+// used but were not enabled at build time.
 def warn_drv_kokkos_disabled : Warning<
   "kokkos support was not enabled when clang was built.">;
 def warn_drv_openmp_target_disabled : Warning<
@@ -798,7 +798,7 @@ def warn_drv_qthreads_target_disabled: Warning<
   "the qthreads runtime ABI transform target was not enabled when clang was built.">;
 def warn_drv_realm_target_disabled: Warning<
   "the realm runtime ABI transform target was not enabled when clang was built.">;
-def warn_drv_cudatk_target_disabled: Warning<
+def warn_drv_cuda_tapir_target_disabled: Warning<
   "the cuda toolkit runtime ABI transform target was not enabled when clang was built.">;
 def warn_drv_hip_target_disabled: Warning<
   "the hip runtime ABI transform target was not enabled when clang was built.">;

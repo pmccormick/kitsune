@@ -15,7 +15,7 @@
 message(DEBUG "KITSUNE-DEV - loading example cache file...")
 cmake_policy(SET CMP0057 NEW)
 
-# Pick a path for the install location -- note you can use the 
+# Pick a path for the install location -- note you can use the
 # build directory for in-tree testing but this is a nice way to
 # also check the install does the right things and can be tested
 # within the tree.
@@ -45,28 +45,28 @@ set(CLANG_CONFIG_FILE_KITSUNE_DIR "${CMAKE_BINARY_DIR}/share/kitsune" CACHE STRI
 set(CLANG_CONFIG_FILE_USER_DIR "$ENV{HOME}/.kitsune" CACHE STRING "")
 
 #if ("openmp" IN_LIST LLVM_ENABLE_PROJECTS)
-  # Disable this for now -- openmp backend needs to be udpated. 
+  # Disable this for now -- openmp backend needs to be udpated.
   #set(KITSUNE_ENABLE_OPENMP_TARGET ON CACHE BOOL "")
 
   # The default nvidia architecture versions within the openmp project
-  # are a bit crufty and can be problematic -- we just blindly set 
-  # them to something a bit more modern so the build at least has a 
-  # chance.  You may have to tweak this depending upon what you are 
-  # doing. 
+  # are a bit crufty and can be problematic -- we just blindly set
+  # them to something a bit more modern so the build at least has a
+  # chance.  You may have to tweak this depending upon what you are
+  # doing.
   set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 70 CACHE STRING "")
   set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_70 CACHE STRING "")
 
-  # CUDA/NVCC is really only happy with older host compilers.  You 
-  # may need to tweak this to make things happy but we typically 
-  # need to fall back to older compilers than what we use to build 
-  # LLVM/Clang/etc.  gcc 8.x and 9.x are typically safe here... 
+  # CUDA/NVCC is really only happy with older host compilers.  You
+  # may need to tweak this to make things happy but we typically
+  # need to fall back to older compilers than what we use to build
+  # LLVM/Clang/etc.  gcc 8.x and 9.x are typically safe here...
  set(CUDA_HOST_COMPILER "/usr/bin/gcc-8" CACHE STRING "")
 #endif()
 
 set(_runtimes_list "cheetah")
 
 # Various helpful LLVM-level settings for development/debugging.
-set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "")    # sometimes errors get lost in all the warnings... 
+set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "")    # sometimes errors get lost in all the warnings...
 set(LLVM_ENABLE_ASSERTIONS ON CACHE BOOL "")
 set(LLVM_ENABLE_BACKTRACES ON CACHE BOOL "")
 set(LLVM_ENABLE_DUMP ON CACHE BOOL "")
@@ -79,11 +79,11 @@ set(LLVM_INSTALL_BINUTILS_SYMLINKS ON CACHE BOOL "")
 # You should carefully look at the parallel workload parameters as
 # LLVM builds can easily swamp systems if the level of parallelism
 # exceeds system resources -- especially memory during the linking
-# stages.  Also use care when building on network mounted file 
-# systems as parallel I/O operations can also bog down the 
-# scalability of the parallel build. 
+# stages.  Also use care when building on network mounted file
+# systems as parallel I/O operations can also bog down the
+# scalability of the parallel build.
 #
-# desktop: 
+# desktop:
 set(LLVM_PARALLEL_COMPILE_JOBS 12 CACHE STRING "")
 set(LLVM_PARALLEL_LINK_JOBS 4 CACHE STRING "")
 # server-class:
@@ -115,7 +115,7 @@ set(KITSUNE_ENABLE_KOKKOS_SUPPORT ON CACHE BOOL
 
 # NOTE: The OpenCilk runtime is always enabled within our builds
 # so it is no longer necessary to explicitly list it (the runtime
-# will be downloaded and built as part of the full llvm build 
+# will be downloaded and built as part of the full llvm build
 # process).
 
 set(KITSUNE_ENABLE_RUNTIME_ABIS ON CACHE BOOL "")
@@ -123,15 +123,15 @@ set(KITSUNE_ENABLE_ABI_LIBRARIES realm CACHE STRING "")
 
 set(KITSUNE_ENABLE_QTHREADS_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_REALM_TARGET ON CACHE BOOL "")
-set(KITSUNE_ENABLE_CUDATK_TARGET OFF CACHE BOOL "")
+set(KITSUNE_ENABLE_CUDATK_TARGET ON CACHE BOOL "")
 set(KITSUNE_ENABLE_HIP_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_OPENCL_TARGET OFF CACHE BOOL "")
 
 
 if (KITSUNE_ENABLE_CUDATK_TARGET OR
-    KITSUNE_ENABLE_HIP_TARGET OR 
-    KITSUNE_ENABLE_REALM_TARGET OR 
-    KITSUNE_ENABLE_EXAMPLES OR 
+    KITSUNE_ENABLE_HIP_TARGET OR
+    KITSUNE_ENABLE_REALM_TARGET OR
+    KITSUNE_ENABLE_EXAMPLES OR
     KITSUNE_ENABLE_KOKKOS_SUPPORT)
   list(APPEND _runtimes_list "kitsune")
 endif()
@@ -140,6 +140,9 @@ set(LLVM_ENABLE_RUNTIMES ${_runtimes_list} CACHE STRING "")
 message(DEBUG "  --> KITSUNE-DEV - enabled LLVM runtimes: ${LLVM_ENABLE_RUNTIMES}")
 
 set(KITSUNE_BUILD_EXAMPLES ON CACHE BOOL "")
+if (LLVM_INCLUDE_TESTS)
+  set(KITSUNE_INCLUDE_TESTS ON CACHE BOOL "")
+endif()
 
 message(DEBUG "  --> KITSUNE-DEV: fixing gcc prefix path.")
 execute_process(

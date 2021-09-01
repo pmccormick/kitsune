@@ -1721,9 +1721,8 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
 
   case TapirTargetID::Cuda:
-  case TapirTargetID::KitCuda:
-    if (! KITSUNE_ENABLE_CUDATK_TARGET)
-      getDriver().Diag(diag::warn_drv_cudatk_target_disabled);
+    if (! KITSUNE_ENABLE_CUDA_TARGET)
+      getDriver().Diag(diag::warn_drv_cuda_tapir_target_disabled);
     break;
 
   case TapirTargetID::OpenCL:
@@ -1740,12 +1739,12 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
   }
 
-  // NOTE: Due to ordering issues introduced by the .cfg files it 
+  // NOTE: Due to ordering issues introduced by the .cfg files it
   // doesn't work to add the link libraries (e.g., -lkokkoscore)
   // as they end up in the wrong order and the symbols will show as
   // undefined when compiling/linking kokkos code.  As such we add
   // the bare minimum kokkos libraries here so they can be left out
-  // of the .cfg files. 
+  // of the .cfg files.
   if (D.CCCIsCXX() && Args.hasArg(options::OPT_fkokkos)) {
     if (! KITSUNE_ENABLE_KOKKOS_SUPPORT)
       getDriver().Diag(diag::warn_drv_kokkos_disabled);

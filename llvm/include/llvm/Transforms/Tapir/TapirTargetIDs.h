@@ -19,13 +19,12 @@
 namespace llvm {
 
 enum class TapirTargetID {
-  Off,      // Completely disabled (i.e., no -ftapir argument was present). 
+  Off,      // Completely disabled (i.e., no -ftapir argument was present).
   None,     // Perform no lowering
   Serial,   // Lower to serial projection
   Cheetah,  // Lower to the Cheetah ABI
   Cilk,     // Lower to the Cilk Plus ABI
   Cuda,     // Lower to Cuda ABI
-  KitCuda,  // Lower to Kitsune's Cuda ABI 
   OpenCilk, // Lower to OpenCilk ABI
   OpenCL,   // Lower to OpenCL ABI
   OpenMP,   // Lower to OpenMP

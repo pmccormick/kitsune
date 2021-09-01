@@ -92,12 +92,12 @@ struct LoopAttributes {
   LSStrategy SpawnStrategy;
 
   /// Kitsune/Tapir loop target strategy.
-  enum LTarget { CheetahRT,  CilkRT, CudaRT,   KitCudaRT, 
-                 HipRT,      OmpRT,  NoneRT,   QthreadsRT, 
-                 RealmRT,    RocmRT, SequentialRT, ZeroRT
+  enum LTarget { CheetahRT,  CilkRT,  CudaRT,     HipRT,
+                 OmpRT,      NoneRT,  QthreadsRT, RealmRT,
+                 RocmRT,     SequentialRT, ZeroRT
                };
 
-  /// Value for tapir.loop.target metadata. 
+  /// Value for tapir.loop.target metadata.
   LTarget LoopTarget;
 };
 

@@ -29,9 +29,9 @@ if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
       ""
       CACHE
       STRING "Additional link flags needed for Kokkos applications.")
-  set(KITSUNE_KOKKOS_EXTRA_LINK_LIBS 
+  set(KITSUNE_KOKKOS_EXTRA_LINK_LIBS
      ""
-     CACHE 
+     CACHE
      STRING "Additional link libraries needed for Kokkos applications.")
   #
   configure_file(${CLANG_SOURCE_DIR}/kitsune/${KITSUNE_KOKKOS_CFG_FILENAME}.in
@@ -135,25 +135,25 @@ if (KITSUNE_ENABLE_REALM_TARGET)
       ${LLVM_BINARY_DIR}/share/kitsune/${TAPIR_REALM_TARGET_CFG_FILENAME})
 endif()
 
-option(KITSUNE_ENABLE_CUDATK_TARGET
+option(KITSUNE_ENABLE_CUDA_TARGET
     "Enable the Kitsune+Tapir CUDA Toolkit target and codegen library." OFF)
-if (KITSUNE_ENABLE_CUDATK_TARGET)
+if (KITSUNE_ENABLE_CUDA_TARGET)
   find_package(CUDAToolkit 10...11 REQUIRED)  # We may need to be a bit more specifc on minor versions here.
-  set(TAPIR_CUDATK_TARGET_CFG_FILENAME
-      "cudatk.cfg"
+  set(TAPIR_CUDA_TARGET_CFG_FILENAME
+      "cuda.cfg"
       CACHE
       STRING "Default CUDA Toolkit runtime ABI target Clang .cfg filename.")
-  set(KITSUNE_CUDATK_TARGET_EXTRA_LINK_FLAGS
+  set(KITSUNE_CUDA_TARGET_EXTRA_LINK_FLAGS
       ""
       CACHE
       STRING "Additional link flags needed for the CUDA Toolkit runtime ABI target.")
-  set(KITSUNE_CUDATK_TARGET_LINK_LIBS_FLAGS
+  set(KITSUNE_CUDA_TARGET_LINK_LIBS_FLAGS
       "-L${CUDAToolkit_LIBRARY_DIR} -lcudart"
       CACHE
       STRING "Link library flags (-L, -lxxx) needed for the CUDA Toolkit runtime ABI target.")
   #
   configure_file(${CLANG_SOURCE_DIR}/kitsune/cudatk.cfg.in
-      ${LLVM_BINARY_DIR}/share/kitsune/${TAPIR_CUDATK_TARGET_CFG_FILENAME})
+      ${LLVM_BINARY_DIR}/share/kitsune/${TAPIR_CUDA_TARGET_CFG_FILENAME})
 endif()
 
 # TODO: This needs to be connected to reality... --PM

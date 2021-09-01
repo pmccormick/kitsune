@@ -2595,16 +2595,15 @@ def fopenmp : Flag<["-"], "fopenmp">, Group<f_Group>, Flags<[CC1Option, NoArgume
 def fkitsune : Flag<["-"], "fkitsune">, Group<f_Group>,
   Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"Enable Kitsune extensions (e.g., forall, spwan+sync, etc.)">;
-
-def fkokkos : Flag<["-"], "fkokkos">, Group<f_Group>, 
-  Flags<[CC1Option, NoArgumentUnused]>, 
+def fkokkos : Flag<["-"], "fkokkos">, Group<f_Group>,
+  Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"Enable Kokkos extensions: recognition and custom code generation">;
-def fkokkos_no_init : Flag<["-"], "fkokkos-no-init">, Group<f_Group>, 
-  Flags<[CC1Option, NoArgumentUnused]>, 
+def fkokkos_no_init : Flag<["-"], "fkokkos-no-init">, Group<f_Group>,
+  Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"Skip code gen of Kokkos initialization (and finalize) calls.">;
-def fflecsi : Flag<["-"], "fflecsi">, Group<f_Group>, 
-  Flags<[CC1Option,NoArgumentUnused]>, 
-  HelpText<"Enable FleCSI extensions: recognition and custom code generation">; 
+def fflecsi : Flag<["-"], "fflecsi">, Group<f_Group>,
+  Flags<[CC1Option,NoArgumentUnused]>,
+  HelpText<"Enable FleCSI extensions: recognition and custom code generation">;
 def fno_openmp : Flag<["-"], "fno-openmp">, Group<f_Group>, Flags<[NoArgumentUnused]>;
 def fopenmp_version_EQ : Joined<["-"], "fopenmp-version=">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused]>,
   HelpText<"Set OpenMP version (e.g. 45 for OpenMP 4.5, 50 for OpenMP 5.0). Default value is 50.">;
