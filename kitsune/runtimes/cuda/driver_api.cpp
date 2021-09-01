@@ -152,3 +152,14 @@ void cuabiLaunchKernel(kernel_t kernel, gpu_id_t id,
                            blockDimX, blockDimY, blockDimZ, 
                            0, NULL, params, NULL) );
 }
+
+extern "C"
+void cuabiLaunch(kernel_t kernel, gpu_id_t id, void **params) {
+  assert(kernel != 0 && "null kernel!");
+  kernel_info_t *kinfo = (kernel_info_t *)kernel;
+
+  CU_CHECK( cuLaunchKernel(kinfo->kernel, 
+                           kinfo->grid_x, kinfo->grid_y, kinfo->grid_z,
+                           kinfo->block_x, kinfo->block_y, kinfo->block_z, 
+                           0, NULL, params, NULL) );
+} 
