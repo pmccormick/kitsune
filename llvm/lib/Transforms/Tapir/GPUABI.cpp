@@ -93,8 +93,8 @@ LLVMLoop::LLVMLoop(Module &M)
   Type *Int32Ty = Type::getInt32Ty(M.getContext());
   Type *Int64Ty = Type::getInt64Ty(M.getContext());
   GPUInit = M.getOrInsertFunction("initRuntime", VoidTy);
-  GPULaunchKernel = M.getOrInsertFunction("launchKernel", VoidPtrTy, VoidPtrTy, VoidPtrPtrTy, Int64Ty);
-  GPUWaitKernel = M.getOrInsertFunction("waitKernel", VoidTy);
+  GPULaunchKernel = M.getOrInsertFunction("launchBCKernel", VoidPtrTy, VoidPtrTy, VoidPtrPtrTy, Int64Ty);
+  GPUWaitKernel = M.getOrInsertFunction("waitKernel", VoidTy, VoidPtrTy);
 }
 
 void LLVMLoop::setupLoopOutlineArgs(
@@ -185,14 +185,14 @@ void LLVMLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   // Set the helper function to have external linkage.
   // Get the thread ID for this invocation of Helper.
   IRBuilder<> B(Entry->getTerminator());
-  Value *ThreadIdx = B.CreateCall(GetThreadIdx, ConstantInt::get(Int32Ty, 0));
+  Value *ThreadIdx = B.CreateCall(GetThreadIdx);
   //Value *BlockIdx = B.CreateCall(GetBlockIdx, ConstantInt::get(Int32Ty, 0));
   //Value *BlockDim = B.CreateCall(GetBlockDim, ConstantInt::get(Int32Ty, 0));
   Value *ThreadID = B.CreateIntCast(ThreadIdx, PrimaryIV->getType(), false);
 
 
   Function *Helper = Out.Outline;
-  //Helper->setName("kitsune_spirv_kernel"); 
+  Helper->setName("kitsune_kernel"); 
   // Fix argument pointer types to global, nocapture
   // TODO: read/write attributes?
   LLVM_DEBUG(dbgs() << "Function type after globalization of argument pointers << " << *Helper->getType() << "\n"); 
@@ -237,42 +237,6 @@ void LLVMLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
   assert(ClonedCond->getOperand(TripCountIdx) == ThreadEnd &&
          "End argument not used in condition");
 
-  // Update paramaters with necessary address space modifcations
-  SmallVector<Type*, 8> paramTys; 
-  for(auto &arg : Helper->args()){
-    if (auto *apty = dyn_cast<PointerType>(arg.getType())){
-      paramTys.push_back(PointerType::get(apty->getPointerElementType(), 1)); 
-    } else {
-      paramTys.push_back(arg.getType()); 
-    }
-  }
-  ArrayRef<Type*> newParams(paramTys); 
-  if(auto *fpty = dyn_cast<PointerType>(Helper->getType())){
-    if(auto *fty = dyn_cast<FunctionType>(fpty->getPointerElementType())){
-      LLVM_DEBUG(dbgs() << "Helper is pointer to function " << *Helper->getType() << "\n"); 
-      auto *NewHelper = Function::Create(
-          FunctionType::get(fty->getReturnType(), newParams, false), 
-          GlobalValue::ExternalLinkage, 
-          "kitsune_llvm_kernel", 
-          LLVMM);
-
-      ValueToValueMapTy NewVMap;
-      auto argit = NewHelper->arg_begin();
-      for (auto &arg : Helper->args()) {
-        NewVMap[&arg] = argit++; 
-      }
-      SmallVector< ReturnInst *,5> retinsts;
-      CloneFunctionInto(NewHelper, Helper, NewVMap, false, retinsts);
-      //Helper->mutateType(PointerType::get(FunctionType::get(fty->getReturnType(), newParams, false), 0)); 
-      NewHelper->setCallingConv(CallingConv::SPIR_KERNEL); 
-      for(auto &arg : NewHelper->args()){
-        if (auto *apty = dyn_cast<PointerType>(arg.getType())){
-          arg.addAttr(Attribute::NoCapture);
-        }
-      }
-      Helper = NewHelper; 
-    }
-  }
 }
 
 void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
@@ -285,7 +249,7 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   //Task *T = TL.getTask();
   //Instruction *ReplCall = cast<CallBase>(TOI.ReplCall);
-  LLVM_DEBUG(dbgs() << "Running processOutlinedLoopCall: " << M);
+  LLVM_DEBUG(dbgs() << "Running processOutlinedLoopCall: " << LLVMM);
   Function *Parent = TOI.ReplCall->getFunction();
   Value *TripCount = OrderedInputs[0];
   BasicBlock* RCBB = TOI.ReplCall->getParent(); 
@@ -335,11 +299,12 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   SmallVector<char, 1<<20> mbuf;
   BitcodeWriter bcw(mbuf);
   bcw.writeModule(LLVMM); 
+  bcw.writeStrtab(); 
 
-  Constant *LLVM = ConstantDataArray::getRaw(mbuf.data(), mbuf.size(), Int8Ty);
-  LLVMGlobal = new GlobalVariable(M, LLVM->getType(), true,
-                                 GlobalValue::PrivateLinkage, LLVM,
-                                 "gpu_" + Twine("kitsune_spirv_kernel"));
+  Constant *LLVMBC = ConstantDataArray::getRaw(mbuf.data(), mbuf.size(), Int8Ty);
+  LLVMGlobal = new GlobalVariable(M, LLVMBC->getType(), true,
+                                 GlobalValue::PrivateLinkage, LLVMBC,
+                                 "gpu_" + Twine("kitsune_kernel"));
 
   //Value* TripCount = isSRetInput(TOI.InputSet[0]) ? TOI.InputSet[1] : TOI.InputSet[0]; 
   //Value *RunStart = ReplCall->getArgOperand(getIVArgIndex(*Parent,
@@ -349,6 +314,7 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   Value *KernelID = ConstantInt::get(Int32Ty, MyKernelID);
   Value *LLVMPtr = B.CreateBitCast(LLVMGlobal, VoidPtrTy);
+  Type *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
 
   Constant *kernelSize = ConstantInt::get(Int32Ty, 
     LLVMGlobal->getInitializer()->getType()->getArrayNumElements()); 
@@ -365,7 +331,7 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     Value *VPtr = B.CreateAlloca(V->getType()); 
     B.CreateStore(V, VPtr); 
     Value *VoidVPtr = B.CreateBitCast(VPtr, VoidPtrTy);
-    Value *argPtr = B.CreateConstInBoundsGEP1_32(VoidPtrTy, argArray, i++); 
+    Value *argPtr = B.CreateConstInBoundsGEP2_32(arrayType, argArray, 0, i); 
     B.CreateStore(VoidVPtr, argPtr); 
   }
 
@@ -379,7 +345,9 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   Value *IsRemAdd = B.CreateZExt(IsRem, RunSizeQ->getType()); 
   Value *RunSize = B.CreateAdd(RunSizeQ, IsRemAdd);  
   
-  Value* stream = B.CreateCall(GPULaunchKernel, { LLVMGlobal, argArray, RunSize });
+  Value* argsPtr = B.CreateConstInBoundsGEP2_32(arrayType, argArray, 0, 0); 
+  Value* bcPtr = B.CreateConstInBoundsGEP2_32(LLVMGlobal->getValueType(), LLVMGlobal, 0, 0); 
+  Value* stream = B.CreateCall(GPULaunchKernel, { bcPtr, argsPtr, RunSize });
   B.CreateCall(GPUWaitKernel, stream);
 
   LLVM_DEBUG(dbgs() << "Finished processOutlinedLoopCall: " << M);
