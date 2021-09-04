@@ -46,6 +46,50 @@ find_package(Clang PATHS "${LLVM_BINARY_DIR}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT
 
 set(LLVM_THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third-party")
 
+function(get_cheetah_path path)
+  foreach(entry ${runtimes})
+    get_filename_component(projName ${entry} NAME)
+    if("${projName}" MATCHES "cheetah")
+      set(${path} ${entry} PARENT_SCOPE)
+      return()
+    endif()
+  endforeach()
+endfunction()
+
+# Some of the runtimes will conditionally use cheetah.  To make this
+# work smoothly we ensure that cheetah is added early in the list of
+# sub-projects. This allows other sub-projects to have checks like
+# `if(TARGET cheetah)`.
+get_cheetah_path(cheetah_path)
+if(cheetah_path)
+  list(REMOVE_ITEM runtimes ${cheetah_path})
+  if(NOT DEFINED LLVM_BUILD_CHEETAH OR LLVM_BUILD_CHEETAH)
+    list(INSERT runtimes 0 ${cheetah_path})
+  endif()
+endif()
+
+function(get_compiler_rt_path path)
+  foreach(entry ${runtimes})
+    get_filename_component(projName ${entry} NAME)
+    if("${projName}" MATCHES "compiler-rt")
+      set(${path} ${entry} PARENT_SCOPE)
+      return()
+    endif()
+  endforeach()
+endfunction()
+
+# Some of the runtimes will conditionally use the compiler-rt sanitizers
+# to make this work smoothly we ensure that compiler-rt is added first in
+# the list of sub-projects. This allows other sub-projects to have checks
+# like `if(TARGET asan)` to enable building with asan.
+get_compiler_rt_path(compiler_rt_path)
+if(compiler_rt_path)
+  list(REMOVE_ITEM runtimes ${compiler_rt_path})
+  if(NOT DEFINED LLVM_BUILD_COMPILER_RT OR LLVM_BUILD_COMPILER_RT)
+    list(INSERT runtimes 0 ${compiler_rt_path})
+  endif()
+endif()
+
 # If building standalone by pointing CMake at this runtimes directory,
 # LLVM_BINARY_DIR isn't set, find_package(LLVM) will fail and these
 # intermediate paths are unset.
