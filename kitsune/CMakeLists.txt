@@ -17,27 +17,37 @@ set(KITSUNE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
   set(KITSUNE_KOKKOS_SRC_DIR  ${LLVM_BINARY_DIR}/kokkos)
+  # TODO: Note that we have to patch Kokkos to disable some sections of code 
+  # that are using exceptions.  In general, this is a bit messy with the
+  # use of the 'fetch content' mechanisms in CMake -- in particular, the 
+  # goofy system appears to continually want to run the patch even though
+  # it has already been run previously.  This is a pain when developing. 
+  # So...  We have hacked the patch command to always return success to 
+  # avoid failed application of the patch from stopping the build.  Need to
+  # find a safe way to accomplish this... 
   FetchContent_Declare(kokkos
-    GIT_REPOSITORY    https://github.com/kokkos/kokkos.git
-    GIT_TAG           3.3.01
-    SOURCE_DIR        ${KITSUNE_KOKKOS_SRC_DIR})
-
-  set(Kokkos_ENABLE_SERIAL ON CACHE BOOL "")
+    GIT_REPOSITORY      https://github.com/kokkos/kokkos.git
+    GIT_TAG             3.3.01
+    SOURCE_DIR          ${KITSUNE_KOKKOS_SRC_DIR}
+    UPDATE_DISCONNECTED TRUE 
+    CMAKE_ARGS -D Kokkos_ENABLE_SERIAL=ON -D BUILD_TESTING=OFF 
+    PATCH_COMMAND patch -p0 --verbose --input=${KITSUNE_SOURCE_DIR}/patches/Kokkos_MemorySpace.patch)
   FetchContent_MakeAvailable(kokkos)
 endif()
 
 option(KITSUNE_ENABLE_RUNTIME_ABIS "Enable the various Kitsune ABI libraries." ON)
 if (KITSUNE_ENABLE_RUNTIME_ABIS)
-  message(STATUS "kitsune: enabling target runtime ABI library selection.")  
+  message(STATUS "kitsune: enabling target runtime ABI library selection.")
   if (KITSUNE_ENABLE_REALM_TARGET)
     set(KITSUNE_REALM_SOURCE_DIR ${LLVM_BINARY_DIR}/legion)
     set(KITSUNE_LEGION_INCLUDE_DIR ${KITSUNE_REALM_SOURCE_DIR}/runtime)
     set(KITSUNE_REALM_INCLUDE_DIR ${KITSUNE_LEGION_SRC_DIR}/realm)
     set(KITSUNE_REALM_BINARY_DIR ${LLVM_BINARY_DIR}/runtimes/runtimes-bins/_deps/realm-build)
-    FetchContent_Declare(realm 
+    FetchContent_Declare(realm
       GIT_REPOSITORY   https://github.com/StanfordLegion/legion.git
       GIT_TAG          master
-      SOURCE_DIR       ${KITSUNE_REALM_SOURCE_DIR})
+      SOURCE_DIR       ${KITSUNE_REALM_SOURCE_DIR}
+      UPDATE_DISCONNECTED TRUE)
     set(Legion_BUILD_REALM_ONLY ON)
     set(Legion_USE_LVVM OFF)
     set(Legion_LINK_LLVM_LIBS OFF)
@@ -45,7 +55,7 @@ if (KITSUNE_ENABLE_RUNTIME_ABIS)
     set(Legion_USE_HIP OFF)
     FetchContent_MakeAvailable(realm)
   endif()
-  
+
   # Following llvm style we use a list to pick the set of runtime abi libraries (i.e., wrappers
   # around various runtime systems that aim to simplify code generation details in the Tapir
   # transforms within LLVM.

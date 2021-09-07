@@ -34,12 +34,10 @@ FunctionCallee RealmABI::get_realmGetNumProcs() {
   LLVMContext &C = M.getContext(); 
   const DataLayout &DL = M.getDataLayout();
   AttributeList AL;
-
   std::vector<Type*> TypeArray;
+
   // TODO: Set appropriate function attributes.
-  FunctionType *FTy = FunctionType::get(DL.getIntPtrType(C),
-					TypeArray, 
-					false);
+  FunctionType *FTy = FunctionType::get(Type::getInt64Ty(C), {}, false);
   RealmGetNumProcs = M.getOrInsertFunction("realmGetNumProcs", FTy, AL);
   return RealmGetNumProcs;
 }
@@ -165,19 +163,18 @@ RealmABI::~RealmABI() {
 
 /// Lower a call to get the grainsize of this Tapir loop.
 ///
-///     Grainsize = ceil(limit / workers)
+///     Grainsize = ceil(limit / # workers) 
+///               = (limit + # workers - 1) / # workers       
 ///
 /// This computation is inserted into the preheader of the loop.
 Value *RealmABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Limit = GrainsizeCall->getArgOperand(0);
   IRBuilder<> Builder(GrainsizeCall);
-
-  Value *Workers = Builder.CreateCall(get_realmGetNumProcs());
-  Value *Grainsize = Builder.CreateUDiv(Builder.CreateSub(Builder.CreateAdd(Limit, Workers),
-                                         ConstantInt::get(Limit->getType(), 1)),
-                       Workers);
-
-
+  Value *Workers = Builder.CreateIntCast(Builder.CreateCall(get_realmGetNumProcs()), 
+                                  Limit->getType(), false);
+  Value *Ceiling = Builder.CreateSub(Builder.CreateAdd(Limit, Workers), 
+                                  ConstantInt::get(Workers->getType(), 1));
+  Value *Grainsize = Builder.CreateUDiv(Ceiling, Workers);
   // Replace uses of grainsize intrinsic call with this grainsize value.
   GrainsizeCall->replaceAllUsesWith(Grainsize);
   return Grainsize;

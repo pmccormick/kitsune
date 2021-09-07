@@ -1,0 +1,40 @@
+--- core/src/impl/Kokkos_MemorySpace.cpp	2021-09-08 08:41:12.537101627 -0600
++++ Kokkos_MemorySpace.cpp	2021-09-08 08:07:52.227125687 -0600
+@@ -73,6 +73,7 @@
+     }
+     o.flush();
+   };
++#ifdef KITSUNE_ENABLE_EXCEPTIONS
+   try {
+     std::ostringstream sstr;
+     generate_failure_message(sstr);
+@@ -89,6 +90,7 @@
+         "Kokkos encountered an allocation failure, then another allocation "
+         "failure while trying to create the error message.");
+   }
++#endif
+ }
+ 
+ }  // end namespace Impl
+--- core/src/impl/Kokkos_MemorySpace.hpp	2021-09-08 08:37:35.530437573 -0600
++++ Kokkos_MemorySpace.hpp	2021-09-08 08:42:35.930433957 -0600
+@@ -68,6 +68,7 @@
+ SharedAllocationHeader *checked_allocation_with_header(MemorySpace const &space,
+                                                        std::string const &label,
+                                                        size_t alloc_size) {
++#ifdef KITSUNE_ENABLE_EXCEPTIONS
+   try {
+     return reinterpret_cast<SharedAllocationHeader *>(space.allocate(
+         label.c_str(), alloc_size + sizeof(SharedAllocationHeader),
+@@ -76,6 +77,11 @@
+     safe_throw_allocation_with_header_failure(space.name(), label, failure);
+   }
+   return nullptr;  // unreachable
++#else 
++    return reinterpret_cast<SharedAllocationHeader *>(space.allocate(
++        label.c_str(), alloc_size + sizeof(SharedAllocationHeader),
++        alloc_size));
++#endif
+ }
+ 
+ }  // end namespace Impl

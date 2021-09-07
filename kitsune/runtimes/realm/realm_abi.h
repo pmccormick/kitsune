@@ -28,7 +28,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
   //typedef struct context context;
   struct context* getRealmCTX();
   int realmInitRuntime(int argc, char** argv);

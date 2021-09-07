@@ -53,14 +53,18 @@ set(_example_srcs
   complex.cpp
   matmult1.cpp
   normalize.cpp
-#  raytrace.cpp
   vecadd.cpp)
+
+set(_example_view_srcs
+  raytrace.cpp
+  vecadd-views.cpp
+  )
 
 # Build the pure-kokkos serial target version of all the examples first.
 # NOTE: Do not build kokkos with parallel "back-ends" as part of the
 # overall kitsune+tapir configure and build.  For performance comparisons
 # and other related work you should use a separate kokkos build.
-foreach(src_file IN ITEMS ${_example_srcs})
+foreach(src_file IN ITEMS ${_example_srcs} ${_example_view_srcs})
   get_filename_component(exec_name kokkos.${src_file} NAME_WLE)
   message(STATUS "  ${src_file} --> ${exec_name}")
   add_executable(${exec_name} ${src_file})
@@ -103,6 +107,44 @@ foreach(rt IN ITEMS ${_tapir_rt_targets})
       -fkokkos
       -fkokkos-no-init
       -ftapir=${rt})
+    target_link_options(${exec_name}
+      PRIVATE
+      -fkokkos
+      -ftapir=${rt})
+    set(dep_list kokkos kokkoscore)
+    set(target_libs kokkoscore)
+    add_tapir_dependency(${exec_name} ${rt})
+    message(STATUS "${exec_name} target libs + ${rt} libs: ${target_libs}")
+    message(STATUS "${exec_name} dependencies: ${dep_list}")
+    target_link_libraries(${exec_name} ${target_libs})
+    set_target_properties(${exec_name}
+      PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY  ${LLVM_BINARY_DIR}/examples/kitsune)
+    #
+  endforeach()
+endforeach()
+
+# TODO: clean this up and write a function for the repeated case here 
+# for views (that can't use -fkokkos-no-init due to the details of
+# implementing views in Kokkos). 
+foreach(rt IN ITEMS ${_tapir_rt_targets})
+  foreach(src_file IN ITEMS ${_example_view_srcs})
+    get_filename_component(exec_name ${src_file} NAME_WLE)
+    set(exec_name "kokkos.${exec_name}.${rt}")
+    message(STATUS "  ${src_file} --> ${exec_name}")
+    add_executable(${exec_name} ${src_file})
+    target_include_directories(${exec_name}
+      BEFORE
+      PRIVATE
+      ${KITSUNE_INCLUDE_DIR}
+      ${KITSUNE_KOKKOS_SRC_DIR}/core/src
+      ${KITSUNE_KOKKOS_SRC_DIR}/containers/src)
+    target_compile_options(${exec_name}
+      PRIVATE
+      -fkokkos
+      -ftapir=${rt}
+      -fno-exceptions
+      -fno-cxx-exceptions)
     target_link_options(${exec_name}
       PRIVATE
       -fkokkos

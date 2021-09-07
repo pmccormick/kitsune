@@ -21,10 +21,10 @@
 #include "Kokkos_DualView.hpp"
 #include "kitsune/timer.h"
 
-#define WIDTH  1920
-#define HEIGHT 1080
-#define BPP 3
-typedef Kokkos::DualView<unsigned char**[3], Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> DualViewVector;
+const size_t WIDTH = 640;
+const size_t HEIGHT = 480;
+
+typedef Kokkos::View<unsigned char**[3], Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> ViewVector;
 
 struct Vec {
  float x,y,z;
@@ -75,7 +75,7 @@ KOKKOS_INLINE_FUNCTION float QueryDatabase(const Vec& position, int &hitType) {
                 9, 0, 9, 16,
                 9, 0, 15, 0
         };
- for (int i = 0; i < sizeof(lines); i += 4) {
+ for (size_t i = 0; i < sizeof(lines); i += 4) {
    Vec begin = Vec(lines[i], lines[i + 1]) * .5;
    Vec e = Vec(lines[i + 2], lines[i + 3]) * .5 + begin * -1;
    Vec o = f + (begin + e * fminf(-fminf((((begin + f * -1) % e )/(e % e)), 0),1)) * -1;
@@ -173,10 +173,9 @@ int main(int argc, char **argv) {
   Kokkos::initialize(argc, argv);
   kitsune::timer t;
   {
-    DualViewVector img = DualViewVector("img", WIDTH, HEIGHT);
-    int samplesCount = 1 << 7;
+    ViewVector img = ViewVector("img", WIDTH, HEIGHT);
+    int samplesCount = 8;
     if (argc > 1 ) {samplesCount = atoi(argv[1]);}
-    //img.modify_device();
     Kokkos::parallel_for(WIDTH*HEIGHT, KOKKOS_LAMBDA(const int i) {
         const int x = i % WIDTH;
         const int y = i / WIDTH;
@@ -199,21 +198,20 @@ int main(int argc, char **argv) {
         color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
         Vec o = color + 1.0f;
         color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
-        img.d_view(x,y,0) = color.x;
-        img.d_view(x,y,1) = color.y;
-        img.d_view(x,y,2) = color.z;
+        img(x,y,0) = color.x;
+        img(x,y,1) = color.y;
+        img(x,y,2) = color.z;
       });
     double loop_secs = t.seconds();
     std::cout << "running time: " << loop_secs << std::endl;
 
     std::ofstream myfile;
     myfile.open ("example.ppm");
-    //img.sync_host();
+
     myfile << "P6 " << WIDTH << " " << HEIGHT << " 255 ";
     for (int y = HEIGHT; y--;) {
       for (int x = WIDTH; x--;) {
-        //int offset = y * w * BPP + x * BPP;
-        myfile << (char)img.h_view(x,y,0) << (char)img.h_view(x,y,1) << (char)img.h_view(x,y,2);
+        myfile << (char)img(x,y,0) << (char)img(x,y,1) << (char)img(x,y,2);
       }
     }
   }
