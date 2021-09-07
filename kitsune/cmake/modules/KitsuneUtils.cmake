@@ -18,7 +18,7 @@
 # Kitsune+Tapir.
 #
 macro(get_tapir_rt_targets rt_list)
-  set(_rt_cmake_var_names "OPENMP;QTHREADS;REALM;CUDATK;HIP;OPENCL")
+  set(_rt_cmake_var_names "OPENMP;QTHREADS;REALM;CUDA;HIP;OPENCL")
   # Always enable the serial and opencilk targets.
   list(APPEND ${rt_list} "serial")
   list(APPEND ${rt_list} "opencilk")
@@ -35,20 +35,24 @@ macro(get_tapir_rt_targets rt_list)
   unset(_kitsune_rt_flags)
 endmacro()
 
-# NOTE: the dep_list and target_libs variables used in the following 
-# function are expected to live in the parent scope (i.e., we're 
-# mucking with state outside of the function to try and debug some 
-# build dependency issues).  
+# NOTE: the dep_list and target_libs variables used in the following
+# function are expected to live in the parent scope (i.e., we're
+# mucking with state outside of the function to try and debug some
+# build dependency issues).
 function(add_tapir_dependency target abi)
   message(STATUS "adding dependency for ${target} w/ -ftapir=${abi}")
   if (${abi} STREQUAL "opencilk")
     list(APPEND dep_list cheetah_personality_c_static;cheetah_personality_cpp_static;cheetah_personality_c_static;cheetah_static;cheetah_abi_bc)
     set(target_libs ${target_libs} opencilk opencilk-personality-cpp PARENT_SCOPE)
-    add_dependencies(${target} ${dep_list})    
+    add_dependencies(${target} ${dep_list})
   elseif(${abi} STREQUAL "realm")
     list(APPEND dep_list RealmABI)
     set(target_libs ${target_libs} realm-abi realm PARENT_SCOPE)
-    add_dependencies(${target} ${dep_list})        
+    add_dependencies(${target} ${dep_list})
+  elseif(${abi} STREQUAL "cuda")
+    list(APPEND dep_list cu-abi)
+    set(target_libs ${target_libs} cu-abi PARENT_SCOPE)
+    add_dependencies(${target} ${dep_list})
   elseif(${abi} STREQUAL "none")
     message(STATUS "no dependencies for '-ftapir=none'...")
   elseif(${abi} STREQUAL "serial")
@@ -59,4 +63,3 @@ function(add_tapir_dependency target abi)
   endif()
 
 endfunction()
-
