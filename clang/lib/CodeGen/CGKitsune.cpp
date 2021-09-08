@@ -226,7 +226,6 @@ void CodeGenFunction::EmitSpawnStmt(const SpawnStmt &S) {
 void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
                                   ArrayRef<const Attr *> ForAttrs) {
   JumpDest LoopExit = getJumpDestInCurrentScope("forall.end");
-  JumpDest Sync = getJumpDestInCurrentScope("forall.sync");
 
   LexicalScope ForScope(*this, S.getSourceRange());
 
@@ -234,13 +233,24 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   if (S.getInit())
     EmitStmt(S.getInit());
 
+  ////////////////////////////////////////////////////////////
+  // Kitsune
   // create the sync region
   PushSyncRegion();
   llvm::Instruction *SRStart = EmitSyncRegionStart();
   CurSyncRegion->setSyncRegionStart(SRStart);
-
+  //
   // TODO: Need to check attributes for spawning strategy. 
   LoopStack.setSpawnStrategy(LoopAttributes::DAC);
+  auto OldAllocaInsertPt = AllocaInsertPt;
+  llvm::SmallVector<std::pair<VarDecl*, RValue>, 4> ivs;  
+  DeclMapTy IVDeclMap; 
+  JumpDest Sync = getJumpDestInCurrentScope("forall.sync");
+  llvm::BasicBlock* Detach = createBasicBlock("forall.detach");
+  // End Kitsune
+  ////////////////////////////////////////////////////////////
+
+
   // Start the loop with a block that tests the condition.
   // If there's an increment, the continue scope will be overwritten
   // later.
@@ -266,9 +276,6 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   // Create a cleanup scope for the condition variable cleanups.
   LexicalScope ConditionScope(*this, S.getSourceRange());
 
-  auto OldAllocaInsertPt = AllocaInsertPt;
-  llvm::SmallVector<std::pair<VarDecl*, RValue>, 4> ivs;  
-  DeclMapTy IVDeclMap; 
   if (S.getCond()) {
     // If the for statement has a condition scope, emit the local variable
     // declaration.
@@ -283,7 +290,6 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
       ExitBlock = createBasicBlock("forall.cond.cleanup");
 
     // As long as the condition is true, iterate the loop.
-    llvm::BasicBlock* Detach = createBasicBlock("forall.detach");
     llvm::BasicBlock *ForBody = createBasicBlock("forall.body");
 
     // C99 6.8.5p2/p4: The first substatement is executed if the expression
@@ -298,10 +304,12 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
       EmitBranchThroughCleanup(Sync);
     }
 
+    ////////////////////////////////////////////////////////////
+    // Kitsune
     EmitBlock(Detach);
     // Extract the DeclStmt from the statement init
     const DeclStmt *DS = cast<DeclStmt>(S.getInit());
-   
+    //
     //Load induction variables as values before the detach 
     for (auto *DI : DS->decls()){
       auto *LoopVar = dyn_cast<VarDecl>(DI);
@@ -313,14 +321,17 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
       RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
       ivs.push_back({LoopVar, OuterRV}); 
     }
-
+    //
     // create the detach terminator
     Builder.CreateDetach(ForBody, Continue.getBlock(), SRStart);  
-
+    //
     // Set up IVs to be copied as firstprivate 
     llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
     AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
-                                               ForBody);
+                                                   ForBody);
+    // End Kitsune
+    ////////////////////////////////////////////////////////////
+
     EmitBlock(ForBody);
   } else {
     // Treat it as a non-zero constant.  Don't even create a new block for the
