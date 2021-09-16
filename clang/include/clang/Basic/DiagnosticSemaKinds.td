@@ -4247,6 +4247,16 @@ def err_tapir_strategy_unknown: Error<
 // 
 def warn_spawn_as_loop_body: Warning<
     "%0 loop with spawn statement body has undefined behavior.">;
+
+// Forall errors/warnings
+def err_forall_no_init: Error<
+    "A forall statement must have an initialization expression.">;
+def err_forall_no_cond: Error<
+    "A forall statement must have a condition.">;
+def err_forall_no_inc: Error<
+    "A forall statement must have an increment expression.">;
+def err_forall_has_break: Error<
+    "A forall body may not have a break statement.">;
 // =====+
 
 // objc_designated_initializer attribute diagnostics.
