@@ -57,7 +57,6 @@ set(_example_srcs
 
 set(_example_view_srcs
   raytrace.cpp
-  vecadd-views.cpp
   )
 
 # Build the pure-kokkos serial target version of all the examples first.

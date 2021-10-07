@@ -32,7 +32,7 @@ set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
 # you are working on.  By default we provide the full suite of
 # clang+tools, openmp, lld, and a debugger via lldb.
 set(LLVM_ENABLE_PROJECTS
-  clang;openmp;
+  clang;openmp
   CACHE STRING "")
 
 message(DEBUG "  --> KITSUNE-DEV - enabled LLVM projects: ${LLVM_ENABLE_PROJECTS}")
@@ -63,7 +63,7 @@ set(CLANG_CONFIG_FILE_USER_DIR "$ENV{HOME}/.kitsune" CACHE STRING "")
  set(CUDA_HOST_COMPILER "/usr/bin/gcc-8" CACHE STRING "")
 #endif()
 
-set(_runtimes_list "cheetah")
+set(_runtimes_list "cheetah;cilktools")
 
 # Various helpful LLVM-level settings for development/debugging.
 set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "")    # sometimes errors get lost in all the warnings...
