@@ -202,6 +202,8 @@ namespace {
 
     bool hasStoreBetween(MachineBasicBlock *From, MachineBasicBlock *To,
                          MachineInstr &MI);
+    bool possiblyHasSetjmpBetween(MachineBasicBlock *From,
+                                  MachineBasicBlock *To, MachineInstr &MI);
 
     /// Postpone the splitting of the given critical
     /// edge (\p From, \p To).
@@ -849,6 +851,22 @@ bool MachineSinking::isProfitableToSinkTo(Register Reg, MachineInstr &MI,
   return true;
 }
 
+// Helper function to check if MBB contains a terminator that might correspond
+// with EH_SjLj_Setup.
+static bool blockMayContainSetjmpSetup(const MachineBasicBlock *MBB,
+                                       const MachineBasicBlock *Succ) {
+  for (const MachineInstr &MI : MBB->terminators())
+    // It seems hard to check for EH_SjLj_Setup directly, since that instruction
+    // seems to be target-dependent.  Instead we simply check if the terminator
+    // has unmodeled side effects.
+    if (MI.hasUnmodeledSideEffects() &&
+        llvm::any_of(MI.operands(), [&](const MachineOperand &Op) {
+          return Op.isMBB() && Op.getMBB() == Succ;
+        }))
+      return true;
+  return false;
+}
+
 /// Get the sorted sequence of successors for this MachineBasicBlock, possibly
 /// computing it if it was not already cached.
 SmallVector<MachineBasicBlock *, 4> &
@@ -1222,6 +1240,75 @@ bool MachineSinking::hasStoreBetween(MachineBasicBlock *From,
   return HasAliasedStore;
 }
 
+// possiblyHasSetjmpBetween - Check for setjmps along the path from block From
+// to block To.
+bool MachineSinking::possiblyHasSetjmpBetween(MachineBasicBlock *From,
+                                              MachineBasicBlock *To,
+                                              MachineInstr &MI) {
+  // Copies and other transient instructions are safe to move past setjmps.
+  if (MI.isCopyLike())
+    return false;
+
+  // If MI cannot store and it does not read any register operands (which might
+  // be spilled), then they are safe to move past setjmps.
+  if (!MI.mayStore() &&
+      !llvm::any_of(MI.operands(), [&](const MachineOperand &Op) {
+        if (Op.isReg() && Op.getReg().isValid() && !Op.isDef()) {
+          LLVM_DEBUG(dbgs()
+                     << "Reads valid register operand " << Op << "\n");
+          return true;
+        }
+        return false;
+      }))
+    return false;
+
+  // For now we examine just the predecessors of predecessors of To for possible
+  // setjmp-setup constructs.  For example:
+  //
+  // Pred:
+  //   ...
+  //   EH_SjLj_Setup BB
+  // BB:
+  //   <reg> = MOV 1
+  //   JMP To
+  // To:
+  //   <setjmp_return> = PHI <reg>
+  //   TEST <setjmp_return>
+  //   CONDITIONAL_JMP
+  //
+  // Note that it is safe to move an instruction after the conditional jmp, but
+  // not into the body of To.  At this time LLVM does not seem to generate more
+  // complex control-flow structures encoding setjmps.  This code should be
+  // revisited if LLVM is able to generate more complex control-flow structures
+  // for setjmp.
+  for (MachineBasicBlock *BB : To->predecessors()) {
+    if (BB->hasAddressTaken() && PDT->dominates(To, BB)) {
+      // Since BB's address is taken, BB might be the desintation of a longjmp.
+      LLVM_DEBUG(dbgs() << "Checking predecessor " << *BB);
+      for (MachineBasicBlock *Pred : BB->predecessors()) {
+        if (PDT->dominates(To, Pred)) {
+          LLVM_DEBUG(dbgs() << "Checking predecessor of predecessor " << *Pred);
+          if (blockMayContainSetjmpSetup(Pred, BB)) {
+            // Pred might contain a setjmp with BB the destination of a
+            // corresponding longjmp.  If BB contains an instruction that
+            // produces a definition, assume that definition is used to
+            // distinguish different returns from the setjmp, meaning its unsafe
+            // to sink the instruction past that definition.
+            for (MachineInstr &I : *BB) {
+              if (I.mayStore() || I.getNumDefs() > 0) {
+                LLVM_DEBUG(dbgs() << "Found definition in pred-pred block: "
+                                  << I << "\n");
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /// Sink instructions into cycles if profitable. This especially tries to
 /// prevent register spills caused by register pressure if there is little to no
 /// overhead moving instructions into cycles.
@@ -1420,6 +1507,13 @@ bool MachineSinking::SinkInstruction(MachineInstr &MI, bool &SawStore,
         (!CI->getCycle(SuccToSinkTo)->isReducible() ||
          CI->getCycle(SuccToSinkTo)->getHeader() == SuccToSinkTo)) {
       LLVM_DEBUG(dbgs() << " *** NOTE: cycle header found\n");
+      TryBreak = true;
+    }
+
+    // Don't sink instructions into successors of setjmps that may execute
+    // multiple times.
+    if (!TryBreak && possiblyHasSetjmpBetween(ParentBlock, SuccToSinkTo, MI)) {
+      LLVM_DEBUG(dbgs() << " *** NOTE: Possible setjmp setup found\n");
       TryBreak = true;
     }
 
