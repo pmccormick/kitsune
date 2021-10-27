@@ -36,4 +36,5 @@ add_llvm_component_library(LLVMInstrumentation
   Support
   TransformUtils
   ProfileData
+  IRReader
   )
