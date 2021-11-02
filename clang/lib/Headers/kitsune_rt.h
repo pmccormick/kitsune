@@ -14,7 +14,13 @@
 
 #if defined(KITSUNE_ENABLE_OPENCL_TARGET)
 #define ocl_mmap(a, n) __kitsune_opencl_mmap_marker((void*)a, n)
-extern "C" void __kitsune_opencl_mmap_marker(void* ptr, uint64_t n);
+#ifdef __cplusplus
+extern "C" { 
+#endif
+  void __kitsune_opencl_mmap_marker(void* ptr, uint64_t n);
+#ifdef __cplusplus
+}
+#endif
 #endif
 
 #endif
