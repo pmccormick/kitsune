@@ -162,7 +162,7 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
 
     SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
     DeclGroupPtrTy DG = ParseSimpleDeclaration(
-        DeclaratorContext::ForContext, DeclEnd, attrs, false,
+        DeclaratorContext::ForInit, DeclEnd, attrs, false,
         MightBeForRangeStmt ? &ForRangeInfo : nullptr);
     FirstPart = Actions.ActOnDeclStmt(DG, DeclStart, Tok.getLocation());
     if (ForRangeInfo.ParsedForRangeDecl()) {
@@ -260,7 +260,7 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
         if (ForRangeInfo.ParsedForRangeDecl()) {
           Diag(FirstPart.get() ? FirstPart.get()->getBeginLoc()
                                : ForRangeInfo.ColonLoc,
-               getLangOpts().CPlusPlus2a
+               getLangOpts().CPlusPlus20
                    ? diag::warn_cxx17_compat_for_range_init_stmt
                    : diag::ext_for_range_init_stmt)
               << (FirstPart.get() ? FirstPart.get()->getSourceRange()

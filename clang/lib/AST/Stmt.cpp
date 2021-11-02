@@ -1487,25 +1487,6 @@ void ForallStmt::setConditionVariable(const ASTContext &C, VarDecl *V) {
                                        VarRange.getEnd());
 }
 
-VarDecl *CilkForStmt::getLoopVariable() const {
-  if (!SubExprs[LOOPVAR])
-    return nullptr;
-
-  DeclStmt *DS = cast<DeclStmt>(SubExprs[LOOPVAR]);
-  return cast<VarDecl>(DS->getSingleDecl());
-}
-
-void CilkForStmt::setLoopVariable(const ASTContext &C, VarDecl *V) {
-  if (!V) {
-    SubExprs[LOOPVAR] = nullptr;
-    return;
-  }
-
-  SourceRange VarRange = V->getSourceRange();
-  SubExprs[LOOPVAR] = new (C) DeclStmt(DeclGroupRef(V), VarRange.getBegin(),
-                                       VarRange.getEnd());
-}
-
 const Stmt* SpawnStmt::getSpawnedStmt() const {
   return SpawnedStmt;
 }

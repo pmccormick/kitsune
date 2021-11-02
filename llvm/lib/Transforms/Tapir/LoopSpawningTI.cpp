@@ -1222,7 +1222,7 @@ namespace {
 // ValueMaterializer to manage remapping uses of the tripcount in the helper
 // function for the loop, when the only uses of tripcount occur in the condition
 // for the loop backedge and, possibly, in metadata.
-class ArgEndMaterializer final : public ValueMaterializer {
+class ArgEndMaterializer final : public OutlineMaterializer {
 private:
   Value *TripCount;
   Value *ArgEnd;
@@ -1243,11 +1243,10 @@ public:
                                       MDTuple::get(V->getContext(), None));
     }
 
-      // Materialize TripCount with ArgEnd.  This should only occur in the loop
-      // latch, and we'll overwrite the use of ArgEnd later.
-      if (V == TripCount)
-        return ArgEnd;
-    }
+    // Materialize TripCount with ArgEnd.  This should only occur in the loop
+    // latch, and we'll overwrite the use of ArgEnd later.
+    if (V == TripCount)
+      return ArgEnd;
 
     // Otherwise go with the default behavior.
     return OutlineMaterializer::materialize(V);
@@ -1537,8 +1536,8 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
         Outline, T->getEntry(), cast<Instruction>(VMap[T->getDetach()]),
         dyn_cast_or_null<Instruction>(VMap[T->getTaskFrameUsed()]),
         LoopInputSets[L], LoopArgStarts[L],
-        L->getLoopPreheader()->getTerminator(), TL->getExitBlock(),
-        T->getDetach()->getSyncRegion(), TL->getUnwindDest());
+        L->getLoopPreheader()->getTerminator(), T->getDetach()->getSyncRegion(),
+        TL->getExitBlock(), TL->getUnwindDest());
 
     // Do ABI-dependent processing of each outlined Tapir loop.
     {

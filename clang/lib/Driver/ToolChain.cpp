@@ -1673,7 +1673,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     // Add to the executable's runpath the default directory containing OpenCilk
     // runtime.
     addOpenCilkRuntimeRunPath(*this, Args, CmdArgs, Triple);
-    if (OnlyStaticOpenCilk) {
+    if (OnlyStaticOpenCilk) 
       CmdArgs.push_back("-Bdynamic");
     CmdArgs.push_back("-lpthread");
     break;

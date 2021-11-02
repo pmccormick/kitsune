@@ -632,54 +632,6 @@ void llvm::getTaskBlocks(Task *T, std::vector<BasicBlock *> &TaskBlocks,
   }
 }
 
-// static AttributeList mapAttributeTypes(LLVMContext &C, AttributeList Attrs) {
-//   for (unsigned i = 0; i < Attrs.getNumAttrSets(); ++i) {
-//     if (Attrs.hasAttribute(i, Attribute::ByVal)) {
-//       Type *Ty = Attrs.getAttribute(i, Attribute::ByVal).getValueAsType();
-//       if (!Ty)
-//         continue;
-
-//       Attrs = Attrs.removeAttribute(C, i, Attribute::ByVal);
-//       Attrs = Attrs.addAttribute(
-//           C, i, Attribute::getWithByValType(C, TypeMap.get(Ty)));
-//     }
-//   }
-//   return Attrs;
-// }
-
-/// Link the function in the source module into the destination module if
-/// needed, setting up mapping information.
-static Function *copyFunctionProto(const Function *SF, Module *DstM) {
-  // If there is no linkage to be performed or we are linking from the source,
-  // bring SF over.
-  auto *F = Function::Create(SF->getFunctionType(),
-                             GlobalValue::ExternalLinkage,
-                             SF->getAddressSpace(), SF->getName(), DstM);
-  F->copyAttributesFrom(SF);
-  // F->setAttributes(mapAttributeTypes(F->getContext(), F->getAttributes()));
-  return F;
-}
-
-// Materialize any necessary information in DstM when outlining Tapir into DstM.
-Value *OutlineMaterializer::materialize(Value *V) {
-  // If no special destination module is specified, go with the default
-  // behavior.
-  if (!DstM)
-    return nullptr;
-
-  GlobalValue *SGV = dyn_cast<GlobalValue>(V);
-  if (!SGV)
-    return nullptr;
-
-  // If we're remapping a function, materialize a copy in DstM.
-  GlobalValue *NewGV = nullptr;
-  if (Function *SF = dyn_cast<Function>(SGV))
-    NewGV = copyFunctionProto(SF, DstM);
-
-  // Otherwise go with the default behavior.
-  return NewGV;
-}
-
 /// Outlines the content of task \p T in function \p F into a new helper
 /// function.  The parameter \p Inputs specified the inputs to the helper
 /// function.  The map \p VMap is updated with the mapping of instructions in
@@ -997,7 +949,7 @@ TaskOutlineInfo llvm::outlineTaskFrame(
                                               ReturnType, AC, DT);
   Instruction *ClonedTF = cast<Instruction>(VMap[TF->getTaskFrameCreate()]);
   return TaskOutlineInfo(Helper, Entry, nullptr, ClonedTF, Inputs,
-                         ArgsStart, StorePt, Continue, nullptr, Unwind);
+                         ArgsStart, StorePt, nullptr, Continue, Unwind);
 }
 
 /// Replaces the spawned task \p T, with associated TaskOutlineInfo \p Out, with
@@ -1099,8 +1051,8 @@ TaskOutlineInfo llvm::outlineTask(
   return TaskOutlineInfo(Helper, T->getEntry(),
                          dyn_cast_or_null<Instruction>(VMap[DI]),
                          dyn_cast_or_null<Instruction>(ClonedTFCreate), Inputs,
-                         ArgsStart, StorePt, DI->getContinue(), 
-                         T->getDetach()->getSyncRegion(), getUnwind);
+                         ArgsStart, StorePt, T->getDetach()->getSyncRegion(), 
+                         DI->getContinue(), Unwind);
 }
 
 //----------------------------------------------------------------------------//

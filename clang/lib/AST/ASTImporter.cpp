@@ -6836,24 +6836,22 @@ ExpectedStmt ASTNodeImporter::VisitCilkScopeStmt(CilkScopeStmt *S) {
 }
 
 ExpectedStmt ASTNodeImporter::VisitForallStmt(ForallStmt *S) {
-  auto Imp = importSeq(
-      S->getInit(), S->getCond(), S->getConditionVariable(), S->getInc(),
-      S->getBody(), S->getForallLoc(), S->getLParenLoc(), S->getRParenLoc());
-  if (!Imp)
-    return Imp.takeError();
+  Error Err = Error::success();
+  auto ToInit = importChecked(Err, S->getInit());
+  auto ToCond = importChecked(Err, S->getCond());
+  auto ToConditionVariable = importChecked(Err, S->getConditionVariable());
+  auto ToInc = importChecked(Err, S->getInc());
+  auto ToBody = importChecked(Err, S->getBody());
+  auto ToForLoc = importChecked(Err, S->getForallLoc());
+  auto ToLParenLoc = importChecked(Err, S->getLParenLoc());
+  auto ToRParenLoc = importChecked(Err, S->getRParenLoc());
+  if (Err)
+    return std::move(Err);
 
-  Stmt *ToInit;
-  Expr *ToCond, *ToInc;
-  VarDecl *ToConditionVariable;
-  Stmt *ToBody;
-  SourceLocation ToForallLoc, ToLParenLoc, ToRParenLoc;
-  std::tie(
-      ToInit, ToCond, ToConditionVariable,  ToInc, ToBody, ToForallLoc,
-      ToLParenLoc, ToRParenLoc) = *Imp;
 
   return new (Importer.getToContext()) ForallStmt(
       Importer.getToContext(),
-      ToInit, ToCond, ToConditionVariable, ToInc, ToBody, ToForallLoc, ToLParenLoc,
+      ToInit, ToCond, ToConditionVariable, ToInc, ToBody, ToForLoc, ToLParenLoc,
       ToRParenLoc);
 }
 

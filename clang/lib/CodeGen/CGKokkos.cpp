@@ -327,7 +327,7 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   
   EmitBlock(ConditionBlock);
   
-  LoopStack.push(ConditionBlock, CGM.getContext(), ForallAttrs,
+  LoopStack.push(ConditionBlock, CGM.getContext(), CGM.getCodeGenOpts(), ForallAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 
@@ -522,7 +522,7 @@ bool CodeGenFunction::EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *
 
   EmitBlock(ConditionBlock);
 
-  LoopStack.push(ConditionBlock, CGM.getContext(), ForallAttrs,
+  LoopStack.push(ConditionBlock, CGM.getContext(), CGM.getCodeGenOpts(), ForallAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 

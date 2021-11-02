@@ -27,6 +27,11 @@ using namespace llvm;
 
 #define DEBUG_TYPE "realmabi"
 
+void RealmABI::preProcessOutlinedTask(llvm::Function&, llvm::Instruction*, llvm::Instruction*, bool, BasicBlock*){}
+void RealmABI::postProcessOutlinedTask(llvm::Function&, llvm::Instruction*, llvm::Instruction*, bool, BasicBlock*){}
+void RealmABI::preProcessRootSpawner(llvm::Function&, BasicBlock *TFEntry){}
+void RealmABI::postProcessRootSpawner(llvm::Function&, BasicBlock *TFEntry){}
+
 FunctionCallee RealmABI::get_realmGetNumProcs() {
   if(RealmGetNumProcs)
     return RealmGetNumProcs;

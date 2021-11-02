@@ -75,6 +75,7 @@
 #include "clang/AST/ExprOpenMP.h"
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/StmtCilk.h"
+#include "clang/AST/StmtKitsune.h"
 #include "clang/AST/StmtObjC.h"
 #include "clang/AST/StmtOpenMP.h"
 #include "clang/AST/TemplateBase.h"

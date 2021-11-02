@@ -78,13 +78,13 @@ public:
     return Type::getInt32Ty(M.getContext());
   }
   void preProcessOutlinedTask(Function &F, Instruction *DetachPt,
-                              Instruction *TaskFrameCreate,
-                              bool IsSpawner) override final {}
+                              Instruction *TaskFrameCreate, bool IsSpawner,
+                              BasicBlock *TFEntry) override final;
   void postProcessOutlinedTask(Function &F, Instruction *DetachPt,
-                               Instruction *TaskFrameCreate,
-                               bool IsSpawner) override final {}
-  void preProcessRootSpawner(Function &F) override final {}
-  void postProcessRootSpawner(Function &F) override final {}
+                               Instruction *TaskFrameCreate, bool IsSpawner,
+                               BasicBlock *TFEntry) override final;
+  void preProcessRootSpawner(Function &F, BasicBlock *TFEntry) override final;
+  void postProcessRootSpawner(Function &F, BasicBlock *TFEntry) override final;
 
 
 };

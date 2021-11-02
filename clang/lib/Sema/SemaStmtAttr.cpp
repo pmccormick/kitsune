@@ -592,14 +592,6 @@ static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const ParsedAttr &A,
     return handleLikely(S, St, A, Range);
   case ParsedAttr::AT_Unlikely:
     return handleUnlikely(S, St, A, Range);
-  // +==== kitsune attr support 
-  case ParsedAttr::AT_KitsuneTarget:
-    return handleKitsuneTargetAttr(S, St, A, Range);
-    break;
-  case ParsedAttr::AT_KitsuneStrategy:
-    return handleKitsuneStrategyAttr(S, St, A, Range);
-    break;
-  // =====+
   default:
     // N.B., ClangAttrEmitter.cpp emits a diagnostic helper that ensures a
     // declaration attribute is not written on a statement, but this code is

@@ -60,10 +60,6 @@ static cl::opt<bool> RequireParallelEpilog(
     cl::desc("Require stripmined Tapir loops to execute their epilogs in "
              "parallel.  Intended for debugging."));
 
-static cl::opt<bool> SerialInnerLoop(
-  "serial-inner-loop", cl::Hidden, cl::init(true),
-  cl::desc("Serialize the inner loop after stripmining."));
-
 /// Create an analysis remark that explains why stripmining failed
 ///
 /// \p RemarkName is the identifier for the remark.  If \p I is passed it is an
@@ -294,8 +290,7 @@ static bool tryToStripMineLoop(
   Loop *NewLoop = StripMineLoop(L, SMP.Count, SMP.AllowExpensiveTripCount,
                                 SMP.UnrollRemainder, LI, &SE, &DT, TTI, &AC, TI,
                                 &ORE, PreserveLCSSA, ParallelEpilog,
-                                NeedNestedSync, SerialInnerLoop,
-                                &RemainderLoop);
+                                NeedNestedSync, &RemainderLoop);
   if (!NewLoop)
     return false;
 

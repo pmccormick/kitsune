@@ -45,10 +45,10 @@ void OpenCLABI::lowerSync(SyncInst &SI) {
   // currently a no-op...
 }
 
-void OpenCLABI::preProcessOutlinedTask(llvm::Function&, llvm::Instruction*, llvm::Instruction*, bool){}
-void OpenCLABI::postProcessOutlinedTask(llvm::Function&, llvm::Instruction*, llvm::Instruction*, bool){}
-void OpenCLABI::preProcessRootSpawner(llvm::Function&){}
-void OpenCLABI::postProcessRootSpawner(llvm::Function&){}
+void OpenCLABI::preProcessOutlinedTask(Function&, Instruction*, Instruction*, bool, BasicBlock*){}
+void OpenCLABI::postProcessOutlinedTask(Function&, Instruction*, Instruction*, bool, BasicBlock*){}
+void OpenCLABI::preProcessRootSpawner(Function &F, BasicBlock *TFEntry) {}
+void OpenCLABI::postProcessRootSpawner(Function&, BasicBlock *TFEntry){}
 
 void OpenCLABI::preProcessFunction(Function &F, TaskInfo &TI,
                                  bool OutliningTapirLoops) {
@@ -64,7 +64,7 @@ void OpenCLABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 }
 
 LoopOutlineProcessor *OpenCLABI::getLoopOutlineProcessor(
-    const TapirLoopInfo *TL) {
+    const TapirLoopInfo *TL) const {
   if(!LOP) 
     return new SPIRVLoop(M);
   return LOP;
@@ -372,8 +372,8 @@ void SPIRVLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   PassManager->add(createLoopVectorizePass());
   PassManager->add(createSLPVectorizerPass());
   //PassManager->add(createBreakCriticalEdgesPass());
-  PassManager->add(createConstantPropagationPass());
-  PassManager->add(createDeadInstEliminationPass());
+  //PassManager->add(createConstantPropagationPass());
+  //PassManager->add(createDeadInstEliminationPass());
   PassManager->add(createDeadStoreEliminationPass());
   //PassManager->add(createInstructionCombiningPass());
   PassManager->add(createCFGSimplificationPass());

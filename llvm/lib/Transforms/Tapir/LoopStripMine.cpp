@@ -28,7 +28,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Transforms/Tapir/TapirLoopInfo.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -1275,19 +1274,9 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   } else
     ReplaceInstWithInst(NewHeader->getTerminator(),
                         DetachInst::Create(NewEntry, NewLatch, NewSyncReg));
-
-  Value *InnerSyncReg = nullptr;
-  if (SerialInnerLoop)
-    // Replace the old detach instruction with a branch
-    ReplaceInstWithInst(Header->getTerminator(),
-                        BranchInst::Create(DI->getDetached()));
-  else {
-    InnerSyncReg = CallInst::Create(
-        Intrinsic::getDeclaration(M, Intrinsic::syncregion_start), {},
-        &*NewEntry->getFirstInsertionPt());
-    InnerSyncReg->setName(SyncReg->getName() + ".strpm.innerloop");
-    DI->setSyncRegion(InnerSyncReg);
-  }
+  // Replace the old detach instruction with a branch
+  ReplaceInstWithInst(Header->getTerminator(),
+                      BranchInst::Create(DI->getDetached()));
 
   // Replace the old reattach instructions with branches.  Along the way,
   // determine their common dominator.
@@ -1297,17 +1286,14 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
       ReattachDom = I->getParent();
     else
       ReattachDom = DT->findNearestCommonDominator(ReattachDom, I->getParent());
-    if (SerialInnerLoop)
-      ReplaceInstWithInst(I, BranchInst::Create(Latch));
-    else
-      cast<ReattachInst>(I)->setSyncRegion(InnerSyncReg);
+    ReplaceInstWithInst(I, BranchInst::Create(Latch));
   }
   assert(ReattachDom && "No reattach-dominator block found");
   // Insert a reattach at the end of NewReattB.
   ReplaceInstWithInst(NewReattB->getTerminator(),
                       ReattachInst::Create(NewLatch, NewSyncReg));
   // Update the dominator tree, and determine predecessors of epilog.
-  if (DT->dominates(Header, Latch) && SerialInnerLoop && ReattachDom)
+  if (DT->dominates(Header, Latch))
     DT->changeImmediateDominator(Latch, ReattachDom);
   if (ParallelEpilog)
     DT->changeImmediateDominator(LoopReattach, NewLatch);
@@ -1335,11 +1321,11 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
   // done.
   //
   // TODO: Generalize to handle non-power-of-2 counts.
-  // Value *TestVal = B2.CreateSub(TripCount, ModVal, "stripiter", true, true);
   assert(isPowerOf2_32(Count) && "Count is not a power of 2.");
   Value *TestVal = B2.CreateUDiv(TripCount,
                                  ConstantInt::get(TripCount->getType(), Count),
                                  "stripiter");
+  // Value *TestVal = B2.CreateSub(TripCount, ModVal, "stripiter", true, true);
 
   // Value *TestCmp = B2.CreateICmpUGT(TestVal,
   //                                   ConstantInt::get(TestVal->getType(), 0),
@@ -1425,9 +1411,6 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
           for (DomTreeNode *I : Children)
             DT->changeImmediateDominator(I, NewNode);
         }
-
-        // Update the pointer to the loop-reattach block.
-        LoopReattach = NewBB;
       }
     }
   }
@@ -1453,44 +1436,6 @@ Loop *llvm::StripMineLoop(Loop *L, unsigned Count, bool AllowExpensiveTripCount,
     LI->changeLoopFor(NewLatch, NewLoop);
     NewLoop->addBlockEntry(NewLatch);
   }
-
-  if (!SerialInnerLoop && NeedNestedSync) {
-    SmallVector<BasicBlock *, 2> Preds(predecessors(NewReattB));
-    BasicBlock *InnerSyncBlock = SplitBlockPredecessors(NewReattB, Preds,
-                                                        ".strpm.inner", DT, LI,
-                                                        nullptr, PreserveLCSSA);
-    ReplaceInstWithInst(InnerSyncBlock->getTerminator(),
-                        SyncInst::Create(NewReattB, InnerSyncReg));
-
-    if (OrigUnwindDest || !F->doesNotThrow()) {
-      // Insert a call to sync.unwind.
-      CallInst *SyncUnwind = CallInst::Create(
-          Intrinsic::getDeclaration(M, Intrinsic::sync_unwind),
-          { InnerSyncReg }, "", NewReattB->getFirstNonPHIOrDbg());
-
-      // If the Tapir loop has an unwind destination, change the sync.unwind to
-      // an invoke that unwinds to the cloned unwind destination.
-      if (OrigUnwindDest) {
-        BasicBlock *NewBB =
-            changeToInvokeAndSplitBasicBlock(SyncUnwind, OrigUnwindDest);
-
-        // Update LI.
-        if (Loop *L = LI->getLoopFor(NewReattB))
-          L->addBasicBlockToLoop(NewBB, *LI);
-
-        // Update DT: NewReattBB dominates Split, which dominates all other
-        // nodes previously dominated by LoopReattach.
-        if (DomTreeNode *OldNode = DT->getNode(NewReattB)) {
-          std::vector<DomTreeNode *> Children(OldNode->begin(), OldNode->end());
-
-          DomTreeNode *NewNode = DT->addNewBlock(NewBB, NewReattB);
-          for (DomTreeNode *I : Children)
-            DT->changeImmediateDominator(I, NewNode);
-        }
-      }
-    }
-  }
-
   // Update loop metadata
   NewLoop->setLoopID(L->getLoopID());
   TapirLoopHints Hints(L);

@@ -1296,7 +1296,7 @@ bool Driver::loadConfigFile() {
   // Prepare list of directories where config file is searched for.  Note that the directories
   // appear in the order they will be searched -- the first matched file will be used and the
   // search will stop from that point.
-  StringRef CfgFileSearchDirs[] = {Dir, UserConfigDir, KitsuneConfigDir, SystemConfigDir};
+  std::vector<StringRef> CfgFileSearchDirs = {Dir, UserConfigDir, KitsuneConfigDir, SystemConfigDir};
 
   // kitsune: check for a kokkos configuration file.
   if (CLOptions->hasArg(options::OPT_fkokkos)) {
@@ -1395,7 +1395,6 @@ bool Driver::loadConfigFile() {
   }
 
   // Prepare list of directories where config file is searched for.
-  StringRef CfgFileSearchDirs[] = {UserConfigDir, SystemConfigDir, Dir};
   CfgFileSearchDirs.push_back(UserConfigDir);
   CfgFileSearchDirs.push_back(KitsuneConfigDir);
   CfgFileSearchDirs.push_back(SystemConfigDir);

@@ -499,7 +499,7 @@ LoopAttributes::LoopAttributes(bool IsParallel)
       TapirGrainsize(0),
       DistributeEnable(LoopAttributes::Unspecified), PipelineDisabled(false),
       PipelineInitiationInterval(0), MustProgress(false),
-      SpawnStrategy(LoopAttributes::Sequential) {}
+      SpawnStrategy(LoopAttributes::SEQ) {}
 
 void LoopAttributes::clear() {
   IsParallel = false;
@@ -517,7 +517,7 @@ void LoopAttributes::clear() {
   PipelineDisabled = false;
   PipelineInitiationInterval = 0;
   MustProgress = false;
-  SpawnStrategy = LoopAttributes::Sequential;
+  SpawnStrategy = LoopAttributes::SEQ;
 }
 
 LoopInfo::LoopInfo(BasicBlock *Header, const LoopAttributes &Attrs,
@@ -544,7 +544,7 @@ LoopInfo::LoopInfo(BasicBlock *Header, const LoopAttributes &Attrs,
       Attrs.UnrollAndJamEnable == LoopAttributes::Unspecified &&
       Attrs.DistributeEnable == LoopAttributes::Unspecified && !StartLoc &&
       !EndLoc && !Attrs.MustProgress &&
-      Attrs.SpawnStrategy == LoopAttributes::Sequential)
+      Attrs.SpawnStrategy == LoopAttributes::SEQ)
     return;
 
   TempLoopID = MDNode::getTemporary(Header->getContext(), None);

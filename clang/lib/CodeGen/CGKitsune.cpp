@@ -249,7 +249,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   EmitBlock(CondBlock);
 
   const SourceRange &R = S.getSourceRange();
-  LoopStack.push(CondBlock, CGM.getContext(), ForAttrs,
+  LoopStack.push(CondBlock, CGM.getContext(), CGM.getCodeGenOpts(), ForAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 
@@ -430,7 +430,7 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
 
   EmitBlock(ConditionBlock);
 
-  LoopStack.push(ConditionBlock, CGM.getContext(), ForAttrs,
+  LoopStack.push(ConditionBlock, CGM.getContext(), CGM.getCodeGenOpts(), ForAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 

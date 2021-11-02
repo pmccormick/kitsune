@@ -3842,9 +3842,13 @@ static void DiagnoseForRangeVariableCopies(Sema &SemaRef,
 ///    Suggest "const foo &x" to prevent the copy.
 static void DiagnoseForallRangeVariableCopies(Sema &SemaRef,
                                            const CXXForallRangeStmt *ForStmt) {
-  if (SemaRef.Diags.isIgnored(diag::warn_for_range_const_reference_copy,
-                              ForStmt->getBeginLoc()) &&
-      SemaRef.Diags.isIgnored(diag::warn_for_range_variable_always_copy,
+  if (SemaRef.inTemplateInstantiation())
+    return;
+
+  if (SemaRef.Diags.isIgnored(
+          diag::warn_for_range_const_ref_binds_temp_built_from_ref,
+          ForStmt->getBeginLoc()) &&
+      SemaRef.Diags.isIgnored(diag::warn_for_range_ref_binds_ret_temp,
                               ForStmt->getBeginLoc()) &&
       SemaRef.Diags.isIgnored(diag::warn_for_range_copy,
                               ForStmt->getBeginLoc())) {
