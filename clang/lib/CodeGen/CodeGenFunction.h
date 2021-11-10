@@ -3876,7 +3876,13 @@ public:
 
   void EmitDetachBlock(const DeclStmt *DS, llvm::ValueMap<llvm::Value*, llvm::AllocaInst *> &VM);
   void ReplaceAllUsesInCurrentBlock(llvm::ValueMap<llvm::Value*, llvm::AllocaInst *> &VM);
+  void SetAllocaInsertPoint(llvm::Value* v, llvm::BasicBlock* bb);
 
+  typedef llvm::DenseMap<const VarDecl *, std::pair<Address, RValue>> DeclMapByValueTy;
+  void EmitIVLoad(const VarDecl* LoopVar, 
+                          DeclMapByValueTy & IVDeclMap);
+  void EmitThreadSafeIV(const VarDecl* IV, const RValue& RV);
+  void RestoreDeclMap(const VarDecl* IV, const Address);
   void EmitSpawnStmt(const SpawnStmt &S);
   void EmitSyncStmt(const SyncStmt &S);
   void EmitForallStmt(const ForallStmt &S,
