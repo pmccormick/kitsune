@@ -16,6 +16,17 @@ if(LLVM_ENABLE_RUNTIMES STREQUAL "all" )
 endif()
 set(COMMON_CMAKE_ARGS "-DHAVE_LLVM_LIT=ON")
 
+include(FetchContent)
+FetchContent_Declare(cheetahrt
+  GIT_REPOSITORY    https://github.com/OpenCilk/cheetah.git
+  GIT_TAG           opencilk/v1.0
+  SOURCE_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/../../cheetah)
+
+FetchContent_Declare(cilktools
+  GIT_REPOSITORY   https://github.com/OpenCilk/productivity-tools.git
+  GIT_TAG          opencilk/v1.0
+  SOURCE_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/../../cilktools)
+
 if ("cheetah" IN_LIST LLVM_ENABLE_RUNTIMES)
   FetchContent_GetProperties(cheetahrt)
   if (NOT cheetahrt_POPULATED)
