@@ -1194,12 +1194,30 @@ bool Driver::readConfigFile(StringRef FileName) {
   llvm::SmallString<128> CfgFileName(FileName);
   llvm::sys::path::native(CfgFileName);
   ConfigFile = std::string(CfgFileName);
-  bool ContainErrors;
-  CfgOptions = std::make_unique<InputArgList>(
-      ParseArgStrings(NewCfgArgs, IsCLMode(), ContainErrors));
-  if (ContainErrors) {
-    CfgOptions.reset();
-    return true;
+
+  bool ContainsErrors;
+  if (CfgOptions.get() == nullptr) {
+    // processing the first .cfg in the set...
+    CfgOptions = std::make_unique<InputArgList>(
+        ParseArgStrings(NewCfgArgs, IsCLMode(), ContainsErrors));
+    if (ContainsErrors) {
+      CfgOptions.reset();
+      return true;
+    }
+  } else {
+    // Don't trash previous cfg options, just append to the list...
+    std::unique_ptr<InputArgList> NextCfgOpts;
+    NextCfgOpts = std::make_unique<InputArgList>(
+        ParseArgStrings(NewCfgArgs, IsCLMode(), ContainsErrors));
+
+    if (ContainsErrors) {
+      CfgOptions.reset();
+      return true;
+    }
+
+    for(Arg *A: *NextCfgOpts)
+      CfgOptions->append(A);
+    NextCfgOpts.release();
   }
 
   if (CfgOptions->hasArg(options::OPT_config)) {
@@ -1316,7 +1334,7 @@ bool Driver::loadConfigFile() {
           Diag(diag::note_drv_config_file_searched_in) << SearchDir;
     }
   }
-  
+
   // tapir: check for a tapir target specific configuration file.
   if (CLOptions->hasArg(options::OPT_ftapir_EQ)) {
     if (const Arg *A = CLOptions->getLastArg(options::OPT_ftapir_EQ)) {

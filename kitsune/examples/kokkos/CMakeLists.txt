@@ -73,11 +73,11 @@ foreach(src_file IN ITEMS ${_example_srcs} ${_example_view_srcs})
     ${KITSUNE_INCLUDE_DIR}
     ${KITSUNE_KOKKOS_SRC_DIR}/core/src
     ${KITSUNE_KOKKOS_SRC_DIR}/containers/src)
+  add_dependencies(${exec_name} kokkos kokkoscore)
   target_link_libraries(${exec_name} PRIVATE kokkoscore)
   set_target_properties(${exec_name}
     PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${LLVM_BINARY_DIR}/examples/kitsune/)
-  add_dependencies(${exec_name} kokkos kokkoscore)
   #
   install(TARGETS ${exec_name}
           DESTINATION ${CMAKE_INSTALL_PREFIX}/kitsune/examples/)

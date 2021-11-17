@@ -17,20 +17,20 @@ set(KITSUNE_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
   set(KITSUNE_KOKKOS_SRC_DIR  ${LLVM_BINARY_DIR}/kokkos)
-  # TODO: Note that we have to patch Kokkos to disable some sections of code 
+  # TODO: Note that we have to patch Kokkos to disable some sections of code
   # that are using exceptions.  In general, this is a bit messy with the
-  # use of the 'fetch content' mechanisms in CMake -- in particular, the 
+  # use of the 'fetch content' mechanisms in CMake -- in particular, the
   # goofy system appears to continually want to run the patch even though
-  # it has already been run previously.  This is a pain when developing. 
-  # So...  We have hacked the patch command to always return success to 
+  # it has already been run previously.  This is a pain when developing.
+  # So...  We have hacked the patch command to always return success to
   # avoid failed application of the patch from stopping the build.  Need to
-  # find a safe way to accomplish this... 
+  # find a safe way to accomplish this...
   FetchContent_Declare(kokkos
     GIT_REPOSITORY      https://github.com/kokkos/kokkos.git
     GIT_TAG             3.3.01
     SOURCE_DIR          ${KITSUNE_KOKKOS_SRC_DIR}
-    UPDATE_DISCONNECTED TRUE 
-    CMAKE_ARGS -D Kokkos_ENABLE_SERIAL=ON -D BUILD_TESTING=OFF 
+    UPDATE_DISCONNECTED TRUE
+    CMAKE_ARGS -D Kokkos_ENABLE_SERIAL=ON -D BUILD_TESTING=OFF
     PATCH_COMMAND patch -p0 --verbose --input=${KITSUNE_SOURCE_DIR}/patches/Kokkos_MemorySpace.patch)
   FetchContent_MakeAvailable(kokkos)
 endif()
@@ -48,7 +48,7 @@ if (KITSUNE_ENABLE_RUNTIME_ABIS)
       GIT_TAG          master
       SOURCE_DIR       ${KITSUNE_REALM_SOURCE_DIR}
       UPDATE_DISCONNECTED TRUE)
-    set(Legion_BUILD_REALM_ONLY ON)
+    set(Legion_BUILD_REALM_ONLY OFF)
     set(Legion_USE_LVVM OFF)
     set(Legion_LINK_LLVM_LIBS OFF)
     set(Legion_USE_CUDA OFF)
