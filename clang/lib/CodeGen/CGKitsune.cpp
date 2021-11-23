@@ -292,7 +292,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   JumpDest Reattach = getJumpDestInCurrentScope("forall.reattach");
   
   // declarations
-  DeclMapByValueTy IVDeclMap;
+  DeclMapByValueTy IVDeclMap; // map from Vardecl to {IV, thread safe IV}
   llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt = AllocaInsertPt;
   llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
 
@@ -309,14 +309,13 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
 
   LexicalScope ForScope(*this, S.getSourceRange());
 
-  // Evaluate the first part before the loop.
+  // Evaluate the initialization before the loop.
   EmitStmt(S.getInit());
 
   // Start the loop with a block that tests the condition.
-  // If there's an increment, the continue scope will be overwritten
-  // later. Should change Continue to "forall.inc"
-  JumpDest Continue = getJumpDestInCurrentScope("forall.cond"); 
-  llvm::BasicBlock *CondBlock = Continue.getBlock();
+  // <Kitsune/>
+  JumpDest Condition = getJumpDestInCurrentScope("forall.cond"); 
+  llvm::BasicBlock *CondBlock = Condition.getBlock();
   EmitBlock(CondBlock);
 
   const SourceRange &R = S.getSourceRange();
@@ -324,20 +323,20 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 
-  // If the for loop doesn't have an increment we can just use the
-  // condition as the continue block.  Otherwise we'll need to create
-  // a block for it (in the current scope, i.e. in the scope of the
-  // condition), and that we will become our continue block.
-  Continue = getJumpDestInCurrentScope("forall.inc");
+  // <KITSUNE/>
+  // We always have an increment and continue to it
+  JumpDest Increment = getJumpDestInCurrentScope("forall.inc");
 
   // Store the blocks to use for break and continue.
-  BreakContinueStack.push_back(BreakContinue(LoopExit, Continue));
+  BreakContinueStack.push_back(BreakContinue(LoopExit, Increment));
 
   // Create a cleanup scope for the condition variable cleanups.
+  // <KITSUNE/> Don't need this unless we allow condition scope variables
   LexicalScope ConditionScope(*this, S.getSourceRange());
 
   // If the for statement has a condition scope, emit the local variable
   // declaration.
+  // <KITSUNE/> Presently, we don't support condition variables, but we should :-)
   if (S.getConditionVariable()) {
     EmitDecl(*S.getConditionVariable());
   }
@@ -371,12 +370,12 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   // Extract the DeclStmt from the statement init
   const DeclStmt *DS = cast<DeclStmt>(S.getInit());
   
-  // Create threadsafe induction variables before the detach 
+  // Create threadsafe induction variables before the detach and put them in IVDeclMap
   for (auto *DI : DS->decls()) 
     EmitIVLoad(dyn_cast<VarDecl>(DI), IVDeclMap);
 
   // create the detach terminator
-  Builder.CreateDetach(ForBody, Continue.getBlock(), SRStart);
+  Builder.CreateDetach(ForBody, Increment.getBlock(), SRStart);
   
   // </KITSUNE>
   /////////////////////////////////////////////////////////////////////////////
@@ -396,7 +395,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
     // change the alloca insert point to the body block
     SetAllocaInsertPoint(Undef, ForBody);
 
-    // emit the thread safe induction variables and initialize them
+    // emit the thread safe induction variables and initialize them by value
     for (const auto &ivp : IVDeclMap) 
       EmitThreadSafeIV(ivp.first, ivp.second.second);
 
@@ -416,7 +415,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
 
   // emit the reattach block
   EmitBlock(Reattach.getBlock());
-  Builder.CreateReattach(Continue.getBlock(), SRStart);
+  Builder.CreateReattach(Increment.getBlock(), SRStart);
 
   // reset the alloca insertion point
   AllocaInsertPt->removeFromParent();
@@ -425,9 +424,9 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   // </KITSUNE>
   /////////////////////////////////////////////////////////////////////////////
 
-  // If there is an increment, emit it next.
+  // Emit the increment.
   if (S.getInc()) {
-    EmitBlock(Continue.getBlock());
+    EmitBlock(Increment.getBlock());
     EmitStmt(S.getInc());
   }
 
@@ -442,6 +441,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
 
   LoopStack.pop();
 
+  // <KITSUNE/> Emit the Sync block and terminator
   EmitBlock(Sync.getBlock());
   Builder.CreateSync(LoopExit.getBlock(), SRStart);
 
