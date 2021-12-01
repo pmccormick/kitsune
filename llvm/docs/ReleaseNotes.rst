@@ -376,6 +376,7 @@ Changes to LLDB
 * Various memory related parts of LLDB have been updated to handle
   non-address bits (such as AArch64 pointer signatures):
 
+<<<<<<< HEAD
   * "memory read", "memory write" and "memory find" can now be used with
     addresses with non-address bits.
   * All the read and write memory methods on SBProccess and SBTarget can
@@ -387,6 +388,22 @@ Changes to LLDB
     writing out new values if the addresses have different non-address bits.
 
 * LLDB now supports reading memory tags from AArch64 Linux core files.
+=======
+  * ``memory find``
+  * ``memory read``
+  * ``memory region`` (see below)
+  * ``memory tag read``
+  * ``memory tag write``
+
+* The ``memory region`` command and ``GetMemoryRegionInfo`` API method now
+  ignore non-address bits in the address parameter. This also means that on
+  systems with non-address bits the last (usually unmapped) memory region
+  will not extend to 0xF...F. Instead it will end at the end of the mappable
+  range that the virtual address size allows.
+
+* The ``memory read`` command has a new option ``--show-tags``. Use this option
+  to show memory tags beside the contents of tagged memory ranges.
+>>>>>>> af19ae529271 (Reland "[lldb] Remove non address bits when looking up memory regions")
 
 * LLDB now supports the gnu debuglink section for reading debug information
   from a separate file on Windows
