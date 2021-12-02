@@ -288,8 +288,8 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
 
   // new basic blocks and jump destinations with Tapir terminators
   llvm::BasicBlock* Detach = createBasicBlock("forall.detach");
-  JumpDest Sync = getJumpDestInCurrentScope("forall.sync");
   JumpDest Reattach = getJumpDestInCurrentScope("forall.reattach");
+  JumpDest Sync = getJumpDestInCurrentScope("forall.sync");
   
   // declarations
   DeclMapByValueTy IVDeclMap; // map from Vardecl to {IV, thread safe IV}
@@ -328,7 +328,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   JumpDest Increment = getJumpDestInCurrentScope("forall.inc");
 
   // Store the blocks to use for break and continue.
-  BreakContinueStack.push_back(BreakContinue(LoopExit, Increment));
+  BreakContinueStack.push_back(BreakContinue(LoopExit, Reattach));
 
   // Create a cleanup scope for the condition variable cleanups.
   // <KITSUNE/> Don't need this unless we allow condition scope variables
@@ -425,10 +425,8 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   /////////////////////////////////////////////////////////////////////////////
 
   // Emit the increment.
-  if (S.getInc()) {
-    EmitBlock(Increment.getBlock());
-    EmitStmt(S.getInc());
-  }
+  EmitBlock(Increment.getBlock());
+  EmitStmt(S.getInc());
 
   BreakContinueStack.pop_back();
 
@@ -451,21 +449,32 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
 
 void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
                                              ArrayRef<const Attr *> ForAttrs) {
-  // Create all jump destinations and blocks in the order they appear in the IR
-  // some are jump destinations, some are basic blocks
-  JumpDest Condition = getJumpDestInCurrentScope("forall.cond");
-  llvm::BasicBlock *Detach = createBasicBlock("forall.detach");
-  llvm::BasicBlock *ForBody = createBasicBlock("forall.body");
+
+  /////////////////////////////////////////////////////////////////////////////
+  // <KITSUNE>
+
+  // new basic blocks and jump destinations with Tapir terminators
+  llvm::BasicBlock* Detach = createBasicBlock("forall.detach");
   JumpDest Reattach = getJumpDestInCurrentScope("forall.reattach");
-  llvm::BasicBlock *Increment = createBasicBlock("forall.inc");
-  JumpDest Cleanup = getJumpDestInCurrentScope("forall.cond.cleanup");
-  JumpDest Sync = getJumpDestInCurrentScope("forall.sync");
+  JumpDest LoopExit = getJumpDestInCurrentScope("forall.sync");
+  
+  // declarations
+  //DeclMapByValueTy IVDeclMap; // map from Vardecl to {IV, thread safe IV}
+  llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt = AllocaInsertPt;
+  llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
+
+  // emit the sync region
+  PushSyncRegion();
+  llvm::Instruction *SRStart = EmitSyncRegionStart();
+  CurSyncRegion->setSyncRegionStart(SRStart);
+  LoopStack.setSpawnStrategy(LoopAttributes::DAC);
+
+  // </KITSUNE>
+  /////////////////////////////////////////////////////////////////////////////
+
+
   llvm::BasicBlock *End = createBasicBlock("forall.end");
 
-  // Extract a convenience block
-  llvm::BasicBlock *ConditionBlock = Condition.getBlock();
-
-  const SourceRange &R = S.getSourceRange();
   LexicalScope ForScope(*this, S.getSourceRange());
 
   // Evaluate the first pieces before the loop.
@@ -477,35 +486,42 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   EmitStmt(S.getIndexStmt());
   EmitStmt(S.getIndexEndStmt());
 
-  // create the sync region
-  PushSyncRegion();
-  llvm::Instruction *SRStart = EmitSyncRegionStart();
-  CurSyncRegion->setSyncRegionStart(SRStart);
+  // Start the loop with a block that tests the condition.
+  // If there's an increment, the continue scope will be overwritten
+  // later.
+  llvm::BasicBlock *CondBlock = createBasicBlock("forall.cond");
+  EmitBlock(CondBlock);
 
-  // FIXME: Need to get attributes for spawning strategy from
-  // code versus this hard-coded route...
-  LoopStack.setSpawnStrategy(LoopAttributes::DAC);
-
-  EmitBlock(ConditionBlock);
-
-  LoopStack.push(ConditionBlock, CGM.getContext(), CGM.getCodeGenOpts(), ForAttrs,
+  const SourceRange &R = S.getSourceRange();
+  LoopStack.push(CondBlock, CGM.getContext(), CGM.getCodeGenOpts(), ForAttrs,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 
-  // Store the blocks to use for break and continue.
-   BreakContinueStack.push_back(BreakContinue(Reattach, Reattach));
-
+    // If there are any cleanups between here and the loop-exit scope,
+  // create a block to stage a loop exit along.
+  llvm::BasicBlock *ExitBlock = LoopExit.getBlock();
+  if (ForScope.requiresCleanups())
+    ExitBlock = createBasicBlock("forall.cond.cleanup");
+  
+  // The loop body, consisting of the specified body and the loop variable.
+  llvm::BasicBlock *ForBody = createBasicBlock("forall.body");
+  
   // The body is executed if the expression, contextually converted
   // to bool, is true.
   llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getCond());
-  Builder.CreateCondBr(
-      BoolCondVal, Detach, Sync.getBlock(),
-      createProfileWeightsForLoop(S.getCond(), getProfileCount(S.getBody())));
+  llvm::MDNode *Weights = createProfileOrBranchWeightsForLoop(
+      S.getCond(), getProfileCount(S.getBody()), S.getBody());
+  Builder.CreateCondBr(BoolCondVal, Detach, LoopExit.getBlock(), Weights);
 
-  if (ForScope.requiresCleanups()) {
-    EmitBlock(Cleanup.getBlock());
-    EmitBranchThroughCleanup(Sync);
+  if (ExitBlock != LoopExit.getBlock()) {
+    EmitBlock(ExitBlock);
+    EmitBranchThroughCleanup(LoopExit);
   }
+
+
+
+
+
 
   /////////////////////////////////
   // Create the detach block
@@ -516,12 +532,6 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
 
   // Extract the DeclStmt from the statement init
   const DeclStmt *DS = cast<DeclStmt>(S.getIndexStmt());
-  
-  // Set up IVs to be copied as firstprivate 
-  auto OldAllocaInsertPt = AllocaInsertPt;
-  llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
-  AllocaInsertPt = new llvm::BitCastInst(Undef, Int32Ty, "",
-                                             ForBody);
   
   DeclMapTy IVDeclMap; 
   llvm::SmallVector<
@@ -569,34 +579,37 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
       }
     }
   }
-  /*
-  for (auto *DI : DS->decls()){
-    auto *LoopVar = dyn_cast<VarDecl>(DI);
-    Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
-    IVDeclMap.insert({LoopVar, OuterLoc}); 
-    LocalDeclMap.erase(LoopVar);
-    AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
-    QualType type = LoopVar->getType();
-    Address Loc = LVEmission.getObjectAddress(*this);
-    LValue LV = MakeAddrLValue(Loc, type);
-    LValue OuterLV = MakeAddrLValue(OuterLoc, type); 
-    RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc()); 
-    LV.setNonGC(true);
-    EmitStoreThroughLValue(OuterRV, LV, true);
-    EmitAutoVarCleanups(LVEmission);
-  }
-  */
+
+  // Create a block for the increment. In case of a 'continue', we jump there.
+  llvm::BasicBlock *Increment = createBasicBlock("forall.inc");
 
   // create the detach terminator
   Builder.CreateDetach(ForBody, Increment, SRStart);
-
   
+  // </KITSUNE>
+  /////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
   EmitBlock(ForBody);
   incrementProfileCounter(&S);
 
+  // Store the blocks to use for break and continue.
+  BreakContinueStack.push_back(BreakContinue(LoopExit, Reattach));
+
   {
     // Create a separate cleanup scope for the loop variable and body.
-    RunCleanupsScope BodyScope(*this);
+    LexicalScope BodyScope(*this, S.getSourceRange());
+
+    ///////////////////////////////////////////////////////////////////////////
+    // <KITSUNE>
+
+    // change the alloca insert point to the body block
+    SetAllocaInsertPoint(Undef, ForBody);
+
+
     for (auto &ivp : ivs) {
       auto *LoopVar = ivp.first;
       auto &LoadedVals = ivp.second;
@@ -637,10 +650,8 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
     EmitStmt(S.getBody());
   }
 
-  auto tmp = AllocaInsertPt; 
-  AllocaInsertPt = OldAllocaInsertPt; 
-  tmp->removeFromParent(); 
-
+  /////////////////////////////////////////////////////////////////////////////
+  // <KITSUNE>
 
   // Restore IVs after emitting body
   for (const auto &p : IVDeclMap){
@@ -648,16 +659,15 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
     LocalDeclMap.insert(p); 
   }
 
-  /////////////////////////////////////////////////////////////////
-  // Modify the body block to use the detach block variable mirror.
-  // At this point in the codegen, the body block has been emitted
-  // and we can safely replace the induction variable with the detach
-  // block mirror in the entire function, since the increment block
-  // (a valid use of the induction variable) has not been emitted yet.
-  /////////////////////////////////////////////////////////////////
-
   EmitBlock(Reattach.getBlock());
   Builder.CreateReattach(Increment, SRStart);
+
+  // reset the alloca insertion point
+  AllocaInsertPt->removeFromParent();
+  AllocaInsertPt = OldAllocaInsertPt; 
+
+  // </KITSUNE>
+  /////////////////////////////////////////////////////////////////////////////
 
   EmitBlock(Increment);
 
@@ -667,13 +677,14 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
 
   EmitStopPoint(&S);
   
-  EmitBranch(ConditionBlock);
+  EmitBranch(CondBlock);
 
   ForScope.ForceCleanup();
 
   LoopStack.pop();
 
-  EmitBlock(Sync.getBlock());
+  // <KITSUNE/> Emit the Sync block and terminator
+  EmitBlock(LoopExit.getBlock());
   Builder.CreateSync(End, SRStart);
 
   EmitBlock(End, true);
