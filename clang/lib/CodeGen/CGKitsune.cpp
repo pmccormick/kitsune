@@ -497,7 +497,7 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
                  SourceLocToDebugLoc(R.getBegin()),
                  SourceLocToDebugLoc(R.getEnd()));
 
-    // If there are any cleanups between here and the loop-exit scope,
+  // If there are any cleanups between here and the loop-exit scope,
   // create a block to stage a loop exit along.
   llvm::BasicBlock *ExitBlock = LoopExit.getBlock();
   if (ForScope.requiresCleanups())
@@ -653,7 +653,8 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   /////////////////////////////////////////////////////////////////////////////
   // <KITSUNE>
 
-  // Restore IVs after emitting body
+  // Restore induction variable mappings after emitting body, and before
+  // the increment
   for (const auto &p : IVDeclMap){
     LocalDeclMap.erase(p.first);
     LocalDeclMap.insert(p); 
