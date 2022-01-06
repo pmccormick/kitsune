@@ -3878,11 +3878,20 @@ public:
   void ReplaceAllUsesInCurrentBlock(llvm::ValueMap<llvm::Value*, llvm::AllocaInst *> &VM);
   void SetAllocaInsertPoint(llvm::Value* v, llvm::BasicBlock* bb);
 
-  typedef llvm::DenseMap<const VarDecl *, std::pair<Address, RValue>> DeclMapByValueTy;
+  // typedef llvm::DenseMap<
+  //                       const VarDecl *, 
+  //                       std::pair<
+  //                                 Address, 
+  //                                 std::unique_ptr<llvm::SmallVector<llvm::Value *, 4>>
+  //                                 >
+                        // > DeclMapByValueTy;
+  typedef llvm::DenseMap<const VarDecl *, 
+                        std::pair<Address,llvm::SmallVector<llvm::Value*,4>>> DeclMapByValueTy;
   void EmitIVLoad(const VarDecl* LoopVar, 
                           DeclMapByValueTy & IVDeclMap);
-  void EmitThreadSafeIV(const VarDecl* IV, const RValue& RV);
+  void EmitThreadSafeIV(const VarDecl* IV, const llvm::SmallVector<llvm::Value*,4>& Values);
   void RestoreDeclMap(const VarDecl* IV, const Address);
+
   void EmitSpawnStmt(const SpawnStmt &S);
   void EmitSyncStmt(const SyncStmt &S);
   void EmitForallStmt(const ForallStmt &S,

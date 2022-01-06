@@ -241,17 +241,49 @@ void CodeGenFunction::EmitIVLoad(const VarDecl* LoopVar,
   // Remove the IV mapping from the LocalDeclMap 
   LocalDeclMap.erase(LoopVar);
 
-  // Clang gymnastics to emit the IV
-  LValue IVLV = MakeAddrLValue(IVAddress, LoopVar->getType());
-  RValue IVRV = EmitLoadOfLValue(IVLV, LoopVar->getBeginLoc()); 
+  // Get the type
+  QualType type = LoopVar->getType();
 
-  // Capture the mapping from LoopVar to the old address and new RValue
-  IVDeclMap.insert({LoopVar, {IVAddress, IVRV}}); 
+  // Create the vector of values
+  llvm::SmallVector<llvm::Value *, 4> ValueVec;
+
+  // Emit all the shallow copy loads and update 
+  switch (getEvaluationKind(type)) {
+    case TEK_Scalar: {
+      LValue IVLV = MakeAddrLValue(IVAddress, type);
+      RValue IVRV = EmitLoadOfLValue(IVLV, LoopVar->getBeginLoc()); 
+      ValueVec.push_back(IVRV.getScalarVal());
+      break;
+    }
+    case TEK_Complex: {
+      ComplexPairTy Val =
+        EmitLoadOfComplex(MakeAddrLValue(IVAddress, type), LoopVar->getBeginLoc());
+      ValueVec.append({Val.first, Val.second});
+      break;
+    }
+    case TEK_Aggregate: {
+      if (const llvm::StructType *STy = dyn_cast<llvm::StructType>(IVAddress.getElementType())) {
+        for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
+          Address EltPtr = Builder.CreateStructGEP(IVAddress, i);
+          llvm::Value *Elt = Builder.CreateLoad(EltPtr);
+          ValueVec.push_back(Elt);
+        }
+      } else {
+        LValue IVLV = MakeAddrLValue(IVAddress, type);
+        RValue IVRV = EmitLoadOfLValue(IVLV, LoopVar->getBeginLoc()); 
+        ValueVec.push_back(IVRV.getScalarVal());
+      }
+      break;
+    }
+  }
+
+  // Capture the mapping from LoopVar to the old address and new vector of Value*'s
+  IVDeclMap.insert({LoopVar, {IVAddress, ValueVec}});
 }
 
 // Emit a thread safe copy of the induction variable and set it's value
 // to the current value of the induction variable
-void CodeGenFunction::EmitThreadSafeIV(const VarDecl* IV, const RValue& RV){
+void CodeGenFunction::EmitThreadSafeIV(const VarDecl* IV, const llvm::SmallVector<llvm::Value*,4>& Values){
 
   // emit the thread safe induction variable and cleanups
   AutoVarEmission LVEmission = EmitAutoVarAlloca(*IV);
@@ -267,7 +299,8 @@ void CodeGenFunction::EmitThreadSafeIV(const VarDecl* IV, const RValue& RV){
   LV.setNonGC(true);
 
   // Store the IV RValue into the newly created thread safe induction variable
-  EmitStoreThroughLValue(RV, LV, true);
+  EmitStoreOfScalar(Values.back(), LV, true);
+  //EmitStoreThroughLValue(Values.back(), LV, true);
 }
 
 // Restore the original mapping between the Vardecl and its address
@@ -292,7 +325,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   JumpDest Sync = getJumpDestInCurrentScope("forall.sync");
   
   // declarations
-  DeclMapByValueTy IVDeclMap; // map from Vardecl to {IV, thread safe IV}
+  DeclMapByValueTy IVDeclMap; // map from Vardecl to {IV, thread safe IV vector}
   llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt = AllocaInsertPt;
   llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
 
