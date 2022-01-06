@@ -258,7 +258,8 @@ void CodeGenFunction::EmitIVLoad(const VarDecl* LoopVar,
     case TEK_Complex: {
       ComplexPairTy Val =
         EmitLoadOfComplex(MakeAddrLValue(IVAddress, type), LoopVar->getBeginLoc());
-      ValueVec.append({Val.first, Val.second});
+      ValueVec.push_back(Val.first);
+      ValueVec.push_back(Val.second);
       break;
     }
     case TEK_Aggregate: {
@@ -288,19 +289,41 @@ void CodeGenFunction::EmitThreadSafeIV(const VarDecl* IV, const llvm::SmallVecto
   // emit the thread safe induction variable and cleanups
   AutoVarEmission LVEmission = EmitAutoVarAlloca(*IV);
   EmitAutoVarCleanups(LVEmission);
+  QualType type = IV->getType();
 
   // get the address of the emission
   Address Loc = LVEmission.getObjectAddress(*this);
 
   // turn the address into an LValue
-  LValue LV = MakeAddrLValue(Loc, IV->getType());	
+  LValue LV = MakeAddrLValue(Loc, type);	
 
   // Make sure the LValue isn't garbage collected
   LV.setNonGC(true);
 
-  // Store the IV RValue into the newly created thread safe induction variable
-  EmitStoreOfScalar(Values.back(), LV, true);
-  //EmitStoreThroughLValue(Values.back(), LV, true);
+  switch (getEvaluationKind(type)) {
+    case TEK_Scalar: {
+      EmitStoreOfScalar(Values[0], LV, true);
+      break;
+    }
+    case TEK_Complex: {
+      ComplexPairTy Val = {Values[0], Values[1]};
+      EmitStoreOfComplex(Val, LV, true);
+      break;
+    }
+    case TEK_Aggregate: {
+      if (const llvm::StructType *STy =dyn_cast<llvm::StructType>(Loc.getElementType())) {
+        for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
+          Address EltPtr = Builder.CreateStructGEP(Loc, i);
+          llvm::Value *Elt = Values[i];
+          Builder.CreateStore(Elt, EltPtr);
+        } 
+      } else {
+        EmitStoreOfScalar(Values[0], LV, /*isInit*/ true);
+      }
+      break;
+    }
+  }
+
 }
 
 // Restore the original mapping between the Vardecl and its address
@@ -480,9 +503,9 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   EmitBlock(LoopExit.getBlock(), true);
 }
 
-void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
+void
+CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
                                              ArrayRef<const Attr *> ForAttrs) {
-
   /////////////////////////////////////////////////////////////////////////////
   // <KITSUNE>
 
@@ -492,7 +515,7 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   JumpDest LoopExit = getJumpDestInCurrentScope("forall.sync");
   
   // declarations
-  //DeclMapByValueTy IVDeclMap; // map from Vardecl to {IV, thread safe IV}
+  DeclMapByValueTy IVDeclMap; // map from Vardecl to {IV, thread safe IV}
   llvm::AssertingVH<llvm::Instruction> OldAllocaInsertPt = AllocaInsertPt;
   llvm::Value *Undef = llvm::UndefValue::get(Int32Ty);
 
@@ -504,7 +527,6 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
 
   // </KITSUNE>
   /////////////////////////////////////////////////////////////////////////////
-
 
   llvm::BasicBlock *End = createBasicBlock("forall.end");
 
@@ -544,21 +566,15 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getCond());
   llvm::MDNode *Weights = createProfileOrBranchWeightsForLoop(
       S.getCond(), getProfileCount(S.getBody()), S.getBody());
-  Builder.CreateCondBr(BoolCondVal, Detach, LoopExit.getBlock(), Weights);
+  Builder.CreateCondBr(BoolCondVal, Detach, ExitBlock, Weights);
 
   if (ExitBlock != LoopExit.getBlock()) {
     EmitBlock(ExitBlock);
     EmitBranchThroughCleanup(LoopExit);
   }
 
-
-
-
-
-
-  /////////////////////////////////
-  // Create the detach block
-  /////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////
+  // <KITSUNE>
 
   // Emit the (currently empty) detach block
   EmitBlock(Detach);
@@ -566,52 +582,9 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   // Extract the DeclStmt from the statement init
   const DeclStmt *DS = cast<DeclStmt>(S.getIndexStmt());
   
-  DeclMapTy IVDeclMap; 
-  llvm::SmallVector<
-      std::pair<VarDecl *,
-                std::unique_ptr<llvm::SmallVector<llvm::Value *, 4>>>,
-      4>
-      ivs;
-  for (auto *DI : DS->decls()) {
-    auto *LoopVar = dyn_cast<VarDecl>(DI);
-    Address OuterLoc = LocalDeclMap.find(LoopVar)->second; 
-    LocalDeclMap.erase(LoopVar);
-    IVDeclMap.insert({LoopVar, OuterLoc}); 
-    QualType type = LoopVar->getType();
-    ivs.push_back(
-          {LoopVar, std::make_unique<llvm::SmallVector<llvm::Value *, 4>>()});
-    switch (getEvaluationKind(type)) {
-      case TEK_Scalar: {
-        LValue OuterLV = MakeAddrLValue(OuterLoc, type);
-        RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc());
-        ivs.back().second->push_back(OuterRV.getScalarVal());
-        break;
-      }
-      case TEK_Complex: {
-        ComplexPairTy Val =
-          EmitLoadOfComplex(MakeAddrLValue(OuterLoc, type), DI->getBeginLoc());
-        ivs.back().second->push_back(Val.first);
-        ivs.back().second->push_back(Val.second);
-        break;
-      }
-      case TEK_Aggregate: {
-        if (const llvm::StructType *STy =
-          dyn_cast<llvm::StructType>(OuterLoc.getElementType())) {
-          // Load each element of the structure
-          for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
-            Address EltPtr = Builder.CreateStructGEP(OuterLoc, i);
-            llvm::Value *Elt = Builder.CreateLoad(EltPtr);
-            ivs.back().second->push_back(Elt);
-          }
-        } else {
-          LValue OuterLV = MakeAddrLValue(OuterLoc, type);
-          RValue OuterRV = EmitLoadOfLValue(OuterLV, DI->getBeginLoc());
-          ivs.back().second->push_back(OuterRV.getScalarVal());
-        }
-        break;
-      }
-    }
-  }
+  // Create threadsafe induction variables before the detach and put them in IVDeclMap
+  for (auto *DI : DS->decls()) 
+    EmitIVLoad(dyn_cast<VarDecl>(DI), IVDeclMap);
 
   // Create a block for the increment. In case of a 'continue', we jump there.
   llvm::BasicBlock *Increment = createBasicBlock("forall.inc");
@@ -621,10 +594,6 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   
   // </KITSUNE>
   /////////////////////////////////////////////////////////////////////////////
-
-
-
-
 
   EmitBlock(ForBody);
   incrementProfileCounter(&S);
@@ -642,43 +611,13 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
     // change the alloca insert point to the body block
     SetAllocaInsertPoint(Undef, ForBody);
 
+    // emit the thread safe induction variables and initialize them by value
+    for (const auto &ivp : IVDeclMap) 
+      EmitThreadSafeIV(ivp.first, ivp.second.second);
 
-    for (auto &ivp : ivs) {
-      auto *LoopVar = ivp.first;
-      auto &LoadedVals = ivp.second;
-      AutoVarEmission LVEmission = EmitAutoVarAlloca(*LoopVar);
-      EmitAutoVarCleanups(LVEmission);
-      QualType type = LoopVar->getType();
-      Address Loc = LVEmission.getObjectAddress(*this);
-      LValue LV = MakeAddrLValue(Loc, type);
-      LV.setNonGC(true);
-      switch (getEvaluationKind(type)) {
-      case TEK_Scalar: {
-        EmitStoreOfScalar(LoadedVals->back(), LV, /*isInit*/ true);
-        break;
-      }
-      case TEK_Complex: {
-	ComplexPairTy Val = {(*LoadedVals)[0], (*LoadedVals)[1]};
-	EmitStoreOfComplex(Val, LV, /*isInit*/ true);
-        break;
-      }
-      case TEK_Aggregate: {
-        if (const llvm::StructType *STy =
-                dyn_cast<llvm::StructType>(Loc.getElementType())) {
-	  // Store the previously-loaded value into the new structure
-          for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
-            Address EltPtr = Builder.CreateStructGEP(Loc, i);
-            llvm::Value *Elt = (*LoadedVals)[i];
-            Builder.CreateStore(Elt, EltPtr);
-          }
-        } else {
-          EmitStoreOfScalar(LoadedVals->back(), LV, /*isInit*/ true);
-        }
-        break;
-      }
-      }
+    // </KITSUNE>
+    ///////////////////////////////////////////////////////////////////////////
 
-    }
     EmitStmt(S.getLoopVarStmt());
     EmitStmt(S.getBody());
   }
@@ -688,10 +627,8 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
 
   // Restore induction variable mappings after emitting body, and before
   // the increment
-  for (const auto &p : IVDeclMap){
-    LocalDeclMap.erase(p.first);
-    LocalDeclMap.insert(p); 
-  }
+  for (const auto &ivp : IVDeclMap) 
+    RestoreDeclMap(ivp.first, ivp.second.first);
 
   EmitBlock(Reattach.getBlock());
   Builder.CreateReattach(Increment, SRStart);
@@ -703,13 +640,12 @@ void CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   // </KITSUNE>
   /////////////////////////////////////////////////////////////////////////////
 
+  EmitStopPoint(&S);
+  // If there is an increment, emit it next.
   EmitBlock(Increment);
-
   EmitStmt(S.getInc());
 
   BreakContinueStack.pop_back();
-
-  EmitStopPoint(&S);
   
   EmitBranch(CondBlock);
 
