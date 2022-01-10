@@ -119,6 +119,9 @@ static bool tryToStripMineLoop(
     return false;
   TapirLoopHints Hints(L);
 
+  if (!EnableTapirLoopStripmine) 
+    return false; 
+
   if (TM_Disable == hasLoopStripmineTransformation(L))
     return false;
 
