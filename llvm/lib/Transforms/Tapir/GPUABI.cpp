@@ -76,6 +76,14 @@ unsigned LLVMLoop::NextKernelID = 0;
 
 LLVMLoop::LLVMLoop(Module &M)
     : LoopOutlineProcessor(M, LLVMM), LLVMM("kernelModule", M.getContext()) {
+  ValueToValueMapTy VMap; 
+  // LLVMMptr = CloneModule(M, vmap, [](const GlobalValue* gv) { return false; });  
+  // And named metadata....
+  for (const NamedMDNode &NMD : M.named_metadata()) {
+    NamedMDNode *NewNMD = LLVMM.getOrInsertNamedMetadata(NMD.getName());
+    for (unsigned i = 0, e = NMD.getNumOperands(); i != e; ++i)
+      NewNMD->addOperand(MapMetadata(NMD.getOperand(i), VMap));
+  }
   // Assign an ID to this kernel.
   MyKernelID = NextKernelID++;
 
