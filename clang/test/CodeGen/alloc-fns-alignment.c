@@ -78,4 +78,3 @@ void *memalign_large_constant_test(size_t n) {
 
 // CHECK-LABEL: @memalign_large_constant_test
 // CHECK: align 4096 i8* @memalign
-
