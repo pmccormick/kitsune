@@ -481,8 +481,6 @@ AIX Support
   ``-mignore-xcoff-visibility`` option can be manually specified on the
   command-line to recover the previous behavior if desired.
 
-- Support for on-demand initialization of TLS variables was added.
-
 C Language Changes in Clang
 ---------------------------
 
