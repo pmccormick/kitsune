@@ -3,6 +3,8 @@
 # RUN: ld.lld -r %t1.o -o %t
 # RUN: llvm-readobj --symbols -r %t | FileCheck %s
 
+# WARN: warning: -d, -dc, -dp, and --[no-]define-common will be removed. See https://github.com/llvm/llvm-project/issues/53660
+
 # CHECK:        Symbol {
 # CHECK:          Name: common
 # CHECK-NEXT:     Value: 0x4
