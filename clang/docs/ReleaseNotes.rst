@@ -481,6 +481,16 @@ AIX Support
   ``-mignore-xcoff-visibility`` option can be manually specified on the
   command-line to recover the previous behavior if desired.
 
+- Improved code generation for ARM, by assuming less strict alignment
+  requirements for instructions (just like other OSes do).
+
+- Fixed using the ``-m32`` flag in x86_64 MinGW setups, by e.g. making ``-m32``
+  pick i686 instead of i386, if there is no i386 sysroot, but only one for
+  i686.
+
+- Fixed passing the ``--no-demangle`` option through to the linker for MinGW
+  targets.
+
 C Language Changes in Clang
 ---------------------------
 

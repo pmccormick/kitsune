@@ -249,6 +249,24 @@ to):
 When you find failures with ``half`` type, check the calling conversion of the
 code and switch it to the new ABI.
 
+Changes to the Windows Target
+-----------------------------
+
+* Changed how the ``.pdata`` sections refer to the code they're describing,
+  to avoid conflicting unwind info if weak symbols are overridden.
+
+* Fixed code generation for calling support routines for converting 128 bit
+  integers from/to floats on x86_64.
+
+* The preferred path separator form (backslashes or forward slashes) can be
+  configured in Windows builds of LLVM now, with the
+  ``LLVM_WINDOWS_PREFER_FORWARD_SLASH`` CMake option. This defaults to
+  true in MinGW builds of LLVM.
+
+* Set proper COFF symbol types for function aliases (e.g. for Itanium C++
+  constructors), making sure that GNU ld exports all of them correctly as
+  functions, not data, when linking a DLL.
+
 Changes to the OCaml bindings
 -----------------------------
 
@@ -310,6 +328,9 @@ Changes to the C API
   * Relocate the ``llvm::zlib`` namespace to ``llvm::compression::zlib``.
   * Remove crc32 from zlib compression namespace, people should use the ``llvm::crc32`` instead.
 
+* Fixed building LLVM-C.dll for i386 targets with MSVC, which had been broken
+  since the LLVM 8.0.0 release.
+
 Changes to the Go bindings
 --------------------------
 
@@ -363,6 +384,8 @@ Changes to the LLVM tools
 * llvm-objdump: improved assembly printing for XCOFF.
 * llc now parses code-model attribute from input file.
 
+* llvm-readobj: Improved printing of symbols in Windows unwind data.
+
 Changes to LLDB
 ---------------------------------
 
@@ -395,6 +418,8 @@ Changes to LLDB
   used for MingW, and MSVC) via the ``plugin.object-file.pe-coff.abi`` setting.
   In Windows builds of LLDB, this defaults to the style used for LLVM's default
   target.
+
+* Fixed continuing from breakpoints and singlestepping on Windows on ARM/ARM64.
 
 Changes to Sanitizers
 ---------------------
