@@ -256,16 +256,10 @@ Build System Changes
   ``libcxxabi/test/configs``, or ``libunwind/test/configs``, please move to one of those
   configurations or define your own.
 
-<<<<<<< HEAD
 - MinGW DLL builds of libc++ no longer use dllimport in their headers, which
   means that the same set of installed headers works for both DLL and static
   linkage. This means that distributors finally can build both library
   versions with a single CMake invocation.
-=======
-  - If you were doing multiple CMake invocations, e.g. one rooted at ``<monorepo>/libcxx`` and one rooted
-    at ``<monorepo>/libcxxabi`` (this used to be called a "Standalone build"), please move them to a
-    single invocation like so:
->>>>>>> 43f21792e4af ([runtimes] Add a warning about the Standalone build being deprecated)
 
 - The ``LIBCXX_HIDE_FROM_ABI_PER_TU_BY_DEFAULT`` configuration option has been removed. Indeed,
   the risk of ODR violations from mixing different versions of libc++ in the same program has
