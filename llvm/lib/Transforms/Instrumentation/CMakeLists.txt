@@ -32,9 +32,10 @@ add_llvm_component_library(LLVMInstrumentation
   Analysis
   Core
   Demangle
+  IRReader
+  Linker
   MC
   Support
   TransformUtils
   ProfileData
-  IRReader
   )
