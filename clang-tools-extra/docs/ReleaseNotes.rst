@@ -295,6 +295,10 @@ Changes in existing checks
   <clang-tidy/checks/readability/simplify-boolean-expr>` to simplify expressions
   using DeMorgan's Theorem.
 
+- Fixed a crash in :doc:`readability-suspicious-call-argument
+  <clang-tidy/checks/readability-suspicious-call-argument>` related to passing
+  arguments that refer to program elements without a trivial identifier.
+
 Removed checks
 ^^^^^^^^^^^^^^
 
