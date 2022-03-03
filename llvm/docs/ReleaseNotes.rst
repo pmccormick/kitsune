@@ -396,9 +396,6 @@ Changes to LLDB
   In Windows builds of LLDB, this defaults to the style used for LLVM's default
   target.
 
-* LLDB has been included in Windows on ARM64 binary release with Python support
-  disabled.
-
 Changes to Sanitizers
 ---------------------
 
