@@ -71,7 +71,7 @@ define i8 @test6(i8* %p) {
 
 ; negative case - explicit sync
 define void @test7(i8* %p) {
-; CHECK: Function Attrs: mustprogress nofree norecurse nounwind willreturn
+; CHECK: Function Attrs: argmemonly mustprogress nofree norecurse nounwind willreturn
 ; CHECK-LABEL: @test7(
 ; CHECK-NEXT:    [[TMP1:%.*]] = atomicrmw add i8* [[P:%.*]], i8 0 seq_cst, align 1
 ; CHECK-NEXT:    ret void

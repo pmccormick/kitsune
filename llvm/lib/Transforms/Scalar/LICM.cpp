@@ -312,8 +312,9 @@ PreservedAnalyses LNICMPass::run(LoopNest &LN, LoopAnalysisManager &AM,
                                Opts.AllowSpeculation);
 
   Loop &OutermostLoop = LN.getOutermostLoop();
-  bool Changed = LICM.runOnLoop(&OutermostLoop, &AR.AA, &AR.LI, &AR.DT, AR.BFI,
-                                &AR.TLI, &AR.TTI, &AR.SE, AR.MSSA, &ORE, true);
+  bool Changed =
+      LICM.runOnLoop(&OutermostLoop, &AR.AA, &AR.LI, &AR.DT, AR.BFI, &AR.TLI,
+                     &AR.TTI, &AR.SE, AR.MSSA, &AR.TI, &ORE, true);
 
   if (!Changed)
     return PreservedAnalyses::all();
