@@ -577,8 +577,8 @@ CodeGenFunction::EmitCXXForallRangeStmt(const CXXForallRangeStmt &S,
   // The body is executed if the expression, contextually converted
   // to bool, is true.
   llvm::Value *BoolCondVal = EvaluateExprAsBool(S.getCond());
-  llvm::MDNode *Weights = createProfileOrBranchWeightsForLoop(
-      S.getCond(), getProfileCount(S.getBody()), S.getBody());
+  llvm::MDNode *Weights = createProfileWeightsForLoop(
+      S.getCond(), getProfileCount(S.getBody()));
   Builder.CreateCondBr(BoolCondVal, Detach, ExitBlock, Weights);
 
   if (ExitBlock != LoopExit.getBlock()) {

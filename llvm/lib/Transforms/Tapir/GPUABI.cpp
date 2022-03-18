@@ -299,7 +299,7 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
                     VMap[&Arg] = &(*NewFArgIt++);
                   }
                   SmallVector<ReturnInst*, 8> Returns;
-                  CloneFunctionInto(deviceF, f, VMap, false, Returns); 
+                  CloneFunctionInto(deviceF, f, VMap, CloneFunctionChangeType::DifferentModule, Returns); 
                   // GPU calls are slow as balls, try to force inlining
                   deviceF->addFnAttr(Attribute::AlwaysInline); 
                   todo.push_back(deviceF);

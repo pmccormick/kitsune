@@ -1679,21 +1679,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
   }
   case TapirTargetID::Cilk:
-
-    if (KITSUNE_ENABLE_CILKRTS_TARGET) {
-      CmdArgs.push_back("-L" CILKRTS_LIBRARY_DIR);
-      if (Triple.isOSDarwin()) {
-        CmdArgs.push_back("-rpath");
-        CmdArgs.push_back(CILKRTS_LIBRARY_DIR);
-      } else {
-        CmdArgs.push_back("-rpath=" CILKRTS_LIBRARY_DIR);
-      }
-      ExtractArgsFromString(CILKRTS_EXTRA_LINK_LIBS, CmdArgs, Args);
-      CmdArgs.push_back("-lcilkrts");
-    } else {
-      // FIXME: we should hard error here if cilkrts support was not built-in.
-      getDriver().Diag(diag::warn_cilkrts_missing_build_params);
-    }
+    CmdArgs.push_back("-lcilkrts");
     break;
   case TapirTargetID::OpenMP:
     if (! KITSUNE_ENABLE_OPENMP_TARGET)

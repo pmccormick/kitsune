@@ -195,7 +195,7 @@ Value *RealmABI::getOrCreateBarrier(Value *SyncRegion, Function *F) {
     AllocaInst* ab = builder.CreateAlloca(getBarrierType(C)); 
     barrier = ab; 
     Value *barrierVal = builder.CreateCall(get_createRealmBarrier(), {}, "");
-    builder.CreateAlignedStore(barrierVal, barrier, ab->getAlignment()); 
+    builder.CreateAlignedStore(barrierVal, barrier, MaybeAlign(ab->getAlignment())); 
     SyncRegionToBarrier[SyncRegion] = barrier;
 
     // Make sure we destroy the barrier at all exit points to prevent memory leaks

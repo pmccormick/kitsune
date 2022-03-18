@@ -10,7 +10,6 @@
 
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/Tapir.h"
-#include "InputInfo.h"
 #include "ToolChains/AIX.h"
 #include "ToolChains/AMDGPU.h"
 #include "ToolChains/AMDGPUOpenMP.h"

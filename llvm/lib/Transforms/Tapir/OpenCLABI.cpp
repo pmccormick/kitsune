@@ -313,7 +313,7 @@ void SPIRVLoop::postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
         NewVMap[&arg] = argit++; 
       }
       SmallVector< ReturnInst *,5> retinsts;
-      CloneFunctionInto(NewHelper, Helper, NewVMap, false, retinsts);
+      CloneFunctionInto(NewHelper, Helper, NewVMap, CloneFunctionChangeType::DifferentModule, retinsts);
       //Helper->mutateType(PointerType::get(FunctionType::get(fty->getReturnType(), newParams, false), 0)); 
       NewHelper->setCallingConv(CallingConv::SPIR_KERNEL); 
       for(auto &arg : NewHelper->args()){
