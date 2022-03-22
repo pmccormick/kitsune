@@ -3886,6 +3886,7 @@ public:
   //                                 >
                         // > DeclMapByValueTy;
   typedef llvm::DenseMap<const VarDecl *, 
+
                         std::pair<Address,llvm::SmallVector<llvm::Value*,4>>> DeclMapByValueTy;
   void EmitIVLoad(const VarDecl* LoopVar, 
                           DeclMapByValueTy & IVDeclMap);
@@ -3950,25 +3951,19 @@ public:
   LoopAttributes::LTarget GetTapirRTTargetAttr(ArrayRef<const Attr*> Attrs);
 
   // Kitsune support for Kokkos.  
-  bool EmitKokkosConstruct(const CallExpr *CE, ArrayRef<const Attr *> Attrs = ArrayRef<const Attr *>());
-  std::vector<const ParmVarDecl*> EmitKokkosParallelForInductionVar(const LambdaExpr* Lambda);
-  void EmitKokkosParallelForCond(const Expr *BoundsExpr, const ParmVarDecl *LoopVar,
-                                 llvm::BasicBlock *DetachBlock,
-                                 llvm::BasicBlock *ExitBlock,
-				 JumpDest &Sync);
-  bool EmitKokkosParallelFor(const CallExpr *CE, ArrayRef<const Attr *> Attrs);
-  bool EmitKokkosParallelForMD(const CallExpr *CE, std::string PFName,
-            const Expr *BE,
-            const LambdaExpr *Lambda,
-            ArrayRef<const Attr *> ForallAttrs);
-  bool EmitKokkosInnerLoop(const CallExpr *CE, const LambdaExpr *Lambda,
-            llvm::BasicBlock *TopBlock,
-            std::vector<std::pair<const Expr*, const Expr*>> BoundsList,
-            std::vector<const ParmVarDecl*> params,
-            std::vector<std::pair<llvm::Value*, llvm::AllocaInst*>> TLIVarList,
-            ArrayRef<const Attr *> ForallAttrs);
-  bool EmitKokkosParallelReduce(const CallExpr *CE, ArrayRef<const Attr *> Attrs);
   bool InKokkosConstruct = false; // FIXME: Should/can we refactor this away?
+  bool EmitKokkosConstruct(const CallExpr *CE, ArrayRef<const Attr *> Attrs = ArrayRef<const Attr *>());
+  bool EmitKokkosParallelFor(const CallExpr *CE, ArrayRef<const Attr *> Attrs);
+  bool EmitKokkosParallelReduce(const CallExpr *CE, ArrayRef<const Attr *> Attrs);
+  bool ParseAndValidateParallelFor(const CallExpr* CE,
+					   std::string &CN, 
+             SmallVector<std::pair<const ParmVarDecl*,std::pair<const Expr*, const Expr*>>,6> &IVinfos,
+					   const LambdaExpr *& LE,
+             DiagnosticsEngine &Diags);
+  void EmitAndInitializeKokkosIV(const std::pair<const ParmVarDecl*,std::pair<const Expr*, const Expr*>> &IVInfo);
+  llvm::Value * EmitKokkosParallelForCond(const std::pair<const ParmVarDecl*,std::pair<const Expr*, const Expr*>> &IVInfo);
+  void EmitKokkosIncrement(const ParmVarDecl *IV);
+
 
   /// Emit simple code for OpenMP directives in Simd-only mode.
   void EmitSimpleOMPExecutableDirective(const OMPExecutableDirective &D);

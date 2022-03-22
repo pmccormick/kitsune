@@ -306,6 +306,10 @@ def warn_kokkos_no_functor : Warning<
     "kokkos - parallel_for functors unsupported.\n"
     "Falling back to standard C++ mode but executable could be unstable.">,
     InGroup<BackendOptimizationFailure>;
+def warn_kokkos_no_functor_args : Warning<
+    "kokkos - parallel_for lambda requires arguments.\n"
+    "Falling back to standard C++ mode but executable could be unstable.">,
+    InGroup<BackendOptimizationFailure>;
 def warn_kokkos_unknown_stmt_class : Warning<
     "kokkos - unrecognized/unsupported construct in parallel_for statement.\n"
     "Failling back to standard C++ mode but executable could be unstable.">,

@@ -245,6 +245,7 @@ void CodeGenFunction::EmitIVLoad(const VarDecl* LoopVar,
   QualType type = LoopVar->getType();
 
   // Create the vector of values
+
   llvm::SmallVector<llvm::Value *, 4> ValueVec;
 
   // Emit all the shallow copy loads and update 
@@ -284,6 +285,7 @@ void CodeGenFunction::EmitIVLoad(const VarDecl* LoopVar,
 
 // Emit a thread safe copy of the induction variable and set it's value
 // to the current value of the induction variable
+
 void CodeGenFunction::EmitThreadSafeIV(const VarDecl* IV, const llvm::SmallVector<llvm::Value*,4>& Values){
 
   // emit the thread safe induction variable and cleanups
