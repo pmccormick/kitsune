@@ -181,6 +181,7 @@ public:
   std::string TapirSerialCfgFile;
   std::string TapirOpenCilkCfgFile;
   std::string TapirCudaCfgFile;
+  std::string TapirGPUCfgFile;
   std::string TapirRealmCfgFile;
   std::string TapirOpenMPCfgFile;
   std::string TapirQthreadsCfgFile;

@@ -366,7 +366,6 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   LLVM_DEBUG(dbgs() << "LLVM Module after passes: " << LLVMM);
 
-
   // generate llvm kernel code
   SmallVector<char, 1<<20> mbuf;
   BitcodeWriter bcw(mbuf);

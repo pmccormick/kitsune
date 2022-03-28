@@ -1,0 +1,105 @@
+//
+//===- kitrt-debug.h - Kitsune ABI runtime debug support    --------------===//
+//
+// TODO: Need to update LANL/Triad Copyright notice.
+//
+// Copyright (c) 2021, Los Alamos National Security, LLC.
+// All rights reserved.
+//
+//  Copyright 2021. Los Alamos National Security, LLC. This software was
+//  produced under U.S. Government contract DE-AC52-06NA25396 for Los
+//  Alamos National Laboratory (LANL), which is operated by Los Alamos
+//  National Security, LLC for the U.S. Department of Energy. The
+//  U.S. Government has rights to use, reproduce, and distribute this
+//  software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY,
+//  LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY
+//  FOR THE USE OF THIS SOFTWARE.  If software is modified to produce
+//  derivative works, such modified software should be clearly marked,
+//  so as not to confuse it with the version available from LANL.
+//
+//  Additionally, redistribution and use in source and binary forms,
+//  with or without modification, are permitted provided that the
+//  following conditions are met:
+//
+//    * Redistributions of source code must retain the above copyright
+//      notice, this list of conditions and the following disclaimer.
+//
+//    * Redistributions in binary form must reproduce the above
+//      copyright notice, this list of conditions and the following
+//      disclaimer in the documentation and/or other materials provided
+//      with the distribution.
+//
+//    * Neither the name of Los Alamos National Security, LLC, Los
+//      Alamos National Laboratory, LANL, the U.S. Government, nor the
+//      names of its contributors may be used to endorse or promote
+//      products derived from this software without specific prior
+//      written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY LOS ALAMOS NATIONAL SECURITY, LLC AND
+//  CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+//  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+//  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL LOS ALAMOS NATIONAL SECURITY, LLC OR
+//  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+//  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+//  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+//  USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+//  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+//  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+//  SUCH DAMAGE.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef __KITRT_CUDA_H__
+#define __KITRT_CUDA_H__
+
+/// Initialize the runtime.  This call may be made mulitple 
+/// times -- only the intial call will initialize CUDA and 
+/// subsequent calls are essentially no-ops. 
+extern "C" bool __kitrt_cuInit();
+
+/// Provide a set of launch parameters for the next kernel 
+/// to be launched after this call.  If these values are not 
+/// provided, the runtime will use a simple (commonly used) 
+/// calculation for determining the launch parameters.
+extern "C" 
+void __kitrt_cuSetCustomLaunchParameters(unsigned BlockPerGrid,
+                                         unsigned ThreadsPerBlock);
+
+/// Provide the number of threads per block to use as part of the
+/// parameters for the next kernel launch. 
+extern "C" void  __kitrt_cuSetDefaultThreadsPerBlock(unsigned tpb);
+extern "C" void  __kitrt_cuEnableEventTiming();
+extern "C" void  __kitrt_cuDisableEventTiming();
+extern "C" void  __kitrt_cuToggleEventTiming();
+extern "C" void* __kitrt_cuCreateEvent();
+extern "C" void  __kitrt_cuRecordEvent(void*);
+extern "C" void  __kitrt_cuSynchronizeEvent(void*);
+
+extern "C" void  __kitrt_cuDestroyEvent(void*);
+extern "C" float __kitrt_cuElapsedEventTime(void *start, void *stop);
+
+extern "C" bool  __kitrt_cuIsMemManaged(void *vp);
+extern "C" void  __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size);
+extern "C" void  __kitrt_cuMemPrefetchAsync(void *vp, size_t size);
+extern "C" void  __kitrt_cuMemPrefetch(void *vp);
+extern "C" void* __kitrt_cuMemAllocManaged(size_t size);
+extern "C" void  __kitrt_cuMemFree(void *vp);
+extern "C" void  __kitrt_cuAdviseRead(void *vp, size_t size);
+extern "C" void* __kitrt_cuLaunchFBKernel(const void *fatBin, 
+                                          const char *kernelName,
+                                          void **fatBinArgs,
+                                          uint64_t numElements);
+extern "C" void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
+                                          const char *kernelName,
+                                          void **fatBinArgs,
+                                          uint64_t numElements);
+extern "C" void *__kitrt_cuLaunchELFKernel(const void *elf, void **args,
+                                           size_t numElements);
+extern "C" void *__kitrt_cuLaunchKernel(llvm::Module & m, void **args,
+                                        size_t n);
+extern "C" void __kitrt_cuStreamSynchronize(void *vs);
+
+#endif 
+

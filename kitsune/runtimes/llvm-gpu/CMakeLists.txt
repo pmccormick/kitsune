@@ -48,7 +48,7 @@ if (KITSUNE_ENABLE_CUDA_ABI)
     cuda.cpp
     llvm-cuda.cpp)
   list(APPEND KITSUNE_LLVM_GPU_ABI_HDRS
-    cuda.h
+    kitrt-cuda.h
     llvm-cuda.h)
   include_directories(${CUDAToolkit_INCLUDE_DIRS})
   link_directories(${CUDAToolkit_LIBRARY_DIR})

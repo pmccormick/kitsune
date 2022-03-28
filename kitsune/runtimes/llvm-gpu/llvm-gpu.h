@@ -5,6 +5,7 @@
 namespace llvm {
 class Module;
 }
+
 extern "C" {
   void* launchKernel(llvm::Module& bc, void** args, uint64_t n);
 #endif
@@ -14,4 +15,5 @@ extern "C" {
   void waitKernel(void* wait);
 #ifdef __cplusplus
 }
+
 #endif

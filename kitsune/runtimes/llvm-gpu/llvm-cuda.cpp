@@ -190,6 +190,7 @@ std::string __kitrt_cuLLVMtoPTX(Module& m, CUdevice device) {
   std::ostringstream arch;
   arch << "sm_" << maj << min;
   cudaarch = arch.str();
+  fprintf(stderr, "cuda arch: %s\n", cudaarch.c_str());
 
   Triple TT("nvptx64", "nvidia", "cuda");
   m.setTargetTriple(TT.str());
@@ -373,6 +374,6 @@ std::string __kitrt_cuLLVMtoPTX(Module& m, CUdevice device) {
   FPM.doFinalization();
   PM.run(m);
   //m.print(llvm::errs(), nullptr);
-  std::cout << ptx.str().str() << std::endl;
+  //std::cout << ptx.str().str() << std::endl;
   return ptx.str().str();
 }
