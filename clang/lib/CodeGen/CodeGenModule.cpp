@@ -1541,11 +1541,7 @@ StringRef CodeGenModule::getMangledName(GlobalDecl GD) {
   // directly between host- and device-compilations, the host- and
   // device-mangling in host compilation could help catching certain ones.
   assert(!isa<FunctionDecl>(ND) || !ND->hasAttr<CUDAGlobalAttr>() ||
-<<<<<<< HEAD
          getContext().shouldExternalize(ND) || getLangOpts().CUDAIsDevice ||
-=======
-         getContext().shouldExternalizeStaticVar(ND) || getLangOpts().CUDAIsDevice ||
->>>>>>> e6de9ed37308 ([CUDA][HIP] Externalize kernels in anonymous name space)
          (getContext().getAuxTargetInfo() &&
           (getContext().getAuxTargetInfo()->getCXXABI() !=
            getContext().getTargetInfo().getCXXABI())) ||
@@ -6957,7 +6953,6 @@ bool CodeGenModule::stopAutoInit() {
 
 void CodeGenModule::printPostfixForExternalizedDecl(llvm::raw_ostream &OS,
                                                     const Decl *D) const {
-<<<<<<< HEAD
   // ptxas does not allow '.' in symbol names. On the other hand, HIP prefers
   // postfix beginning with '.' since the symbol name can be demangled.
   if (LangOpts.HIP)
@@ -7576,8 +7571,4 @@ void CodeGenModule::moveLazyEmissionStates(CodeGenModule *NewBuilder) {
   NewBuilder->EmittedDeferredDecls = std::move(EmittedDeferredDecls);
 
   NewBuilder->ABI->MangleCtx = std::move(ABI->MangleCtx);
-=======
-  OS << (isa<VarDecl>(D) ? "__static__" : ".anon.")
-     << getContext().getCUIDHash();
->>>>>>> e6de9ed37308 ([CUDA][HIP] Externalize kernels in anonymous name space)
 }
