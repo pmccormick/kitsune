@@ -1219,7 +1219,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
                   (GlobalVariable *)nullptr, GV->getThreadLocalMode(),
                   GV->getType()->getAddressSpace());
               NewGV->copyAttributesFrom(GV);
-              NewGV->getAttributes().dump();
+              //NewGV->getAttributes().dump();
               VMap[op] = NewGV;
               const Comdat *SC = GV->getComdat();
               if (!SC)
@@ -1276,7 +1276,6 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
     if (CodeGenDisablePrefetch == false) {
       Type *VT = V->getType(); 
       if (VT->isPointerTy()) {
-        fprintf(stderr, "code gen prefetching...\n");
         Value *VoidPP = B.CreateBitCast(V, VoidPtrTy);
         B.CreateCall(KitCudaMemPrefetchFn, { VoidPP });
       }
