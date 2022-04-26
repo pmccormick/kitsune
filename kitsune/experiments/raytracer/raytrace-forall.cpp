@@ -6,6 +6,7 @@
 #include <float.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <omp.h>
 #include <time.h>
 #include "kitsune/timer.h"
 #include <kitsune.h>
@@ -189,8 +190,8 @@ int main(int argc, char **argv)
     }
   }
 
-  fprintf(stderr, "image size: %d x %d\n", imageWidth, imageHeight);
-  fprintf(stderr, "sample count %d\n", samplesCount);
+  //fprintf(stderr, "image size: %d x %d\n", imageWidth, imageHeight);
+  //fprintf(stderr, "sample count %d\n", samplesCount);
   Pixel *img = (Pixel*)__kitrt_cuMemAllocManaged(sizeof(Pixel) * imageWidth * imageHeight);
 
   __kitrt_cuEnableEventTiming();

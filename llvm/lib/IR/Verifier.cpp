@@ -4848,7 +4848,6 @@ void Verifier::visitInstruction(Instruction &I) {
       // taken. Ignore cases where the address of the intrinsic function is used
       // as the argument of operand bundle "clang.arc.attachedcall" as those
       // cases are handled in verifyAttachedCallBundle.
-<<<<<<< HEAD
       Check((!F->isIntrinsic() ||
              (CBI && &CBI->getCalledOperandUse() == &I.getOperandUse(i)) ||
              IsAttachedCallOperand(F, CBI, i)),

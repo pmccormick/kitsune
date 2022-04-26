@@ -1,6 +1,7 @@
 include ../common.mk
 include ../cuda.mk
 include ../kokkos.mk
+include ../gcc.mk 
 
 # General (shared) flags (see common.mk)
 clang_flags=${cxx_flags} ${opt_flags} ${clang_info_flags}
@@ -43,13 +44,17 @@ all: raytrace-forall.cuda.${host_arch} \
      raytrace-forall.cuda.${GRAINSIZE}.${host_arch} \
      raytrace.nvcc.${host_arch} \
      raytrace.clang.${host_arch} \
-     raytrace.kokkos.${host_arch} 
+     raytrace.kokkos.${host_arch} \
+     raytrace.kokkos.noview.${host_arch} \
+     raytrace.openmp.clang.${host_arch} \
+     raytrace.openmp.gcc.${host_arch} 
 
 
 # Kitsune-Tapir versions.
 raytrace-forall.cuda.${host_arch}: raytrace-forall.cpp
 	${clangxx} ${clang_flags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-
+raytrace.kokkos.noview.${host_arch}: raytrace-kokkos-noview.cpp
+	${clangxx} ${clang_flags} ${tapir_cu_flags} ${kit_kokkos_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 raytrace-forall.cuda.${GRAINSIZE}.${host_arch}: raytrace-forall.cpp
 	${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 
@@ -61,13 +66,18 @@ raytrace.clang.${host_arch}: raytrace.cu
 raytrace.kokkos.${host_arch}: raytrace-kokkos.cpp
 	${nvcc_wrapper} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
+# OpenMP version.
+raytrace.openmp.clang.${host_arch}: raytrace-openmp.cpp
+	${clangxx} ${clang_flags} -fopenmp -fopenmp-targets=nvptx64-cuda -Xopenmp-target -march=${NVARCH} -I${kitsune_prefix}/include -fopenmp -o $@ $<
+
+raytrace.openmp.gcc.${host_arch}: raytrace-openmp.cpp
+	${gccxx} ${gcc_flags} -fopenmp -foffload=nvptx-none="-O3 -lm" -o $@ $<
+
 clean:
 	-rm -f *.${host_arch}
 	-rm -f *.fatbin
 	-rm -rf *-cfg-tmp
 	-rm -f *.bc
 	-rm -f *.fatbin
-
-realclean:
-	-rm -f *.ll *.ptx *.csv *.log 
-	
+	-rm -f *.ppm *.jpg 
+	-rm -f *.ll *.ptx *.csv *.log *.s *.fbin

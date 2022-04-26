@@ -54,52 +54,69 @@
 #ifndef __KITRT_CUDA_H__
 #define __KITRT_CUDA_H__
 
-/// Initialize the runtime.  This call may be made mulitple 
-/// times -- only the intial call will initialize CUDA and 
-/// subsequent calls are essentially no-ops. 
-extern "C" bool __kitrt_cuInit();
+#include <stdlib.h>
 
-/// Provide a set of launch parameters for the next kernel 
-/// to be launched after this call.  If these values are not 
-/// provided, the runtime will use a simple (commonly used) 
-/// calculation for determining the launch parameters.
-extern "C" 
-void __kitrt_cuSetCustomLaunchParameters(unsigned BlockPerGrid,
-                                         unsigned ThreadsPerBlock);
+#ifdef __cplusplus
+extern "C" {
+#else
+#include <stdbool.h>
+#endif
 
-/// Provide the number of threads per block to use as part of the
-/// parameters for the next kernel launch. 
-extern "C" void  __kitrt_cuSetDefaultThreadsPerBlock(unsigned tpb);
-extern "C" void  __kitrt_cuEnableEventTiming();
-extern "C" void  __kitrt_cuDisableEventTiming();
-extern "C" void  __kitrt_cuToggleEventTiming();
-extern "C" void* __kitrt_cuCreateEvent();
-extern "C" void  __kitrt_cuRecordEvent(void*);
-extern "C" void  __kitrt_cuSynchronizeEvent(void*);
+  /// Initialize the runtime.  This call may be made mulitple
+  /// times -- only the intial call will initialize CUDA and
+  /// subsequent calls are essentially no-ops.
+  bool __kitrt_cuInit();
 
-extern "C" void  __kitrt_cuDestroyEvent(void*);
-extern "C" float __kitrt_cuElapsedEventTime(void *start, void *stop);
+  /// Clean up and destroy runtime components.
+  void __kitrt_cuDestroy();
 
-extern "C" bool  __kitrt_cuIsMemManaged(void *vp);
-extern "C" void  __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size);
-extern "C" void  __kitrt_cuMemPrefetchAsync(void *vp, size_t size);
-extern "C" void  __kitrt_cuMemPrefetch(void *vp);
-extern "C" void* __kitrt_cuMemAllocManaged(size_t size);
-extern "C" void  __kitrt_cuMemFree(void *vp);
-extern "C" void  __kitrt_cuAdviseRead(void *vp, size_t size);
-extern "C" void* __kitrt_cuLaunchFBKernel(const void *fatBin, 
-                                          const char *kernelName,
-                                          void **fatBinArgs,
-                                          uint64_t numElements);
-extern "C" void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
-                                          const char *kernelName,
-                                          void **fatBinArgs,
-                                          uint64_t numElements);
-extern "C" void *__kitrt_cuLaunchELFKernel(const void *elf, void **args,
-                                           size_t numElements);
-extern "C" void *__kitrt_cuLaunchKernel(llvm::Module & m, void **args,
-                                        size_t n);
-extern "C" void __kitrt_cuStreamSynchronize(void *vs);
+  /// Provide a set of launch parameters for the next kernel
+  /// to be launched after this call.  If these values are not
+  /// provided, the runtime will use a simple (commonly used)
+  /// calculation for determining the launch parameters.
+  void __kitrt_cuSetCustomLaunchParameters(unsigned BlockPerGrid,
+                                           unsigned ThreadsPerBlock);
 
-#endif 
+  /// Provide the number of threads per block to use as part of the
+  /// parameters for the next kernel launch.
+  void  __kitrt_cuSetDefaultThreadsPerBlock(unsigned tpb);
+  void  __kitrt_cuEnableEventTiming();
+  void  __kitrt_cuDisableEventTiming();
+  void  __kitrt_cuToggleEventTiming();
+  void *__kitrt_cuCreateEvent();
+  void  __kitrt_cuRecordEvent(void*);
+  void  __kitrt_cuSynchronizeEvent(void*);
+
+  void  __kitrt_cuDestroyEvent(void*);
+  float __kitrt_cuElapsedEventTime(void *start, void *stop);
+
+  bool  __kitrt_cuIsMemManaged(void *vp);
+  void  __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size);
+  void  __kitrt_cuMemPrefetchAsync(void *vp, size_t size);
+  void  __kitrt_cuMemPrefetch(void *vp);
+  void *__kitrt_cuMemAllocManaged(size_t size);
+  void  __kitrt_cuMemFree(void *vp);
+  void  __kitrt_cuAdviseRead(void *vp, size_t size);
+  void  __kitrt_cuMemcpySymbolToDevice(void *hostSym,
+                                       uint64_t devSym,
+                                       size_t size);
+  void *__kitrt_cuLaunchFBKernel(const void *fatBin,
+                                 const char *kernelName,
+                                 void **fatBinArgs,
+                                 uint64_t numElements);
+  void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
+                                       const char *kernelName,
+                                       void **fatBinArgs,
+                                       uint64_t numElements);
+  void *__kitrt_cuLaunchELFKernel(const void *elf, void **args,
+                                  size_t numElements);
+  void __kitrt_cuStreamSynchronize(void *vs);
+
+#ifdef __cplusplus
+  void *__kitrt_cuLaunchKernel(llvm::Module & m, void **args,
+                               size_t n);
+} // extern "C"
+#endif
+
+#endif // __KITRT_CUDA_H__
 
