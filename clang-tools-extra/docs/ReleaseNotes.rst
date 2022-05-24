@@ -141,6 +141,10 @@ Improvements to clang-tidy
 
 - .clang-tidy files can now use the more natural dictionary syntax for specifying `CheckOptions`.
 
+- Fixed a regression introduced in clang-tidy 14.0.0, which prevented NOLINTs
+  from suppressing diagnostics associated with macro arguments. This fixes
+  `Issue 55134 <https://github.com/llvm/llvm-project/issues/55134>`_.
+
 New checks
 ^^^^^^^^^^
 
