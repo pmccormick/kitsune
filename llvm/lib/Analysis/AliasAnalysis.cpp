@@ -129,7 +129,7 @@ AliasResult AAResults::alias(const MemoryLocation &LocA,
 AliasResult AAResults::alias(const MemoryLocation &LocA,
                              const MemoryLocation &LocB,
                              bool AssumeSameSpindle) {
-  AAQueryInfo AAQIP;
+  SimpleAAQueryInfo AAQIP;
   AAQIP.AssumeSameSpindle = AssumeSameSpindle;
   return alias(LocA, LocB, AAQIP);
 }
@@ -301,7 +301,7 @@ ModRefInfo AAResults::getModRefInfo(const CallBase *Call,
 ModRefInfo AAResults::getModRefInfo(const CallBase *Call,
                                     const MemoryLocation &Loc,
                                     bool SameSpindle) {
-  AAQueryInfo AAQIP;
+  SimpleAAQueryInfo AAQIP;
   AAQIP.AssumeSameSpindle = SameSpindle;
   return getModRefInfo(Call, Loc, AAQIP);
 }
@@ -883,7 +883,7 @@ ModRefInfo AAResults::getModRefInfo(const Instruction *I,
 
 ModRefInfo AAResults::getModRefInfo(const DetachInst *D,
                                     const MemoryLocation &Loc) {
-  AAQueryInfo AAQIP;
+  SimpleAAQueryInfo AAQIP;
   return getModRefInfo(D, Loc, AAQIP);
 }
 
@@ -929,7 +929,7 @@ ModRefInfo AAResults::getModRefInfo(const DetachInst *D,
 
 ModRefInfo AAResults::getModRefInfo(const SyncInst *S,
                                     const MemoryLocation &Loc) {
-  AAQueryInfo AAQIP;
+  SimpleAAQueryInfo AAQIP;
   return getModRefInfo(S, Loc, AAQIP);
 }
 

@@ -3933,10 +3933,6 @@ Sema::ActOnCilkForStmt(SourceLocation CilkForLoc, SourceLocation LParenLoc,
 
   Expr *Increment = Third.release().getAs<Expr>();
 
-  DiagnoseUnusedExprResult(First);
-  DiagnoseUnusedExprResult(Increment);
-  DiagnoseUnusedExprResult(Body);
-
   if (isa<NullStmt>(Body)) {
     Diag(CilkForLoc, diag::warn_empty_cilk_for_body);
     getCurCompoundScope().setHasEmptyLoopBodies();

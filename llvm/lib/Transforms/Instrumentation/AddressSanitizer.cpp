@@ -634,7 +634,7 @@ namespace {
 
 /// AddressSanitizer: instrument the code in module to find memory bugs.
 struct AddressSanitizer {
-  AddressSanitizer(Module &M, const StackSafetyGlobalInfo *SSGI, TaskInfo &TI,
+  AddressSanitizer(Module &M, const StackSafetyGlobalInfo *SSGI, TaskInfo *TI,
                    bool CompileKernel = false, bool Recover = false,
                    bool UseAfterScope = false,
                    AsanDetectStackUseAfterReturnMode UseAfterReturn =
@@ -645,7 +645,7 @@ struct AddressSanitizer {
         UseAfterScope(UseAfterScope || ClUseAfterScope),
         UseAfterReturn(ClUseAfterReturn.getNumOccurrences() ? ClUseAfterReturn
                                                             : UseAfterReturn),
-        TI(TI), SSGI(SSGI) {
+        SSGI(SSGI), TI(TI) {
     C = &(M.getContext());
     LongSize = M.getDataLayout().getPointerSizeInBits();
     IntptrTy = Type::getIntNTy(*C, LongSize);
@@ -749,7 +749,7 @@ private:
   Constant *AsanShadowGlobal;
 
   // Analyses
-  TaskInfo &TI;
+  TaskInfo *TI;
 
   // These arrays is indexed by AccessIsWrite, Experiment and log2(AccessSize).
   FunctionCallee AsanErrorCallback[2][2][kNumberOfAccessSizes];
@@ -1116,89 +1116,6 @@ struct FunctionStackPoisoner : public InstVisitor<FunctionStackPoisoner> {
 
 } // end anonymous namespace
 
-<<<<<<< HEAD
-=======
-void LocationMetadata::parse(MDNode *MDN) {
-  assert(MDN->getNumOperands() == 3);
-  MDString *DIFilename = cast<MDString>(MDN->getOperand(0));
-  Filename = DIFilename->getString();
-  LineNo = mdconst::extract<ConstantInt>(MDN->getOperand(1))->getLimitedValue();
-  ColumnNo =
-      mdconst::extract<ConstantInt>(MDN->getOperand(2))->getLimitedValue();
-}
-
-// FIXME: It would be cleaner to instead attach relevant metadata to the globals
-// we want to sanitize instead and reading this metadata on each pass over a
-// function instead of reading module level metadata at first.
-GlobalsMetadata::GlobalsMetadata(Module &M) {
-  NamedMDNode *Globals = M.getNamedMetadata("llvm.asan.globals");
-  if (!Globals)
-    return;
-  for (auto MDN : Globals->operands()) {
-    // Metadata node contains the global and the fields of "Entry".
-    assert(MDN->getNumOperands() == 5);
-    auto *V = mdconst::extract_or_null<Constant>(MDN->getOperand(0));
-    // The optimizer may optimize away a global entirely.
-    if (!V)
-      continue;
-    auto *StrippedV = V->stripPointerCasts();
-    auto *GV = dyn_cast<GlobalVariable>(StrippedV);
-    if (!GV)
-      continue;
-    // We can already have an entry for GV if it was merged with another
-    // global.
-    Entry &E = Entries[GV];
-    if (auto *Loc = cast_or_null<MDNode>(MDN->getOperand(1)))
-      E.SourceLoc.parse(Loc);
-    if (auto *Name = cast_or_null<MDString>(MDN->getOperand(2)))
-      E.Name = Name->getString();
-    ConstantInt *IsDynInit = mdconst::extract<ConstantInt>(MDN->getOperand(3));
-    E.IsDynInit |= IsDynInit->isOne();
-    ConstantInt *IsExcluded =
-        mdconst::extract<ConstantInt>(MDN->getOperand(4));
-    E.IsExcluded |= IsExcluded->isOne();
-  }
-}
-
-AnalysisKey ASanGlobalsMetadataAnalysis::Key;
-
-GlobalsMetadata ASanGlobalsMetadataAnalysis::run(Module &M,
-                                                 ModuleAnalysisManager &AM) {
-  return GlobalsMetadata(M);
-}
-
-PreservedAnalyses AddressSanitizerPass::run(Function &F,
-                                            AnalysisManager<Function> &AM) {
-  auto &MAMProxy = AM.getResult<ModuleAnalysisManagerFunctionProxy>(F);
-  Module &M = *F.getParent();
-  if (auto *R = MAMProxy.getCachedResult<ASanGlobalsMetadataAnalysis>(M)) {
-    TaskInfo &TI = AM.getResult<TaskAnalysis>(F);
-    const TargetLibraryInfo *TLI = &AM.getResult<TargetLibraryAnalysis>(F);
-    AddressSanitizer Sanitizer(M, R, nullptr, TI, Options.CompileKernel,
-                               Options.Recover, Options.UseAfterScope,
-                               Options.UseAfterReturn);
-    if (Sanitizer.instrumentFunction(F, TLI))
-      return PreservedAnalyses::none();
-    return PreservedAnalyses::all();
-  }
-
-  report_fatal_error(
-      "The ASanGlobalsMetadataAnalysis is required to run before "
-      "AddressSanitizer can run");
-  return PreservedAnalyses::all();
-}
-
-void AddressSanitizerPass::printPipeline(
-    raw_ostream &OS, function_ref<StringRef(StringRef)> MapClassName2PassName) {
-  static_cast<PassInfoMixin<AddressSanitizerPass> *>(this)->printPipeline(
-      OS, MapClassName2PassName);
-  OS << "<";
-  if (Options.CompileKernel)
-    OS << "kernel";
-  OS << ">";
-}
-
->>>>>>> 61c41ac6035d ([TapirTaskInfo] Updating passes to use isAllocaParallelPromotable method in TapirTaskInfo.)
 void ModuleAddressSanitizerPass::printPipeline(
     raw_ostream &OS, function_ref<StringRef(StringRef)> MapClassName2PassName) {
   static_cast<PassInfoMixin<ModuleAddressSanitizerPass> *>(this)->printPipeline(
@@ -1225,9 +1142,12 @@ PreservedAnalyses ModuleAddressSanitizerPass::run(Module &M,
   const StackSafetyGlobalInfo *const SSGI =
       ClUseStackSafety ? &MAM.getResult<StackSafetyGlobalAnalysis>(M) : nullptr;
   for (Function &F : M) {
-    AddressSanitizer FunctionSanitizer(M, SSGI, Options.CompileKernel,
-                                       Options.Recover, Options.UseAfterScope,
-                                       Options.UseAfterReturn);
+    TaskInfo *TI = nullptr;
+    if (!F.empty())
+      TI = &FAM.getResult<TaskAnalysis>(F);
+    AddressSanitizer FunctionSanitizer(
+        M, SSGI, TI, Options.CompileKernel, Options.Recover,
+        Options.UseAfterScope, Options.UseAfterReturn);
     const TargetLibraryInfo &TLI = FAM.getResult<TargetLibraryAnalysis>(F);
     Modified |= FunctionSanitizer.instrumentFunction(F, &TLI);
   }
@@ -1235,53 +1155,6 @@ PreservedAnalyses ModuleAddressSanitizerPass::run(Module &M,
   return Modified ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
-<<<<<<< HEAD
-=======
-INITIALIZE_PASS(ASanGlobalsMetadataWrapperPass, "asan-globals-md",
-                "Read metadata to mark which globals should be instrumented "
-                "when running ASan.",
-                false, true)
-
-char AddressSanitizerLegacyPass::ID = 0;
-
-INITIALIZE_PASS_BEGIN(
-    AddressSanitizerLegacyPass, "asan",
-    "AddressSanitizer: detects use-after-free and out-of-bounds bugs.", false,
-    false)
-INITIALIZE_PASS_DEPENDENCY(ASanGlobalsMetadataWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(StackSafetyGlobalInfoWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(TargetLibraryInfoWrapperPass)
-INITIALIZE_PASS_DEPENDENCY(TaskInfoWrapperPass)
-INITIALIZE_PASS_END(
-    AddressSanitizerLegacyPass, "asan",
-    "AddressSanitizer: detects use-after-free and out-of-bounds bugs.", false,
-    false)
-
-FunctionPass *llvm::createAddressSanitizerFunctionPass(
-    bool CompileKernel, bool Recover, bool UseAfterScope,
-    AsanDetectStackUseAfterReturnMode UseAfterReturn) {
-  assert(!CompileKernel || Recover);
-  return new AddressSanitizerLegacyPass(CompileKernel, Recover, UseAfterScope,
-                                        UseAfterReturn);
-}
-
-char ModuleAddressSanitizerLegacyPass::ID = 0;
-
-INITIALIZE_PASS(
-    ModuleAddressSanitizerLegacyPass, "asan-module",
-    "AddressSanitizer: detects use-after-free and out-of-bounds bugs."
-    "ModulePass",
-    false, false)
-
-ModulePass *llvm::createModuleAddressSanitizerLegacyPassPass(
-    bool CompileKernel, bool Recover, bool UseGlobalsGC, bool UseOdrIndicator,
-    AsanDtorKind Destructor) {
-  assert(!CompileKernel || Recover);
-  return new ModuleAddressSanitizerLegacyPass(
-      CompileKernel, Recover, UseGlobalsGC, UseOdrIndicator, Destructor);
-}
-
->>>>>>> 61c41ac6035d ([TapirTaskInfo] Updating passes to use isAllocaParallelPromotable method in TapirTaskInfo.)
 static size_t TypeSizeToSizeIndex(uint32_t TypeSize) {
   size_t Res = countTrailingZeros(TypeSize / 8);
   assert(Res < kNumberOfAccessSizes);
@@ -1365,7 +1238,7 @@ bool AddressSanitizer::isInterestingAlloca(const AllocaInst &AI) {
        // Promotable allocas are common under -O0.
        (!ClSkipPromotableAllocas || !isAllocaPromotable(&AI)) &&
        (!ClSkipPromotableAllocas ||
-        (TI.isSerial() || !TI.isAllocaParallelPromotable(&AI))) &&
+        (TI->isSerial() || !TI->isAllocaParallelPromotable(&AI))) &&
        // inalloca allocas are not treated as static, and we don't want
        // dynamic alloca instrumentation for them as well.
        !AI.isUsedWithInAlloca() &&
