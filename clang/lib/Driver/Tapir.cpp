@@ -72,6 +72,9 @@ clang::serializeTapirTarget(TapirTargetID Target) {
   case TapirTargetID::Cuda:
     TapirTargetStr = "cuda";
     break;
+  case TapirTargetID::GPU:
+    TapirTargetStr = "gpu";
+    break;
   case TapirTargetID::OpenCilk:
     TapirTargetStr = "opencilk";
     break;
