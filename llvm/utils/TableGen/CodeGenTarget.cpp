@@ -836,7 +836,45 @@ void CodeGenIntrinsic::setDefaultProperties(
     setProperty(Rec);
 }
 
+struct BoolField {
+  bool CodeGenIntrinsic:: *Field;
+  const char *InputName; // name in .td file
+};
+static const BoolField BoolFieldList[] = {
+  {&CodeGenIntrinsic::canThrow, "Throws"},
+  {&CodeGenIntrinsic::isNoReturn, "IntrNoReturn"},
+  {&CodeGenIntrinsic::isNoSync, "IntrNoSync"},
+  {&CodeGenIntrinsic::isNoFree, "IntrNoFree"},
+  {&CodeGenIntrinsic::isWillReturn, "IntrWillReturn"},
+  {&CodeGenIntrinsic::isCold, "IntrCold"},
+  {&CodeGenIntrinsic::isNoDuplicate, "IntrNoDuplicate"},
+  {&CodeGenIntrinsic::isConvergent, "IntrConvergent"},
+  {&CodeGenIntrinsic::isSpeculatable, "IntrSpeculatable"},
+  {&CodeGenIntrinsic::isCommutative, "Commutative"},
+  {&CodeGenIntrinsic::hasSideEffects, "IntrHasSideEffects"},
+  {&CodeGenIntrinsic::isNoMerge, "IntrNoMerge"},
+  {&CodeGenIntrinsic::isInjective, "IntrInjective"},
+  {&CodeGenIntrinsic::isStrandPure, "IntrStrandPure"},
+  {&CodeGenIntrinsic::isReducerRegister, "IntrReducerRegister"},
+  {&CodeGenIntrinsic::isHyperView, "IntrHyperView"},
+  {&CodeGenIntrinsic::isHyperToken, "IntrHyperToken"},
+  {&CodeGenIntrinsic::isReducerUnregister, "IntrReducerUnregister"},
+};
+
 void CodeGenIntrinsic::setProperty(Record *R) {
+
+  if (R->getName() == "IntrWillReturn") {
+    isWillReturn = !isNoReturn;
+    return;
+  }
+
+  for (auto &Field : BoolFieldList) {
+    if (R->getName() == Field.InputName) {
+      this->*Field.Field = true;
+      return;
+    }
+  }
+
   if (R->getName() == "IntrNoMem")
     ModRef = NoMem;
   else if (R->getName() == "IntrReadMem") {

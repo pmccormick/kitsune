@@ -3808,6 +3808,12 @@ QualType Sema::CheckTemplateIdType(TemplateName Name,
 
       return QualType();
     }
+#if 0 /* this was needed for OpenCilk, maybe no longer */
+    if (AliasTemplate->getTemplatedDecl()->hasAttrs()) {
+      const Attr *First = *AliasTemplate->getTemplatedDecl()->attr_begin();
+      Diag(First->getLocation(), diag::warn_attribute_no_decl) << First;
+    }
+#endif
   } else if (Name.isDependent() ||
              TemplateSpecializationType::anyDependentTemplateArguments(
                  TemplateArgs, Converted)) {
@@ -6020,6 +6026,10 @@ bool UnnamedLocalNoLinkageFinder::VisitBuiltinType(const BuiltinType*) {
 }
 
 bool UnnamedLocalNoLinkageFinder::VisitComplexType(const ComplexType* T) {
+  return Visit(T->getElementType());
+}
+
+bool UnnamedLocalNoLinkageFinder::VisitHyperobjectType(const HyperobjectType* T) {
   return Visit(T->getElementType());
 }
 

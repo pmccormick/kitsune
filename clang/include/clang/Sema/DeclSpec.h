@@ -1175,7 +1175,8 @@ struct DeclaratorChunk {
   DeclaratorChunk() {};
 
   enum {
-    Pointer, Reference, Array, Function, BlockPointer, MemberPointer, Paren, Pipe
+    Pointer, Reference, Array, Function, BlockPointer, MemberPointer,
+    Paren, Pipe, Hyperobject
   } Kind;
 
   /// Loc - The place where this type was defined.
@@ -1546,6 +1547,17 @@ struct DeclaratorChunk {
     void destroy() {}
   };
 
+  struct HyperobjectTypeInfo {
+    SourceLocation LParenLoc;
+    SourceLocation RParenLoc;
+    Expr *Arg[3];
+    void destroy() {
+      Arg[0] = nullptr;
+      Arg[1] = nullptr;
+      Arg[2] = nullptr;
+    }
+  };
+
   union {
     PointerTypeInfo       Ptr;
     ReferenceTypeInfo     Ref;
@@ -1554,6 +1566,7 @@ struct DeclaratorChunk {
     BlockPointerTypeInfo  Cls;
     MemberPointerTypeInfo Mem;
     PipeTypeInfo          PipeInfo;
+    HyperobjectTypeInfo   Hyper;
   };
 
   void destroy() {
@@ -1566,6 +1579,7 @@ struct DeclaratorChunk {
     case DeclaratorChunk::MemberPointer: return Mem.destroy();
     case DeclaratorChunk::Paren:         return;
     case DeclaratorChunk::Pipe:          return PipeInfo.destroy();
+    case DeclaratorChunk::Hyperobject:   return Hyper.destroy();
     }
   }
 
@@ -1680,6 +1694,22 @@ struct DeclaratorChunk {
     I.Mem.StarLoc = StarLoc;
     I.Mem.TypeQuals = TypeQuals;
     new (I.Mem.ScopeMem) CXXScopeSpec(SS);
+    return I;
+  }
+
+  static DeclaratorChunk getHyperobject(unsigned TypeQuals,
+                                        SourceLocation Loc,
+                                        SourceLocation LParen,
+                                        SourceLocation RParen,
+                                        Expr *E0, Expr *E1, Expr *E2) {
+    DeclaratorChunk I;
+    I.Kind            = Hyperobject;
+    I.Loc             = Loc;
+    I.Hyper.LParenLoc = LParen;
+    I.Hyper.RParenLoc = RParen;
+    I.Hyper.Arg[0]    = E0;
+    I.Hyper.Arg[1]    = E1;
+    I.Hyper.Arg[2]    = E2;
     return I;
   }
 
@@ -2343,6 +2373,7 @@ public:
       case DeclaratorChunk::BlockPointer:
       case DeclaratorChunk::MemberPointer:
       case DeclaratorChunk::Pipe:
+      case DeclaratorChunk::Hyperobject:
         return false;
       }
       llvm_unreachable("Invalid type chunk");
