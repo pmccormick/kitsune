@@ -746,3 +746,6 @@ defm android_memtag_heap: BB<"android-memtag-heap",
     "Instruct the dynamic loader to enable MTE protection for the heap", "">;
 defm android_memtag_mode: EEq<"android-memtag-mode",
     "Instruct the dynamic loader to start under MTE mode {async, sync, none}">;
+
+defm tapir_target:
+  Eq<"tapir-target", "Tapir target">; 

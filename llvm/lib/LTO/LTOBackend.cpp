@@ -13,6 +13,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include<iostream>
 #include "llvm/LTO/LTOBackend.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/CGSCCPassManager.h"
