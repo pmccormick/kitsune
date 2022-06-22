@@ -80,6 +80,9 @@ static bool _kitrtUseCustomLaunchParameters = false;
 static CUdevice  _kitrtCUdevice = -1;
 static CUcontext _kitrtCUcontext = nullptr;
 
+static bool   _kitrtReportTiming = false;
+static double _kitrtLastEventTime = 0.0f;
+
 
 // NOTE: Over a series of CUDA releases it is worthwhile to
 // check in on the header files for replacement versioned
@@ -307,16 +310,24 @@ void __kitrt_cuSetDefaultThreadsPerBlock(unsigned ThreadsPerBlock) {
   _kitrtDefaultThreadsPerBlock = ThreadsPerBlock;
 }
 
-void __kitrt_cuEnableEventTiming() {
+void __kitrt_cuEnableEventTiming(unsigned report) {
   _kitrtEnableTiming = true;
+  _kitrtReportTiming = report > 0;
 }
 
 void __kitrt_cuDisableEventTiming() {
   _kitrtEnableTiming = false;
+  _kitrtReportTiming = false;
+  _kitrtLastEventTime = 0.0;
 }
 
 void __kitrt_cuToggleEventTiming() {
   _kitrtEnableTiming = _kitrtEnableTiming ? false : true;
+  _kitrtLastEventTime = 0.0;
+}
+
+double __kitrt_cuGetLastEventTime() {
+  return _kitrtLastEventTime;
 }
 
 void* __kitrt_cuCreateEvent() {
@@ -516,7 +527,9 @@ void *__kitrt_cuLaunchModuleKernel(void *mod,
     cuEventSynchronize_p(stop);
     float msecs = 0;
     cuEventElapsedTime_p(&msecs, start, stop);
-    printf("%.8lg\n", msecs / 1000.0);
+    if (_kitrtReportTiming)
+      printf("%.8lg\n", msecs / 1000.0);
+    _kitrtLastEventTime = msecs / 1000.0;
     cuEventDestroy_v2_p(start);
     cuEventDestroy_v2_p(stop);
   }
@@ -577,7 +590,9 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
     cuEventSynchronize_p(stop);
     float msecs = 0;
     cuEventElapsedTime_p(&msecs, start, stop);
-    printf("%.8lg\n", msecs / 1000.0);
+    if (_kitrtReportTiming)
+      printf("%.8lg\n", msecs / 1000.0);
+    _kitrtLastEventTime = msecs / 1000.0;
     cuEventDestroy_v2_p(start);
     cuEventDestroy_v2_p(stop);
   }
@@ -641,7 +656,9 @@ void *__kitrt_cuLaunchFBKernel(const void *fatBin,
 
     float msecs = 0;
     cuEventElapsedTime_p(&msecs, start, stop);
-    printf("%.8lg\n", msecs / 1000.0);
+    if (_kitrtReportTiming)
+      printf("%.8lg\n", msecs / 1000.0);
+    _kitrtLastEventTime = msecs / 1000.0;
     cuEventDestroy_v2_p(start);
     cuEventDestroy_v2_p(stop);
   }

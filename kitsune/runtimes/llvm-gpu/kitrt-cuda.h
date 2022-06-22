@@ -80,9 +80,10 @@ extern "C" {
   /// Provide the number of threads per block to use as part of the
   /// parameters for the next kernel launch.
   void  __kitrt_cuSetDefaultThreadsPerBlock(unsigned tpb);
-  void  __kitrt_cuEnableEventTiming();
+  void  __kitrt_cuEnableEventTiming(unsigned report);
   void  __kitrt_cuDisableEventTiming();
   void  __kitrt_cuToggleEventTiming();
+  double __kitrt_cuGetLastEventTime();
   void *__kitrt_cuCreateEvent();
   void  __kitrt_cuRecordEvent(void*);
   void  __kitrt_cuSynchronizeEvent(void*);

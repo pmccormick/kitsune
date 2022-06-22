@@ -1,130 +1,90 @@
+###########
 #
-# NOTE: You will need at least Python 3.7 for this script.
+#  NOTE: You will need at least Python 3.7 for this script.
 #
-from audioop import add
+# Run the set of benchmarks in the directory and capture the results
+# in a comma separated values output file.  The file is then read in
+# and processed via pandas and matplotlib to provide a plot of the
+# performance across all the benchmarks.
+#
+# The code to gather run time data is dependent upon the output from
+# each benchmark. Any changes in the output format will likely break
+# this script.
+#
 import subprocess
 import platform
 import csv
 from datetime import datetime
+import pandas as pd
 import matplotlib.pyplot as plt
-import numpy  as np
+import matplotlib.pylab as pylab
 
 
 # Grab the local machine's architecture details and the date+time to
 # create a unique filename for this benchmark run.
 march = platform.machine()
-date_str = str(datetime.now())
-date_str = date_str.replace(' ', '_')
-date_str = date_str.replace(':', '.')
+now = datetime.now()
+date_str = now.strftime("%m-%d-%Y_%H:%M")
+print(date_str)
 
+# Number of times to run each benchmark to get an average
+# execution time.
+NUM_RUNS = 5
 
-# NOTE: For now it is best not to tweak the coarsening factor -- it makes
-# controlling the benchmark characteristics a bit too difficult...
-coarsen_factor = 1
-
-
-# Set up the benchmark parameters.  These currently include:
-#
-#    1. A set of fixed grainsize parameters for the strip mining
-#       transformation.  This is the number of items each thread
-#       will work on (think of it as an inner loop within the
-#       thread's execution).  For GPU benchmarking we need to
-#       limit this in comparison to what we would do on  CPU to
-#       avoid thrashing the cache...
-#
-#    2. Problem size (the loop trip count).
-#
-#    3. Run the kernel in a mode where data is prefetched or "prime"
-#       the memory by running the kernel twice, timing only the
-#       second executable.
-
-# Set up some values to control the code generation grainsize.
-grainsizes = []
-for cf in (2**p for p in range(0, 3)):
-  grainsizes.append(cf)
-
+# Array of problem sizes (trip counts) to benchmark.
 array_sizes = []
-for x in (2**p for p in range(27, 29)):
+for x in (2**p for p in range(27, 30)):
   array_sizes.append(x)
 
-prefetch_modes = ["explicit", "pre-launch", "none"]
-
-blocks_per_grid = 0
-
-# The various executables we will generate for the experiment identify
-# the coarsening factor and grainsize used.  The executable name is
-# controlled by the makefile in this directory and follows the following
-# convention:
-#
-#     executable.ABI.[GRAINSIZE]_[BLKS_PER_GRID]_[THREADS_PER_BLK].MARCH
-#
-# For example, 'vecadd-forall.cuda.1_4.x86_64' is using the CUDA ABI target,
-# a coarsening factor of 1, a grainsize of 4, and was compiled for a x86_64
-# host architecture (TODO: we could also add the GPU architecture used just
-# to keep the details clear).
-#
-# The code below loops through these details below and builds the corresponding
-# executables based on the various grainsize parameters above.
-additional_executables = []
-for gs in grainsizes:
-  make_arg0 = "make"
-  make_arg1 = "GRAINSIZE=" + str(gs)
-  # make_arg2 = "BLOCKS_PER_GRID=" + str(blocks_per_grid)
-  # make_arg3 = "THREADS_PER_BLOCK=" + str(tbp)
-  print("running: ", make_arg0, make_arg1)
-  result = subprocess.run([make_arg0, make_arg1], capture_output=True, text=True)
-  exe_name = "vecadd-forall.cuda."+ str(gs) + "." + march
-  additional_executables.append(exe_name)
-
-# The benchmarking expects two other executables to have been created.  Both
-# are CUDA versions of the benchmark and one is compiled by Clang and the other
-# by nvcc.
 executables = ["vecadd.clang."+march,
-               "vecadd.nvcc."+march, 
-	       "vecadd-kokkos."+march]
-executables = executables + additional_executables
-
-# The benchmark run will have a CSV file that is automatically created with the
-# captured performance of the various parameters set by either the compilation
-# of the executables above or by command line arguments to each executable.
+               "vecadd.nvcc."+march,
+               "vecadd-kokkos."+march,
+               "vecadd-forall.cuda."+march]
 csv_filename = str("vecadd-benchmark-") + march + "-" + date_str + ".csv";
-header = ["Number of Elements"]
-for e in executables:
-  header.append(e + " kernel")
-  header.append(e + " overall")
-benchmark_data = {}
+
+header = ['Size', 'Benchmark', 'Time']
 
 with open(csv_filename, 'w', newline='') as csvfile:
-
   writer = csv.writer(csvfile)
-  writer.writerow([header])
+  writer.writerow(header)
   row=[]
 
-  for prefetch in prefetch_modes:
-    print("benchmarking with prefetch mode '", prefetch, "'")
-    for num in array_sizes:
-      # benchmark_data[num] = []
+  for num in array_sizes:
+    print("problem size: ", "{:,}".format(num))
+    for exe in executables:
       row.append(num)
-      for exe in executables:
-        print(exe)
-        arg0 = "./" + exe
-        print("-----------")
-        print(arg0, str(num), prefetch)
-        kernel_runtime = 0.0
-        overall_runtime = 0.0
-        for rc in range(5):
-          result = subprocess.run([arg0, str(num), prefetch], capture_output=True, text=True)
-          kernel_runtime = kernel_runtime + float(result.stdout)
-          overall_runtime = overall_runtime + float(result.stderr)
-        kernel_runtime = kernel_runtime / 5.0
-        overall_runtime = overall_runtime / 5.0
-        print("  kernel runtime:", kernel_runtime)
-        print("  overall runtime:", overall_runtime)
-        print("-----------");
-        row.append(kernel_runtime)
-        row.append(overall_runtime)
-      print("***")
+      row.append(exe)
+      print("  ", exe)
+      arg0 = "./" + exe
+      kernel_runtime = 0.0
+      overall_runtime = 0.0
+      print("    ", end="")
+      for rc in range(NUM_RUNS):
+        result = subprocess.run([arg0, str(num)], capture_output=True, text=True)
+        output = result.stdout.split()
+        kernel_runtime = kernel_runtime + float(output[5])
+        overall_runtime = overall_runtime + float(output[8])
+        print("#", end="",flush=True)
+      print("")
+      kernel_runtime = kernel_runtime / NUM_RUNS
+      overall_runtime = overall_runtime / NUM_RUNS
+      print("    average kernel runtime:", kernel_runtime)
+      print("    average overall runtime:", overall_runtime, flush=True)
+      row.append(kernel_runtime)
       writer.writerow(row)
       row.clear()
+    print("")
 
 print("benchmark results saved to: ", csv_filename)
+
+
+df = pd.read_csv(csv_filename)
+plotdf = df.pivot(index='Size', columns='Benchmark', values='Time')
+plotdf.plot(kind='bar', figsize=(15, 13))
+plt.xlabel('Array Size (# of elements)', fontsize=14, )
+plt.ylabel('Kernel Execution Time (secs)', fontsize=14)
+plt.title('Vector Addition Benchmark', fontsize=20, fontweight='bold')
+pdf_name = str("plots/vecadd-benchmark-") + march + "-" + date_str + ".pdf"
+plt.savefig(pdf_name)
+jpg_name = str("plots/vecadd-benchmark-") + march + "-" + date_str + ".jpg"
+plt.savefig(jpg_name)

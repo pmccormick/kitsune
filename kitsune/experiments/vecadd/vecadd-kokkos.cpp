@@ -38,9 +38,10 @@ void random_fill(DualViewVector &data, size_t N) {
 
 int main (int argc, char* argv[]) {
   size_t size = VEC_SIZE;
-  if (argc > 1) {
+  if (argc > 1)
     size = atol(argv[1]);
-  }
+
+  fprintf(stdout, "problem size: %ld\n", size);
 
   Kokkos::initialize(argc, argv); {
     timer r;
@@ -59,18 +60,16 @@ int main (int argc, char* argv[]) {
     C.sync_device();
     C.modify_device();
     timer t;
-    Kokkos::parallel_for(size, KOKKOS_LAMBDA(const int i) { 
-      C.d_view(i) = A.d_view(i) + B.d_view(i); 
+    Kokkos::parallel_for(size, KOKKOS_LAMBDA(const int i) {
+      C.d_view(i) = A.d_view(i) + B.d_view(i);
       }
     );
     Kokkos::fence();
     double loop_secs = t.seconds();
-    fprintf(stdout, "%7lg\n", loop_secs);
+    fprintf(stdout, "kernel runtime: %7lg\n", loop_secs);
     C.sync_host();
     A.sync_host();
     B.sync_host();
-    double rtime = r.seconds();
-    fprintf(stderr, "%7lg\n", rtime);
 
     // Sanity check the results...
     size_t error_count = 0;
@@ -82,6 +81,10 @@ int main (int argc, char* argv[]) {
 
     if (error_count > 0)
       printf("bad result!\n");
+    else {
+      double rtime = r.seconds();
+      fprintf(stdout, "total runtime: %7lg\n", rtime);
+    }
   }
 
   Kokkos::finalize();
