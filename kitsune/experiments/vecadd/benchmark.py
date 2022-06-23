@@ -3,13 +3,13 @@
 #  NOTE: You will need at least Python 3.7 for this script.
 #
 # Run the set of benchmarks in the directory and capture the results
-# in a comma separated values output file.  The file is then read in
-# and processed via pandas and matplotlib to provide a plot of the
-# performance across all the benchmarks.
+# in a CSV output file.  The file is then read and processed via pandas
+# and matplotlib to provide a plot of the performance across all the
+# benchmarks.
 #
-# The code to gather run time data is dependent upon the output from
-# each benchmark. Any changes in the output format will likely break
-# this script.
+# The code to gather run time data is dependent upon the output format
+# from the benchmarks.  Any changes to the output format will likely
+# break this script.
 #
 import subprocess
 import platform
@@ -76,7 +76,6 @@ with open(csv_filename, 'w', newline='') as csvfile:
     print("")
 
 print("benchmark results saved to: ", csv_filename)
-
 
 df = pd.read_csv(csv_filename)
 plotdf = df.pivot(index='Size', columns='Benchmark', values='Time')

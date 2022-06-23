@@ -17,11 +17,12 @@
 #include "kitsune/timer.h"
 #include "kitsune/llvm-gpu-abi/llvm-gpu.h"
 #include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
-
 #include "Kokkos_DualView.hpp"
 
 typedef Kokkos::DualView<float*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> SaxpyDualView;
+
 using namespace std;
+using namespace kitsune;
 
 
 const size_t DEFAULT_SIZE = 1 << 26;
@@ -30,7 +31,7 @@ const size_t DEFAULT_SIZE = 1 << 26;
 // global constants with a dynamic allocation/assignment.  As a result
 // we have to stuff in some CUDA-centric pieces; perhaps Kokkos has
 // some equivalent to this that is similar to KOKKOS_INLINE_FUNCTION?
-// For now we will just use CUDA syntax to do this... 
+// For now we will just use CUDA syntax to do this...
 __managed__ __device__ float DEFAULT_X_VALUE;
 __managed__ __device__ float DEFAULT_Y_VALUE;
 __managed__ __device__ float DEFAULT_A_VALUE;
@@ -40,54 +41,58 @@ bool check_saxpy(const SaxpyDualView &v, size_t N) {
   for(size_t i = 0; i < N; i++) {
     err = err + fabs(v.h_view(i) - (DEFAULT_A_VALUE * DEFAULT_X_VALUE + DEFAULT_Y_VALUE));
   }
-  fprintf(stderr, "Error: %f\n", err);
   return err == 0.0f;
 }
 
 int main(int argc, char *argv[]) {
   int retval;
-
   // We must initialize these here -- they will be paged to the
   // GPU given they are managed...
   DEFAULT_X_VALUE = rand() % 1000000;
   DEFAULT_Y_VALUE = rand() % 1000000;
   DEFAULT_A_VALUE = rand() % 1000000;
-  
+
   size_t N = DEFAULT_SIZE;
-  if (argc > 1) 
+  if (argc > 1)
     N = atol(argv[1]);
-  
+
+  fprintf(stdout, "problem size: %ld\n", N);
+
+  timer r;
+
   Kokkos::initialize(argc, argv); {
     SaxpyDualView x = SaxpyDualView("x", N);
     SaxpyDualView y = SaxpyDualView("y", N);
 
     x.modify_device();
     y.modify_device();
-    kitsune::timer t;    
+    kitsune::timer t;
     Kokkos::parallel_for("init", N, KOKKOS_LAMBDA(const int &i) {
-	x.d_view(i) = DEFAULT_X_VALUE;
-	y.d_view(i) = DEFAULT_Y_VALUE;
-      });
+      x.d_view(i) = DEFAULT_X_VALUE;
+      y.d_view(i) = DEFAULT_Y_VALUE;
+    });
     Kokkos::fence();
-    double loop_secs = t.seconds();
-    std::cout << loop_secs << std::endl;
-
+    double ktime = t.seconds();
     t.reset();
     y.modify_device();
     Kokkos::parallel_for("saxpy", N, KOKKOS_LAMBDA(const int &i) {
-	y.d_view(i) = DEFAULT_A_VALUE * x.d_view(i) + y.d_view(i);
-      });
+      y.d_view(i) = DEFAULT_A_VALUE * x.d_view(i) + y.d_view(i);
+    });
     Kokkos::fence();
-    loop_secs = t.seconds();
-    std::cout << loop_secs << std::endl;
+    ktime = ktime + t.seconds();
+    fprintf(stdout, "kernel time: %7.6g\n", ktime);
     y.sync_host();
-    
-    if (! check_saxpy(y, N)) 
+
+    if (! check_saxpy(y, N)) {
+      abort();
       retval = 1;
-    else
+    } else {
+      double rtime = r.seconds();
+      fprintf(stdout, "total runtime: %7.6g\n", rtime);
       retval = 0;
-  }
-  Kokkos::finalize();
+    }
+  } Kokkos::finalize();
+
   return retval;
 }
 

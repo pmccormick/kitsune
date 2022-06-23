@@ -194,7 +194,7 @@ int main(int argc, char **argv)
   //fprintf(stderr, "sample count %d\n", samplesCount);
   Pixel *img = (Pixel*)__kitrt_cuMemAllocManaged(sizeof(Pixel) * imageWidth * imageHeight);
 
-  __kitrt_cuEnableEventTiming();
+  __kitrt_cuEnableEventTiming(1);
   unsigned totalPixels = imageWidth * imageHeight;
   forall(size_t i = 0; i < totalPixels; ++i) { 
     int x = i % imageWidth;

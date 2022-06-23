@@ -23,7 +23,7 @@ saxpy-forall.cuda.${host_arch}: saxpy-forall.cpp
 	${clangxx} -ftime-report ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 
 saxpy-kokkos.${host_arch}: saxpy-kokkos.cpp
-	${nvcc_wrapper} ${kokkos_cu_flags} -time=kokkos.time -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+	${nvcc_wrapper} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
 clean:
 	-rm -f *.${host_arch}

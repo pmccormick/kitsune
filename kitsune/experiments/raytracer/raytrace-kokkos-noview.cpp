@@ -190,7 +190,7 @@ int main(int argc, char **argv)
     if (argc > 1 )
       samplesCount = atoi(argv[1]);
 
-    __kitrt_cuEnableEventTiming();    
+    __kitrt_cuEnableEventTiming(1);    
     Kokkos::parallel_for(imageWidth * imageHeight, KOKKOS_LAMBDA(const unsigned int i) {
 	int x = i % imageWidth;
 	int y = i / imageWidth;

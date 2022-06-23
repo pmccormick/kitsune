@@ -15,10 +15,12 @@
 #include <stdlib.h>
 #include <math.h>
 #include <kitsune.h>
+#include "kitsune/timer.h"
 #include "kitsune/llvm-gpu-abi/llvm-gpu.h"
 #include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
 
 using namespace std;
+using namespace kitsune;
 
 const size_t DEFAULT_SIZE = 1 << 26;
 const float DEFAULT_X_VALUE = rand() % 1000000;
@@ -30,31 +32,41 @@ bool check_saxpy(const float *v, size_t N) {
   for(size_t i = 0; i < N; i++) {
     err = err + fabs(v[i] - (DEFAULT_A_VALUE * DEFAULT_X_VALUE + DEFAULT_Y_VALUE));
   }
-  fprintf(stderr, "Error: %f\n", err);
   return err == 0.0f;
 }
 
 int main(int argc, char *argv[]) {
   size_t N = DEFAULT_SIZE;
-  if (argc > 1) 
+  if (argc > 1)
     N = atol(argv[1]);
-  
+
+  fprintf(stdout, "problem size: %ld\n", N);
+
+  timer r;
+
   float *x = (float*)__kitrt_cuMemAllocManaged(sizeof(float) * N);
   float *y = (float*)__kitrt_cuMemAllocManaged(sizeof(float) * N);
 
-  __kitrt_cuEnableEventTiming();    
+  __kitrt_cuEnableEventTiming(0);
   forall(size_t i = 0; i < N; i++) {
     x[i] = DEFAULT_X_VALUE;
     y[i] = DEFAULT_Y_VALUE;
   }
-  
+  double time = __kitrt_cuGetLastEventTime();
   forall(size_t i = 0; i < N; i++) {
     y[i] = DEFAULT_A_VALUE * x[i] + y[i];
   }
+  time = time + __kitrt_cuGetLastEventTime();
+  printf("kernel time: %7.6g\n", time);
 
-  if (! check_saxpy(y, N)) 
+  if (! check_saxpy(y, N)) {
+    abort();
     return 1;
-  else
+  }
+  else {
+    double rtime = r.seconds();
+    fprintf(stdout, "total runtime: %7.6g\n", rtime);
     return 0;
+  }
 }
 
