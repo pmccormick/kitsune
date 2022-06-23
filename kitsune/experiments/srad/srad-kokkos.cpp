@@ -139,11 +139,11 @@ int main(int argc, char* argv[])
     random_matrix(I, rows, cols);
     I.modify_host();
 
+    ktimer.reset();
     I.sync_device();
     J.sync_device();
-    ktimer.reset();
     Kokkos::parallel_for("size_I", size_I, KOKKOS_LAMBDA(const int &k) {
-      J.d_view(k) = (float)exp(I.d_view(k)) ;
+      J.d_view(k) = (float)exp(I.d_view(k));
     });
     etime = ktimer.seconds();
     ktime += etime;
@@ -155,7 +155,6 @@ int main(int argc, char* argv[])
     iS.sync_device();
     jE.sync_device();
     jW.sync_device();
-
 
     for (int iter=0; iter< niter; iter++) {
       sum=0; sum2=0;
@@ -174,11 +173,12 @@ int main(int argc, char* argv[])
       q0sqr   = varROI / (meanROI*meanROI);
 
       ktimer.reset();
+      J.sync_device();
       Kokkos::parallel_for("loop1", rows, KOKKOS_LAMBDA(const int &i) {
         for (int j = 0; j < cols; j++) {
           int k = i * cols + j;
           float Jc = J.d_view(k);
-          // directional derivates
+          // directional derivatives
           dN.d_view(k) = J.d_view(iN.d_view(i) * cols + j) - Jc;
           dS.d_view(k) = J.d_view(iS.d_view(i) * cols + j) - Jc;
           dW.d_view(k) = J.d_view(i * cols + jW.d_view(j)) - Jc;

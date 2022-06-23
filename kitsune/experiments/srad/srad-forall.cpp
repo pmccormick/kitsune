@@ -105,9 +105,9 @@ int main(int argc, char* argv[])
   double ktime = etime;
   fprintf(stderr, "%g\n", etime);
 
-  forall(int i=0; i < cols; i++) {
-    jW[i] = i-1;
-    jE[i] = i+1;
+  forall(int j=0; j < cols; j++) {
+    jW[j] = j-1;
+    jE[j] = j+1;
   }
   etime = __kitrt_cuGetLastEventTime();
   ktime += etime;
