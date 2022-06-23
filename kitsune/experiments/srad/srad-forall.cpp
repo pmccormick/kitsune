@@ -3,15 +3,18 @@
 #include <string.h>
 #include <math.h>
 #include <chrono>
-
 #include <kitsune.h>
+#include "kitsune/timer.h"
 #include "kitsune/llvm-gpu-abi/llvm-gpu.h"
 #include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
 
+using namespace std;
+using namespace kitsune;
+
 void random_matrix(float *I, int rows, int cols) {
   srand(7);
-  for( int i = 0 ; i < rows ; i++){
-    for ( int j = 0 ; j < cols ; j++){
+  for(int i = 0 ; i < rows ; i++) {
+    for (int j = 0 ; j < cols ; j++) {
       I[i * cols + j] = rand()/(float)RAND_MAX ;
     }
   }
@@ -33,7 +36,7 @@ void usage(int argc, char **argv)
 
 int main(int argc, char* argv[])
 {
-  int rows, cols, size_I, size_R, niter = 10, iter, k;
+  int rows, cols, size_I, size_R, niter = 10;
   float *I, *J, q0sqr, sum, sum2, tmp, meanROI,varROI ;
   float Jc, G2, L, num, den, qsqr;
   int *iN,*iS,*jE,*jW;
@@ -42,7 +45,6 @@ int main(int argc, char* argv[])
   float cN,cS,cW,cE;
   float *c, D;
   float lambda;
-  int i, j;
 
   if (argc == 9) {
     rows = atoi(argv[1]); //number of rows in the domain
@@ -72,6 +74,10 @@ int main(int argc, char* argv[])
     usage(argc, argv);
   }
 
+  fprintf(stderr, "row/col size: %d/%d\n", rows, cols);
+
+  timer r;
+
   size_I = cols * rows;
   size_R = (r2-r1+1)*(c2-c1+1);
 
@@ -89,94 +95,113 @@ int main(int argc, char* argv[])
   dW = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
   dE = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
 
-  forall(int i=0; i< rows; i++) {
+  __kitrt_cuEnableEventTiming(0);
+  double etime;
+  forall(int i=0; i < rows; i++) {
     iN[i] = i-1;
     iS[i] = i+1;
   }
+  etime = __kitrt_cuGetLastEventTime();
+  double ktime = etime;
+  fprintf(stderr, "%g\n", etime);
 
-  forall(int j=0; j< cols; j++) {
-    jW[j] = j-1;
-    jE[j] = j+1;
+  forall(int i=0; i < cols; i++) {
+    jW[i] = i-1;
+    jE[i] = i+1;
   }
+  etime = __kitrt_cuGetLastEventTime();
+  ktime += etime;
+  fprintf(stderr, "%g\n", etime);
 
   iN[0] = 0;
   iS[rows-1] = rows-1;
   jW[0] = 0;
   jE[cols-1] = cols-1;
 
-  printf("Randomizing the input matrix\n");
   random_matrix(I, rows, cols);
 
   forall(int k = 0;  k < size_I; k++ ) {
     J[k] = (float)exp(I[k]) ;
   }
+  etime = __kitrt_cuGetLastEventTime();
+  ktime += etime;
+  fprintf(stderr, "%g\n", etime);
 
-  printf("Start the SRAD main loop\n");
-  auto start = std::chrono::steady_clock::now();
+  for (int iter=0; iter < niter; iter++) {
 
-  for (iter=0; iter< niter; iter++){
     sum=0; sum2=0;
-    for (i=r1; i<=r2; i++) {
-      for (j=c1; j<=c2; j++) {
-	tmp   = J[i * cols + j];
-	sum  += tmp ;
-	sum2 += tmp*tmp;
+
+    for (int i=r1; i <= r2; i++) {
+      for (int j = c1; j<=c2; j++) {
+        tmp   = J[i * cols + j];
+        sum  += tmp ;
+        sum2 += tmp*tmp;
       }
     }
+
     meanROI = sum / size_R;
     varROI  = (sum2 / size_R) - meanROI*meanROI;
     q0sqr   = varROI / (meanROI*meanROI);
 
-    forall(int i = 0 ; i < rows ; i++) {
+    forall(int i = 0 ; i < rows; i++) {
       for (int j = 0; j < cols; j++) {
-	int k = i * cols + j;
-	float Jc = J[k];
-	// directional derivates
-	dN[k] = J[iN[i] * cols + j] - Jc;
-	dS[k] = J[iS[i] * cols + j] - Jc;
-	dW[k] = J[i * cols + jW[j]] - Jc;
-	dE[k] = J[i * cols + jE[j]] - Jc;
+        int k = i * cols + j;
+        float Jc = J[k];
+        // directional derivatives
+        dN[k] = J[iN[i] * cols + j] - Jc;
+        dS[k] = J[iS[i] * cols + j] - Jc;
+        dW[k] = J[i * cols + jW[j]] - Jc;
+        dE[k] = J[i * cols + jE[j]] - Jc;
 
-	float G2 = (dN[k]*dN[k] + dS[k]*dS[k]
+        float G2 = (dN[k]*dN[k] + dS[k]*dS[k]
                     + dW[k]*dW[k] + dE[k]*dE[k]) / (Jc*Jc);
 
-	float L = (dN[k] + dS[k] + dW[k] + dE[k]) / Jc;
+        float L = (dN[k] + dS[k] + dW[k] + dE[k]) / Jc;
 
-	float num  = (0.5*G2) - ((1.0/16.0)*(L*L)) ;
-	float den  = 1 + (.25*L);
-	float qsqr = num/(den*den);
+        float num  = (0.5*G2) - ((1.0/16.0)*(L*L)) ;
+        float den  = 1 + (.25*L);
+        float qsqr = num/(den*den);
 
-	// diffusion coefficent (equ 33)
-	den = (qsqr-q0sqr) / (q0sqr * (1+q0sqr)) ;
-	c[k] = 1.0 / (1.0+den) ;
+        // diffusion coefficient (equ 33)
+        den = (qsqr-q0sqr) / (q0sqr * (1+q0sqr)) ;
+        c[k] = 1.0 / (1.0+den) ;
 
-	// saturate diffusion coefficent
-	if (c[k] < 0) {c[k] = 0;}
-	else if (c[k] > 1) {c[k] = 1;}
+        // saturate diffusion coefficient
+        if (c[k] < 0)
+          c[k] = 0.0;
+        else if (c[k] > 1)
+          c[k] = 1.0;
       }
     }
+    etime = __kitrt_cuGetLastEventTime();
+    ktime += etime;
+    fprintf(stderr, "1. %g (%g)\n", etime, ktime);
 
     forall(int i = 0; i < rows; i++) {
       for (int j = 0; j < cols; j++) {
-	// current index
-	int k = i * cols + j;
+        // current index
+        int k = i * cols + j;
 
-	// diffusion coefficent
-	float cN = c[k];
-	float cS = c[iS[i] * cols + j];
-	float cW = c[k];
-	float cE = c[i * cols + jE[j]];
+        // diffusion coefficient
+        float cN = c[k];
+        float cS = c[iS[i] * cols + j];
+        float cW = c[k];
+        float cE = c[i * cols + jE[j]];
 
-	// divergence (equ 58)
-	float D = cN * dN[k] + cS * dS[k] + cW * dW[k] + cE * dE[k];
-	// image update (equ 61)
-	J[k] = J[k] + 0.25*lambda*D;
+        // divergence (equ 58)
+        float D = cN * dN[k] + cS * dS[k] + cW * dW[k] + cE * dE[k];
+        // image update (equ 61)
+        J[k] = J[k] + 0.25*lambda*D;
       }
     }
+    etime = __kitrt_cuGetLastEventTime();
+    ktime += etime;
+    fprintf(stderr, "2. %g (%g)\n", etime, ktime);
   }
-  auto end = std::chrono::steady_clock::now();
-  printf("Computation Done: %.12f s\n",
-	 std::chrono::duration<double>(end-start).count());
+
+  double rtime = r.seconds();
+  fprintf(stdout, "kernel times: %7.6g\n", ktime);
+  fprintf(stdout, "total runtime: %7.6g\n", rtime);
 
   FILE *fp = fopen("srad-forall.dat", "wb");
   if (fp != NULL) {

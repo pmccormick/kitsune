@@ -4,8 +4,7 @@ include ../kokkos.mk
 
 # General (shared) flags (see common.mk)
 clang_flags=${cxx_flags} ${opt_flags} ${clang_info_flags}
-#tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-arch=${NVARCH} -I${CUDA_HOME}/include 
-tapir_cu_flags=-ftapir=cuda -mllvm -cuabi-arch=${NVARCH} -I${CUDA_HOME}/include 
+tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-arch=${NVARCH} -I${CUDA_HOME}/include 
 tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1
 ####
 

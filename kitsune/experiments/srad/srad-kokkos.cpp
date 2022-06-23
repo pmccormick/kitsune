@@ -3,14 +3,14 @@
 #include <string.h>
 #include <math.h>
 #include <chrono>
-
-#include "kitsune/llvm-gpu-abi/llvm-gpu.h"
-#include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
-
+#include "kitsune/timer.h"
 #include "Kokkos_DualView.hpp"
+
+using namespace kitsune;
 
 typedef Kokkos::DualView<float*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> FloatDualView;
 typedef Kokkos::DualView<int*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> IntDualView;
+
 
 
 void random_matrix(FloatDualView &I, int rows, int cols) {
@@ -40,11 +40,10 @@ int main(int argc, char* argv[])
 {
   Kokkos::initialize(argc, argv); {
 
-    int rows, cols, size_I, size_R, niter = 10, iter;
+    int rows, cols, size_I, size_R, niter = 10;
     float q0sqr, sum, sum2, tmp, meanROI,varROI ;
     int r1, r2, c1, c2;
     float lambda;
-    int i, j;
 
     if (argc == 9) {
       rows = atoi(argv[1]); //number of rows in the domain
@@ -75,6 +74,9 @@ int main(int argc, char* argv[])
       usage(argc, argv);
     }
 
+    fprintf(stderr, "row/col size: %d/%d\n", rows, cols);
+    timer r;
+
     size_I = cols * rows;
     size_R = (r2-r1+1)*(c2-c1+1);
 
@@ -92,17 +94,29 @@ int main(int argc, char* argv[])
     FloatDualView dW = FloatDualView("dW", size_I);
     FloatDualView dE = FloatDualView("dE", size_I);
 
+    double ktime = 0.0;
+    double etime = 0.0;
+    timer ktimer;
     Kokkos::parallel_for("rows", rows, KOKKOS_LAMBDA(const int &i) {
       iN.d_view(i) = i-1;
       iS.d_view(i) = i+1;
     });
+    etime = ktimer.seconds();
+    ktime = etime;
+    fprintf(stderr, "%g\n", etime);
+
     iN.modify_device();
     iS.modify_device();
 
-    Kokkos::parallel_for("cols", cols, KOKKOS_LAMBDA(const int &i) {
+    ktimer.reset();
+    Kokkos::parallel_for("cols", cols, KOKKOS_LAMBDA(const int &j) {
       jW.d_view(j) = j-1;
       jE.d_view(j) = j+1;
     });
+    etime = ktimer.seconds();
+    ktime += ktimer.seconds();
+    fprintf(stderr, "%g\n", etime);
+
     jW.modify_device();
     jE.modify_device();
 
@@ -122,30 +136,33 @@ int main(int argc, char* argv[])
     jE.h_view(cols-1) = cols-1;
     jE.modify_host();
 
-    printf("Randomizing the input matrix\n");
     random_matrix(I, rows, cols);
     I.modify_host();
 
     I.sync_device();
+    J.sync_device();
+    ktimer.reset();
     Kokkos::parallel_for("size_I", size_I, KOKKOS_LAMBDA(const int &k) {
       J.d_view(k) = (float)exp(I.d_view(k)) ;
     });
+    etime = ktimer.seconds();
+    ktime += etime;
+    fprintf(stderr, "%g\n", etime);
     J.modify_device();
-
-    printf("Start the SRAD main loop\n");
-    auto start = std::chrono::steady_clock::now();
 
     J.sync_device();
     iN.sync_device();
     iS.sync_device();
     jE.sync_device();
     jW.sync_device();
-    for (iter=0; iter< niter; iter++) {
+
+
+    for (int iter=0; iter< niter; iter++) {
       sum=0; sum2=0;
 
       J.sync_host();
-      for (int i=r1; i<=r2; i++) {
-        for (int j=c1; j<=c2; j++) {
+      for (int i=r1; i<= r2; i++) {
+        for (int j=c1; j<= c2; j++) {
           tmp   = J.h_view(i * cols + j);
           sum  += tmp ;
           sum2 += tmp*tmp;
@@ -156,6 +173,7 @@ int main(int argc, char* argv[])
       varROI  = (sum2 / size_R) - meanROI*meanROI;
       q0sqr   = varROI / (meanROI*meanROI);
 
+      ktimer.reset();
       Kokkos::parallel_for("loop1", rows, KOKKOS_LAMBDA(const int &i) {
         for (int j = 0; j < cols; j++) {
           int k = i * cols + j;
@@ -177,19 +195,22 @@ int main(int argc, char* argv[])
           float den  = 1 + (.25*L);
           float qsqr = num/(den*den);
 
-          // diffusion coefficent (equ 33)
+          // diffusion coefficient (equ 33)
           den = (qsqr-q0sqr) / (q0sqr * (1+q0sqr));
           c.d_view(k) = 1.0 / (1.0+den);
-          // saturate diffusion coefficent
+          // saturate diffusion coefficient
           if (c.d_view(k) < 0)
             c.d_view(k) = 0.0;
           else if (c.d_view(k) > 1)
             c.d_view(k) = 1.0;
         }
       });
+      etime = ktimer.seconds();
+      ktime += etime;
+      fprintf(stderr, "1. %g (%g)\n", etime, ktime);
 
+      ktimer.reset();
       Kokkos::parallel_for("loop2", rows, KOKKOS_LAMBDA(const int &i) {
-
         for (int j = 0; j < cols; j++) {
           // current index
           int k = i * cols + j;
@@ -207,13 +228,15 @@ int main(int argc, char* argv[])
           J.d_view(k) = J.d_view(k) + 0.25*lambda*D;
         }
       });
-
+      etime = ktimer.seconds();
+      ktime += etime;
+      fprintf(stderr, "2. %g (%g)\n", etime, ktime);
       J.modify_device();
     }
 
-    auto end = std::chrono::steady_clock::now();
-    printf("Computation Done: %.12f s\n",
-    std::chrono::duration<double>(end-start).count());
+    double rtime = r.seconds();
+    fprintf(stdout, "kernel times: %7.6g\n", ktime);
+    fprintf(stdout, "total runtime: %7.6g\n", rtime);
 
     J.sync_host();
     auto V = J.view_host();

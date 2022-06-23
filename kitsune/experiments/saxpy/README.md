@@ -30,4 +30,4 @@ There are two versions of the benchmark:
 
 
 
-![Vector Addition Plot](plots/saxpy-benchmark-x86_64-06-23-2022_10:20.jpg "Vector Addition Performance Plot")
+![Saxpy Plot](plots/saxpy-benchmark-x86_64-06-23-2022_10:20.jpg "Saxpy Performance Plot")
