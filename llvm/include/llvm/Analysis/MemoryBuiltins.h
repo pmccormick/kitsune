@@ -112,7 +112,8 @@ bool isRemovableAlloc(const CallBase *V, const TargetLibraryInfo *TLI);
 /// built-in knowledge based on fuction names/signatures or allocalign
 /// attributes. Note: the Value returned may not indicate a valid alignment, per
 /// the definition of the allocalign attribute.
-Value *getAllocAlignment(const CallBase *V, const TargetLibraryInfo *TLI);
+Value *getAllocAlignment(const CallBase *V, const TargetLibraryInfo *TLI,
+                         bool IgnoreBuiltinAttr = false);
 
 /// Return the size of the requested allocation. With a trivial mapper, this is
 /// similar to calling getObjectSize(..., Exact), but without looking through
@@ -131,6 +132,11 @@ Optional<APInt> getAllocSize(
 Constant *getInitialValueOfAllocation(const Value *V,
                                       const TargetLibraryInfo *TLI,
                                       Type *Ty);
+
+/// Gets the size arguments for the requested allocation.
+std::pair<Value *, Value *> getAllocSizeArgs(const CallBase *CB,
+                                             const TargetLibraryInfo *TLI,
+                                             bool IgnoreBuiltinAttr = false);
 
 /// If a function is part of an allocation family (e.g.
 /// malloc/realloc/calloc/free), return the identifier for its family
