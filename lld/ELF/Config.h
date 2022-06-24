@@ -22,6 +22,7 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/GlobPattern.h"
 #include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include <atomic>
 #include <memory>
 #include <vector>
@@ -123,6 +124,7 @@ struct Configuration {
   llvm::StringRef ltoSampleProfile;
   llvm::StringRef mapFile;
   llvm::StringRef outputFile;
+  llvm::StringRef opencilkABIBitcodeFile;
   llvm::StringRef optRemarksFilename;
   llvm::Optional<uint64_t> optRemarksHotnessThreshold = 0;
   llvm::StringRef optRemarksPasses;
@@ -133,6 +135,7 @@ struct Configuration {
   llvm::StringRef printSymbolOrder;
   llvm::StringRef soName;
   llvm::StringRef sysroot;
+  llvm::TapirTargetID tapirTarget;
   llvm::StringRef thinLTOCacheDir;
   llvm::StringRef thinLTOIndexOnlyArg;
   llvm::StringRef whyExtract;
