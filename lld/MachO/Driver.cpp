@@ -1350,6 +1350,10 @@ bool macho::link(ArrayRef<const char *> argsArr, llvm::raw_ostream &stdoutOS,
   config->callGraphProfileSort = args.hasFlag(
       OPT_call_graph_profile_sort, OPT_no_call_graph_profile_sort, true);
   config->printSymbolOrder = args.getLastArgValue(OPT_print_symbol_order);
+  config->tapirTarget =
+      args::parseTapirTarget(args.getLastArgValue(OPT_tapir_target));
+  config->opencilkABIBitcodeFile =
+      args.getLastArgValue(OPT_opencilk_abi_bitcode);
 
   for (const Arg *arg : args.filtered(OPT_alias)) {
     config->aliasedSymbols.push_back(

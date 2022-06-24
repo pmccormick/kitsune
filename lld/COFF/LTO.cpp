@@ -84,7 +84,8 @@ static lto::Config createConfig() {
   c.CGOptLevel = args::getCGOptLevel(config->ltoo);
   c.AlwaysEmitRegularLTOObj = !config->ltoObjPath.empty();
   c.DebugPassManager = config->ltoDebugPassManager;
-  c.TapirTarget = config->tapirTarget;
+  if (args::validTapirTarget(config->tapirTarget))
+    c.TapirTarget = config->tapirTarget;
   c.OpenCilkABIBitcodeFile = std::string(config->opencilkABIBitcodeFile);
   c.CSIRProfile = std::string(config->ltoCSProfileFile);
   c.RunCSIRInstr = config->ltoCSProfileGenerate;
