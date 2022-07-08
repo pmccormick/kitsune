@@ -681,6 +681,12 @@ CodeGenIntrinsic::CodeGenIntrinsic(Record *R,
   isConvergent = false;
   isSpeculatable = false;
   hasSideEffects = false;
+  isInjective = false;
+  isStrandPure = false;
+  isHyperView = false;
+  isHyperToken = false;
+  isReducerRegister = false;
+  isReducerUnregister = false;
 
   if (DefName.size() <= 4 || DefName.substr(0, 4) != "int_")
     PrintFatalError(DefLoc,
@@ -836,45 +842,7 @@ void CodeGenIntrinsic::setDefaultProperties(
     setProperty(Rec);
 }
 
-struct BoolField {
-  bool CodeGenIntrinsic:: *Field;
-  const char *InputName; // name in .td file
-};
-static const BoolField BoolFieldList[] = {
-  {&CodeGenIntrinsic::canThrow, "Throws"},
-  {&CodeGenIntrinsic::isNoReturn, "IntrNoReturn"},
-  {&CodeGenIntrinsic::isNoSync, "IntrNoSync"},
-  {&CodeGenIntrinsic::isNoFree, "IntrNoFree"},
-  {&CodeGenIntrinsic::isWillReturn, "IntrWillReturn"},
-  {&CodeGenIntrinsic::isCold, "IntrCold"},
-  {&CodeGenIntrinsic::isNoDuplicate, "IntrNoDuplicate"},
-  {&CodeGenIntrinsic::isConvergent, "IntrConvergent"},
-  {&CodeGenIntrinsic::isSpeculatable, "IntrSpeculatable"},
-  {&CodeGenIntrinsic::isCommutative, "Commutative"},
-  {&CodeGenIntrinsic::hasSideEffects, "IntrHasSideEffects"},
-  {&CodeGenIntrinsic::isNoMerge, "IntrNoMerge"},
-  {&CodeGenIntrinsic::isInjective, "IntrInjective"},
-  {&CodeGenIntrinsic::isStrandPure, "IntrStrandPure"},
-  {&CodeGenIntrinsic::isReducerRegister, "IntrReducerRegister"},
-  {&CodeGenIntrinsic::isHyperView, "IntrHyperView"},
-  {&CodeGenIntrinsic::isHyperToken, "IntrHyperToken"},
-  {&CodeGenIntrinsic::isReducerUnregister, "IntrReducerUnregister"},
-};
-
 void CodeGenIntrinsic::setProperty(Record *R) {
-
-  if (R->getName() == "IntrWillReturn") {
-    isWillReturn = !isNoReturn;
-    return;
-  }
-
-  for (auto &Field : BoolFieldList) {
-    if (R->getName() == Field.InputName) {
-      this->*Field.Field = true;
-      return;
-    }
-  }
-
   if (R->getName() == "IntrNoMem")
     ModRef = NoMem;
   else if (R->getName() == "IntrReadMem") {
@@ -922,6 +890,18 @@ void CodeGenIntrinsic::setProperty(Record *R) {
     isSpeculatable = true;
   else if (R->getName() == "IntrHasSideEffects")
     hasSideEffects = true;
+  else if (R->getName() == "IntrInjective")
+    isInjective = true;
+  else if (R->getName() == "IntrStrandPure")
+    isStrandPure = true;
+  else if (R->getName() == "IntrReducerRegister")
+    isReducerRegister = true;
+  else if (R->getName() == "IntrHyperView")
+    isHyperView = true;
+  else if (R->getName() == "IntrHyperToken")
+    isHyperToken = true;
+  else if (R->getName() == "IntrReducerUnregister")
+    isReducerUnregister = true;
   else if (R->isSubClassOf("NoCapture")) {
     unsigned ArgNo = R->getValueAsInt("ArgNo");
     ArgumentAttributes.emplace_back(ArgNo, NoCapture, 0);
