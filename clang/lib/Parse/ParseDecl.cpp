@@ -5979,7 +5979,7 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
     ParseTypeQualifierListOpt(DS, AR_GNUAttributesParsedAndRejected,
                               true, !D.mayOmitIdentifier());
 
-    Expr *Reduce = nullptr, *Identity = nullptr, *Destroy = nullptr;
+    Expr *Reduce = nullptr, *Identity = nullptr;
     if (Tok.is(tok::l_paren)) {
       SourceLocation Open = ConsumeParen(); // Eat the parenthesis
       SmallVector<Expr *, 3> Args;
@@ -6006,9 +6006,6 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
       switch (Args.size()) {
       case 0:
         break;
-      case 3:
-        Destroy = Args[2];
-        LLVM_FALLTHROUGH;
       case 2:
         Identity = Args[0];
         Reduce = Args[1];
@@ -6030,7 +6027,7 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
       D.AddTypeInfo(DeclaratorChunk::getHyperobject(
                           DS.getTypeQualifiers(),
                           Loc, SourceLocation(), SourceLocation(),
-                          Identity, Reduce, Destroy),
+                          Identity, Reduce),
                     std::move(DS.getAttributes()), SourceLocation());
     else
       Diag(Loc, diag::attribute_requires_cilk) << Kind;
