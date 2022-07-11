@@ -92,6 +92,8 @@ extern "C" {
   float __kitrt_cuElapsedEventTime(void *start, void *stop);
 
   bool  __kitrt_cuIsMemManaged(void *vp);
+  void  __kitrt_cuEnablePrefetch();  
+  void  __kitrt_cuDisablePrefetch();
   void  __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size);
   void  __kitrt_cuMemPrefetchAsync(void *vp, size_t size);
   void  __kitrt_cuMemPrefetch(void *vp);

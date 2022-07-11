@@ -1075,10 +1075,12 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
     Value *VoidVPtr = B.CreateBitCast(VP, VoidPtrTy);
     Value *ArgPtr = B.CreateConstInBoundsGEP2_32(ArrayTy, ArgArray, 0, i++);
     B.CreateStore(VoidVPtr, ArgPtr);
-
-    // TODO: This is still experimental and currently just about as simple
-    // of an approach as we can take on issuing prefetch calls.  Is it
-    // better than nothing -- it is obviously very far from ideal placement.
+    // TODO: This is still experimental and obviously lacking any
+    // significant hueristics about when to issue a prefetch (e.g.,
+    // prefetched but not written in a previous launch).
+    // NOTE: In fact, this path is less than ideal if the pages are
+    // already on the device -- CUDA documentation seems to imply
+    // this will create a new device-side set of pages?
     if (! CodeGenDisablePrefetch) {
       Type *VT = V->getType();
       if (VT->isPointerTy()) {
@@ -1135,8 +1137,8 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
                           "stream");
   }
 
-  LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with kernel wait call.\n");
-  B.CreateCall(KitCudaWaitFn, Stream);
+  //LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with kernel wait call.\n");
+  //B.CreateCall(KitCudaWaitFn, Stream);
 }
 
 CudaABI::CudaABI(Module &M)

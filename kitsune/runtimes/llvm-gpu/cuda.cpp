@@ -74,6 +74,7 @@
 // Has the runtime been initialized (successfully)?
 static bool _kitrtIsInitialized = false;
 static bool _kitrtEnableTiming = false;
+static bool _kitrtEnablePrefetch = true;
 static unsigned _kitrtDefaultThreadsPerBlock = 256;
 static unsigned _kitrtDefaultBlocksPerGrid = 0;
 static bool _kitrtUseCustomLaunchParameters = false;
@@ -375,19 +376,30 @@ bool __kitrt_cuIsMemManaged(void *vp) {
     return false;
 }
 
+void __kitrt_cuEnablePrefetch() {
+  _kitrtEnablePrefetch = true;
+}
+    
+void  __kitrt_cuDisablePrefetch() {
+  _kitrtEnablePrefetch = false;
+}
+  
 void __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size) {
-  if (__kitrt_cuIsMemManaged(vp))
+  if (_kitrtEnablePrefetch && __kitrt_cuIsMemManaged(vp))
     __kitrt_cuMemPrefetchAsync(vp, size);
 }
 
 void __kitrt_cuMemPrefetchAsync(void *vp, size_t size) {
   assert(vp && "__kitrt_cuMemPrefetchAsync() null data pointer!");
+  fprintf(stderr, "async prefetch.\n");
   CUdeviceptr devp = (CUdeviceptr)vp;
   CU_SAFE_CALL(cuMemPrefetchAsync_p(devp, size, _kitrtCUdevice, NULL));
 }
 
 void __kitrt_cuMemPrefetch(void *vp) {
   assert(vp && "__kitrt_cmMemPrefetch() null data pointer!");
+  if (!_kitrtEnablePrefetch)
+    return;
   size_t size = __kitrt_getMemAllocSize(vp);
   // TODO: In theory -- but perhaps not practice -- we should only get a
   // non-zero size back for data that has been allocated as managed memory.

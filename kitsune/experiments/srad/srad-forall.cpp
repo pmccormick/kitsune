@@ -50,10 +50,6 @@ int main(int argc, char* argv[])
     rows = atoi(argv[1]); //number of rows in the domain
     cols = atoi(argv[2]); //number of cols in the domain
 
-    if ((rows%16!=0) || (cols%16!=0)){
-      fprintf(stderr, "rows and cols must be multiples of 16\n");
-      exit(1);
-    }
     r1   = atoi(argv[3]); //y1 position of the speckle
     r2   = atoi(argv[4]); //y2 position of the speckle
     c1   = atoi(argv[5]); //x1 position of the speckle
@@ -74,6 +70,11 @@ int main(int argc, char* argv[])
     usage(argc, argv);
   }
 
+  if ((rows%16!=0) || (cols%16!=0)){
+    fprintf(stderr, "rows and cols must be multiples of 16\n");
+    exit(1);
+  }
+  
   fprintf(stderr, "row/col size: %d/%d\n", rows, cols);
 
   timer r;
@@ -85,33 +86,34 @@ int main(int argc, char* argv[])
   J = (float *)__kitrt_cuMemAllocManaged(sizeof(float) * size_I);
   c = (float *)__kitrt_cuMemAllocManaged(sizeof(float) * size_I);
 
-  iN = (int *)__kitrt_cuMemAllocManaged(sizeof(unsigned int*) * rows);
-  iS = (int *)__kitrt_cuMemAllocManaged(sizeof(unsigned int*) * rows);
-  jW = (int *)__kitrt_cuMemAllocManaged(sizeof(unsigned int*) * cols);
-  jE = (int *)__kitrt_cuMemAllocManaged(sizeof(unsigned int*) * cols);
+  iN = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * rows);
+  iS = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * rows);
+  jW = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * cols);
+  jE = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * cols);
 
   dN = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
   dS = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
   dW = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
   dE = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
 
-  __kitrt_cuEnableEventTiming(0);
   double etime;
+  timer ktimer;
   forall(int i=0; i < rows; i++) {
     iN[i] = i-1;
     iS[i] = i+1;
   }
-  etime = __kitrt_cuGetLastEventTime();
+  etime = ktimer.seconds();
   double ktime = etime;
-  fprintf(stderr, "%g\n", etime);
+  fprintf(stderr, "%g (%g)\n", etime, ktime);
 
+  ktimer.reset();
   forall(int j=0; j < cols; j++) {
     jW[j] = j-1;
     jE[j] = j+1;
   }
-  etime = __kitrt_cuGetLastEventTime();
+  etime = ktimer.seconds();
   ktime += etime;
-  fprintf(stderr, "%g\n", etime);
+  fprintf(stderr, "%g (%g)\n", etime, ktime);
 
   iN[0] = 0;
   iS[rows-1] = rows-1;
@@ -120,15 +122,15 @@ int main(int argc, char* argv[])
 
   random_matrix(I, rows, cols);
 
+  ktimer.reset();
   forall(int k = 0;  k < size_I; k++ ) {
     J[k] = (float)exp(I[k]) ;
   }
-  etime = __kitrt_cuGetLastEventTime();
+  etime = ktimer.seconds();
   ktime += etime;
-  fprintf(stderr, "%g\n", etime);
+  fprintf(stderr, "%g (%g)\n", etime, ktime);
 
   for (int iter=0; iter < niter; iter++) {
-
     sum=0; sum2=0;
 
     for (int i=r1; i <= r2; i++) {
@@ -143,6 +145,7 @@ int main(int argc, char* argv[])
     varROI  = (sum2 / size_R) - meanROI*meanROI;
     q0sqr   = varROI / (meanROI*meanROI);
 
+    ktimer.reset();
     forall(int i = 0 ; i < rows; i++) {
       for (int j = 0; j < cols; j++) {
         int k = i * cols + j;
@@ -173,12 +176,13 @@ int main(int argc, char* argv[])
           c[k] = 1.0;
       }
     }
-    etime = __kitrt_cuGetLastEventTime();
+    etime = ktimer.seconds();
     ktime += etime;
     fprintf(stderr, "1. %g (%g)\n", etime, ktime);
 
+    ktimer.reset();
     forall(int i = 0; i < rows; i++) {
-      for (int j = 0; j < cols; j++) {
+      for(int j = 0; j < cols; j++) {
         // current index
         int k = i * cols + j;
 
@@ -194,7 +198,7 @@ int main(int argc, char* argv[])
         J[k] = J[k] + 0.25*lambda*D;
       }
     }
-    etime = __kitrt_cuGetLastEventTime();
+    etime = ktimer.seconds();
     ktime += etime;
     fprintf(stderr, "2. %g (%g)\n", etime, ktime);
   }
