@@ -18,9 +18,8 @@ srad.${host_arch}: srad.cpp
 	${clangxx} -ftime-report ${clang_flags} -o $@ $<
 
 srad-kokkos.${host_arch}: srad-kokkos.cpp
-	${nvcc_wrapper} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_p\
+	/usr/bin/time ${nvcc_wrapper} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_p\
 refix}/lib
-
 
 clean:
 	-rm -f *.${host_arch}

@@ -22,14 +22,16 @@ void random_matrix(float *I, int rows, int cols) {
 
 void usage(int argc, char **argv)
 {
-  fprintf(stderr, "Usage: %s <rows> <cols> <y1> <y2> <x1> <x2> <lamda> <no. of iter>\n", argv[0]);
+  fprintf(stderr,
+        "Usage: %s <rows> <cols> <y1> <y2> <x1> <x2> <lambda> <no. of iter>\n",
+        argv[0]);
   fprintf(stderr, "\t<rows>   - number of rows\n");
   fprintf(stderr, "\t<cols>    - number of cols\n");
   fprintf(stderr, "\t<y1> 	 - y1 value of the speckle\n");
   fprintf(stderr, "\t<y2>      - y2 value of the speckle\n");
   fprintf(stderr, "\t<x1>       - x1 value of the speckle\n");
   fprintf(stderr, "\t<x2>       - x2 value of the speckle\n");
-  fprintf(stderr, "\t<lamda>   - lambda (0,1)\n");
+  fprintf(stderr, "\t<lambda>   - lambda (0,1)\n");
   fprintf(stderr, "\t<no. of iter>   - number of iterations\n");
   exit(1);
 }
@@ -57,15 +59,15 @@ int main(int argc, char* argv[])
     lambda = atof(argv[7]); //Lambda value
     niter = atoi(argv[8]); //number of iterations
   } else if (argc == 1) {
-      // run with a default configuration.
-      rows = 6400;
-      cols = 6400;
-      r1 = 0;
-      r2 = 127;
-      c1 = 0;
-      c2 = 127;
-      lambda = 0.5;
-      niter = 10;
+    // run with a default configuration.
+    rows = 6400;
+    cols = 6400;
+    r1 = 0;
+    r2 = 127;
+    c1 = 0;
+    c2 = 127;
+    lambda = 0.5;
+    niter = 10;
   } else {
     usage(argc, argv);
   }
@@ -74,11 +76,10 @@ int main(int argc, char* argv[])
     fprintf(stderr, "rows and cols must be multiples of 16\n");
     exit(1);
   }
-  
+
   fprintf(stderr, "row/col size: %d/%d\n", rows, cols);
 
   timer r;
-
   size_I = cols * rows;
   size_R = (r2-r1+1)*(c2-c1+1);
 
@@ -123,9 +124,8 @@ int main(int argc, char* argv[])
   random_matrix(I, rows, cols);
 
   ktimer.reset();
-  forall(int k = 0;  k < size_I; k++ ) {
+  forall(int k = 0;  k < size_I; k++ )
     J[k] = (float)exp(I[k]) ;
-  }
   etime = ktimer.seconds();
   ktime += etime;
   fprintf(stderr, "%g (%g)\n", etime, ktime);
@@ -133,13 +133,16 @@ int main(int argc, char* argv[])
   for (int iter=0; iter < niter; iter++) {
     sum=0; sum2=0;
 
-    for (int i=r1; i <= r2; i++) {
-      for (int j = c1; j<=c2; j++) {
+    ktimer.reset();
+    for(int i=r1; i <= r2; i++) {
+      for(int j = c1; j<=c2; j++) {
         tmp   = J[i * cols + j];
         sum  += tmp ;
         sum2 += tmp*tmp;
       }
     }
+
+    fprintf(stderr, "seq loop time: %g\n", ktimer.seconds());
 
     meanROI = sum / size_R;
     varROI  = (sum2 / size_R) - meanROI*meanROI;
@@ -147,7 +150,7 @@ int main(int argc, char* argv[])
 
     ktimer.reset();
     forall(int i = 0 ; i < rows; i++) {
-      for (int j = 0; j < cols; j++) {
+      for(int j = 0; j < cols; j++) {
         int k = i * cols + j;
         float Jc = J[k];
         // directional derivatives
@@ -156,8 +159,8 @@ int main(int argc, char* argv[])
         dW[k] = J[i * cols + jW[j]] - Jc;
         dE[k] = J[i * cols + jE[j]] - Jc;
 
-        float G2 = (dN[k]*dN[k] + dS[k]*dS[k]
-                    + dW[k]*dW[k] + dE[k]*dE[k]) / (Jc*Jc);
+        float G2 = (dN[k]*dN[k] + dS[k]*dS[k] +
+                    dW[k]*dW[k] + dE[k]*dE[k]) / (Jc*Jc);
 
         float L = (dN[k] + dS[k] + dW[k] + dE[k]) / Jc;
 
@@ -185,7 +188,6 @@ int main(int argc, char* argv[])
       for(int j = 0; j < cols; j++) {
         // current index
         int k = i * cols + j;
-
         // diffusion coefficient
         float cN = c[k];
         float cS = c[iS[i] * cols + j];
@@ -214,6 +216,3 @@ int main(int argc, char* argv[])
   }
   return 0;
 }
-
-
-

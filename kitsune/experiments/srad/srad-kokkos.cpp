@@ -24,22 +24,22 @@ void random_matrix(FloatDualView &I, int rows, int cols) {
 
 void usage(int argc, char **argv)
 {
-  fprintf(stderr, "Usage: %s <rows> <cols> <y1> <y2> <x1> <x2> <lamda> <no. of iter>\n",
-	  argv[0]);
+  fprintf(stderr,
+        "Usage: %s <rows> <cols> <y1> <y2> <x1> <x2> <lambda> <no. of iter>\n",
+        argv[0]);
   fprintf(stderr, "\t<rows>   - number of rows\n");
   fprintf(stderr, "\t<cols>    - number of cols\n");
   fprintf(stderr, "\t<y1> 	 - y1 value of the speckle\n");
   fprintf(stderr, "\t<y2>      - y2 value of the speckle\n");
   fprintf(stderr, "\t<x1>       - x1 value of the speckle\n");
   fprintf(stderr, "\t<x2>       - x2 value of the speckle\n");
-  fprintf(stderr, "\t<lamda>   - lambda (0,1)\n");
+  fprintf(stderr, "\t<lambda>   - lambda (0,1)\n");
   fprintf(stderr, "\t<no. of iter>   - number of iterations\n");
   exit(1);
 }
 
 int main(int argc, char* argv[])
 {
-
   int rows, cols, size_I, size_R, niter = 10;
   float q0sqr, sum, sum2, tmp, meanROI,varROI ;
   int r1, r2, c1, c2;
@@ -98,9 +98,9 @@ int main(int argc, char* argv[])
     double etime = 0.0;
     timer ktimer;
     Kokkos::parallel_for("rows", rows, KOKKOS_LAMBDA(const int &i) {
-	iN.d_view(i) = i-1;
-	iS.d_view(i) = i+1;
-      });
+      iN.d_view(i) = i-1;
+      iS.d_view(i) = i+1;
+    });
     etime = ktimer.seconds();
     ktime = etime;
     fprintf(stderr, "%g (%g)\n", etime, ktime);
@@ -110,9 +110,9 @@ int main(int argc, char* argv[])
 
     ktimer.reset();
     Kokkos::parallel_for("cols", cols, KOKKOS_LAMBDA(const int &j) {
-	jW.d_view(j) = j-1;
-	jE.d_view(j) = j+1;
-      });
+      jW.d_view(j) = j-1;
+      jE.d_view(j) = j+1;
+    });
     etime = ktimer.seconds();
     ktime += etime;
     fprintf(stderr, "%g (%g)\n", etime, ktime);
@@ -144,8 +144,8 @@ int main(int argc, char* argv[])
     J.sync_device();
     jE.sync_device();
     Kokkos::parallel_for("size_I", size_I, KOKKOS_LAMBDA(const int &k) {
-	J.d_view(k) = (float)exp(I.d_view(k));
-      });
+      J.d_view(k) = (float)exp(I.d_view(k));
+    });
     etime = ktimer.seconds();
     ktime += etime;
     fprintf(stderr, "%g\n", etime);
@@ -160,6 +160,7 @@ int main(int argc, char* argv[])
     for (int iter=0; iter< niter; iter++) {
       sum=0; sum2=0;
 
+      ktimer.reset();
       J.sync_host();
       for (int i=r1; i<= r2; i++) {
         for (int j=c1; j<= c2; j++) {
@@ -168,6 +169,7 @@ int main(int argc, char* argv[])
           sum2 += tmp*tmp;
       	}
       }
+      fprintf(stderr, "seq loop time: %g\n", ktimer.seconds());
 
       meanROI = sum / size_R;
       varROI  = (sum2 / size_R) - meanROI*meanROI;
@@ -175,59 +177,60 @@ int main(int argc, char* argv[])
 
       ktimer.reset();
       Kokkos::parallel_for("loop1", rows, KOKKOS_LAMBDA(const int &i) {
-	  for (int j = 0; j < cols; j++) {
-	    int k = i * cols + j;
-	    float Jc = J.d_view(k);
-	    // directional derivatives
-	    dN.d_view(k) = J.d_view(iN.d_view(i) * cols + j) - Jc;
-	    dS.d_view(k) = J.d_view(iS.d_view(i) * cols + j) - Jc;
-	    dW.d_view(k) = J.d_view(i * cols + jW.d_view(j)) - Jc;
-	    dE.d_view(k) = J.d_view(i * cols + jE.d_view(j)) - Jc;
+        for (int j = 0; j < cols; j++) {
+          int k = i * cols + j;
+          float Jc = J.d_view(k);
+          // directional derivatives
+          dN.d_view(k) = J.d_view(iN.d_view(i) * cols + j) - Jc;
+          dS.d_view(k) = J.d_view(iS.d_view(i) * cols + j) - Jc;
+          dW.d_view(k) = J.d_view(i * cols + jW.d_view(j)) - Jc;
+          dE.d_view(k) = J.d_view(i * cols + jE.d_view(j)) - Jc;
 
-	    float G2 = (dN.d_view(k)*dN.d_view(k) + dS.d_view(k)*dS.d_view(k)
-			+ dW.d_view(k)*dW.d_view(k) + dE.d_view(k)*dE.d_view(k))
-	      / (Jc*Jc);
+          float G2 = (dN.d_view(k)*dN.d_view(k) + dS.d_view(k)*dS.d_view(k) +
+                      dW.d_view(k)*dW.d_view(k) + dE.d_view(k)*dE.d_view(k)) /
+                     (Jc*Jc);
 
-	    float L = (dN.d_view(k) + dS.d_view(k) + dW.d_view(k) +
-		       dE.d_view(k)) / Jc;
+          float L = (dN.d_view(k) + dS.d_view(k) + dW.d_view(k) +
+                     dE.d_view(k)) / Jc;
 
-	    float num  = (0.5*G2) - ((1.0/16.0)*(L*L));
-	    float den  = 1 + (.25*L);
-	    float qsqr = num/(den*den);
+          float num  = (0.5*G2) - ((1.0/16.0)*(L*L));
+          float den  = 1 + (.25*L);
+          float qsqr = num/(den*den);
 
-	    // diffusion coefficient (equ 33)
-	    den = (qsqr-q0sqr) / (q0sqr * (1+q0sqr));
-	    c.d_view(k) = 1.0 / (1.0+den);
-	    // saturate diffusion coefficient
-	    if (c.d_view(k) < 0)
-	      c.d_view(k) = 0.0;
-	    else if (c.d_view(k) > 1)
-	      c.d_view(k) = 1.0;
-	  }
-	});
+          // diffusion coefficient (equ 33)
+          den = (qsqr-q0sqr) / (q0sqr * (1+q0sqr));
+          c.d_view(k) = 1.0 / (1.0+den);
+          // saturate diffusion coefficient
+          if (c.d_view(k) < 0)
+            c.d_view(k) = 0.0;
+          else if (c.d_view(k) > 1)
+            c.d_view(k) = 1.0;
+        }
+      });
       etime = ktimer.seconds();
       ktime += etime;
       fprintf(stderr, "1. %g (%g)\n", etime, ktime);
 
       ktimer.reset();
       Kokkos::parallel_for("loop2", rows, KOKKOS_LAMBDA(const int &i) {
-	  for (int j = 0; j < cols; j++) {
-	    // current index
-	    int k = i * cols + j;
+        for (int j = 0; j < cols; j++) {
+          // current index
+          int k = i * cols + j;
 
-	    // diffusion coefficient
-	    float cN = c.d_view(k);
-	    float cS = c.d_view(iS.d_view(i) * cols + j);
-	    float cW = c.d_view(k);
-	    float cE = c.d_view(i * cols + jE.d_view(j));
+          // diffusion coefficient
+          float cN = c.d_view(k);
+          float cS = c.d_view(iS.d_view(i) * cols + j);
+          float cW = c.d_view(k);
+          float cE = c.d_view(i * cols + jE.d_view(j));
 
-	    // divergence (equ 58)
-	    float D = cN * dN.d_view(k) + cS * dS.d_view(k) +
-	      cW * dW.d_view(k) + cE * dE.d_view(k);
-	    // image update (equ 61)
-	    J.d_view(k) = J.d_view(k) + 0.25*lambda*D;
-	  }
-	});
+          // divergence (equ 58)
+          float D = cN * dN.d_view(k) + cS * dS.d_view(k) +
+          cW * dW.d_view(k) + cE * dE.d_view(k);
+          // image update (equ 61)
+          J.d_view(k) = J.d_view(k) + 0.25*lambda*D;
+        }
+      });
+
       J.modify_device();
       etime = ktimer.seconds();
       ktime += etime;

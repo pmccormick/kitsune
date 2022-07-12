@@ -150,6 +150,11 @@ declare(cuMemcpyHtoD_v2);
     }                                                        \
   }
 
+struct AllocMapEntry {
+  size_t    size;
+  bool      prefetched;
+};
+
 typedef std::map<void *, size_t> KitRTAllocMap;
 static KitRTAllocMap _kitrtAllocMap;
 
@@ -379,11 +384,11 @@ bool __kitrt_cuIsMemManaged(void *vp) {
 void __kitrt_cuEnablePrefetch() {
   _kitrtEnablePrefetch = true;
 }
-    
+
 void  __kitrt_cuDisablePrefetch() {
   _kitrtEnablePrefetch = false;
 }
-  
+
 void __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size) {
   if (_kitrtEnablePrefetch && __kitrt_cuIsMemManaged(vp))
     __kitrt_cuMemPrefetchAsync(vp, size);
@@ -391,7 +396,6 @@ void __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size) {
 
 void __kitrt_cuMemPrefetchAsync(void *vp, size_t size) {
   assert(vp && "__kitrt_cuMemPrefetchAsync() null data pointer!");
-  fprintf(stderr, "async prefetch.\n");
   CUdeviceptr devp = (CUdeviceptr)vp;
   CU_SAFE_CALL(cuMemPrefetchAsync_p(devp, size, _kitrtCUdevice, NULL));
 }
