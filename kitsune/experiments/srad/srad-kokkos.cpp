@@ -56,8 +56,8 @@ int main(int argc, char* argv[])
     niter = atoi(argv[8]); //number of iterations
   } else if (argc == 1) {
     // run with default configuration...
-    rows = 6400;
-    cols = 6400;
+    rows = 12800;
+    cols = 12800;
     r1 = 0;
     r2 = 127;
     c1 = 0;
@@ -160,7 +160,6 @@ int main(int argc, char* argv[])
     for (int iter=0; iter< niter; iter++) {
       sum=0; sum2=0;
 
-      ktimer.reset();
       J.sync_host();
       for (int i=r1; i<= r2; i++) {
         for (int j=c1; j<= c2; j++) {
@@ -169,7 +168,6 @@ int main(int argc, char* argv[])
           sum2 += tmp*tmp;
       	}
       }
-      fprintf(stderr, "seq loop time: %g\n", ktimer.seconds());
 
       meanROI = sum / size_R;
       varROI  = (sum2 / size_R) - meanROI*meanROI;
@@ -252,6 +250,3 @@ int main(int argc, char* argv[])
 
   return 0;
 }
-
-
-

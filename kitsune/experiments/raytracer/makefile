@@ -26,15 +26,16 @@ clang_cuda_flags=-xcuda --cuda-gpu-arch=${NVARCH} ${cxx_flags} ${opt_flags} -I${
 
 #### Kokkos stuff 
 kokkos_cu_flags=-I${kokkos_cu_prefix}/include ${nvcc_cxx_flags} -m64 -arch=${NVARCH} --resource-usage -O3 --no-exceptions -I${kitsune_prefix}/include
+kokkos_clang_cu_flags=-I${kokkos_cu_prefix}/include ${clang_cuda_flags} -I${kitsune_prefix}/include
 
 
 all: raytrace-forall.cuda.${host_arch} \
-     raytrace.nvcc.${host_arch} \
-     raytrace.clang.${host_arch} \
-     raytrace.kokkos.${host_arch} \
+     raytrace.cuda.nvcc.${host_arch} \
+     raytrace.cuda.clang.${host_arch} \
+     raytrace.kokkos.nvcc.${host_arch} \
+     raytrace.kokkos.clang.${host_arch} \
      raytrace.kokkos.noview.${host_arch} \
      raytrace.openmp.clang.${host_arch} 
-#     raytrace.openmp.gcc.${host_arch} 
 
 
 # Kitsune-Tapir versions.
@@ -45,18 +46,18 @@ raytrace.kokkos.noview.${host_arch}: raytrace-kokkos-noview.cpp
 
 
 # Cuda version.
-raytrace.nvcc.${host_arch}: raytrace.cu
+raytrace.cuda.nvcc.${host_arch}: raytrace.cu
 	${nvcc} ${nvcc_flags} -o $@ $<
-raytrace.clang.${host_arch}: raytrace.cu
+raytrace.cuda.clang.${host_arch}: raytrace.cu
 	${clangxx} ${clang_cuda_flags} -o $@ $< -L${CUDA_HOME}/lib64 -lcudart_static -ldl -lrt -pthread
-raytrace.kokkos.${host_arch}: raytrace-kokkos.cpp
+raytrace.kokkos.nvcc.${host_arch}: raytrace-kokkos.cpp
 	${nvcc_wrapper} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+raytrace.kokkos.clang.${host_arch}: raytrace-kokkos.cpp
+	${clangxx} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
 # OpenMP version.
 raytrace.openmp.clang.${host_arch}: raytrace-openmp.cpp
 	${clangxx} ${clang_flags} -fopenmp -fopenmp-targets=nvptx64-cuda -Xopenmp-target -march=${NVARCH} -I${kitsune_prefix}/include -fopenmp -o $@ $<
-#raytrace.openmp.gcc.${host_arch}: raytrace-openmp.cpp
-#	${gccxx} ${gcc_flags} -fopenmp -foffload=nvptx-none="-O3 -lm" -o $@ $<
 
 clean:
 	-rm -f *.${host_arch}

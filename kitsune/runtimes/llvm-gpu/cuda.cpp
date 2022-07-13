@@ -75,6 +75,7 @@
 static bool _kitrtIsInitialized = false;
 static bool _kitrtEnableTiming = false;
 static bool _kitrtEnablePrefetch = true;
+static bool _kitrtUseHeuristicLaunchParameters = false;
 static unsigned _kitrtDefaultThreadsPerBlock = 256;
 static unsigned _kitrtDefaultBlocksPerGrid = 0;
 static bool _kitrtUseCustomLaunchParameters = false;
@@ -135,6 +136,7 @@ declare(cuCtxSynchronize);
 declare(cuModuleGetGlobal_v2);
 declare(cuMemcpy);
 declare(cuMemcpyHtoD_v2);
+declare(cuOccupancyMaxPotentialBlockSize);
 
 #define CU_SAFE_CALL(x)                                      \
   {                                                          \
@@ -242,6 +244,7 @@ static bool __kitrt_load_dlsyms() {
 
     DLSYM_LOAD(cuMemcpy);
     DLSYM_LOAD(cuMemcpyHtoD_v2);
+    DLSYM_LOAD(cuOccupancyMaxPotentialBlockSize);
     return true;
   } else {
     fprintf(stderr, "kitrt: Failed to load CUDA dynamic library.\n");
@@ -268,7 +271,7 @@ bool __kitrt_cuInit() {
   CU_SAFE_CALL(cuInit_p(0 /*, __CUDA_API_VERSION*/));
   CU_SAFE_CALL(cuDeviceGetCount_p(&deviceCount));
   if (deviceCount == 0) {
-    fprintf(stderr, "kitrt: no CUDA devices were found. aborting...\n");
+    fprintf(stderr, "kitrt: no CUDA devices found!\n");
     exit(1);
   }
   CU_SAFE_CALL(cuDeviceGet_p(&_kitrtCUdevice, 0));
@@ -277,6 +280,18 @@ bool __kitrt_cuInit() {
   // to be different than what the driver API docs suggest...
   CU_SAFE_CALL(cuCtxSetCurrent_p(_kitrtCUcontext));
   _kitrtIsInitialized = true;
+
+  char *envValue;
+  if ((envValue = getenv("KITRT_CU_THREADS_PER_BLOCK"))) {
+    _kitrtDefaultThreadsPerBlock = atoi(envValue);
+  }
+
+  if ((envValue = getenv("KITRT_USE_OCCUPANCY_HEURISTIC"))) {
+    _kitrtUseHeuristicLaunchParameters = true;
+  } else {
+    _kitrtUseHeuristicLaunchParameters = false;
+  }
+
   return _kitrtIsInitialized;
 }
 
@@ -452,8 +467,20 @@ void __kitrt_cuMemcpySymbolToDevice(void *hostPtr,
   CU_SAFE_CALL(cuMemcpyHtoD_v2_p(devPtr, hostPtr, size));
 }
 
-static void __kitrt_cuGetLaunchParameters(size_t &threadsPerBlock,
-                                          size_t &blocksPerGrid,
+static void __kitrt_cuMaxPotentialBlockSize(int &blocksPerGrid,
+                                            int &threadsPerBlock,
+                                            CUfunction F,
+                                            size_t numElements) {
+
+  CU_SAFE_CALL(cuOccupancyMaxPotentialBlockSize_p(&blocksPerGrid,
+                                     &threadsPerBlock, F, 0,
+                                     0, // no dynamic shared memory...
+                                     0));
+  blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+}
+
+static void __kitrt_cuGetLaunchParameters(int &threadsPerBlock,
+                                          int &blocksPerGrid,
                                           size_t numElements) {
   if (_kitrtUseCustomLaunchParameters) {
     threadsPerBlock = _kitrtDefaultThreadsPerBlock;
@@ -465,6 +492,8 @@ static void __kitrt_cuGetLaunchParameters(size_t &threadsPerBlock,
     CU_SAFE_CALL(cuDeviceGetAttribute_p(&warpSize,
                                         CU_DEVICE_ATTRIBUTE_WARP_SIZE,
                                         _kitrtCUdevice));
+    fprintf(stderr, "warp size = %d\n", warpSize);
+
     unsigned blockSize = 4 * warpSize;
     //assert(numElements % blockSize == 0);
     // TODO: There is likely quite a bit of improvement to be had here
@@ -507,12 +536,20 @@ void *__kitrt_cuLaunchModuleKernel(void *mod,
   // TODO: we probably want to calculate the launch compilers during code
   // generation (when we have some more information about the actual kernel
   // code -- in that case, we should pass launch parameters to this call.
-  size_t threadsPerBlock, blocksPerGrid;
-  __kitrt_cuGetLaunchParameters(threadsPerBlock, blocksPerGrid, numElements);
+  int threadsPerBlock, blocksPerGrid;
+
 
   CUfunction kFunc;
   CUmodule module = (CUmodule)mod;
   CU_SAFE_CALL(cuModuleGetFunction_p(&kFunc, module, kernelName));
+
+  if (_kitrtUseHeuristicLaunchParameters)
+    __kitrt_cuMaxPotentialBlockSize(blocksPerGrid,
+                                    threadsPerBlock,
+                                    kFunc,
+                                    numElements);
+  else
+    __kitrt_cuGetLaunchParameters(threadsPerBlock, blocksPerGrid, numElements);
 
   CUevent start, stop;
   if (_kitrtEnableTiming) {
@@ -534,6 +571,10 @@ void *__kitrt_cuLaunchModuleKernel(void *mod,
     cuEventCreate_p(&stop, CU_EVENT_DEFAULT);
     cuEventRecord_p(start, 0);
   }
+
+  fprintf(stderr, "launch parameters:\n");
+  fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
+  fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
                                 1, 0, nullptr, fatBinArgs, NULL));
@@ -564,8 +605,8 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
   // TODO: we probably want to calculate the launch compilers during code
   // generation (when we have some more information about the actual kernel
   // code -- in that case, we should pass launch parameters to this call.
-  size_t threadsPerBlock, blocksPerGrid;
-  __kitrt_cuGetLaunchParameters(threadsPerBlock, blocksPerGrid, numElements);
+  int threadsPerBlock, blocksPerGrid;
+  //__kitrt_cuGetLaunchParameters(threadsPerBlock, blocksPerGrid, numElements);
 
   // TODO: We need a better path here for binding and tracking
   // allcoated CUDA resources -- as it stands we will "leak"
@@ -576,6 +617,13 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
   CU_SAFE_CALL(cuModuleGetFunction_p(&kFunc, module, kernelName));
   CUstream stream = nullptr;
   CU_SAFE_CALL(cuStreamCreate_p(&stream, 0));
+  if (_kitrtUseHeuristicLaunchParameters)
+    __kitrt_cuMaxPotentialBlockSize(blocksPerGrid,
+                                    threadsPerBlock,
+                                    kFunc,
+                                    numElements);
+  else
+    __kitrt_cuGetLaunchParameters(threadsPerBlock, blocksPerGrid, numElements);
 
   CUevent start, stop;
   if (_kitrtEnableTiming) {
@@ -597,6 +645,11 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
     cuEventCreate_p(&stop, CU_EVENT_DEFAULT);
     cuEventRecord_p(start, stream);
   }
+
+
+  fprintf(stderr, "launch parameters:\n");
+  fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
+  fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock,
                                 1, 1, 0, stream, fatBinArgs, NULL));
@@ -623,8 +676,8 @@ void *__kitrt_cuLaunchFBKernel(const void *fatBin,
   assert(fatBin && "request to launch null fat binary image!");
   assert(kernelName && "request to launch kernel w/ null name!");
 
-  size_t threadsPerBlock, blocksPerGrid;
-  __kitrt_cuGetLaunchParameters(threadsPerBlock, blocksPerGrid, numElements);
+  int threadsPerBlock, blocksPerGrid;
+  //__kitrt_cuGetLaunchParameters(threadsPerBlock, blocksPerGrid, numElements);
 
   // TODO: We need a better path here for binding and tracking
   // allcoated CUDA resources -- as it stands we will "leak"
@@ -633,6 +686,13 @@ void *__kitrt_cuLaunchFBKernel(const void *fatBin,
   CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
   CUfunction kFunc;
   CU_SAFE_CALL(cuModuleGetFunction_p(&kFunc, module, kernelName));
+  if (_kitrtUseHeuristicLaunchParameters)
+    __kitrt_cuMaxPotentialBlockSize(blocksPerGrid,
+                                    threadsPerBlock,
+                                    kFunc,
+                                    numElements);
+  else
+    __kitrt_cuGetLaunchParameters(threadsPerBlock, blocksPerGrid, numElements);
 
   CUevent start, stop;
   if (_kitrtEnableTiming) {
@@ -659,6 +719,10 @@ void *__kitrt_cuLaunchFBKernel(const void *fatBin,
     // Kick off an event prior to kernel launch...
     cuEventRecord_p(start, 0);
   }
+
+  fprintf(stderr, "launch parameters:\n");
+  fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
+  fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
                                 1, 0, nullptr, fatBinArgs, NULL));
@@ -695,7 +759,7 @@ void *__kitrt_cuLaunchELFKernel(const void *elf,
   CU_SAFE_CALL(cuModuleGetFunction_p(&kernel, module, "kitsune_kernel"));
   CUstream stream = nullptr;
   CU_SAFE_CALL(cuStreamCreate_p(&stream, 0));
-  size_t threadsPerBlock, blocksPerGrid;
+  int threadsPerBlock, blocksPerGrid;
   __kitrt_cuGetLaunchParameters(threadsPerBlock, blocksPerGrid, numElements);
   CU_SAFE_CALL(cuLaunchKernel_p(kernel, blocksPerGrid, 1, 1, // grid dim
                                 threadsPerBlock, 1, 1,       // block dim

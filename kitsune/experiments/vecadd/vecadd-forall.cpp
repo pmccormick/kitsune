@@ -52,7 +52,7 @@ int main (int argc, char* argv[]) {
   random_fill(B, size);
 
   __kitrt_cuEnableEventTiming(0);
-  forall(size_t i = 0; i < size; i++)
+  forall(size_t i = 0; i < size-1; i++)
       C[i] = A[i] + B[i];
 
   double time = __kitrt_cuGetLastEventTime();
@@ -62,8 +62,10 @@ int main (int argc, char* argv[]) {
   size_t error_count = 0;
   for(size_t i = 0; i < size; i++) {
     float sum = A[i] + B[i];
-    if (C[i] != sum)
+    if (C[i] != sum) {
+      printf("bad result at index %d (%f != %f)\n", i, C[i], sum);
       error_count++;
+    }
   }
 
   if (error_count > 0)

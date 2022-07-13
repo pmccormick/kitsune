@@ -899,6 +899,7 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   Argument *End;
   Value *Grainsize;
   {
+    // TODO: We really only want a grainsize of 1 for now...
     auto OutlineArgsIter = Helper->arg_begin();
     // End argument is the first LC arg.
     End = &*OutlineArgsIter++;
@@ -925,9 +926,12 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   Value *ThreadID = B.CreateIntCast(
       B.CreateAdd(ThreadIdx, B.CreateMul(BlockIdx, BlockDim), "thread_id"),
       PrimaryIV->getType(), false);
-  ThreadID = B.CreateMul(ThreadID, Grainsize);
-  Value *ThreadEnd = B.CreateAdd(ThreadID, Grainsize);
+  // TODO: assuming grainsize == 1...
+  //ThreadID = B.CreateMul(ThreadID, Grainsize);
+  Value *CudaABIGrainSize = ConstantInt::get(ThreadID->getType(), 1);
+  Value *ThreadEnd = B.CreateAdd(ThreadID, CudaABIGrainSize);
   Value *Cond = B.CreateICmpUGE(ThreadID, End);
+
   ReplaceInstWithInst(Entry->getTerminator(),
                       BranchInst::Create(Exit, Header, Cond));
   // Use the thread ID as the start iteration number for the primary IV.
@@ -936,11 +940,11 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   // Update cloned loop condition to use the thread-end value.
   unsigned TripCountIdx = 0;
   ICmpInst *ClonedCond = cast<ICmpInst>(VMap[TLI.getCondition()]);
-  if (ClonedCond->getOperand(0) != ThreadEnd)
+  if (ClonedCond->getOperand(0) != End)
     ++TripCountIdx;
-  ClonedCond->setOperand(TripCountIdx, ThreadEnd);
-  assert(ClonedCond->getOperand(TripCountIdx) == ThreadEnd &&
+  assert(ClonedCond->getOperand(TripCountIdx) == End &&
          "End argument not used in condition");
+  ClonedCond->setOperand(TripCountIdx, ThreadEnd);
 }
 
 void CudaLoop::transformForPTX() {

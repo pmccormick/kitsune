@@ -56,6 +56,9 @@ autoconf/autom4te.cache
 # CLion project configuration
 /.idea
 
+.vscode/settings.json
+.vscode/launch.json
+
 #==============================================================================#
 # Directories to ignore (do not add trailing '/'s, they skip symlinks).
 #==============================================================================#
