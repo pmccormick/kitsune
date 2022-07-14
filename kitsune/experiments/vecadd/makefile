@@ -16,7 +16,7 @@ kit_kokkos_flags=-fkokkos -fkokkos-no-init
 #   -cuabi-keep-files saves intermediate files (.ll, .ptx, .fatbin) on disk for a closer look at codegen details. 
 #
 tapir_cu_launch_flags=-I${CUDA_HOME}/include
-tapir_cu_flags=-ffast-math -ftapir=cuda -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags}
+tapir_cu_flags=-ffast-math -ftapir=cuda -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-keep-files
 tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1  -mllvm -cuabi-default-grainsize=1
 ####
 
@@ -54,5 +54,5 @@ clean:
 	-rm -f *.fatbin
 	-rm -rf *-cfg-tmp
 	-rm -f *.bc
-	-rm -f *.ll *.ptx *.csv *.log *.fatbin
+	-rm -f *.ll *.ptx *.csv *.log *.fbin *.s
 	

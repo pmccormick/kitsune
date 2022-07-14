@@ -48,11 +48,15 @@ int main (int argc, char* argv[]) {
   float *B = (float *)__kitrt_cuMemAllocManaged(sizeof(float) * size);
   float *C = (float *)__kitrt_cuMemAllocManaged(sizeof(float) * size);
 
+  printf("address of A: %p\n", A);
+  printf("address of B: %p\n", B);
+  printf("address of C: %p\n", C);
+  
   random_fill(A, size);
   random_fill(B, size);
 
   __kitrt_cuEnableEventTiming(0);
-  forall(size_t i = 0; i < size-1; i++)
+  forall(size_t i = 0; i < size; i++)
       C[i] = A[i] + B[i];
 
   double time = __kitrt_cuGetLastEventTime();
@@ -63,7 +67,6 @@ int main (int argc, char* argv[]) {
   for(size_t i = 0; i < size; i++) {
     float sum = A[i] + B[i];
     if (C[i] != sum) {
-      printf("bad result at index %d (%f != %f)\n", i, C[i], sum);
       error_count++;
     }
   }

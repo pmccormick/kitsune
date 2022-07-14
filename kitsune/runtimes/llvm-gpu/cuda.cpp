@@ -434,7 +434,7 @@ void __kitrt_cuMemPrefetch(void *vp) {
 void *__kitrt_cuMemAllocManaged(size_t size) {
   //(void)__kitrt_cuInit();
   CUdeviceptr devp;
-  CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_HOST));
+  CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_GLOBAL));
   __kitrt_registerMemAlloc((void*)devp, size);
   return (void *)devp;
 }
@@ -492,8 +492,6 @@ static void __kitrt_cuGetLaunchParameters(int &threadsPerBlock,
     CU_SAFE_CALL(cuDeviceGetAttribute_p(&warpSize,
                                         CU_DEVICE_ATTRIBUTE_WARP_SIZE,
                                         _kitrtCUdevice));
-    fprintf(stderr, "warp size = %d\n", warpSize);
-
     unsigned blockSize = 4 * warpSize;
     //assert(numElements % blockSize == 0);
     // TODO: There is likely quite a bit of improvement to be had here
@@ -572,9 +570,10 @@ void *__kitrt_cuLaunchModuleKernel(void *mod,
     cuEventRecord_p(start, 0);
   }
 
-  fprintf(stderr, "launch parameters:\n");
-  fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
-  fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
+  //fprintf(stderr, "launch parameters:\n");
+  //fprintf(stderr, "\tnumber of overall elements: %ld\n", numElements);
+  //fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
+  //fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
                                 1, 0, nullptr, fatBinArgs, NULL));
@@ -647,9 +646,10 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
   }
 
 
-  fprintf(stderr, "launch parameters:\n");
-  fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
-  fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
+  //fprintf(stderr, "launch parameters:\n");
+  //fprintf(stderr, "\tnumber of overall elements: %ld\n", numElements);
+  //fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
+  //fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock,
                                 1, 1, 0, stream, fatBinArgs, NULL));
@@ -720,9 +720,10 @@ void *__kitrt_cuLaunchFBKernel(const void *fatBin,
     cuEventRecord_p(start, 0);
   }
 
-  fprintf(stderr, "launch parameters:\n");
-  fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
-  fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
+  //fprintf(stderr, "launch parameters:\n");
+  //fprintf(stderr, "\tnumber of overall elements: %ld\n", numElements);
+  //fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
+  //fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
                                 1, 0, nullptr, fatBinArgs, NULL));

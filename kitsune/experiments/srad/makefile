@@ -29,8 +29,8 @@ kokkos_nvcc_flags=-I${kokkos_cu_prefix}/include ${nvcc_cxx_flags} -m64 -arch=${N
 
 
 all: srad-forall.cuda.${host_arch} \
-     srad-kokkos.nvcc.${host_arch} \
-     srad-kokkos.clang.${host_arch}
+     srad-kokkos.nvcc.${host_arch} 
+#     srad-kokkos.clang.${host_arch}
 
 srad-forall.cuda.${host_arch}: srad-forall.cpp
 	${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib

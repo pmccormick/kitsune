@@ -906,11 +906,11 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
 
     // Get the grainsize value, which is either constant or the third LC
     // arg.
-    if (unsigned ConstGrainsize = TLI.getGrainsize())
-      Grainsize = ConstantInt::get(PrimaryIV->getType(), ConstGrainsize);
-    else
-      Grainsize =
-          ConstantInt::get(PrimaryIV->getType(), DefaultGrainSize.getValue());
+    //if (unsigned ConstGrainsize = TLI.getGrainsize())
+    //  Grainsize = ConstantInt::get(PrimaryIV->getType(), ConstGrainsize);
+    //else
+      Grainsize = ConstantInt::get(PrimaryIV->getType(),
+                                    DefaultGrainSize.getValue());
   }
 
   IRBuilder<> B(Entry->getTerminator());
@@ -923,19 +923,21 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   Value *ThreadIdx = B.CreateCall(CUThreadIdxX);
   Value *BlockIdx = B.CreateCall(CUBlockIdxX);
   Value *BlockDim = B.CreateCall(CUBlockDimX);
-  Value *ThreadID = B.CreateIntCast(
-      B.CreateAdd(ThreadIdx, B.CreateMul(BlockIdx, BlockDim), "thread_id"),
-      PrimaryIV->getType(), false);
-  // TODO: assuming grainsize == 1...
-  //ThreadID = B.CreateMul(ThreadID, Grainsize);
-  Value *CudaABIGrainSize = ConstantInt::get(ThreadID->getType(), 1);
-  Value *ThreadEnd = B.CreateAdd(ThreadID, CudaABIGrainSize);
-  Value *Cond = B.CreateICmpUGE(ThreadID, End);
+  Value *ThreadIV = B.CreateIntCast(
+      B.CreateAdd(ThreadIdx, B.CreateMul(BlockIdx, BlockDim, "blk_offset"),
+                  "cuthread_id"), PrimaryIV->getType(), false,
+                  "thread_iv");
 
+  // NOTE/TODO: Assuming that the grainsize is fixed at 1 for the
+  // current codegen...
+  //ThreadID = B.CreateMul(ThreadID, Grainsize);
+  Value *ThreadEnd = B.CreateAdd(ThreadIV, Grainsize, "thread_end");
+  Value *Cond = B.CreateICmpUGE(ThreadIV, End, "cond_thread_end");
   ReplaceInstWithInst(Entry->getTerminator(),
                       BranchInst::Create(Exit, Header, Cond));
+
   // Use the thread ID as the start iteration number for the primary IV.
-  PrimaryIVInput->replaceAllUsesWith(ThreadID);
+  PrimaryIVInput->replaceAllUsesWith(ThreadIV);
 
   // Update cloned loop condition to use the thread-end value.
   unsigned TripCountIdx = 0;
@@ -943,7 +945,7 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   if (ClonedCond->getOperand(0) != End)
     ++TripCountIdx;
   assert(ClonedCond->getOperand(TripCountIdx) == End &&
-         "End argument not used in condition");
+         "End argument not used in condition!");
   ClonedCond->setOperand(TripCountIdx, ThreadEnd);
 }
 
@@ -1042,6 +1044,17 @@ void CudaLoop::transformForPTX() {
 
   if (auto *F = KernelModule.getFunction("gtid"))
     F->eraseFromParent();
+
+  if (KeepIntermediateFiles) {
+    std::error_code  EC;
+    std::unique_ptr<ToolOutputFile> KernelIRFile;
+    SmallString<255> IRFileName(Twine(F.getName()).str() + "-ptx");
+    sys::path::replace_extension(IRFileName, ".ll");
+    KernelIRFile = std::make_unique<ToolOutputFile>(IRFileName, EC,
+                sys::fs::OpenFlags::OF_None);
+    F.print(KernelIRFile->os(), nullptr);
+    KernelIRFile->keep();
+  }
 }
 
 void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
@@ -1095,17 +1108,17 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   }
   const DataLayout &DL = M.getDataLayout();
 
-  Value *GrainSize = TL.getGrainsize() ? ConstantInt::get(TripCount->getType(),
-                                                          TL.getGrainsize())
-                                       : OrderedInputs[2];
+  Value *GrainSize = ConstantInt::get(TripCount->getType(),
+                                      DefaultGrainSize.getValue());
+  /*
   Value *RunSizeQ = B.CreateUDiv(TripCount, GrainSize, "run_size");
   Value *RunRem = B.CreateURem(TripCount, GrainSize, "run_rem");
   Value *isRem = B.CreateICmp(ICmpInst::ICMP_UGT, RunRem,
                               ConstantInt::get(RunRem->getType(), 0));
   Value *isRemAdd = B.CreateZExt(isRem, RunSizeQ->getType());
   Value *RunSize = B.CreateZExt(B.CreateAdd(RunSizeQ, isRemAdd), Int64Ty);
+  */
   Value *argsPtr = B.CreateConstInBoundsGEP2_32(ArrayTy, ArgArray, 0, 0);
-
   // Generate a call to launch the kernel.
   Constant *KNameCS = ConstantDataArray::getString(Ctx, KernelName);
   GlobalVariable *KNameGV =
@@ -1131,18 +1144,18 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   if (! TTarget->hasGlobalVariables()) {
     LLVM_DEBUG(dbgs() << "\t\tcreating no-globals kernel launch.\n");
     Stream = B.CreateCall(KitCudaLaunchFn,
-                          {DummyFBPtr, KNameParam, argsPtr, RunSize},
+                          {DummyFBPtr, KNameParam, argsPtr, TripCount},
                           "stream");
   } else {
     LLVM_DEBUG(dbgs() << "\t\tcreating kernel launch w/ globals.\n");
     Value *CM = B.CreateCall(KitCudaCreateFBModuleFn, {DummyFBPtr});
     Stream = B.CreateCall(KitCudaLaunchModuleFn,
-                          {CM, KNameParam, argsPtr, RunSize},
+                          {CM, KNameParam, argsPtr, TripCount},
                           "stream");
   }
 
-  //LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with kernel wait call.\n");
-  //B.CreateCall(KitCudaWaitFn, Stream);
+  LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with kernel wait call.\n");
+  B.CreateCall(KitCudaWaitFn, Stream);
 }
 
 CudaABI::CudaABI(Module &M)
@@ -1313,6 +1326,8 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
              << "\twill use level 3 instead.\n";
       OptLevel = 3;
   }
+
+
   PTXASArgList.push_back("--opt-level");
   switch (OptLevel) {
   case 0:
@@ -1875,11 +1890,22 @@ void CudaABI::registerFatbinary(GlobalVariable *Fatbinary) {
 }
 
 CudaABIOutputFile CudaABI::generatePTX() {
+  std::error_code  EC;
+
+  if (KeepIntermediateFiles) {
+    std::unique_ptr<ToolOutputFile> IRFile;
+    SmallString<255> IRFileName(Twine(KM.getName()).str());
+    sys::path::replace_extension(IRFileName, ".tapir");
+    IRFile = std::make_unique<ToolOutputFile>(IRFileName, EC,
+                sys::fs::OpenFlags::OF_None);
+    KM.print(IRFile->os(), nullptr);
+    IRFile->keep();
+  }
+
   // Take the intermediate form code in the kernel module (KM) and
   // generate a PTX file.  The PTX file will be named the same as
   // the original input source modle (M) with the extension changed
   // to PTX.
-  std::error_code  EC;
   SmallString<255> PTXFileName(Twine(CUABI_PREFIX + M.getName()).str());
   sys::path::replace_extension(PTXFileName, ".ptx");
 
