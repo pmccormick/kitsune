@@ -101,30 +101,30 @@ int main(int argc, char* argv[])
       iN.d_view(i) = i-1;
       iS.d_view(i) = i+1;
     });
+    Kokkos::fence();
+    iN.modify_device();
+    iS.modify_device();
     etime = ktimer.seconds();
     ktime = etime;
     fprintf(stderr, "%g (%g)\n", etime, ktime);
-
-    iN.modify_device();
-    iS.modify_device();
 
     ktimer.reset();
     Kokkos::parallel_for("cols", cols, KOKKOS_LAMBDA(const int &j) {
       jW.d_view(j) = j-1;
       jE.d_view(j) = j+1;
     });
+    Kokkos::fence();
+    jW.modify_device();
+    jE.modify_device();
     etime = ktimer.seconds();
     ktime += etime;
     fprintf(stderr, "%g (%g)\n", etime, ktime);
-
-    jW.modify_device();
-    jE.modify_device();
 
     iN.sync_host();
     iN.h_view(0) = 0;
     iN.modify_host();
 
-    iS.sync_host();
+    iS.sync_host();    
     iS.h_view(rows-1) = rows-1;
     iS.modify_host();
 
@@ -132,34 +132,30 @@ int main(int argc, char* argv[])
     jW.h_view(0) = 0;
     jW.modify_host();
 
-    jE.sync_host();
+    jE.sync_host();    
     jE.h_view(cols-1) = cols-1;
     jE.modify_host();
 
+    I.modify_host();    
     random_matrix(I, rows, cols);
-    I.modify_host();
-
+    
     ktimer.reset();
     I.sync_device();
-    J.sync_device();
-    jE.sync_device();
     Kokkos::parallel_for("size_I", size_I, KOKKOS_LAMBDA(const int &k) {
       J.d_view(k) = (float)exp(I.d_view(k));
     });
+    Kokkos::fence();    
+    J.modify_device();        
     etime = ktimer.seconds();
     ktime += etime;
-    fprintf(stderr, "%g\n", etime);
-    J.modify_device();
-
-    J.sync_device();
+    fprintf(stderr, "%g (%g)\n", etime, ktime);
+    
     iN.sync_device();
     iS.sync_device();
     jE.sync_device();
     jW.sync_device();
-
     for (int iter=0; iter< niter; iter++) {
       sum=0; sum2=0;
-
       J.sync_host();
       for (int i=r1; i<= r2; i++) {
         for (int j=c1; j<= c2; j++) {
@@ -181,9 +177,9 @@ int main(int argc, char* argv[])
           // directional derivatives
           dN.d_view(k) = J.d_view(iN.d_view(i) * cols + j) - Jc;
           dS.d_view(k) = J.d_view(iS.d_view(i) * cols + j) - Jc;
+          dE.d_view(k) = J.d_view(i * cols + jE.d_view(j)) - Jc;	  
           dW.d_view(k) = J.d_view(i * cols + jW.d_view(j)) - Jc;
-          dE.d_view(k) = J.d_view(i * cols + jE.d_view(j)) - Jc;
-
+	  
           float G2 = (dN.d_view(k)*dN.d_view(k) + dS.d_view(k)*dS.d_view(k) +
                       dW.d_view(k)*dW.d_view(k) + dE.d_view(k)*dE.d_view(k)) /
                      (Jc*Jc);
@@ -205,11 +201,13 @@ int main(int argc, char* argv[])
             c.d_view(k) = 1.0;
         }
       });
+      Kokkos::fence();
       etime = ktimer.seconds();
       ktime += etime;
       fprintf(stderr, "1. %g (%g)\n", etime, ktime);
 
       ktimer.reset();
+      J.modify_device();
       Kokkos::parallel_for("loop2", rows, KOKKOS_LAMBDA(const int &i) {
         for (int j = 0; j < cols; j++) {
           // current index
@@ -228,15 +226,13 @@ int main(int argc, char* argv[])
           J.d_view(k) = J.d_view(k) + 0.25*lambda*D;
         }
       });
-
-      J.modify_device();
+      Kokkos::fence();      
       etime = ktimer.seconds();
       ktime += etime;
       fprintf(stderr, "2. %g (%g)\n", etime, ktime);
     }
-
     double rtime = r.seconds();
-    fprintf(stdout, "kernel times: %7.6g\n", ktime);
+    fprintf(stdout, "total time in kernels: %7.6g\n", ktime);
     fprintf(stdout, "total runtime: %7.6g\n", rtime);
 
     J.sync_host();

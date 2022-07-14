@@ -78,8 +78,8 @@ int main(int argc, char* argv[])
   }
 
   fprintf(stderr, "row/col size: %d/%d\n", rows, cols);
-
   timer r;
+  
   size_I = cols * rows;
   size_R = (r2-r1+1)*(c2-c1+1);
 
@@ -97,14 +97,15 @@ int main(int argc, char* argv[])
   dW = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
   dE = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
 
-  double etime;
+  double ktime = 0.0;  
+  double etime = 0.0;
   timer ktimer;
   forall(int i=0; i < rows; i++) {
     iN[i] = i-1;
     iS[i] = i+1;
   }
   etime = ktimer.seconds();
-  double ktime = etime;
+  ktime = etime;
   fprintf(stderr, "%g (%g)\n", etime, ktime);
 
   ktimer.reset();
@@ -152,8 +153,8 @@ int main(int argc, char* argv[])
         // directional derivatives
         dN[k] = J[iN[i] * cols + j] - Jc;
         dS[k] = J[iS[i] * cols + j] - Jc;
+        dE[k] = J[i * cols + jE[j]] - Jc;	
         dW[k] = J[i * cols + jW[j]] - Jc;
-        dE[k] = J[i * cols + jE[j]] - Jc;
 
         float G2 = (dN[k]*dN[k] + dS[k]*dS[k] +
                     dW[k]*dW[k] + dE[k]*dE[k]) / (Jc*Jc);
@@ -202,7 +203,7 @@ int main(int argc, char* argv[])
   }
 
   double rtime = r.seconds();
-  fprintf(stdout, "kernel times: %7.6g\n", ktime);
+  fprintf(stdout, "total time in kernels: %7.6g\n", ktime);
   fprintf(stdout, "total runtime: %7.6g\n", rtime);
 
   FILE *fp = fopen("srad-forall.dat", "wb");
