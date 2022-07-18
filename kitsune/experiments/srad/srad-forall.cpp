@@ -38,7 +38,7 @@ void usage(int argc, char **argv)
 
 int main(int argc, char* argv[])
 {
-  int rows, cols, size_I, size_R, niter = 10;
+  int rows, cols, size_I, size_R, niter = 20;
   float *I, *J, q0sqr, sum, sum2, tmp, meanROI,varROI ;
   float Jc, G2, L, num, den, qsqr;
   int *iN,*iS,*jE,*jW;
@@ -60,14 +60,14 @@ int main(int argc, char* argv[])
     niter = atoi(argv[8]); //number of iterations
   } else if (argc == 1) {
     // run with a default configuration.
-    rows = 12800;
-    cols = 12800;
+    rows = 16000;
+    cols = 16000;
     r1 = 0;
     r2 = 127;
     c1 = 0;
     c2 = 127;
     lambda = 0.5;
-    niter = 10;
+    niter = 20;
   } else {
     usage(argc, argv);
   }
@@ -76,8 +76,7 @@ int main(int argc, char* argv[])
     fprintf(stderr, "rows and cols must be multiples of 16\n");
     exit(1);
   }
-
-  fprintf(stderr, "row/col size: %d/%d\n", rows, cols);
+  
   timer r;
   
   size_I = cols * rows;
@@ -97,25 +96,15 @@ int main(int argc, char* argv[])
   dW = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
   dE = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
 
-  double ktime = 0.0;  
-  double etime = 0.0;
-  timer ktimer;
   forall(int i=0; i < rows; i++) {
     iN[i] = i-1;
     iS[i] = i+1;
   }
-  etime = ktimer.seconds();
-  ktime = etime;
-  fprintf(stderr, "%g (%g)\n", etime, ktime);
 
-  ktimer.reset();
   forall(int j=0; j < cols; j++) {
     jW[j] = j-1;
     jE[j] = j+1;
   }
-  etime = ktimer.seconds();
-  ktime += etime;
-  fprintf(stderr, "%g (%g)\n", etime, ktime);
 
   iN[0] = 0;
   iS[rows-1] = rows-1;
@@ -124,12 +113,8 @@ int main(int argc, char* argv[])
 
   random_matrix(I, rows, cols);
 
-  ktimer.reset();
   forall(int k = 0;  k < size_I; k++ )
     J[k] = (float)exp(I[k]) ;
-  etime = ktimer.seconds();
-  ktime += etime;
-  fprintf(stderr, "%g (%g)\n", etime, ktime);
 
   for (int iter=0; iter < niter; iter++) {
     sum=0; sum2=0;
@@ -145,7 +130,6 @@ int main(int argc, char* argv[])
     varROI  = (sum2 / size_R) - meanROI*meanROI;
     q0sqr   = varROI / (meanROI*meanROI);
 
-    ktimer.reset();
     forall(int i = 0 ; i < rows; i++) {
       for(int j = 0; j < cols; j++) {
         int k = i * cols + j;
@@ -176,11 +160,7 @@ int main(int argc, char* argv[])
           c[k] = 1.0;
       }
     }
-    etime = ktimer.seconds();
-    ktime += etime;
-    fprintf(stderr, "1. %g (%g)\n", etime, ktime);
 
-    ktimer.reset();
     forall(int i = 0; i < rows; i++) {
       for(int j = 0; j < cols; j++) {
         // current index
@@ -197,19 +177,17 @@ int main(int argc, char* argv[])
         J[k] = J[k] + 0.25*lambda*D;
       }
     }
-    etime = ktimer.seconds();
-    ktime += etime;
-    fprintf(stderr, "2. %g (%g)\n", etime, ktime);
   }
 
   double rtime = r.seconds();
-  fprintf(stdout, "total time in kernels: %7.6g\n", ktime);
-  fprintf(stdout, "total runtime: %7.6g\n", rtime);
+  fprintf(stdout, "runtime: %7.6g\n", rtime);
 
+  /*
   FILE *fp = fopen("srad-forall.dat", "wb");
   if (fp != NULL) {
     fwrite((void*)J, sizeof(float), size_I, fp);
     fclose(fp);
   }
+  */
   return 0;
 }

@@ -476,6 +476,8 @@ static void __kitrt_cuMaxPotentialBlockSize(int &blocksPerGrid,
                                      &threadsPerBlock, F, 0,
                                      0, // no dynamic shared memory...
                                      0));
+  fprintf(stderr, "occupancy returned: %d, %d\n", blocksPerGrid,
+                   threadsPerBlock);
   blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
 }
 
@@ -805,5 +807,10 @@ void __kitrt_cuCheckCtxState() {
 	    "kitrt: context check encountered uninitialized CUDA state!\n");
   }
 }
+struct GraphInfo {
+  CUgraph     graph;
+  GUgraphExec exec;
+
+};
 
 } // extern "C"

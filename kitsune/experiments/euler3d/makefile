@@ -28,16 +28,10 @@ kokkos_clang_flags=${clang_cuda_flags} -I${kokkos_cu_prefix}/include
 kokkos_nvcc_flags=-I${kokkos_cu_prefix}/include ${nvcc_cxx_flags} -m64 -arch=${NVARCH} --resource-usage --no-exceptions -I${kitsune_prefix}/include
 
 
-all: srad-forall.cuda.${host_arch} \
-     srad-kokkos.nvcc.${host_arch} \
-     srad-kokkos.clang.${host_arch}
+all: euler3d-forall.cuda.${host_arch} 
 
-srad-forall.cuda.${host_arch}: srad-forall.cpp
+euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
 	/bin/time ${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-srad-kokkos.nvcc.${host_arch}: srad-kokkos.cpp
-	/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-srad-kokkos.clang.${host_arch}: srad-kokkos.cpp
-	${clangxx} ${clang_flags} ${kokkos_clang_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 
 clean:
 	-rm -f *.${host_arch}

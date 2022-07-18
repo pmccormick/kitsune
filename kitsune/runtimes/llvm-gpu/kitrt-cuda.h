@@ -92,7 +92,7 @@ extern "C" {
   float __kitrt_cuElapsedEventTime(void *start, void *stop);
 
   bool  __kitrt_cuIsMemManaged(void *vp);
-  void  __kitrt_cuEnablePrefetch();  
+  void  __kitrt_cuEnablePrefetch();
   void  __kitrt_cuDisablePrefetch();
   void  __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size);
   void  __kitrt_cuMemPrefetchAsync(void *vp, size_t size);
@@ -114,6 +114,9 @@ extern "C" {
   void *__kitrt_cuLaunchELFKernel(const void *elf, void **args,
                                   size_t numElements);
   void __kitrt_cuStreamSynchronize(void *vs);
+
+  int __kitrt_cuGraphBegin();
+  void __kitrt_cuGraphEnd(int graphID);
 
 #ifdef __cplusplus
   void *__kitrt_cuLaunchKernel(llvm::Module & m, void **args,

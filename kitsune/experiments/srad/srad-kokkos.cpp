@@ -11,8 +11,6 @@ using namespace kitsune;
 typedef Kokkos::DualView<float*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> FloatDualView;
 typedef Kokkos::DualView<int*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> IntDualView;
 
-
-
 void random_matrix(FloatDualView &I, int rows, int cols) {
   srand(7);
   for(int i = 0 ; i < rows ; i++) {
@@ -40,7 +38,7 @@ void usage(int argc, char **argv)
 
 int main(int argc, char* argv[])
 {
-  int rows, cols, size_I, size_R, niter = 10;
+  int rows, cols, size_I, size_R, niter = 20;
   float q0sqr, sum, sum2, tmp, meanROI,varROI ;
   int r1, r2, c1, c2;
   float lambda;
@@ -56,14 +54,14 @@ int main(int argc, char* argv[])
     niter = atoi(argv[8]); //number of iterations
   } else if (argc == 1) {
     // run with default configuration...
-    rows = 12800;
-    cols = 12800;
+    rows = 16000;
+    cols = 16000;
     r1 = 0;
     r2 = 127;
     c1 = 0;
     c2 = 127;
     lambda = 0.5;
-    niter = 10;
+    niter = 20;
   } else {
     usage(argc, argv);
   }
@@ -74,8 +72,7 @@ int main(int argc, char* argv[])
   }
 
   Kokkos::initialize(argc, argv); {
-    fprintf(stderr, "row/col size: %d/%d\n", rows, cols);
-    timer r;
+    timer r;  
 
     size_I = cols * rows;
     size_R = (r2-r1+1)*(c2-c1+1);
@@ -94,9 +91,6 @@ int main(int argc, char* argv[])
     FloatDualView dW = FloatDualView("dW", size_I);
     FloatDualView dE = FloatDualView("dE", size_I);
 
-    double ktime = 0.0;
-    double etime = 0.0;
-    timer ktimer;
     Kokkos::parallel_for("rows", rows, KOKKOS_LAMBDA(const int &i) {
       iN.d_view(i) = i-1;
       iS.d_view(i) = i+1;
@@ -104,11 +98,7 @@ int main(int argc, char* argv[])
     Kokkos::fence();
     iN.modify_device();
     iS.modify_device();
-    etime = ktimer.seconds();
-    ktime = etime;
-    fprintf(stderr, "%g (%g)\n", etime, ktime);
 
-    ktimer.reset();
     Kokkos::parallel_for("cols", cols, KOKKOS_LAMBDA(const int &j) {
       jW.d_view(j) = j-1;
       jE.d_view(j) = j+1;
@@ -116,9 +106,6 @@ int main(int argc, char* argv[])
     Kokkos::fence();
     jW.modify_device();
     jE.modify_device();
-    etime = ktimer.seconds();
-    ktime += etime;
-    fprintf(stderr, "%g (%g)\n", etime, ktime);
 
     iN.sync_host();
     iN.h_view(0) = 0;
@@ -139,17 +126,13 @@ int main(int argc, char* argv[])
     I.modify_host();    
     random_matrix(I, rows, cols);
     
-    ktimer.reset();
     I.sync_device();
     Kokkos::parallel_for("size_I", size_I, KOKKOS_LAMBDA(const int &k) {
       J.d_view(k) = (float)exp(I.d_view(k));
     });
     Kokkos::fence();    
     J.modify_device();        
-    etime = ktimer.seconds();
-    ktime += etime;
-    fprintf(stderr, "%g (%g)\n", etime, ktime);
-    
+
     iN.sync_device();
     iS.sync_device();
     jE.sync_device();
@@ -169,7 +152,6 @@ int main(int argc, char* argv[])
       varROI  = (sum2 / size_R) - meanROI*meanROI;
       q0sqr   = varROI / (meanROI*meanROI);
 
-      ktimer.reset();
       Kokkos::parallel_for("loop1", rows, KOKKOS_LAMBDA(const int &i) {
         for (int j = 0; j < cols; j++) {
           int k = i * cols + j;
@@ -202,11 +184,7 @@ int main(int argc, char* argv[])
         }
       });
       Kokkos::fence();
-      etime = ktimer.seconds();
-      ktime += etime;
-      fprintf(stderr, "1. %g (%g)\n", etime, ktime);
 
-      ktimer.reset();
       J.modify_device();
       Kokkos::parallel_for("loop2", rows, KOKKOS_LAMBDA(const int &i) {
         for (int j = 0; j < cols; j++) {
@@ -227,14 +205,10 @@ int main(int argc, char* argv[])
         }
       });
       Kokkos::fence();      
-      etime = ktimer.seconds();
-      ktime += etime;
-      fprintf(stderr, "2. %g (%g)\n", etime, ktime);
     }
     double rtime = r.seconds();
-    fprintf(stdout, "total time in kernels: %7.6g\n", ktime);
-    fprintf(stdout, "total runtime: %7.6g\n", rtime);
-
+    fprintf(stdout, "runtime: %7.6g\n", rtime);
+    /*
     J.sync_host();
     auto V = J.view_host();
     FILE *fp = fopen("srad-kokkos.dat", "wb");
@@ -242,6 +216,7 @@ int main(int argc, char* argv[])
       fwrite((void*)V.data(), sizeof(float), size_I, fp);
       fclose(fp);
     }
+    */
   } Kokkos::finalize();
 
   return 0;
