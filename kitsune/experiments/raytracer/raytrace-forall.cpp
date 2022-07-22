@@ -6,7 +6,6 @@
 #include <float.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <omp.h>
 #include <time.h>
 #include "kitsune/timer.h"
 #include <kitsune.h>

@@ -14,7 +14,7 @@ clang_flags=${cxx_flags} ${opt_flags} ${clang_info_flags}
 #   -cuabi-keep-files saves intermediate files (.ll, .ptx, .fatbin) on disk for a closer look at codegen details. 
 #
 tapir_cu_launch_flags=-I${CUDA_HOME}/include
-tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags}
+tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm --cuabi-keep-files -mllvm -debug-only=cuda-abi
 tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1 -mllvm -cuabi-default-grainsize=1
 ####
 
@@ -31,7 +31,7 @@ kokkos_nvcc_flags=-I${kokkos_cu_prefix}/include ${nvcc_cxx_flags} -m64 -arch=${N
 all: euler3d-forall.cuda.${host_arch} 
 
 euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
-	/bin/time ${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+	${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 
 clean:
 	-rm -f *.${host_arch}
@@ -40,4 +40,4 @@ clean:
 	-rm -f *.bc
 	-rm -f *.fatbin
 	-rm -f *.ppm *.jpg 
-	-rm -f *.ll *.ptx *.csv *.log *.s *.fbin
+	-rm -f *.ll *.ptx *.csv *.log *.s *.fbin *.tapir 

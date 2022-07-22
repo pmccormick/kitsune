@@ -1,16 +1,18 @@
-// Copyright 2009, Andrew Corrigan, acorriga@gmu.edu
+/// Copyright 2009, Andrew Corrigan, acorriga@gmu.edu
 // This code is from the AIAA-2009-4001 paper
 
 #include <iostream>
 #include <fstream>
 #include <chrono>
+#include <kitsune.h>
 #include <cmath>
 
-#include <kitsune.h>
+
 #include "kitsune/timer.h"
 #include "kitsune/llvm-gpu-abi/llvm-gpu.h"
 #include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
 
+using namespace std;
 using namespace kitsune;
 
 struct float3 {
@@ -74,32 +76,34 @@ void copy(T* dst, T* src, int N)
 void dump(float* variables, int nel, int nelr)
 {
   {
-    std::ofstream file("density");
-    file << nel << " " << nelr << std::endl;
+    ofstream file("density");
+    file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++)
-      file << variables[i + VAR_DENSITY*nelr] << std::endl;
+      file << variables[i + VAR_DENSITY*nelr] << endl;
   }
 
   {
-    std::ofstream file("momentum");
-    file << nel << " " << nelr << std::endl;
+    ofstream file("momentum");
+    file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++) {
     	for(int j = 0; j != NDIM; j++)
         file << variables[i + (VAR_MOMENTUM+j)*nelr] << " ";
-    	file << std::endl;
+    	file << endl;
     }
   }
 
   {
-    std::ofstream file("density_energy");
-    file << nel << " " << nelr << std::endl;
+    ofstream file("density_energy");
+    file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++)
-      file << variables[i + VAR_DENSITY_ENERGY*nelr] << std::endl;
+      file << variables[i + VAR_DENSITY_ENERGY*nelr] << endl;
   }
 
 }
 
-void initialize_variables(int nelr, float* variables, float* ff_variable)
+void initialize_variables(int nelr,
+			  float* variables,
+			  const float* ff_variable)
 {
   forall(int i = 0; i < nelr; i++) {
     for(int j = 0; j < NVAR; j++)
@@ -107,10 +111,16 @@ void initialize_variables(int nelr, float* variables, float* ff_variable)
   }
 }
 
-inline void compute_flux_contribution(float& density, float3& momentum,
-              float& density_energy, float& pressure, float3& velocity,
-              float3& fc_momentum_x, float3& fc_momentum_y,
-              float3& fc_momentum_z, float3& fc_density_energy)
+inline __attribute__((always_inline))
+void compute_flux_contribution(const float density,
+			       const float3& momentum,
+			       const float density_energy,
+			       const float pressure,
+			       float3& velocity,
+			       float3& fc_momentum_x,
+			       float3& fc_momentum_y,
+			       float3& fc_momentum_z,
+			       float3& fc_density_energy)
 {
   fc_momentum_x.x = velocity.x*momentum.x + pressure;
   fc_momentum_x.y = velocity.x*momentum.y;
@@ -130,31 +140,42 @@ inline void compute_flux_contribution(float& density, float3& momentum,
   fc_density_energy.z = velocity.z*de_p;
 }
 
-inline void compute_velocity(float& density, float3& momentum, float3& velocity)
+inline __attribute__((always_inline))
+void compute_velocity(float density,
+		      const float3& momentum,
+		      float3& velocity)
 {
   velocity.x = momentum.x / density;
   velocity.y = momentum.y / density;
   velocity.z = momentum.z / density;
 }
 
-inline float compute_speed_sqd(float3& velocity)
+inline __attribute__((always_inline))
+float compute_speed_sqd(const float3 &velocity)
 {
-  return velocity.x*velocity.x + velocity.y*velocity.y + velocity.z*velocity.z;
+  return velocity.x*velocity.x +
+         velocity.y*velocity.y +
+         velocity.z*velocity.z;
 }
 
-inline float compute_pressure(float& density, float& density_energy,
-                              float& speed_sqd)
+inline __attribute__((always_inline))
+float compute_pressure(float density,
+		       float density_energy,
+		       float speed_sqd)
 {
   return (float(GAMMA)-float(1.0f))*(density_energy - float(0.5f)*density*speed_sqd);
 }
 
-inline float compute_speed_of_sound(float& density, float& pressure)
+inline __attribute__((always_inline))
+float compute_speed_of_sound(float density, float pressure)
 {
-  return std::sqrt(float(GAMMA)*pressure/density);
+  return sqrtf(float(GAMMA)*pressure/density);
 }
 
 
-void compute_step_factor(int nelr, float* __restrict variables, float* areas,
+void compute_step_factor(int nelr,
+			 const float* __restrict variables,
+			 const float* areas,
                          float* __restrict step_factors)
 {
   forall(int blk = 0; blk < nelr/block_length; ++blk) {
@@ -170,24 +191,32 @@ void compute_step_factor(int nelr, float* __restrict variables, float* areas,
       momentum.z = variables[i + (VAR_MOMENTUM+2)*nelr];
 
       float density_energy = variables[i + VAR_DENSITY_ENERGY*nelr];
-      float3 velocity;	   compute_velocity(density, momentum, velocity);
-      float speed_sqd      = compute_speed_sqd(velocity);
-      float pressure       = compute_pressure(density, density_energy, speed_sqd);
+      float3 velocity;
+      compute_velocity(density, momentum, velocity);
+      float speed_sqd = compute_speed_sqd(velocity);
+      float pressure = compute_pressure(density, density_energy, speed_sqd);
       float speed_of_sound = compute_speed_of_sound(density, pressure);
 
-      // dt = float(0.5f) * std::sqrt(areas[i]) / (||v|| + c).... but
+      // dt = float(0.5f) * sqrt(areas[i]) / (||v|| + c).... but
       // when we do time stepping, this later would need to be divided
       // by the area, so we just do it all at once
-      step_factors[i] = float(0.5f) / (std::sqrt(areas[i]) * (std::sqrt(speed_sqd) + speed_of_sound));
+      step_factors[i] = float(0.5f) / (sqrtf(areas[i]) *
+        (sqrtf(speed_sqd) + speed_of_sound));
     }
   }
 }
-void compute_flux(int nelr, int* elements_surrounding_elements, float* normals,
-                  float* variables, float* fluxes, float* ff_variable,
-                  float3 ff_flux_contribution_momentum_x,
-                  float3 ff_flux_contribution_momentum_y,
-                  float3 ff_flux_contribution_momentum_z,
-                  float3 ff_flux_contribution_density_energy) {
+
+void compute_flux(int nelr,
+		  const int* elements_surrounding_elements,
+		  const float* normals,
+                  const float* variables,
+		  float* fluxes,
+		  const float* ff_variable,
+                  const float3 ff_flux_contribution_momentum_x,
+                  const float3 ff_flux_contribution_momentum_y,
+                  const float3 ff_flux_contribution_momentum_z,
+                  const float3 ff_flux_contribution_density_energy) {
+  using namespace std;
   const float smoothing_coefficient = float(0.2f);
 
   forall(int blk = 0; blk < nelr/block_length; ++blk) {
@@ -206,7 +235,7 @@ void compute_flux(int nelr, int* elements_surrounding_elements, float* normals,
       float3 velocity_i;
       compute_velocity(density_i, momentum_i, velocity_i);
       float speed_sqd_i = compute_speed_sqd(velocity_i);
-      float speed_i = std::sqrt(speed_sqd_i);
+      float speed_i = sqrtf(speed_sqd_i);
       float pressure_i = compute_pressure(density_i,
                                           density_energy_i,
                                           speed_sqd_i);
@@ -245,9 +274,9 @@ void compute_flux(int nelr, int* elements_surrounding_elements, float* normals,
         normal.x = normals[i + (j + 0*NNB)*nelr];
         normal.y = normals[i + (j + 1*NNB)*nelr];
         normal.z = normals[i + (j + 2*NNB)*nelr];
-        normal_len = std::sqrt(normal.x*normal.x +
-                               normal.y*normal.y +
-                               normal.z*normal.z);
+        normal_len = sqrtf(normal.x*normal.x +
+                          normal.y*normal.y +
+                          normal.z*normal.z);
 
         if (nb >= 0) { // a legitimate neighbor
           density_nb = variables[nb + VAR_DENSITY*nelr];
@@ -269,7 +298,7 @@ void compute_flux(int nelr, int* elements_surrounding_elements, float* normals,
 
           // artificial viscosity
           factor = -normal_len*smoothing_coefficient*float(0.5f) *
-                        (speed_i + std::sqrt(speed_sqd_nb) +
+                        (speed_i + sqrtf(speed_sqd_nb) +
                          speed_of_sound_i + speed_of_sound_nb);
           flux_i_density += factor*(density_i-density_nb);
           flux_i_density_energy += factor*(density_energy_i-density_energy_nb);
@@ -390,7 +419,7 @@ void time_step(int j, int nelr, float* old_variables, float* variables,
 int main(int argc, char** argv)
 {
   if (argc < 2) {
-    std::cout << "specify data file name" << std::endl;
+    cout << "specify data file name" << endl;
     return 0;
   }
   const char* data_file_name = argv[1];
@@ -406,7 +435,8 @@ int main(int argc, char** argv)
     ff_variable[VAR_DENSITY] = float(1.4);
 
     float ff_pressure = float(1.0f);
-    float ff_speed_of_sound = sqrt(GAMMA*ff_pressure / ff_variable[VAR_DENSITY]);
+    float ff_speed_of_sound = sqrtf(GAMMA*ff_pressure /
+                                    ff_variable[VAR_DENSITY]);
     float ff_speed = float(ff_mach)*ff_speed_of_sound;
 
     float3 ff_velocity;
@@ -437,10 +467,10 @@ int main(int argc, char** argv)
   int* elements_surrounding_elements;
   float* normals;
   {
-    std::ifstream file(data_file_name);
+    ifstream file(data_file_name);
 
     file >> nel;
-    nelr = block_length*((nel / block_length )+ std::min(1, nel % block_length));
+    nelr = block_length*((nel / block_length )+ min(1, nel % block_length));
 
     areas = new float[nelr];
     elements_surrounding_elements = new int[nelr*NNB];
@@ -482,8 +512,8 @@ int main(int argc, char** argv)
   float* step_factors = alloc<float>(nelr);
 
   // these need to be computed the first time in order to compute time step
-  std::cout << "Starting..." << std::endl;
-  auto start = std::chrono::steady_clock::now();
+  cout << "Starting..." << endl;
+  auto start = chrono::steady_clock::now();
   // Begin iterations
   for(int i = 0; i < iterations; i++) {
     copy<float>(old_variables, variables, nelr*NVAR);
@@ -499,15 +529,15 @@ int main(int argc, char** argv)
     }
   }
 
-  auto end = std::chrono::steady_clock::now();
-  std::cout  << "Compute time: " << std::chrono::duration<double>(end-start).count() << std::endl;
+  auto end = chrono::steady_clock::now();
+  cout  << "Compute time: " << chrono::duration<double>(end-start).count() << endl;
 
-  std::cout << "Saving solution..." << std::endl;
+  cout << "Saving solution..." << endl;
   dump(variables, nel, nelr);
-  std::cout << "Saved solution..." << std::endl;
+  cout << "Saved solution..." << endl;
 
 
-  std::cout << "Cleaning up..." << std::endl;
+  cout << "Cleaning up..." << endl;
   dealloc<float>(areas);
   dealloc<int>(elements_surrounding_elements);
   dealloc<float>(normals);
@@ -517,7 +547,7 @@ int main(int argc, char** argv)
   dealloc<float>(fluxes);
   dealloc<float>(step_factors);
 
-  std::cout << "Done..." << std::endl;
+  cout << "Done..." << endl;
 
   return 0;
 }

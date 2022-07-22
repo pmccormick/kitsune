@@ -152,29 +152,91 @@ declare(cuOccupancyMaxPotentialBlockSize);
     }                                                        \
   }
 
+
+// The runtime cooperates with the compiler to manage the
+// prefetching (simple for now) of data for both GPU and
+// host and gpu computations.  This is geared specifically
+// to support UVM and avoid developers having to manually
+// insert synchronization calls between host and gpu-side
+// computations.
+//
+// This includes tracking allocated UVM memory (via address)
+// and also information about the state of the allocation.
+// For example, the size in bytes of the allocation and the
+// location of the data's last known write (most recent
+// update).  This currently assumes synchronous launches as
+// details have to coordinated with the compiler analysis in
+// this regard.
+
+// Location of the most recently updated UVM allocated memory.
+// This can be either host or device, or host AND device meaning
+// there is valid data in both locations (e.g., computed on host
+// and then prefetched and used as a read-only variable on the
+// GPU).
 struct AllocMapEntry {
-  size_t    size;
-  bool      prefetched;
+  size_t         size;
+  KitRTMemoryAffinity affinity;
 };
 
-typedef std::map<void *, size_t> KitRTAllocMap;
+typedef std::map<void *, AllocMapEntry> KitRTAllocMap;
 static KitRTAllocMap _kitrtAllocMap;
 
 static void __kitrt_registerMemAlloc(void *addr, size_t size) {
   assert(addr != nullptr && "unexpected null pointer!");
   assert(_kitrtAllocMap.find(addr) == _kitrtAllocMap.end() && "insertion of existing mem alloc pointer!");
-  _kitrtAllocMap[addr] = size;
+  AllocMapEntry E;
+  E.size = size;
+  E.affinity = _KITRT_Host;
+  _kitrtAllocMap[addr] = E;
 }
 
 static size_t __kitrt_getMemAllocSize(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMap::const_iterator cit = _kitrtAllocMap.find(addr);
-  if (cit != _kitrtAllocMap.end())
-    return cit->second;
-  else
+  if (cit != _kitrtAllocMap.end()) {
+    AllocMapEntry E = cit->second;
+    return E.size;
+  } else
     return 0;
 }
 
+bool __kitrt_memHasAffinity(void *addr,
+                            const KitRTMemoryAffinity &affinity) {
+  assert(addr != nullptr && "unexpected null pointer!");
+  KitRTAllocMap::const_iterator cit = _kitrtAllocMap.find(addr);
+  assert(cit != _kitrtAllocMap.end() && "query on unmanaged pointer!");
+  AllocMapEntry E = cit->second;
+  return (int(E.affinity) & int(affinity)) != 0;
+}
+
+/*
+bool __kitrt_memHasHostAffinity(void *addr) {
+  return __kitrt_memHasAffinity(addr,
+              KitRTMemoryAffinity::_KITRT_Host &
+              KitRTMemoryAffinity::_KITRT_HostAndDevice);
+}
+
+bool __kitrt_memHasGPUAffinity(void *addr) {
+  return __kitrt_memHasAffinity(addr,
+              KitRTMemoryAffinity::_KITRT_Device &
+              KitRTMemoryAffinity::_KITRT_HostAndDevice);
+}
+
+void __kitrt_cuMemSetAffinity(void *addr, KitRTMemoryAffinity &A) {
+  assert(addr != nullptr && "unexpected null pointer!\n");
+  KitRTAllocMap::iterator it = _kitrtAllocMap.find(addr);
+  assert(it != _kitrtAllocMap.end() && "query on unmanaged pointer!");
+  it->second.affinity = A;
+}
+
+void __kitrt_cuMemSetHostAffinity(void *addr) {
+  __kitrt_cuMemSetAffinity(addr, KitRTMemoryAffinity::_KITRT_Host);
+}
+
+void __kitrt_cuMemSetDeviceAffinity(void *addr) {
+  __kitrt_cuMemSetAffinity(addr, KitRTMemoryAffinity::_KITRT_Device);
+}
+*/
 static bool __kitrt_unregisterMemAlloc(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMap::iterator it = _kitrtAllocMap.find(addr);
@@ -807,10 +869,5 @@ void __kitrt_cuCheckCtxState() {
 	    "kitrt: context check encountered uninitialized CUDA state!\n");
   }
 }
-struct GraphInfo {
-  CUgraph     graph;
-  GUgraphExec exec;
-
-};
 
 } // extern "C"

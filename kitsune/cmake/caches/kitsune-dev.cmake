@@ -32,11 +32,11 @@ set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
 # you are working on.  By default we provide the full suite of
 # clang+tools, openmp, lld, and a debugger via lldb.
 set(LLVM_ENABLE_PROJECTS
-  clang;mlir;openmp;
+  clang;clang-tools-extra;mlir;openmp;
   CACHE STRING "")
 
 set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 70 CACHE STRING "")
-set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_70 CACHE STRING "")
+set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_75 CACHE STRING "")
 
 # CUDA/NVCC is really only happy with older host compilers.  You
 # may need to tweak this to make things happy but we typically

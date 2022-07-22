@@ -179,12 +179,12 @@ public:
   }
 
   void preProcessTapirLoop(TapirLoopInfo &TL,
-                           ValueToValueMapTy &VMap);
+                           ValueToValueMapTy &VMap) override;
   void postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo & Out,
                           ValueToValueMapTy &VMap) override final;
   void processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo & TOI,
                                DominatorTree &DT) override final;
-  void transformForPTX();
+  void transformForPTX(Function &F);
 
 };
 
