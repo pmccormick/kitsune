@@ -76,14 +76,14 @@ void copy(T* dst, T* src, int N)
 void dump(float* variables, int nel, int nelr)
 {
   {
-    ofstream file("density");
+    ofstream file("density-forall.dat");
     file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++)
       file << variables[i + VAR_DENSITY*nelr] << endl;
   }
 
   {
-    ofstream file("momentum");
+    ofstream file("momentum-forall.dat");
     file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++) {
     	for(int j = 0; j != NDIM; j++)
@@ -93,7 +93,7 @@ void dump(float* variables, int nel, int nelr)
   }
 
   {
-    ofstream file("density_energy");
+    ofstream file("density_energy-forall.dat");
     file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++)
       file << variables[i + VAR_DENSITY_ENERGY*nelr] << endl;
@@ -102,8 +102,8 @@ void dump(float* variables, int nel, int nelr)
 }
 
 void initialize_variables(int nelr,
-			  float* variables,
-			  const float* ff_variable)
+                          float* variables,
+                          const float* ff_variable)
 {
   forall(int i = 0; i < nelr; i++) {
     for(int j = 0; j < NVAR; j++)
@@ -113,14 +113,14 @@ void initialize_variables(int nelr,
 
 inline __attribute__((always_inline))
 void compute_flux_contribution(const float density,
-			       const float3& momentum,
-			       const float density_energy,
-			       const float pressure,
-			       float3& velocity,
-			       float3& fc_momentum_x,
-			       float3& fc_momentum_y,
-			       float3& fc_momentum_z,
-			       float3& fc_density_energy)
+                               const float3& momentum,
+                               const float density_energy,
+                               const float pressure,
+                               float3& velocity,
+                               float3& fc_momentum_x,
+                               float3& fc_momentum_y,
+                               float3& fc_momentum_z,
+                               float3& fc_density_energy)
 {
   fc_momentum_x.x = velocity.x*momentum.x + pressure;
   fc_momentum_x.y = velocity.x*momentum.y;
@@ -142,8 +142,8 @@ void compute_flux_contribution(const float density,
 
 inline __attribute__((always_inline))
 void compute_velocity(float density,
-		      const float3& momentum,
-		      float3& velocity)
+                      const float3& momentum,
+                      float3& velocity)
 {
   velocity.x = momentum.x / density;
   velocity.y = momentum.y / density;
@@ -160,8 +160,8 @@ float compute_speed_sqd(const float3 &velocity)
 
 inline __attribute__((always_inline))
 float compute_pressure(float density,
-		       float density_energy,
-		       float speed_sqd)
+                       float density_energy,
+                       float speed_sqd)
 {
   return (float(GAMMA)-float(1.0f))*(density_energy - float(0.5f)*density*speed_sqd);
 }
@@ -174,9 +174,9 @@ float compute_speed_of_sound(float density, float pressure)
 
 
 void compute_step_factor(int nelr,
-			 const float* __restrict variables,
-			 const float* areas,
-                         float* __restrict step_factors)
+                        const float* __restrict variables,
+                        const float* areas,
+                        float* __restrict step_factors)
 {
   forall(int blk = 0; blk < nelr/block_length; ++blk) {
     int b_start = blk*block_length;
@@ -207,11 +207,11 @@ void compute_step_factor(int nelr,
 }
 
 void compute_flux(int nelr,
-		  const int* elements_surrounding_elements,
-		  const float* normals,
+                  const int* elements_surrounding_elements,
+                  const float* normals,
                   const float* variables,
-		  float* fluxes,
-		  const float* ff_variable,
+                  float* fluxes,
+                  const float* ff_variable,
                   const float3 ff_flux_contribution_momentum_x,
                   const float3 ff_flux_contribution_momentum_y,
                   const float3 ff_flux_contribution_momentum_z,
@@ -422,15 +422,22 @@ int main(int argc, char** argv)
     cout << "specify data file name" << endl;
     return 0;
   }
+
   const char* data_file_name = argv[1];
 
-  float ff_variable[NVAR];
-  float3 ff_flux_contribution_momentum_x, ff_flux_contribution_momentum_y,
-    ff_flux_contribution_momentum_z, ff_flux_contribution_density_energy;
+  cout << "Starting..." << endl;
+  auto start = chrono::steady_clock::now();
+
+  float *ff_variable = alloc<float>(NVAR);
+  float3 ff_flux_contribution_momentum_x,
+         ff_flux_contribution_momentum_y,
+         ff_flux_contribution_momentum_z;
+  float3 ff_flux_contribution_density_energy;
 
   // set far field conditions
   {
-    const float angle_of_attack = float(3.1415926535897931 / 180.0f) * float(deg_angle_of_attack);
+    const float angle_of_attack = float(3.1415926535897931 / 180.0f) *
+                                  float(deg_angle_of_attack);
 
     ff_variable[VAR_DENSITY] = float(1.4);
 
@@ -448,17 +455,23 @@ int main(int argc, char** argv)
     ff_variable[VAR_MOMENTUM+1] = ff_variable[VAR_DENSITY] * ff_velocity.y;
     ff_variable[VAR_MOMENTUM+2] = ff_variable[VAR_DENSITY] * ff_velocity.z;
 
-    ff_variable[VAR_DENSITY_ENERGY] = ff_variable[VAR_DENSITY]*(float(0.5f)*(ff_speed*ff_speed)) +
-      (ff_pressure / float(GAMMA-1.0f));
+    ff_variable[VAR_DENSITY_ENERGY] = ff_variable[VAR_DENSITY]*(float(0.5f)*
+                                      (ff_speed*ff_speed)) +
+                                      (ff_pressure / float(GAMMA-1.0f));
 
     float3 ff_momentum;
     ff_momentum.x = *(ff_variable+VAR_MOMENTUM+0);
     ff_momentum.y = *(ff_variable+VAR_MOMENTUM+1);
     ff_momentum.z = *(ff_variable+VAR_MOMENTUM+2);
-    compute_flux_contribution(ff_variable[VAR_DENSITY], ff_momentum, ff_variable[VAR_DENSITY_ENERGY], ff_pressure,
-			      ff_velocity, ff_flux_contribution_momentum_x, ff_flux_contribution_momentum_y,
-			      ff_flux_contribution_momentum_z, ff_flux_contribution_density_energy);
+    compute_flux_contribution(ff_variable[VAR_DENSITY], ff_momentum,
+                              ff_variable[VAR_DENSITY_ENERGY],
+                              ff_pressure, ff_velocity,
+                              ff_flux_contribution_momentum_x,
+                              ff_flux_contribution_momentum_y,
+                              ff_flux_contribution_momentum_z,
+                              ff_flux_contribution_density_energy);
   }
+
   int nel;
   int nelr;
 
@@ -466,28 +479,30 @@ int main(int argc, char** argv)
   float* areas;
   int* elements_surrounding_elements;
   float* normals;
+
   {
     ifstream file(data_file_name);
-
     file >> nel;
     nelr = block_length*((nel / block_length )+ min(1, nel % block_length));
 
-    areas = new float[nelr];
-    elements_surrounding_elements = new int[nelr*NNB];
-    normals = new float[NDIM*NNB*nelr];
+    areas = alloc<float>(nelr);
+    elements_surrounding_elements = alloc<int>(nelr*NNB);
+    normals = alloc<float>(NDIM*NNB*nelr);
 
     // read in data
     for(int i = 0; i < nel; i++) {
       file >> areas[i];
       for(int j = 0; j < NNB; j++) {
-	file >> elements_surrounding_elements[i + j*nelr];
-	if(elements_surrounding_elements[i+j*nelr] < 0) elements_surrounding_elements[i+j*nelr] = -1;
-	elements_surrounding_elements[i + j*nelr]--; //it's coming in with Fortran numbering
+        file >> elements_surrounding_elements[i + j*nelr];
+        if (elements_surrounding_elements[i+j*nelr] < 0)
+          elements_surrounding_elements[i+j*nelr] = -1;
+        // it's coming in with Fortran numbering
+        elements_surrounding_elements[i + j*nelr]--;
 
-	for(int k = 0; k < NDIM; k++) {
-	  file >>  normals[i + (j + k*NNB)*nelr];
-	  normals[i + (j + k*NNB)*nelr] = -normals[i + (j + k*NNB)*nelr];
-	}
+        for(int k = 0; k < NDIM; k++) {
+          file >>  normals[i + (j + k*NNB)*nelr];
+          normals[i + (j + k*NNB)*nelr] = -normals[i + (j + k*NNB)*nelr];
+        }
       }
     }
 
@@ -496,9 +511,11 @@ int main(int argc, char** argv)
     for(int i = nel; i < nelr; i++) {
       areas[i] = areas[last];
       for(int j = 0; j < NNB; j++) {
-	// duplicate the last element
-	elements_surrounding_elements[i + j*nelr] = elements_surrounding_elements[last + j*nelr];
-	for(int k = 0; k < NDIM; k++) normals[i + (j + k*NNB)*nelr] = normals[last + (j + k*NNB)*nelr];
+        // duplicate the last element
+        elements_surrounding_elements[i + j*nelr] =
+              elements_surrounding_elements[last + j*nelr];
+        for(int k = 0; k < NDIM; k++)
+          normals[i + (j + k*NNB)*nelr] = normals[last + (j + k*NNB)*nelr];
       }
     }
   }
@@ -511,9 +528,6 @@ int main(int argc, char** argv)
   float* fluxes = alloc<float>(nelr*NVAR);
   float* step_factors = alloc<float>(nelr);
 
-  // these need to be computed the first time in order to compute time step
-  cout << "Starting..." << endl;
-  auto start = chrono::steady_clock::now();
   // Begin iterations
   for(int i = 0; i < iterations; i++) {
     copy<float>(old_variables, variables, nelr*NVAR);
@@ -522,9 +536,12 @@ int main(int argc, char** argv)
     compute_step_factor(nelr, variables, areas, step_factors);
 
     for(int j = 0; j < RK; j++) {
-      compute_flux(nelr, elements_surrounding_elements, normals, variables, fluxes, ff_variable,
-		   ff_flux_contribution_momentum_x, ff_flux_contribution_momentum_y,
-		   ff_flux_contribution_momentum_z, ff_flux_contribution_density_energy);
+      compute_flux(nelr, elements_surrounding_elements, normals, variables,
+                   fluxes, ff_variable,
+                   ff_flux_contribution_momentum_x,
+                   ff_flux_contribution_momentum_y,
+                   ff_flux_contribution_momentum_z,
+                   ff_flux_contribution_density_energy);
       time_step(j, nelr, old_variables, variables, step_factors, fluxes);
     }
   }
@@ -535,7 +552,6 @@ int main(int argc, char** argv)
   cout << "Saving solution..." << endl;
   dump(variables, nel, nelr);
   cout << "Saved solution..." << endl;
-
 
   cout << "Cleaning up..." << endl;
   dealloc<float>(areas);

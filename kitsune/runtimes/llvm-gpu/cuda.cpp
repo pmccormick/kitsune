@@ -493,6 +493,7 @@ void __kitrt_cuMemPrefetch(void *vp) {
             "pointer.\n");
 }
 
+__attribute__((malloc))
 void *__kitrt_cuMemAllocManaged(size_t size) {
   //(void)__kitrt_cuInit();
   CUdeviceptr devp;
