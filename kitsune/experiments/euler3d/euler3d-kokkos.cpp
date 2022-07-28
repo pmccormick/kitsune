@@ -590,8 +590,6 @@ int main(int argc, char** argv)
     cout << "Saving solution..." << endl;
     dump(variables, nel, nelr);
     cout << "Saved solution..." << endl;
-
-    cout << "Cleaning up..." << endl;
     cout << "Done..." << endl;
   }  Kokkos::finalize();
 

@@ -445,15 +445,15 @@ bool __kitrt_cuIsMemManaged(void *vp) {
   assert(vp && "__kitrt_cuIsMemManaged() null data pointer!");
   CUdeviceptr devp = (CUdeviceptr)vp;
 
-  /* For a tad bit of flexiblity we don't wrap this call in a
+  /* For a tad bit of flexibility we don't wrap this call in a
    * safe call -- we want to return false if the given pointer
    * is "junk" as far as CUDA is concerned.
    */
   unsigned int is_managed;
   CUresult r = cuPointerGetAttribute_p(&is_managed,
                                        CU_POINTER_ATTRIBUTE_IS_MANAGED, devp);
-  if (r == CUDA_SUCCESS)
-    return is_managed ? true : false;
+  if (r == CUDA_SUCCESS || is_managed != 0)
+    return true;
   else
     return false;
 }
@@ -479,18 +479,18 @@ void __kitrt_cuMemPrefetchAsync(void *vp, size_t size) {
 
 void __kitrt_cuMemPrefetch(void *vp) {
   assert(vp && "__kitrt_cmMemPrefetch() null data pointer!");
-  if (!_kitrtEnablePrefetch)
-    return;
-  size_t size = __kitrt_getMemAllocSize(vp);
-  // TODO: In theory -- but perhaps not practice -- we should only get a
-  // non-zero size back for data that has been allocated as managed memory.
-  // So only prefetch with that in mind...
-  if (size > 0)
-    __kitrt_cuMemPrefetchAsync(vp, size);
-  else
+  if (_kitrtEnablePrefetch && __kitrt_cuIsMemManaged(vp)) {
+    size_t size = __kitrt_getMemAllocSize(vp);
+    // TODO: In theory -- but perhaps not practice -- we should only get a
+    // non-zero size back for data that has been allocated as managed memory.
+    // So only prefetch with that in mind...
+    if (size > 0)
+      __kitrt_cuMemPrefetchAsync(vp, size);
+  } else {
     fprintf(stderr,
             "__kitrt: warning, prefetch requested for an unregistered "
             "pointer.\n");
+  }
 }
 
 __attribute__((malloc))

@@ -19,18 +19,21 @@ tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor
 ####
 
 #### CUDA flags
-nvcc_flags=--std c++17 -m64 -arch=${NVARCH} --resource-usage -O3 --no-exceptions -I${kitsune_prefix}/include
+nvcc_flags=--std c++17 -m64 -arch=${NVARCH} --resource-usage ${opt_flags} --no-exceptions -I${kitsune_prefix}/include
+nvcc_kokkos_flags=${nvcc_flags} -I${kokkos_cuda_prefix}/include -I${kitsune_prefix}/include
 clang_cuda_flags=-xcuda --cuda-gpu-arch=${NVARCH} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include
 ####
 
 #### Kokkos stuff
+kokkos_cu_flags=-I${kokkos_cu_prefix}/include
 kokkos_clang_flags=${clang_cuda_flags} -I${kokkos_cu_prefix}/include
 kokkos_nvcc_flags=-I${kokkos_cu_prefix}/include ${nvcc_cxx_flags} -m64 -arch=${NVARCH} --resource-usage --no-exceptions -I${kitsune_prefix}/include
 
 
 all: euler3d.${host_arch} \
      euler3d-forall.cuda.${host_arch} \
-     euler3d-kokkos.nvcc.${host_arch}
+     euler3d-kokkos.nvcc.${host_arch} \
+     euler3d-kokkos.clang.${host_arch} 
 
 euler3d.${host_arch}: euler3d.cpp
 	${clangxx} ${clang_flags} -o $@ $<
@@ -40,6 +43,9 @@ euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
 
 euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp
 	 ${nvcc_wrapper} ${kokkos_nvcc_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+
+euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
+	 ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
 clean:
 	-rm -f *.${host_arch}

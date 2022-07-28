@@ -69,14 +69,14 @@ void copy(T* dst, T* src, int N)
 void dump(float* variables, int nel, int nelr)
 {
   {
-    ofstream file("density");
+    ofstream file("density.dat");
     file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++)
       file << variables[i + VAR_DENSITY*nelr] << endl;
   }
 
   {
-    ofstream file("momentum");
+    ofstream file("momentum.dat");
     file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++) {
     	for(int j = 0; j != NDIM; j++)
@@ -86,7 +86,7 @@ void dump(float* variables, int nel, int nelr)
   }
 
   {
-    ofstream file("density_energy");
+    ofstream file("density_energy.dat");
     file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++)
       file << variables[i + VAR_DENSITY_ENERGY*nelr] << endl;

@@ -8,6 +8,6 @@ kokkos_cu_prefix=${kitsune_prefix}/opt/kokkos_cuda
 nvcc_wrapper=${kokkos_cu_prefix}/bin/nvcc_wrapper
 
 kokkos_cxx_flags=-I${kokkos_cu_prefix}/include
-kokkos_ld_flags=-L${kokkos_cu_prefix}/lib
-kokkos_ld_libs=-lkokkoscore -lcuda -ldl -lrt
+kokkos_ld_flags=-L${kokkos_cu_prefix}/lib -L/opt/cuda/lib64 
+kokkos_ld_libs=-lkokkoscore -lcuda -lcudart -ldl -lrt
 
