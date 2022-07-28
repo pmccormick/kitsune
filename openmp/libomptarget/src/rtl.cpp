@@ -247,12 +247,11 @@ void RTLsTy::loadRTLs() {
        R.NumberOfDevices);
 
     // Optional functions
-#ifdef FIXME
     *((void **)&R.deinit_plugin) =
         dlsym(DynlibHandle, "__tgt_rtl_deinit_plugin");
     *((void **)&R.is_valid_binary_info) =
         dlsym(DynlibHandle, "__tgt_rtl_is_valid_binary_info");
-#endif
+//#endif
     *((void **)&R.deinit_device) =
         dlsym(DynlibHandle, "__tgt_rtl_deinit_device");
     *((void **)&R.init_requires) =
