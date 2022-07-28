@@ -1347,16 +1347,7 @@ pthread_mutex_t SignalPoolT::mutex = PTHREAD_MUTEX_INITIALIZER;
 // Putting accesses to DeviceInfo global behind a function call prior
 // to changing to use init_plugin/deinit_plugin calls
 static RTLDeviceInfoTy DeviceInfoState;
-static RTLDeviceInfoTy &DeviceInfo() { return DeviceInfoState; }
-
-int32_t __tgt_rtl_init_plugin() { return OFFLOAD_SUCCESS; }
-int32_t __tgt_rtl_deinit_plugin() { return OFFLOAD_SUCCESS; }
-
-/// Global function for enabling/disabling queue profiling, used for OMPT trace
-/// records.
-void ompt_enable_queue_profiling(int enable) {
-  DeviceInfo().enableQueueProfiling(enable);
-}
+RTLDeviceInfoTy& DeviceInfo() { return DeviceInfoState; }
 
 namespace {
 
@@ -1776,7 +1767,8 @@ void *prepareHstPtrForDataRetrieve(size_t Size, void *HstPtr) {
 }
 
 int32_t dataRetrieve(int32_t DeviceId, void *HstPtr, void *TgtPtr, int64_t Size,
-                     AMDGPUAsyncInfoDataTy &AsyncData) {
+                     __tgt_async_info *AsyncInfo) {
+  assert(AsyncInfo && "AsyncInfo is nullptr");
   assert(DeviceId < DeviceInfo().NumberOfDevices && "Device ID too large");
   // Return success if we are not copying back to host from target.
   if (!HstPtr)
@@ -1786,13 +1778,8 @@ int32_t dataRetrieve(int32_t DeviceId, void *HstPtr, void *TgtPtr, int64_t Size,
      (long long unsigned)(Elf64_Addr)TgtPtr,
      (long long unsigned)(Elf64_Addr)HstPtr);
 
-  void *HstOrPoolPtr = prepareHstPtrForDataRetrieve(Size, HstPtr);
-  assert(HstOrPoolPtr && "HstOrPoolPtr cannot be null");
-
-  hsa_signal_t Signal;
-  bool UserLocked;
-  Err = DeviceInfo().freesignalpoolMemcpyD2H(HstOrPoolPtr, TgtPtr, (size_t)Size,
-                                           DeviceId, Signal, UserLocked);
+  Err = DeviceInfo().freesignalpoolMemcpyD2H(HstPtr, TgtPtr, (size_t)Size,
+                                           DeviceId);
 
   if (Err != HSA_STATUS_SUCCESS) {
     DP("Error when copying data from device to host. Pointers: "
@@ -1840,14 +1827,8 @@ int32_t dataSubmit(int32_t DeviceId, void *TgtPtr, void *HstPtr, int64_t Size,
   DP("Submit data %ld bytes, (hst:%016llx) -> (tgt:%016llx).\n", Size,
      (long long unsigned)(Elf64_Addr)HstPtr,
      (long long unsigned)(Elf64_Addr)TgtPtr);
-
-  void *HstOrPoolPtr = prepareHstPtrForDataSubmit(Size, HstPtr);
-  assert(HstOrPoolPtr && "HstOrPoolPtr cannot be null");
-
-  hsa_signal_t Signal;
-  bool UserLocked;
-  Err = DeviceInfo().freesignalpoolMemcpyH2D(TgtPtr, HstOrPoolPtr, (size_t)Size,
-                                           DeviceId, Signal, UserLocked);
+  Err = DeviceInfo().freesignalpoolMemcpyH2D(TgtPtr, HstPtr, (size_t)Size,
+                                           DeviceId);
   if (Err != HSA_STATUS_SUCCESS) {
     DP("Error when copying data from host to device. Pointers: "
        "host = 0x%016lx, device = 0x%016lx, size = %lld\n",
@@ -2134,17 +2115,15 @@ int32_t runRegionLocked(int32_t DeviceId, void *TgtEntryPtr, void **TgtArgs,
   /*
    * Set limit based on ThreadsPerGroup and GroupsPerDevice
    */
-  int NumGroups = 0;
-  int ThreadsPerGroup = 0;
-
-  getLaunchVals(ThreadsPerGroup, NumGroups, DeviceInfo().WarpSize[DeviceId],
-                DeviceInfo().Env, KernelInfo->ConstWGSize,
-                KernelInfo->ExecutionMode,
-                NumTeams,      // From run_region arg
-                ThreadLimit,   // From run_region arg
-                LoopTripcount, // From run_region arg
-                DeviceInfo().NumTeams[KernelInfo->DeviceId],
-                DeviceInfo().ComputeUnits[KernelInfo->DeviceId]);
+  LaunchVals LV =
+      getLaunchVals(DeviceInfo().WarpSize[DeviceId], DeviceInfo().Env,
+                    KernelInfo->ConstWGSize, KernelInfo->ExecutionMode,
+                    NumTeams,      // From run_region arg
+                    ThreadLimit,   // From run_region arg
+                    LoopTripcount, // From run_region arg
+                    DeviceInfo().NumTeams[KernelInfo->DeviceId]);
+  const int GridSize = LV.GridSize;
+  const int WorkgroupSize = LV.WorkgroupSize;
 
   if (print_kernel_trace >= LAUNCH) {
     // if host tracing requested, init rpc counters for each kernel launch
@@ -2287,9 +2266,13 @@ int32_t runRegionLocked(int32_t DeviceId, void *TgtEntryPtr, void **TgtArgs,
     // accessed any more
     hsa_signal_store_relaxed(Queue->doorbell_signal, PacketId);
 
-    // wait for completion, then free signal and kernarg
-    AsyncInfo.addKernelLaunchInfo(AMDGPUAsyncInfoComputeTy(
-        S, DeviceInfo().HSAAgents[DeviceId], ArgPool, KernArg));
+    while (hsa_signal_wait_scacquire(S, HSA_SIGNAL_CONDITION_EQ, 0, UINT64_MAX,
+                                     HSA_WAIT_STATE_BLOCKED) != 0)
+      ;
+
+    assert(ArgPool);
+    ArgPool->deallocate(KernArg);
+    DeviceInfo().FreeSignalPool.push(S);
   }
 
   DP("Kernel completed\n");
@@ -2595,17 +2578,8 @@ struct DeviceEnvironment {
           return HSA_STATUS_ERROR;
         }
 
-        hsa_signal_t Signal;
-        bool UserLocked;
-        Err = DeviceInfo().freesignalpoolMemcpyH2D(StatePtr, &HostDeviceEnv,
-                                                 StatePtrSize, DeviceId,
-                                                 Signal, UserLocked);
-        if (Err == HSA_STATUS_ERROR)
-          return Err;
-        AMDGPUAsyncInfoDataTy AsyncInfo(Signal, &HostDeviceEnv, &HostDeviceEnv,
-                                        StatePtrSize, UserLocked);
-        Err = AsyncInfo.waitToComplete();
-        return Err;
+        return DeviceInfo().freesignalpoolMemcpyH2D(StatePtr, &HostDeviceEnv,
+                                                  StatePtrSize, DeviceId);
       }
     }
     return HSA_STATUS_SUCCESS;
@@ -2645,140 +2619,156 @@ hsa_status_t allow_access_to_all_gpu_agents(void *Ptr) {
   return hsa_amd_agents_allow_access(DeviceInfo().HSAAgents.size(),
                                      &DeviceInfo().HSAAgents[0], NULL, Ptr);
 }
-
-hsa_signal_t launchBarrierANDPacket(hsa_queue_t *Queue,
-                                    std::vector<hsa_signal_t> &depSignals,
-                                    bool isBarrierBitSet) {
-  hsa_signal_t barrier_signal = DeviceInfo().FreeSignalPool.pop();
-  uint64_t barrierAndPacketId = acquire_available_packet_id(Queue);
-  const uint32_t mask = Queue->size - 1;
-  hsa_barrier_and_packet_t *barrier_and_packet =
-      (hsa_barrier_and_packet_t *)Queue->base_address +
-      (barrierAndPacketId & mask);
-  memset(barrier_and_packet, 0, sizeof(hsa_barrier_and_packet_t));
-  for (size_t i = 0; (i < depSignals.size()) && (depSignals.size() <= 5); i++)
-    barrier_and_packet->dep_signal[i] = depSignals[i];
-  int16_t header = create_BarrierAND_header();
-  if (isBarrierBitSet)
-    header |= 1 << 8;
-  packetStoreRelease(reinterpret_cast<uint32_t *>(barrier_and_packet), header,
-                       0);
-  hsa_signal_store_screlease(Queue->doorbell_signal, barrierAndPacketId);
-  return barrier_signal;
-}
-
-int32_t runInitFiniKernel(int DeviceId, uint16_t header,
-                          const atl_kernel_info_t &entryInfo) {
-  hsa_signal_t signal;
-  void *kernarg_address = nullptr;
-
-  hsa_queue_t *Queue = DeviceInfo().HSAQueueSchedulers[DeviceId].next();
-  if (!Queue) {
-    DP("Failed to get the queue instance.\n");
-    return OFFLOAD_FAIL;
-  }
-
-  uint64_t packet_id = acquire_available_packet_id(Queue);
-  const uint32_t mask = Queue->size - 1; // size is a power of 2
-  hsa_kernel_dispatch_packet_t *dispatch_packet =
-      (hsa_kernel_dispatch_packet_t *)Queue->base_address + (packet_id & mask);
-
-  signal = DeviceInfo().FreeSignalPool.pop();
-  if (signal.handle == 0) {
-    DP("Failed to get signal instance\n");
-    return OFFLOAD_FAIL;
-  }
-
-  dispatch_packet->setup |= 1 << HSA_KERNEL_DISPATCH_PACKET_SETUP_DIMENSIONS;
-  dispatch_packet->workgroup_size_x = (uint16_t)1;
-  dispatch_packet->workgroup_size_y = (uint16_t)1;
-  dispatch_packet->workgroup_size_z = (uint16_t)1;
-  dispatch_packet->grid_size_x = (uint32_t)(1 * 1);
-  dispatch_packet->grid_size_y = 1;
-  dispatch_packet->grid_size_z = 1;
-  dispatch_packet->completion_signal = signal;
-  dispatch_packet->kernel_object = entryInfo.kernel_object;
-  dispatch_packet->private_segment_size = entryInfo.private_segment_size;
-  dispatch_packet->group_segment_size = entryInfo.group_segment_size;
-  dispatch_packet->kernarg_address = (void *)kernarg_address;
-  dispatch_packet->completion_signal = signal;
-
-  hsa_signal_store_relaxed(dispatch_packet->completion_signal, 1);
-
-  packetStoreRelease(reinterpret_cast<uint32_t *>(dispatch_packet), header,
-                       dispatch_packet->setup);
-
-  // Increment the write index and ring the doorbell to dispatch the kernel.
-  hsa_signal_store_screlease(Queue->doorbell_signal, packet_id);
-
-  while (hsa_signal_wait_scacquire(dispatch_packet->completion_signal,
-                                   HSA_SIGNAL_CONDITION_EQ, 0, UINT64_MAX,
-                                   HSA_WAIT_STATE_ACTIVE) != 0)
-    ;
-  DeviceInfo().FreeSignalPool.push(signal);
-  return OFFLOAD_SUCCESS;
-}
-
-void launchInitFiniKernel(int32_t DeviceId, void *img, const size_t &size,
-                          const initORfini status) {
-  std::string kernelName, kernelTag;
-  bool symbolExist = false;
-  auto &KernelInfoTable = DeviceInfo().KernelInfoTable;
-  int32_t runInitFini = OFFLOAD_FAIL;
-  atl_kernel_info_t kernelInfoEntry;
-  switch (status) {
-  case INIT:
-    kernelName = "amdgcn.device.init";
-    kernelTag = "Init";
-    symbolExist =
-        imageContainsSymbol(img, size, (kernelName + ".kd").c_str());
-    if (symbolExist && KernelInfoTable[DeviceId].find(kernelName) !=
-                           KernelInfoTable[DeviceId].end()) {
-      assert(DeviceInfo().ImageList[img].initfini != 0);
-      kernelInfoEntry = KernelInfoTable[DeviceId][kernelName];
-      assert(kernelInfoEntry.kind == "init");
-      runInitFini =
-          runInitFiniKernel(DeviceId, createHeader(), kernelInfoEntry);
-    }
-    break;
-
-  case FINI:
-    kernelName = "amdgcn.device.fini";
-    kernelTag = "Fini";
-    symbolExist =
-        imageContainsSymbol(img, size, (kernelName + ".kd").c_str());
-    if (symbolExist && KernelInfoTable[DeviceId].find(kernelName) !=
-                           KernelInfoTable[DeviceId].end()) {
-      assert(DeviceInfo().ImageList[img].initfini != 0);
-      kernelInfoEntry = KernelInfoTable[DeviceId][kernelName];
-      assert(kernelInfoEntry.kind == "fini");
-      runInitFini =
-          runInitFiniKernel(DeviceId, createHeader(), kernelInfoEntry);
-    }
-    break;
-
-  default:
-    kernelTag = "Normal";
-  };
-
-  if (runInitFini == OFFLOAD_SUCCESS) {
-    DP("%s kernel launch successfull on AMDGPU Device %d for image(" DPxMOD
-       ")!\n ",
-       kernelTag.c_str(), DeviceId, DPxPTR(img));
-  } else {
-    DP("%s kernel launch failed on AMDGPU Device %d for image(" DPxMOD ")!\n ",
-       kernelTag.c_str(), DeviceId, DPxPTR(img));
-  }
-}
 } // namespace core
+
+static hsa_status_t GetIsaInfo(hsa_isa_t isa, void *data) {
+  hsa_status_t err;
+  uint32_t name_len;
+  err = hsa_isa_get_info_alt(isa, HSA_ISA_INFO_NAME_LENGTH, &name_len);
+  if (err != HSA_STATUS_SUCCESS) {
+    DP("Error getting ISA info length\n");
+    return err;
+  }
+
+  char TargetID[name_len];
+  err = hsa_isa_get_info_alt(isa, HSA_ISA_INFO_NAME, TargetID);
+  if (err != HSA_STATUS_SUCCESS) {
+    DP("Error getting ISA info name\n");
+    return err;
+  }
+
+  auto TripleTargetID = llvm::StringRef(TargetID);
+  if (TripleTargetID.consume_front("amdgcn-amd-amdhsa")) {
+    DeviceInfo().TargetID.push_back(TripleTargetID.ltrim('-').str());
+  }
+  return HSA_STATUS_SUCCESS;
+}
+
+/// Parse a TargetID to get processor arch and feature map.
+/// Returns processor subarch.
+/// Returns TargetID features in \p FeatureMap argument.
+/// If the \p TargetID contains feature+, FeatureMap it to true.
+/// If the \p TargetID contains feature-, FeatureMap it to false.
+/// If the \p TargetID does not contain a feature (default), do not map it.
+StringRef parseTargetID(StringRef TargetID, StringMap<bool> &FeatureMap) {
+  if (TargetID.empty())
+    return llvm::StringRef();
+
+  auto ArchFeature = TargetID.split(":");
+  auto Arch = ArchFeature.first;
+  auto Features = ArchFeature.second;
+  if (Features.empty())
+    return Arch;
+
+  if (Features.contains("sramecc+")) {
+    FeatureMap.insert(std::pair<std::string, bool>("sramecc", true));
+  } else if (Features.contains("sramecc-")) {
+    FeatureMap.insert(std::pair<std::string, bool>("sramecc", false));
+  }
+  if (Features.contains("xnack+")) {
+    FeatureMap.insert(std::pair<std::string, bool>("xnack", true));
+  } else if (Features.contains("xnack-")) {
+    FeatureMap.insert(std::pair<std::string, bool>("xnack", false));
+  }
+
+  return Arch;
+}
+
+/// Checks if an image \p ImgInfo is compatible with current
+/// system's environment \p EnvInfo
+bool IsImageCompatibleWithEnv(const char *ImgInfo, std::string EnvInfo) {
+  llvm::StringRef ImgTID(ImgInfo), EnvTID(EnvInfo);
+
+  // Compatible in case of exact match
+  if (ImgTID == EnvTID) {
+    DP("Compatible: Exact match \t[Image: %s]\t:\t[Environment: %s]\n",
+       ImgTID.data(), EnvTID.data());
+    return true;
+  }
+
+  // Incompatible if Archs mismatch.
+  StringMap<bool> ImgMap, EnvMap;
+  StringRef ImgArch = parseTargetID(ImgTID, ImgMap);
+  StringRef EnvArch = parseTargetID(EnvTID, EnvMap);
+
+  // Both EnvArch and ImgArch can't be empty here.
+  if (EnvArch.empty() || ImgArch.empty() || !ImgArch.contains(EnvArch)) {
+    DP("Incompatible: Processor mismatch \t[Image: %s]\t:\t[Environment: %s]\n",
+       ImgTID.data(), EnvTID.data());
+    return false;
+  }
+
+  // Incompatible if image has more features than the environment, irrespective
+  // of type or sign of features.
+  if (ImgMap.size() > EnvMap.size()) {
+    DP("Incompatible: Image has more features than the environment \t[Image: "
+       "%s]\t:\t[Environment: %s]\n",
+       ImgTID.data(), EnvTID.data());
+    return false;
+  }
+
+  // Compatible if each target feature specified by the environment is
+  // compatible with target feature of the image. The target feature is
+  // compatible if the iamge does not specify it (meaning Any), or if it
+  // specifies it with the same value (meaning On or Off).
+  for (const auto &ImgFeature : ImgMap) {
+    auto EnvFeature = EnvMap.find(ImgFeature.first());
+    if (EnvFeature == EnvMap.end()) {
+      DP("Incompatible: Value of Image's non-ANY feature is not matching with "
+         "the Environment feature's ANY value \t[Image: %s]\t:\t[Environment: "
+         "%s]\n",
+         ImgTID.data(), EnvTID.data());
+      return false;
+    } else if (EnvFeature->first() == ImgFeature.first() &&
+               EnvFeature->second != ImgFeature.second) {
+      DP("Incompatible: Value of Image's non-ANY feature is not matching with "
+         "the Environment feature's non-ANY value \t[Image: "
+         "%s]\t:\t[Environment: %s]\n",
+         ImgTID.data(), EnvTID.data());
+      return false;
+    }
+  }
+
+  // Image is compatible if all features of Environment are:
+  //   - either, present in the Image's features map with the same sign,
+  //   - or, the feature is missing from Image's features map i.e. it is
+  //   set to ANY
+  DP("Compatible: Target IDs are compatible \t[Image: %s]\t:\t[Environment: "
+     "%s]\n",
+     ImgTID.data(), EnvTID.data());
+  return true;
+}
 
 extern "C" {
 int32_t __tgt_rtl_is_valid_binary(__tgt_device_image *Image) {
   return elfMachineIdIsAmdgcn(Image);
 }
 
-int __tgt_rtl_number_of_team_procs(int DeviceId) {
-  return DeviceInfo().ComputeUnits[DeviceId];
+int32_t __tgt_rtl_is_valid_binary_info(__tgt_device_image *image,
+                                       __tgt_image_info *info) {
+  if (!__tgt_rtl_is_valid_binary(image))
+    return false;
+
+  // A subarchitecture was not specified. Assume it is compatible.
+  if (!info->Arch)
+    return true;
+
+  int32_t NumberOfDevices = __tgt_rtl_number_of_devices();
+
+  for (int32_t DeviceId = 0; DeviceId < NumberOfDevices; ++DeviceId) {
+    __tgt_rtl_init_device(DeviceId);
+    hsa_agent_t agent = DeviceInfo().HSAAgents[DeviceId];
+    hsa_status_t err = hsa_agent_iterate_isas(agent, GetIsaInfo, &DeviceId);
+    if (err != HSA_STATUS_SUCCESS) {
+      DP("Error iterating ISAs\n");
+      return false;
+    }
+    if (!IsImageCompatibleWithEnv(info->Arch, DeviceInfo().TargetID[DeviceId]))
+      return false;
+  }
+  DP("Image has Target ID compatible with the current environment: %s\n",
+     info->Arch);
+  return true;
 }
 
 int32_t __tgt_rtl_init_plugin() { return OFFLOAD_SUCCESS; }
@@ -2939,7 +2929,7 @@ int32_t __tgt_rtl_init_device(int DeviceId) {
        DeviceInfo().ThreadsPerGroup[DeviceId]);
   }
 
-  DP("Device %d: default limit for groupsPerDevice %d & ThreadsPerGroup %d\n",
+  DP("Device %d: default limit for groupsPerDevice %d & threadsPerGroup %d\n",
      DeviceId, DeviceInfo().GroupsPerDevice[DeviceId],
      DeviceInfo().ThreadsPerGroup[DeviceId]);
 
@@ -2948,21 +2938,6 @@ int32_t __tgt_rtl_init_device(int DeviceId) {
      DeviceInfo().GroupsPerDevice[DeviceId],
      DeviceInfo().GroupsPerDevice[DeviceId] *
          DeviceInfo().ThreadsPerGroup[DeviceId]);
-
-  // Initialize memspace table to keep track of coarse grain memory regions
-  // in USM mode
-  if (DeviceInfo().RequiresFlags & OMP_REQ_UNIFIED_SHARED_MEMORY) {
-    // TODO: add framework for multiple systems supporting unified_shared_memory
-    coarse_grain_mem_tab = new AMDGPUMemTypeBitFieldTable(
-        AMDGPU_X86_64_SystemConfiguration::max_addressable_byte +
-            1, // memory size
-        AMDGPU_X86_64_SystemConfiguration::page_size);
-  }
-
-  OMPT_IF_ENABLED(
-      std::string ompt_gpu_type("AMD "); ompt_gpu_type += GetInfoName;
-      const char *type = ompt_gpu_type.c_str();
-      ompt_device_callbacks.ompt_callback_device_initialize(DeviceId, type););
 
   return OFFLOAD_SUCCESS;
 }
@@ -3126,10 +3101,8 @@ __tgt_target_table *__tgt_rtl_load_binary_locked(int32_t DeviceId,
         }
 
         // write ptr to device memory so it can be used by later kernels
-        hsa_signal_t Signal;
-        bool UserLocked;
         Err = DeviceInfo().freesignalpoolMemcpyH2D(StatePtr, &Ptr, sizeof(void *),
-                                                 DeviceId, Signal, UserLocked);
+                                                 DeviceId);
         if (Err != HSA_STATUS_SUCCESS) {
           DP("memcpy install of state_ptr failed\n");
           return NULL;
@@ -3197,10 +3170,8 @@ __tgt_target_table *__tgt_rtl_load_binary_locked(int32_t DeviceId,
         // If unified memory is present any target link variables
         // can access host addresses directly. There is no longer a
         // need for device copies.
-        hsa_signal_t Signal;
-        bool UserLocked;
         Err = DeviceInfo().freesignalpoolMemcpyH2D(Varptr, E->addr,
-          sizeof(void *), DeviceId, Signal, UserLocked);
+                                                 sizeof(void *), DeviceId);
         if (Err != HSA_STATUS_SUCCESS)
           DP("Error when copying USM\n");
 
@@ -3377,8 +3348,8 @@ __tgt_target_table *__tgt_rtl_load_binary_locked(int32_t DeviceId,
   return DeviceInfo().getOffloadEntriesTable(DeviceId);
 }
 
-void *__tgt_rtl_data_alloc(int DeviceId, int64_t size, void *, int32_t kind) {
-  void *ptr = nullptr;
+void *__tgt_rtl_data_alloc(int DeviceId, int64_t Size, void *, int32_t Kind) {
+  void *Ptr = NULL;
   assert(DeviceId < DeviceInfo().NumberOfDevices && "Device ID too large");
 
   {
@@ -3392,49 +3363,20 @@ void *__tgt_rtl_data_alloc(int DeviceId, int64_t size, void *, int32_t kind) {
     __tgt_rtl_set_coarse_grain_mem_region(ptr, size);
   }
 
-  DP("Tgt alloc data %ld bytes, (tgt:%016llx).\n", size,
-     (long long unsigned)(Elf64_Addr)ptr);
-
-  return ptr;
+  hsa_amd_memory_pool_t MemoryPool = DeviceInfo().getDeviceMemoryPool(DeviceId);
+  hsa_status_t Err = hsa_amd_memory_pool_allocate(MemoryPool, Size, 0, &Ptr);
+  DP("Tgt alloc data %ld bytes, (tgt:%016llx).\n", Size,
+     (long long unsigned)(Elf64_Addr)Ptr);
+  Ptr = (Err == HSA_STATUS_SUCCESS) ? Ptr : NULL;
+  return Ptr;
 }
 
-void *__tgt_rtl_data_lock(int DeviceId, void *TgtPtr, int64_t size) {
-  void *ptr = TgtPtr;
+int32_t __tgt_rtl_data_submit(int DeviceId, void *TgtPtr, void *HstPtr,
+                              int64_t Size) {
   assert(DeviceId < DeviceInfo().NumberOfDevices && "Device ID too large");
-  hsa_status_t err = HSA_STATUS_SUCCESS;
-
-  err = lock_memory(&ptr, size);
-
-  if (err != HSA_STATUS_SUCCESS) {
-    DP("Error in tgt_rtl_data_lock\n");
-    return nullptr;
-  }
-
-  DP("Tgt lock data %ld bytes, (tgt:%016llx).\n", size,
-     (long long unsigned)(Elf64_Addr)ptr);
-
-  return ptr;
-}
-
-void __tgt_rtl_data_unlock(int DeviceId, void *TgtPtr) {
-  assert(DeviceId < DeviceInfo().NumberOfDevices && "Device ID too large");
-  hsa_status_t err = HSA_STATUS_SUCCESS;
-
-  err = unlock_memory(TgtPtr);
-
-  if (err != HSA_STATUS_SUCCESS)
-    DP("Error in tgt_rtl_data_unlock\n");
-
-  DP("Tgt unlock data (tgt:%016llx).\n",
-     (long long unsigned)(Elf64_Addr)TgtPtr);
-}
-
-int32_t __tgt_rtl_data_submit(int DeviceId, void *tgt_ptr, void *hst_ptr,
-                              int64_t size) {
-  assert(DeviceId < DeviceInfo().NumberOfDevices && "Device ID too large");
-  AMDGPUAsyncInfoDataTy AsyncData;
-  int32_t rc = dataSubmit(DeviceId, tgt_ptr, hst_ptr, size, AsyncData);
-  if (rc != OFFLOAD_SUCCESS)
+  __tgt_async_info AsyncInfo;
+  int32_t Rc = dataSubmit(DeviceId, TgtPtr, HstPtr, Size, &AsyncInfo);
+  if (Rc != OFFLOAD_SUCCESS)
     return OFFLOAD_FAIL;
 
   AsyncData.waitToComplete();
@@ -3459,12 +3401,12 @@ int32_t __tgt_rtl_data_submit_async(int DeviceId, void *TgtPtr, void *HstPtr,
   return __tgt_rtl_data_submit(DeviceId, TgtPtr, HstPtr, Size);
 }
 
-int32_t __tgt_rtl_data_retrieve(int DeviceId, void *hst_ptr, void *tgt_ptr,
-                                int64_t size) {
+int32_t __tgt_rtl_data_retrieve(int DeviceId, void *HstPtr, void *TgtPtr,
+                                int64_t Size) {
   assert(DeviceId < DeviceInfo().NumberOfDevices && "Device ID too large");
-  AMDGPUAsyncInfoDataTy AsyncData;
-  int32_t rc = dataRetrieve(DeviceId, hst_ptr, tgt_ptr, size, AsyncData);
-  if (rc != OFFLOAD_SUCCESS)
+  __tgt_async_info AsyncInfo;
+  int32_t Rc = dataRetrieve(DeviceId, HstPtr, TgtPtr, Size, &AsyncInfo);
+  if (Rc != OFFLOAD_SUCCESS)
     return OFFLOAD_FAIL;
 
   AsyncData.waitToComplete();
@@ -3475,33 +3417,22 @@ int32_t __tgt_rtl_data_retrieve(int DeviceId, void *hst_ptr, void *tgt_ptr,
 int32_t __tgt_rtl_data_retrieve_async(int DeviceId, void *HstPtr, void *TgtPtr,
                                       int64_t Size,
                                       __tgt_async_info *AsyncInfo) {
+  assert(AsyncInfo && "AsyncInfo is nullptr");
   assert(DeviceId < DeviceInfo().NumberOfDevices && "Device ID too large");
-  if (AsyncInfo) {
-    initAsyncInfo(AsyncInfo);
-    AMDGPUAsyncInfoDataTy AsyncData;
-    AMDGPUAsyncInfoQueueTy *AsyncInfoQueue =
-        reinterpret_cast<AMDGPUAsyncInfoQueueTy *>(AsyncInfo->Queue);
-
-    // if data retrieve call is part of target region, wait for kernel to
-    // complete
-    if (AsyncInfoQueue->needToWaitForKernel())
-      AsyncInfoQueue->getKernelInfo().waitToComplete();
-    // OMPT_END for kernel goes here
-
-    int32_t RC = dataRetrieve(DeviceId, HstPtr, TgtPtr, Size, AsyncData);
-    reinterpret_cast<AMDGPUAsyncInfoQueueTy *>(AsyncInfo->Queue)
-        ->addMapExitingInfo(std::move(AsyncData));
-    return RC;
-  } else
-    return __tgt_rtl_data_retrieve(DeviceId, HstPtr, TgtPtr, Size);
+  initAsyncInfo(AsyncInfo);
+  return dataRetrieve(DeviceId, HstPtr, TgtPtr, Size, AsyncInfo);
 }
 
 int32_t __tgt_rtl_data_delete(int DeviceId, void *TgtPtr) {
   assert(DeviceId < DeviceInfo().NumberOfDevices && "Device ID too large");
-  // We don't have HSA-profiling timestamps for device delete, so just get the
-  // start and end system timestamps for OMPT
-  OmptTimestampRAII DeleteTimestamp;
-  return DeviceInfo().DeviceAllocators[DeviceId].dev_free(TgtPtr);
+  hsa_status_t Err;
+  DP("Tgt free data (tgt:%016llx).\n", (long long unsigned)(Elf64_Addr)TgtPtr);
+  Err = core::Runtime::Memfree(TgtPtr);
+  if (Err != HSA_STATUS_SUCCESS) {
+    DP("Error when freeing CUDA memory\n");
+    return OFFLOAD_FAIL;
+  }
+  return OFFLOAD_SUCCESS;
 }
 
 int32_t __tgt_rtl_run_target_team_region(int32_t DeviceId, void *TgtEntryPtr,
@@ -3510,14 +3441,12 @@ int32_t __tgt_rtl_run_target_team_region(int32_t DeviceId, void *TgtEntryPtr,
                                          int32_t ThreadLimit,
                                          uint64_t LoopTripcount) {
 
-  AMDGPUAsyncInfoQueueTy AsyncInfo;
   DeviceInfo().LoadRunLock.lock_shared();
   int32_t Res = runRegionLocked(DeviceId, TgtEntryPtr, TgtArgs, TgtOffsets,
                                 ArgNum, NumTeams, ThreadLimit, LoopTripcount,
 				AsyncInfo);
 
   DeviceInfo().LoadRunLock.unlock_shared();
-  AsyncInfo.waitForKernelCompletion();
   return Res;
 }
 
