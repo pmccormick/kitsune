@@ -1265,8 +1265,12 @@ X86TargetLowering::X86TargetLowering(const X86TargetMachine &TM,
     setOperationAction(ISD::FP_TO_UINT,                MVT::v8i32, Custom);
     setOperationAction(ISD::STRICT_FP_TO_SINT,         MVT::v8i32, Legal);
 
-    setOperationAction(ISD::SINT_TO_FP,         MVT::v8i32, Legal);
-    setOperationAction(ISD::STRICT_SINT_TO_FP,  MVT::v8i32, Legal);
+    setOperationAction(ISD::SINT_TO_FP,         MVT::v8i32, Custom);
+    setOperationAction(ISD::STRICT_SINT_TO_FP,  MVT::v8i32, Custom);
+    setOperationAction(ISD::FP_EXTEND,          MVT::v8f32, Expand);
+    setOperationAction(ISD::FP_ROUND,           MVT::v8f16, Expand);
+    setOperationAction(ISD::FP_EXTEND,          MVT::v4f64, Custom);
+    setOperationAction(ISD::STRICT_FP_EXTEND,   MVT::v4f64, Custom);
 
     setOperationAction(ISD::STRICT_FP_ROUND,    MVT::v4f32, Legal);
     setOperationAction(ISD::STRICT_FADD,        MVT::v8f32, Legal);
@@ -16006,16 +16010,18 @@ static SDValue lowerV8F16Shuffle(const SDLoc &DL, ArrayRef<int> Mask,
   assert(Mask.size() == 8 && "Unexpected mask size for v8 shuffle!");
   int NumV2Elements = count_if(Mask, [](int M) { return M >= 8; });
 
-  if (NumV2Elements == 0) {
-    // Check for being able to broadcast a single element.
-    if (SDValue Broadcast = lowerShuffleAsBroadcast(DL, MVT::v8f16, V1, V2,
-                                                    Mask, Subtarget, DAG))
-      return Broadcast;
+  if (Subtarget.hasFP16()) {
+    if (NumV2Elements == 0) {
+      // Check for being able to broadcast a single element.
+      if (SDValue Broadcast = lowerShuffleAsBroadcast(DL, MVT::v8f16, V1, V2,
+                                                      Mask, Subtarget, DAG))
+        return Broadcast;
+    }
+    if (NumV2Elements == 1 && Mask[0] >= 8)
+      if (SDValue V = lowerShuffleAsElementInsertion(
+              DL, MVT::v8f16, V1, V2, Mask, Zeroable, Subtarget, DAG))
+        return V;
   }
-  if (NumV2Elements == 1 && Mask[0] >= 8)
-    if (SDValue V = lowerShuffleAsElementInsertion(DL, MVT::v8f16, V1, V2, Mask,
-                                                   Zeroable, Subtarget, DAG))
-      return V;
 
   V1 = DAG.getBitcast(MVT::v8i16, V1);
   V2 = DAG.getBitcast(MVT::v8i16, V2);
