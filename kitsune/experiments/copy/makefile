@@ -14,12 +14,12 @@ clang_flags=${cxx_flags} ${opt_flags} ${clang_info_flags}
 #   -cuabi-keep-files saves intermediate files (.ll, .ptx, .fatbin) on disk for a closer look at codegen details.
 #
 tapir_cu_launch_flags=-I${CUDA_HOME}/include
-tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags}
+tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-keep-files
 tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1 -mllvm -cuabi-default-grainsize=1
 ####
 
 #### CUDA flags
-nvcc_flags=--std c++17 -m64 -arch=${NVARCH} --resource-usage ${opt_flags} --no-exceptions -I${kitsune_prefix}/include
+nvcc_flags=--std c++17 -m64 -arch=${NVARCH} --resource-usage ${opt_flags} --no-exceptions -I${kitsune_prefix}/include --keep
 nvcc_kokkos_flags=${nvcc_flags} -I${kokkos_cuda_prefix}/include -I${kitsune_prefix}/include
 clang_cuda_flags=-xcuda --cuda-gpu-arch=${NVARCH} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include
 ####
@@ -30,22 +30,18 @@ kokkos_clang_flags=${clang_cuda_flags} -I${kokkos_cu_prefix}/include
 kokkos_nvcc_flags=-I${kokkos_cu_prefix}/include ${nvcc_cxx_flags} ${opt_flags} -m64 -arch=${NVARCH} --resource-usage --no-exceptions -I${kitsune_prefix}/include
 
 
-all: euler3d.${host_arch} \
-     euler3d-forall.cuda.${host_arch} \
-     euler3d-kokkos.nvcc.${host_arch} \
-     euler3d-kokkos.clang.${host_arch} 
+all: copy-forall.cuda.${host_arch} \
+     copy-kokkos.nvcc.${host_arch} \
+     copy-kokkos.clang.${host_arch} 
 
-euler3d.${host_arch}: euler3d.cpp
-	/usr/bin/time ${clangxx} ${clang_flags} -o $@ $<
+copy-forall.cuda.${host_arch}: copy-forall.cpp
+	${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 
-euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
-	/usr/bin/time ${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+copy-kokkos.nvcc.${host_arch}: copy-kokkos.cpp
+	 ${nvcc_wrapper} ${kokkos_nvcc_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
-euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp
-	 /usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-
-euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
-	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+copy-kokkos.clang.${host_arch}: copy-kokkos.cpp
+	 ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
 clean:
 	-rm -f *.${host_arch}

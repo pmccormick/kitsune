@@ -52,7 +52,10 @@
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/IPO/Inliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
@@ -415,10 +418,13 @@ void runKernelOptimizationPasses(Module &KM, unsigned OptLevel = OptLevel3,
 
   LLVM_DEBUG(dbgs() << "\trunning kernel module optimizations...\n");
   legacy::PassManager PM;
+  PM.add(createAlwaysInlinerLegacyPass());
   PM.add(createReassociatePass());
-  PM.add(createGVNPass());
+  PM.add(createSROAPass());
+  PM.add(createAggressiveInstCombinerPass());
+   PM.add(createGVNPass());
   PM.add(createCFGSimplificationPass());
-  PM.add(createSLPVectorizerPass());
+  //PM.add(createSLPVectorizerPass());  // not that helpful for GPUs?
   PM.add(createDeadCodeEliminationPass());
   PM.add(createDeadStoreEliminationPass());
   PM.add(createCFGSimplificationPass());
@@ -549,7 +555,7 @@ CudaLoop::CudaLoop(Module &M, Module &KM, const std::string &KN,
   // help to simplify codegen calls.
   KitCudaLaunchFn = M.getOrInsertFunction("__kitrt_cuLaunchFBKernel",
                                           VoidPtrTy, // returns an opaque stream
-                                          VoidPtrTy, // fatbinary
+                                          VoidPtrTy, // fat-binary
                                           VoidPtrTy, // kernel name
                                           VoidPtrPtrTy, // arguments
                                           Int64Ty);     // trip count
@@ -1114,16 +1120,6 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
     }
   }
   const DataLayout &DL = M.getDataLayout();
-  /*
-  Value *GrainSize = ConstantInt::get(TripCount->getType(),
-                                      DefaultGrainSize.getValue());
-  Value *RunSizeQ = B.CreateUDiv(TripCount, GrainSize, "run_size");
-  Value *RunRem = B.CreateURem(TripCount, GrainSize, "run_rem");
-  Value *isRem = B.CreateICmp(ICmpInst::ICMP_UGT, RunRem,
-                              ConstantInt::get(RunRem->getType(), 0));
-  Value *isRemAdd = B.CreateZExt(isRem, RunSizeQ->getType());
-  Value *RunSize = B.CreateZExt(B.CreateAdd(RunSizeQ, isRemAdd), Int64Ty);
-  */
   Value *argsPtr = B.CreateConstInBoundsGEP2_32(ArrayTy, ArgArray, 0, 0);
   // Generate a call to launch the kernel.
   Constant *KNameCS = ConstantDataArray::getString(Ctx, KernelName);
@@ -1160,7 +1156,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
                           "stream");
   }
 
-  LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with kernel wait call.\n");
+  //LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with kernel wait call.\n");
   B.CreateCall(KitCudaWaitFn, Stream);
 }
 
@@ -1931,7 +1927,7 @@ CudaABIOutputFile CudaABI::generatePTX() {
                 sys::fs::OpenFlags::OF_None);
   PTXFile->keep();
 
-  pushPTXFilename(PTXFileName.c_str());
+  //pushPTXFilename(PTXFileName.c_str());
 
   KM.addModuleFlag(llvm::Module::Override, "nvvm-reflect-ftz", true);
 

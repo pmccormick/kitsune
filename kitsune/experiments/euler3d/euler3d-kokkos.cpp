@@ -9,11 +9,8 @@
 using namespace std;
 
 #include "Kokkos_DualView.hpp"
-
 template <typename T>
-using View = Kokkos::DualView<T*,
-                              Kokkos::LayoutRight,
-                              Kokkos::DefaultExecutionSpace>;
+using View = Kokkos::DualView<T*>;
 
 struct Float3 {
   float x, y, z;
@@ -26,11 +23,9 @@ struct Float3 {
  *
  */
 #define GAMMA 1.4
-#define iterations 2000
-
+#define ITERATIONS 2000
 #define NDIM 3
 #define NNB 4
-
 #define RK 3	// 3rd order RK
 #define ff_mach 1.2
 #define deg_angle_of_attack 0.0f
@@ -51,9 +46,9 @@ struct Float3 {
 #endif
 
 template <typename T>
-void copy(View<T> &dst, View<T> &src, int N) {
-  dst.sync_device();
+void cpy(View<T> &dst, View<T> &src, int N) {
   src.sync_device();
+  dst.sync_device();
   Kokkos::parallel_for("copy", N, KOKKOS_LAMBDA(const int &i) {
     dst.d_view(i) = src.d_view(i);
   });
@@ -97,14 +92,13 @@ void initialize_variables(int nelr,
 {
   variables.sync_device();
   ff_variable.sync_device();
-
+  variables.modify_device();
   Kokkos::parallel_for("initialize_variables", nelr,
         KOKKOS_LAMBDA(const int &i) {
     for(int j = 0; j < NVAR; j++)
       variables.d_view(i + j*nelr) = ff_variable.d_view(j);
   });
   Kokkos::fence();
-  variables.modify_device();
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
@@ -177,6 +171,7 @@ void compute_step_factor(int nelr,
   variables.sync_device();
   areas.sync_device();
   step_factors.sync_device();
+  step_factors.modify_device();
 
   Kokkos::parallel_for("compute_step_factor", nelr/block_length,
         KOKKOS_LAMBDA(const int &blk) {
@@ -206,7 +201,6 @@ void compute_step_factor(int nelr,
     }
   });
   Kokkos::fence();
-  step_factors.modify_device();
 }
 
 void compute_flux(int nelr,
@@ -226,6 +220,7 @@ void compute_flux(int nelr,
   variables.sync_device();
   fluxes.sync_device();
   ff_variable.sync_device();
+  fluxes.modify_device();
 
   Kokkos::parallel_for("compute_flux", nelr/block_length,
         KOKKOS_LAMBDA(const int &blk) {
@@ -399,7 +394,6 @@ void compute_flux(int nelr,
     }
   });
   Kokkos::fence();
-  fluxes.modify_device();
 }
 
 void time_step(int j, int nelr,
@@ -412,7 +406,7 @@ void time_step(int j, int nelr,
   variables.sync_device();
   step_factors.sync_device();
   fluxes.sync_device();
-
+  variables.modify_device();
   Kokkos::parallel_for("time_step", nelr/block_length,
       KOKKOS_LAMBDA(const int &blk) {
     int b_start = blk*block_length;
@@ -437,7 +431,6 @@ void time_step(int j, int nelr,
     }
   });
   Kokkos::fence();
-  variables.modify_device();
 }
 
 /*
@@ -450,11 +443,14 @@ int main(int argc, char** argv)
     return 1;
   }
 
+  int iterations = ITERATIONS;
+  if (argc > 2)
+    iterations = atoi(argv[2]);
+
   const char* data_file_name = argv[1];
 
   // these need to be computed the first time in order to compute time step
-  cout << "Starting..." << endl;
-  auto start = chrono::steady_clock::now();
+
 
   Kokkos::initialize(argc, argv); {
 
@@ -564,13 +560,25 @@ int main(int argc, char** argv)
     View<float> step_factors = View<float>("step_factors", nelr);
 
     // Begin iterations
+    cout << "Starting " << ITERATIONS << " iterations..." << endl;
+    auto start = chrono::steady_clock::now();
+    double copy_total = 0.0;
+    double sf_total = 0.0;
+    double rk_total = 0.0;
     for(int i = 0; i < iterations; i++) {
 
-      copy(old_variables, variables, nelr*NVAR);
+      auto copy_start = chrono::steady_clock::now();
+      cpy(old_variables, variables, nelr*NVAR);
+      auto copy_end = chrono::steady_clock::now();
+      copy_total += chrono::duration<double>(copy_end-copy_start).count();
 
       // for the first iteration we compute the time step
+      auto sf_start = chrono::steady_clock::now();
       compute_step_factor(nelr, variables, areas, step_factors);
+      auto sf_end = chrono::steady_clock::now();
+      sf_total += chrono::duration<double>(sf_end-sf_start).count();
 
+      auto rk_start = chrono::steady_clock::now();
       for(int j = 0; j < RK; j++) {
         compute_flux(nelr, elements_surrounding_elements, normals, variables,
                     fluxes, ff_variable,
@@ -580,12 +588,15 @@ int main(int argc, char** argv)
                     ff_flux_contribution_density_energy);
         time_step(j, nelr, old_variables, variables, step_factors, fluxes);
       }
+      auto rk_end = chrono::steady_clock::now();
+      rk_total += chrono::duration<double>(rk_end-rk_start).count();
     }
 
     auto end = chrono::steady_clock::now();
-    cout  << "Compute time: "
-          << chrono::duration<double>(end-start).count()
-          << endl;
+    cout  << "Compute time: " << chrono::duration<double>(end-start).count() << endl;
+    cout << "\ttotal copy time: " << copy_total << endl;
+    cout << "\tstep factor time: " << sf_total << endl;
+    cout << "\trk loop time: " << rk_total << endl;
 
     cout << "Saving solution..." << endl;
     dump(variables, nel, nelr);

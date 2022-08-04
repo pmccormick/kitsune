@@ -110,6 +110,7 @@ extern "C" {
   void  __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size);
   void  __kitrt_cuMemPrefetchAsync(void *vp, size_t size);
   void  __kitrt_cuMemPrefetch(void *vp);
+  void  __kitrt_cuMemNeedsPrefetch(void *vp);
   void *__kitrt_cuMemAllocManaged(size_t size);
   void  __kitrt_cuMemFree(void *vp);
   void  __kitrt_cuAdviseRead(void *vp, size_t size);
