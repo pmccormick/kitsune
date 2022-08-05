@@ -1143,17 +1143,34 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   Value *DummyFBPtr = B.CreateLoad(VoidPtrTy, DummyFBGV);
 
   Value * Stream;
+  Type *Int64Ty = Type::getInt64Ty(Ctx);
+  CastInst *TCCI = nullptr;
+  if (TripCount->getType() != Int64Ty) {
+    TCCI = CastInst::CreateIntegerCast(TripCount, Int64Ty, false);
+    B.Insert(TCCI, "tcci");
+  }
+
   if (! TTarget->hasGlobalVariables()) {
     LLVM_DEBUG(dbgs() << "\t\tcreating no-globals kernel launch.\n");
-    Stream = B.CreateCall(KitCudaLaunchFn,
-                          {DummyFBPtr, KNameParam, argsPtr, TripCount},
-                          "stream");
+    if (TCCI)
+      Stream = B.CreateCall(KitCudaLaunchFn,
+                            {DummyFBPtr, KNameParam, argsPtr, TCCI},
+                            "stream");
+
+    else
+      Stream = B.CreateCall(KitCudaLaunchFn,
+                            {DummyFBPtr, KNameParam, argsPtr, TripCount},
+                            "stream");
   } else {
     LLVM_DEBUG(dbgs() << "\t\tcreating kernel launch w/ globals.\n");
     Value *CM = B.CreateCall(KitCudaCreateFBModuleFn, {DummyFBPtr});
-    Stream = B.CreateCall(KitCudaLaunchModuleFn,
-                          {CM, KNameParam, argsPtr, TripCount},
-                          "stream");
+    if (TCCI)
+      Stream = B.CreateCall(KitCudaLaunchModuleFn,
+                            {CM, KNameParam, argsPtr, TCCI},
+                            "stream");
+    else
+      Stream = B.CreateCall(KitCudaLaunchModuleFn,
+                       {CM, KNameParam, argsPtr, TripCount}, "stream");
   }
 
   //LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with kernel wait call.\n");
@@ -2006,6 +2023,11 @@ void CudaABI::postProcessModule() {
 
   finalizeLaunchCalls(M, Fatbinary);
   registerFatbinary(Fatbinary);
+
+  std::error_code ec;
+  llvm::raw_fd_ostream fs("code.llvm", ec);
+  fs << M;
+  fs.close();
 }
 
 LoopOutlineProcessor *
