@@ -728,7 +728,6 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock,
                                 1, 1, 0, stream, fatBinArgs, NULL));
-  CU_SAFE_CALL(cuStreamSynchronize_p(0));
   if (_kitrtEnableTiming) {
     cuEventRecord_p(stop, stream);
     cuEventSynchronize_p(stop);
@@ -747,9 +746,9 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
 
 // Launch a kernel on the default stream.
   void *__kitrt_cuLaunchFBKernel(const void *fatBin,
-				 const char *kernelName,
-				 void **fatBinArgs,
-				 uint64_t numElements) {
+                                 const char *kernelName,
+                                 void **fatBinArgs,
+                                 uint64_t numElements) {
     assert(fatBin && "request to launch with null fat binary image!");
     assert(kernelName && "request to launch kernel w/ null name!");
     assert(fatBinArgs && "request to launch kernel w/ null fatbin args!");
@@ -812,8 +811,6 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
         cuEventDestroy_v2_p(stop);
       }
 
-    //CU_SAFE_CALL(cuStreamSynchronize_p(0));
-
     return nullptr;  // default stream...
   }
 
@@ -849,16 +846,10 @@ void *__kitrt_cuLaunchKernel(llvm::Module &m, void **args, size_t n) {
 void __kitrt_cuStreamSynchronize(void *vs) {
   if (_kitrtEnableTiming)
     return; // TODO: In theory we sync'ed at kernel launch to time
-            // the execution.  So, we don't need this... ???
+            // the execution.  For now assuming we can skip this
+            // call but we should make certain this is the case.
 
-  // TODO: we can probably just stream sync on the default
-  // stream here but let's be a bit more 'precise' (not sure
-  // if it matters so we should look into it more).
-  if (vs != nullptr) {
-    CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
-  } else {
-    CU_SAFE_CALL(cuStreamSynchronize_p(0));
-  }
+  CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
 }
 
 void __kitrt_cuCheckCtxState() {

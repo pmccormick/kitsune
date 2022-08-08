@@ -560,7 +560,7 @@ int main(int argc, char** argv)
     View<float> step_factors = View<float>("step_factors", nelr);
 
     // Begin iterations
-    cout << "Starting " << ITERATIONS << " iterations..." << endl;
+    cout << iterations << " "; 
     auto start = chrono::steady_clock::now();
     double copy_total = 0.0;
     double sf_total = 0.0;
@@ -593,16 +593,12 @@ int main(int argc, char** argv)
     }
 
     auto end = chrono::steady_clock::now();
-    cout  << "Compute time: " << chrono::duration<double>(end-start).count() << endl;
-    cout << "\ttotal copy time: " << copy_total << endl;
-    cout << "\tstep factor time: " << sf_total << endl;
-    cout << "\trk loop time: " << rk_total << endl;
-
-    cout << "Saving solution..." << endl;
+    cout << copy_total << " "
+	 << sf_total << " "
+	 << rk_total << " "
+	 << chrono::duration<double>(end-start).count() << endl;
     dump(variables, nel, nelr);
-    cout << "Saved solution..." << endl;
-    cout << "Done..." << endl;
-  }  Kokkos::finalize();
+  } Kokkos::finalize();
 
   return 0;
 }
