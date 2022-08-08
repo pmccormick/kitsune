@@ -1173,7 +1173,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
                        {CM, KNameParam, argsPtr, TripCount}, "stream");
   }
 
-  //LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with kernel wait call.\n");
+  //LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with sync call.\n");
   B.CreateCall(KitCudaWaitFn, Stream);
 }
 
@@ -1698,7 +1698,8 @@ void CudaABI::bindGlobalVariables(Value *Handle, IRBuilder<> &B) {
   }
 }
 
-Function *CudaABI::createCtor(GlobalVariable *Fatbinary, GlobalVariable *Wrapper) {
+Function *CudaABI::createCtor(GlobalVariable *Fatbinary,
+                              GlobalVariable *Wrapper) {
   LLVMContext &Ctx = M.getContext();
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
@@ -2015,19 +2016,20 @@ void CudaABI::postProcessModule() {
   CudaABIOutputFile FatbinFile = createFatbinaryFile(AsmFile);
   GlobalVariable *Fatbinary = embedFatbinary(FatbinFile);
 
+  finalizeLaunchCalls(M, Fatbinary);
+  registerFatbinary(Fatbinary);
+
   if (! KeepIntermediateFiles) {
     sys::fs::remove(PTXFile->getFilename());
     sys::fs::remove(AsmFile->getFilename());
     sys::fs::remove(FatbinFile->getFilename());
   }
-
-  finalizeLaunchCalls(M, Fatbinary);
-  registerFatbinary(Fatbinary);
-
+/*
   std::error_code ec;
-  llvm::raw_fd_ostream fs("code.llvm", ec);
+  llvm::raw_fd_ostream fs("kitsune-module.ll", ec);
   fs << M;
   fs.close();
+ */
 }
 
 LoopOutlineProcessor *
