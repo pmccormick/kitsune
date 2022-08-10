@@ -845,11 +845,12 @@ void *__kitrt_cuLaunchKernel(llvm::Module &m, void **args, size_t n) {
 
 void __kitrt_cuStreamSynchronize(void *vs) {
   if (_kitrtEnableTiming)
-    return; // TODO: In theory we sync'ed at kernel launch to time
-            // the execution.  For now assuming we can skip this
-            // call but we should make certain this is the case.
-
-  CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
+    return; // We sync'ed at kernel launch to time with events...
+  if (not vs)
+    // TODO: This call doesn't wrap well in CU_SAFE_CALL????
+    cuCtxSynchronize_p();
+  else
+    CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
 }
 
 void __kitrt_cuCheckCtxState() {

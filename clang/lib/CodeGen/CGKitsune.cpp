@@ -67,8 +67,7 @@ using namespace CodeGen;
 LoopAttributes::LSStrategy CodeGenFunction::GetTapirStrategyAttr(
        ArrayRef<const Attr *> Attrs) {
 
-
-    LoopAttributes::LSStrategy Strategy = LoopAttributes::SEQ;
+  LoopAttributes::LSStrategy Strategy = LoopAttributes::SEQ;
   
   auto curAttr = Attrs.begin();
 
@@ -102,7 +101,7 @@ LoopAttributes::LSStrategy CodeGenFunction::GetTapirStrategyAttr(
   return Strategy;
 }
 
-LoopAttributes::LTarget CodeGenFunction::GetTapirRTTargetAttr(
+LoopAttributes::LTarget CodeGenFunction::GetTapirTargetAttr(
       ArrayRef<const Attr *> Attrs) {
 
   auto curAttr = Attrs.begin();
@@ -114,39 +113,39 @@ LoopAttributes::LTarget CodeGenFunction::GetTapirRTTargetAttr(
     
     const attr::Kind AttrKind = (*curAttr)->getKind();
 
-    if (AttrKind == attr::TapirRTTarget) {
-      const auto *TAttr = cast<const TapirRTTargetAttr>(*curAttr);
+    if (AttrKind == attr::TapirTarget) {
+      const auto *TAttr = cast<const TapirTargetAttr>(*curAttr);
       
-      switch(TAttr->getTapirRTTargetType()) {
+      switch(TAttr->getTapirTargetAttrType()) {
 
-      case TapirRTTargetAttr::CheetahRT:
+      case TapirTargetAttr::CheetahRT:
         Target = LoopAttributes::CheetahRT;
         break;
-      case TapirRTTargetAttr::CilkRT: 
+      case TapirTargetAttr::CilkRT: 
         Target = LoopAttributes::CilkRT;
         break;        
-      case TapirRTTargetAttr::CudaRT:
+      case TapirTargetAttr::CudaRT:
         Target = LoopAttributes::CudaRT;
         break;
-      case TapirRTTargetAttr::HipRT:
+      case TapirTargetAttr::HipRT:
         Target = LoopAttributes::HipRT;
         break;
-      case TapirRTTargetAttr::OmpRT:
+      case TapirTargetAttr::OmpRT:
         Target = LoopAttributes::OmpRT;
         break;
-      case TapirRTTargetAttr::QthreadsRT:
+      case TapirTargetAttr::QthreadsRT:
         Target = LoopAttributes::QthreadsRT;
         break;
-      case TapirRTTargetAttr::RealmRT:
+      case TapirTargetAttr::RealmRT:
         Target = LoopAttributes::RealmRT;
         break;
-      case TapirRTTargetAttr::RocmRT:
+      case TapirTargetAttr::RocmRT:
         Target = LoopAttributes::RocmRT;
         break;
-      case TapirRTTargetAttr::SequentialRT:
+      case TapirTargetAttr::SequentialRT:
         Target = LoopAttributes::SequentialRT;
         break;
-      case TapirRTTargetAttr::ZeroRT:
+      case TapirTargetAttr::ZeroRT:
         Target = LoopAttributes::ZeroRT;
         break;
       default:
