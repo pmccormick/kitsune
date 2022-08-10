@@ -9906,6 +9906,15 @@ struct AAPotentialValuesImpl : AAPotentialValues {
   struct ItemInfo {
     AA::ValueAndContext I;
     AA::ValueScope S;
+
+    bool operator==(const ItemInfo &II) const {
+      return II.I == I && II.S == S;
+    };
+    bool operator<(const ItemInfo &II) const {
+      if (I == II.I)
+        return S < II.S;
+      return I < II.I;
+    };
   };
 
   bool recurseForValue(Attributor &A, const IRPosition &IRP, AA::ValueScope S) {
@@ -10278,7 +10287,7 @@ struct AAPotentialValuesFloating : AAPotentialValuesImpl {
     SmallMapVector<const Function *, LivenessInfo, 4> LivenessAAs;
 
     Value *InitialV = &getAssociatedValue();
-    SmallSet<AA::ValueAndContext, 16> Visited;
+    SmallSet<ItemInfo, 16> Visited;
     SmallVector<ItemInfo, 16> Worklist;
     Worklist.push_back({{*InitialV, getCtxI()}, AA::AnyScope});
 
@@ -10292,7 +10301,7 @@ struct AAPotentialValuesFloating : AAPotentialValuesImpl {
 
       // Check if we should process the current value. To prevent endless
       // recursion keep a record of the values we followed!
-      if (!Visited.insert(II.I).second)
+      if (!Visited.insert(II).second)
         continue;
 
       // Make sure we limit the compile time for complex expressions.
