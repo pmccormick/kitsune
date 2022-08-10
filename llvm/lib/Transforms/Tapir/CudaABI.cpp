@@ -1364,25 +1364,26 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
       OptLevel = 3;
   }
 
-
-  PTXASArgList.push_back("--opt-level");
-  switch (OptLevel) {
-  case 0:
-    PTXASArgList.push_back("0");
-    break;
-  case 1:
-    PTXASArgList.push_back("1");
-    break;
-  case 2:
-    PTXASArgList.push_back("2");
-    break;
-  case 3:
-    PTXASArgList.push_back("3");
-    break;
-  default:
-    llvm_unreachable_internal("unhandled/unexpected optimization level",
-                              __FILE__, __LINE__);
-    break;
+  if (not Debug) {
+    PTXASArgList.push_back("--opt-level");
+    switch (OptLevel) {
+      case 0:
+        PTXASArgList.push_back("0");
+        break;
+      case 1:
+        PTXASArgList.push_back("1");
+        break;
+      case 2:
+        PTXASArgList.push_back("2");
+        break;
+      case 3:
+        PTXASArgList.push_back("3");
+        break;
+      default:
+        llvm_unreachable_internal("unhandled/unexpected optimization level",
+                                  __FILE__, __LINE__);
+        break;
+    }
   }
 
   if (OptLevel < 2 && AllowExpensiveOpts) {
