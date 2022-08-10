@@ -4113,11 +4113,12 @@ def ReducerUnregister : InheritableAttr {
 }
 
 // +===== kitsune-/tapir-centric attributes 
-
-def TapirRTTarget : StmtAttr {
-  let Spellings = [CXX11<"tapir","rt_target">];
+def TapirTarget : StmtAttr {
+  let Spellings = [CXX11<"tapir","target">];
+  let Subjects = SubjectList<[ForallStmt, CXXForallRangeStmt],
+      	       	 ErrorDiag, "'forall' statement">;
   let Args = [
-    EnumArgument<"TapirRTTargetType", "TapirRTTargetTy",
+    EnumArgument<"TapirTargetAttrType", "TapirTargetAttrTy",
     // TODO: Is there a difference between "serial" and "none"?
     ["cheetah",    "cilk",   "cuda",
      "hip",        "libomp", "none",

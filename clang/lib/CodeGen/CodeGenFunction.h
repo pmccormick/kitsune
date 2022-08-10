@@ -3948,7 +3948,7 @@ public:
   llvm::Value *EmitSEHAbnormalTermination();
 
   LoopAttributes::LSStrategy GetTapirStrategyAttr(ArrayRef<const Attr*> Attrs);
-  LoopAttributes::LTarget GetTapirRTTargetAttr(ArrayRef<const Attr*> Attrs);
+  LoopAttributes::LTarget GetTapirTargetAttr(ArrayRef<const Attr*> Attrs);
 
   // Kitsune support for Kokkos.  
   bool InKokkosConstruct = false; // FIXME: Should/can we refactor this away?
