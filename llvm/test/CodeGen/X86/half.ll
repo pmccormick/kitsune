@@ -212,9 +212,10 @@ define i64 @test_fptosi_i64(ptr %p) #0 {
 ; CHECK-I686:       # %bb.0:
 ; CHECK-I686-NEXT:    subl $28, %esp
 ; CHECK-I686-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; CHECK-I686-NEXT:    movzwl (%eax), %eax
-; CHECK-I686-NEXT:    movl %eax, (%esp)
-; CHECK-I686-NEXT:    calll __gnu_h2f_ieee
+; CHECK-I686-NEXT:    pinsrw $0, (%eax), %xmm0
+; CHECK-I686-NEXT:    pextrw $0, %xmm0, %eax
+; CHECK-I686-NEXT:    movw %ax, (%esp)
+; CHECK-I686-NEXT:    calll __extendhfsf2
 ; CHECK-I686-NEXT:    fstps {{[0-9]+}}(%esp)
 ; CHECK-I686-NEXT:    flds {{[0-9]+}}(%esp)
 ; CHECK-I686-NEXT:    fnstcw {{[0-9]+}}(%esp)
@@ -306,9 +307,10 @@ define i64 @test_fptoui_i64(ptr %p) #0 {
 ; CHECK-I686:       # %bb.0:
 ; CHECK-I686-NEXT:    subl $28, %esp
 ; CHECK-I686-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; CHECK-I686-NEXT:    movzwl (%eax), %eax
-; CHECK-I686-NEXT:    movl %eax, (%esp)
-; CHECK-I686-NEXT:    calll __gnu_h2f_ieee
+; CHECK-I686-NEXT:    pinsrw $0, (%eax), %xmm0
+; CHECK-I686-NEXT:    pextrw $0, %xmm0, %eax
+; CHECK-I686-NEXT:    movw %ax, (%esp)
+; CHECK-I686-NEXT:    calll __extendhfsf2
 ; CHECK-I686-NEXT:    fstps {{[0-9]+}}(%esp)
 ; CHECK-I686-NEXT:    movss {{.*#+}} xmm0 = mem[0],zero,zero,zero
 ; CHECK-I686-NEXT:    movss {{.*#+}} xmm1 = mem[0],zero,zero,zero
