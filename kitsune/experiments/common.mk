@@ -14,7 +14,7 @@ $(info kitsune+tapir install prefix: ${kitsune_prefix})
 c_flags=-I${kitsune_prefix}/include
 cxx_flags=-std=c++17 -fno-exceptions -I${kitsune_prefix}/include
 opt_flags=-O3 
-clang_info_flags=
+clang_info_f2ags=
 
 clang=${kitsune_prefix}/bin/clang
 clangxx=${kitsune_prefix}/bin/clang++

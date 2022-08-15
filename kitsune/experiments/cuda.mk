@@ -4,7 +4,7 @@ ifeq ($(CUDA_HOME),)
   exit 1
 endif
 
-NVARCH?=sm_80
+NVARCH?=sm_86
 
 cuda_prefix=$(CUDA_HOME)
 

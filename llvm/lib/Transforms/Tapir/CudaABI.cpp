@@ -415,23 +415,18 @@ void runKernelOptimizationPasses(Module &KM, unsigned OptLevel = OptLevel3,
                                  unsigned SizeLevel = OptLevel2) {
 
   // TODO: Need to spend some time exploring the selected set of passes here.
-
-  LLVM_DEBUG(dbgs() << "\trunning kernel module optimizations...\n");
-  legacy::PassManager PM;
-  PM.add(createAlwaysInlinerLegacyPass());
-  PM.add(createReassociatePass());
-  PM.add(createSROAPass());
-  PM.add(createAggressiveInstCombinerPass());
-   PM.add(createGVNPass());
-  PM.add(createCFGSimplificationPass());
-  //PM.add(createSLPVectorizerPass());  // not that helpful for GPUs?
-  PM.add(createDeadCodeEliminationPass());
-  PM.add(createDeadStoreEliminationPass());
-  PM.add(createCFGSimplificationPass());
-  PM.add(createDeadCodeEliminationPass());
-  PM.add(createVerifierPass());
-  PM.run(KM);
-  LLVM_DEBUG(dbgs() << "\t\tpasses complete...\n");
+  if (OptLevel > 0) {
+    legacy::PassManager PM;
+    LLVM_DEBUG(dbgs() << "\trunning kernel module optimizations...\n");
+    PM.add(createReassociatePass());
+    PM.add(createGVNPass());
+    PM.add(createCFGSimplificationPass());
+    PM.add(createDeadStoreEliminationPass());
+    PM.add(createCFGSimplificationPass());
+    PM.add(createVerifierPass());
+    PM.run(KM);
+    LLVM_DEBUG(dbgs() << "\t\tpasses complete...\n");
+  }
 }
 
 // TODO: This call assumes we want to create the constant string
@@ -1957,16 +1952,17 @@ CudaABIOutputFile CudaABI::generatePTX() {
   PMB.OptLevel = OptLevel;
   PMB.VerifyInput = 1;
   PMB.Inliner = createFunctionInliningPass(PMB.OptLevel, 0, false);
-  PMB.populateLTOPassManager(PM);
+  PMB.DisableUnrollLoops = false;
+  PMB.LoopVectorize = false;
+  PMB.SLPVectorize = false;
   PMB.populateFunctionPassManager(FPM);
   PMB.populateModulePassManager(PM);
 
   // Setup the passes and request that the output goes to the
   // specified PTX file.
-  bool Fail = PTXTargetMachine->addPassesToEmitFile(
-                  PM, PTXFile->os(), nullptr,
-                  CodeGenFileType::CGFT_AssemblyFile,
-                  false);
+  bool Fail = PTXTargetMachine->addPassesToEmitFile(PM, PTXFile->os(),
+                           nullptr, CodeGenFileType::CGFT_AssemblyFile,
+                           false);
   if (Fail)
     report_fatal_error("Cuda ABI transform -- PTX generation failed!");
 
@@ -2011,7 +2007,7 @@ void CudaABI::postProcessModule() {
     L.linkInModule(std::move(LibDeviceModule), Linker::LinkOnlyNeeded);
   }
 
-  runKernelOptimizationPasses(KM, OptLevel);
+  //runKernelOptimizationPasses(KM, OptLevel);
   CudaABIOutputFile PTXFile = generatePTX();
   CudaABIOutputFile AsmFile = assemblePTXFile(PTXFile);
   CudaABIOutputFile FatbinFile = createFatbinaryFile(AsmFile);

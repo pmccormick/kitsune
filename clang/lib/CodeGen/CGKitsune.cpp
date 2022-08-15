@@ -336,6 +336,11 @@ void CodeGenFunction::RestoreDeclMap(const VarDecl* IV, const Address IVAddress)
 void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
                                   ArrayRef<const Attr *> ForallAttr) {
 
+  LoopAttributes::LTarget TT = GetTapirTargetAttr(ForallAttr);
+  if (TT == LoopAttributes::CudaRT) {
+    fprintf(stderr, "Found a cuda attributed forall statement.\n");
+  }
+
   /////////////////////////////////////////////////////////////////////////////
   // Code Modifications necessary for implementing parallel loops not required
   // by serial loops.
