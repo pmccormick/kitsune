@@ -9,8 +9,8 @@
 #include <time.h>
 #include "kitsune/timer.h"
 #include <kitsune.h>
-#include "kitsune/llvm-gpu-abi/llvm-gpu.h"
-#include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
+#include "kitsune/kitrt/llvm-gpu.h"
+#include "kitsune/kitrt/kitrt-cuda.h"
 
 #define DEFAULT_WIDTH  2048
 #define DEFAULT_HEIGHT 1024

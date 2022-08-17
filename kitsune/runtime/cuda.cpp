@@ -685,7 +685,8 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
   // allcoated resources -- as it stands we will "leak"
   // modules, streams, functions, etc.
   CUmodule module;
-  CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
+  //CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
+  CU_SAFE_CALL(cuModuleLoadFatBinary_p(&module, fatBin));
   CUfunction kFunc;
   CU_SAFE_CALL(cuModuleGetFunction_p(&kFunc, module, kernelName));
   CUstream stream = nullptr;
@@ -845,12 +846,8 @@ void *__kitrt_cuLaunchKernel(llvm::Module &m, void **args, size_t n) {
 
 void __kitrt_cuStreamSynchronize(void *vs) {
   if (_kitrtEnableTiming)
-    return; // We sync'ed at kernel launch to time with events...
-  if (not vs)
-    // TODO: This call doesn't wrap well in CU_SAFE_CALL????
-    cuCtxSynchronize_p();
-  else
-    CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
+    return; // TODO: Is this really safe?  We sync with events for timing.
+  CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
 }
 
 void __kitrt_cuCheckCtxState() {

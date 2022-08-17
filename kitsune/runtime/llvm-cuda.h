@@ -94,6 +94,7 @@ extern "C" {
   /// Allocate a managed memory buffer of the given size in
   /// bytes.  Upon failure the call will return a null pointer,
   /// otherwise a pointer to the allocated memory is returned.
+  __attribute__((malloc))
   void *__kitrt_cuMemAllocManaged(size_t size);
 
   /// Launch the named kernel that is part of the "fat binary"
