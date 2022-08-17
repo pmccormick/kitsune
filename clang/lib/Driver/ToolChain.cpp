@@ -1718,7 +1718,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     if (! KITSUNE_ENABLE_CUDA_ABI_TARGET)
       getDriver().Diag(diag::warn_drv_tapir_cuda_target_disabled);
     else {
-      CmdArgs.push_back("-lllvm-gpu-abi");
+      CmdArgs.push_back("-lkitrt");
       #if defined(KITSUNE_CUDA_EXTRA_LINK_LIBS)
       ExtractArgsFromString(KITSUNE_CUDA_EXTRA_LINK_LIBS, CmdArgs, Args);
       #endif
@@ -1734,7 +1734,7 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     if (! KITSUNE_ENABLE_GPU_ABI_TARGET)
       getDriver().Diag(diag::warn_drv_tapir_gpu_target_disabled);
     else {
-      CmdArgs.push_back("-lllvm-gpu-abi");
+      CmdArgs.push_back("-lkitrt");
       CmdArgs.push_back("-ldl");
       #if defined(KITSUNE_GPU_ABI_EXTRA_LINK_LIBS)
       ExtractArgsFromString(KITSUNE_GPU_ABI_EXTRA_LINK_LIBS, CmdArgs, Args);

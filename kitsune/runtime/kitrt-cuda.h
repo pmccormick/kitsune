@@ -111,13 +111,14 @@ extern "C" {
   void  __kitrt_cuMemPrefetchAsync(void *vp, size_t size);
   void  __kitrt_cuMemPrefetch(void *vp);
   void  __kitrt_cuMemNeedsPrefetch(void *vp);
+  __attribute__((malloc))
   void *__kitrt_cuMemAllocManaged(size_t size);
   void  __kitrt_cuMemFree(void *vp);
   void  __kitrt_cuAdviseRead(void *vp, size_t size);
 
   bool  __kitrt_cuMemHasHostAffinity(const void *vp);
   bool  __kitrt_cuMemHasDeviceAffinity(const void *vp);
-  void  __kitrt_cuMemSetAffinity(void *vp, KitRTMemoryAffinity affinity);
+  void  __kitrt_cuMemSetAffinity(void *vp, enum KitRTMemoryAffinity affinity);
   void  __kitrt_cuMemSetHostAffinity(void *vp);
   void  __kitrt_cuMemSetDeviceAffinity(void *vp);
   void  __kitrt_cuMemHintReadOnly(void *vp);

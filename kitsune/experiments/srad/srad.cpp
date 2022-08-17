@@ -5,8 +5,8 @@
 #include <chrono>
 
 #include <kitsune.h>
-#include "kitsune/llvm-gpu-abi/llvm-gpu.h"
-#include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
+#include "kitsune/kitrt/llvm-gpu.h"
+#include "kitsune/kitrt/kitrt-cuda.h"
 
 void random_matrix(float *I, int rows, int cols) {
   srand(7);

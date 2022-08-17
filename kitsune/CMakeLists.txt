@@ -40,42 +40,69 @@ if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
   FetchContent_MakeAvailable(kokkos)
 endif()
 
-option(KITSUNE_ENABLE_RUNTIME_ABIS "Enable the various Kitsune ABI libraries." ON)
-if (KITSUNE_ENABLE_RUNTIME_ABIS)
-  # Following llvm style we use a list to pick the set of runtime abi libraries (i.e., wrappers
-  # around various runtime systems that aim to simplify code generation details in the Tapir
-  # transforms within LLVM.
-  set(KITSUNE_ALL_RT_ABIS "realm;llvm-gpu" CACHE STRING "List of all Kitsune ABI libraries.")
-  set(KITSUNE_ENABLE_ABI_LIBRARIES "" CACHE STRING
-    "Semicolon-separated list of runtime ABI targets to build (or \"all\".)")
-  if (KITSUNE_ENABLE_ABI_LIBRARIES STREQUAL "all")
-    set(KITSUNE_ENABLE_ABI_LIBRARIES ${KITSUNE_ALL_RT_ABIS})
+option(KITSUNE_ENABLE_KITRT "Build the Kitsune runtime library (kitrt)." ON)
+if (KITSUNE_ENABLE_KITRT)
+  set(KITSUNE_ALL_KITRT_TARGETS "cuda;hip;llvm;realm;spirv" CACHE STRING "List of all Kitsune runtime targets.")
+  set(KITSUNE_ENABLE_KITRT_TARGETS "" CACHE STRING
+    "Semicolon-separated list of runtime targets to build (or \"all\".)")
+
+  if (KITSUNE_ENABLE_KITRT_TARGETS STREQUAL "all")
+    set(KITSUNE_ENABLE_KITRT_TARGETS ${KITSUNE_ALL_KITRT_TARGETS})
+  else()
+    # Make sure the runtime configuration matches what was set as the 
+    # supported compiler target(s).  
+    if (KITSUNE_ENABLE_CUDA_ABI_TARGET)
+      message(STATUS "kitsune: cuda compiler target enabled -- enabling runtime support.")
+      list(APPEND KITSUNE_ENABLE_KITRT_TARGETS "cuda")
+    endif()
+
+    if (KITSUNE_ENABLE_HIP_ABI_TARGET) 
+      message(STATUS "kitsune: hip compiler target enabled -- enabling runtime support.")
+      list(APPEND KITSUNE_ENABLE_KITRT_TARGETS "hip")
+    endif()
+
+    if (KITSUNE_ENABLE_LLVM_GPU_ABI_TARGET)
+      message(STATUS "kitsune: llvm/jit compiler target enabled -- enabling runtime support.")
+      list(APPEND KITSUNE_ENABLE_KITRT_TARGETS "llvm")
+    endif()
+
+    if (KITSUNE_ENABLE_REALM_ABI_TARGET) 
+      message(STATUS "kitsune: realm compiler target enabled -- enabling runtime support.")
+      list(APPEND KITSUNE_ENABLE_KITRT_TARGETS "realm")
+    endif()
+
+    if (KITSUNE_ENABLE_SPIRV_ABI_TARGET) 
+      message(STATUS "kitsune: spirv compiler target enabled -- enabling runtime support.")
+      list(APPEND KITSUNE_ENABLE_KITRT_TARGETS "spirv")
+    endif()
+
   endif()
 
-  if (NOT KITSUNE_ENABLE_ABI_LIBRARIES STREQUAL "'")
-    foreach(lib ${KITSUNE_ENABLE_ABI_LIBRARIES})
-      string(TOUPPER "${lib}" upper_lib)
-      string(REGEX REPLACE "-" "_" upper_lib ${upper_lib})
-      if ("${lib}" IN_LIST KITSUNE_ENABLE_ABI_LIBRARIES)
-        message(STATUS "Kitsune: ${lib} abi target library is enabled")
-        set(ABI_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/${lib}")
-        if (NOT EXISTS "${ABI_LIB_DIR}" OR NOT IS_DIRECTORY "${ABI_LIB_DIR}")
-          message(FATAL_ERROR "Requested abi library source not found: ${ABI_LIB_DIR}")
-        else()
-          message(STATUS "Kitsune: Kitsune_ENABLE_${upper_lib} ON")
-          set(KITSUNE_ENABLE_${upper_lib}_ABI ON CACHE
-            BOOL "Wether to build ${upper_lib} ABI library.")
-          add_subdirectory(runtimes/${lib})
-        endif()
+  if (NOT KITSUNE_ENABLE_KITRT_TARGETS STREQUAL "'")
+    foreach(target ${KITSUNE_ALL_KITRT_TARGETS})
+      string(TOUPPER "${target}" upper_target)
+      message(STATUS "Kitsune runtime: ${target} --> ${upper_target}")
+      if (${target} IN_LIST KITSUNE_ENABLE_KITRT_TARGETS)
+        message(STATUS "Kitsune runtime target '${target}' ENABLED.")
+        message(STATUS "    KITSUNE_RT_ENABLE_${upper_target} ON")
+        set(KITSUNE_RT_ENABLE_${upper_target} ON CACHE
+            BOOL "Build kitsune runtime support for ${upper_lib} target.")
+      else()
+        message(STATUS "Kitsune runtime target ${target} DISABLED.")
+        message(STATUS "    KITSUNE_RT_ENABLE_${upper_target} OFF")      
+        set(KITSUNE_RT_ENABLE_${upper_target} OFF CACHE
+            BOOL "Build kitsune runtime support for ${upper_lib} target.")
       endif()
     endforeach()
   endif()
 endif()
 
-option(KITSUNE_BUILD_EXAMPLES "Build the Kitsune example programs." OFF)
-if (KITSUNE_BUILD_EXAMPLES)
-  add_subdirectory(examples)
-endif()
-
+add_subdirectory(runtime)
 add_subdirectory(include)
+
+#option(KITSUNE_BUILD_EXAMPLES "Build the Kitsune example programs." OFF)
+#if (KITSUNE_BUILD_EXAMPLES)
+#  add_subdirectory(examples)
+#endif()
+
 

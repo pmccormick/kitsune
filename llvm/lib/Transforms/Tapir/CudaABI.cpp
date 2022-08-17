@@ -1769,12 +1769,12 @@ Function *CudaABI::createCtor(GlobalVariable *Fatbinary,
   }
 
   // Wrap up fatbinary registration steps...
-  FunctionCallee EndFBRegrestrationFn =
+  FunctionCallee EndFBRegistrationFn =
         M.getOrInsertFunction("__cudaRegisterFatBinaryEnd",
                 FunctionType::get(VoidTy,
                                   VoidPtrPtrTy,   // cubin handle.
                                   false));
-  CtorBuilder.CreateCall(EndFBRegrestrationFn, RegFatbin);
+  CtorBuilder.CreateCall(EndFBRegistrationFn, RegFatbin);
 
   // Now add a Dtor to help us clean up at program exit...
   if (Function *CleanupFn = createDtor(Handle)) {
@@ -1806,15 +1806,12 @@ Function *CudaABI::createDtor(GlobalVariable *FBHandle) {
                              GlobalValue::InternalLinkage,
                              CUABI_PREFIX + ".dtor", &M);
 
-  // TODO: One problem with this path is that we actually will insert an entry
-  // here for ever module with a parallel construct in it...  We really only
-  // need to tear down the runtime infrastructure once...  We have addressed
-  // this via the runtime entry point but it would be nice to avoid stuffing
-  // repeatative calls into the dtor if possible.
+  // TODO: Do we call into this too many times???
   BasicBlock *DtorEntryBB = BasicBlock::Create(Ctx, "entry", DtorFn);
   IRBuilder<> DtorBuilder(DtorEntryBB);
-  Value *HandleValue = DtorBuilder.CreateAlignedLoad(
-      VoidPtrPtrTy, FBHandle, DL.getPointerABIAlignment(0));
+  Value *HandleValue = DtorBuilder.CreateAlignedLoad(VoidPtrPtrTy,
+                                            FBHandle,
+                                            DL.getPointerABIAlignment(0));
   DtorBuilder.CreateCall(UnregisterFatbinFn, HandleValue);
 
   FunctionCallee KitRTDestroyFn = M.getOrInsertFunction("__kitrt_cuDestroy",

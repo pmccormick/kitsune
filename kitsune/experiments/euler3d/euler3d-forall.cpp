@@ -8,8 +8,8 @@
 #include <cmath>
 
 #include "kitsune/timer.h"
-#include "kitsune/llvm-gpu-abi/llvm-gpu.h"
-#include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
+#include "kitsune/kitrt/llvm-gpu.h"
+#include "kitsune/kitrt/kitrt-cuda.h"
 
 using namespace std;
 using namespace kitsune;
