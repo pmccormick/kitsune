@@ -15,8 +15,8 @@ clang_flags=${cxx_flags} ${opt_flags} ${clang_info_flags}
 #
 kitsune_kokkos_flags = -fkokkos -fkokkos-no-init -I${kitsune_prefix}/include
 tapir_cu_launch_flags=-I${CUDA_HOME}/include
-#tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-opt-level=3
-tapir_cu_flags=-v -ftapir=cuda -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-opt-level=3 -mllvm -cuabi-disable-prefetch=true
+#tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-opt-level=3 
+tapir_cu_flags=-mllvm -debug-only=cuda-abi -ftapir=cuda -ffp-contract=fast -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-opt-level=3 -mllvm -cuabi-disable-prefetch=true
 tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1 -mllvm -cuabi-default-grainsize=1
 ####
 
@@ -43,6 +43,7 @@ euler3d.${host_arch}: euler3d.cpp
 	/usr/bin/time ${clangxx} ${clang_flags} -o $@ $<
 
 euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
+	${clangxx} ${clang_flags} -S -emit-llvm ${tapir_cu_flags} ${tapir_stripmine_flags} $< 
 	/usr/bin/time ${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 
 euler3d-kokkos-noview.kitsune.${host_arch}: euler3d-kokkos-noview.cpp
@@ -56,7 +57,7 @@ euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
 	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
 euler3d-kokkos-noview.clang.${host_arch}: euler3d-kokkos-noview.cpp
-	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -lllvm-gpu-abi -Xlinker -rpath=${kokkos_cu_prefix}/lib
+	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -lkitrt -Xlinker -rpath=${kokkos_cu_prefix}/lib
 clean:
 	-rm -f *.${host_arch}
 	-rm -f *.fatbin

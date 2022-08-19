@@ -51,6 +51,7 @@ struct Float3 {
  * Generic functions
  */
 template <typename T>
+inline __attribute__((always_inline))
 T* alloc(int N) {
   return (T*)__kitrt_cuMemAllocManaged(sizeof(T) * N);
 }

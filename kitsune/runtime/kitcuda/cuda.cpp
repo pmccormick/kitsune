@@ -61,8 +61,8 @@
 //
 
 #include "kitrt-debug.h"
-#include "llvm-cuda.h"
-#include "kitrt-cuda.h"
+#include "kitcuda/llvm-cuda.h"
+#include "kitcuda/cuda.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -73,17 +73,42 @@
 
 // Has the runtime been initialized (successfully)?
 static bool _kitrtIsInitialized = false;
+
+// Measure internal timing of launched kernels.
 static bool _kitrtEnableTiming = false;
-static bool _kitrtEnablePrefetch = true;
+// Automatically report kernel execution times to stdout.
+static bool   _kitrtReportTiming = false;
+// Last measured kernel execution time.
+static double _kitrtLastEventTime = 0.0f;
+
+
+// Use heuristic-based launch parameters.
 static bool _kitrtUseHeuristicLaunchParameters = false;
+
+// Default number of threads to use per block for kernel
+// launches.
 static unsigned _kitrtDefaultThreadsPerBlock = 256;
+
+// Default number of blocks per grid (allows for custom
+// settings but otherwise automatically computed).
 static unsigned _kitrtDefaultBlocksPerGrid = 0;
+
+// Enable external settings for kernel launch parameters.
 static bool _kitrtUseCustomLaunchParameters = false;
+
+// CUDA device (-1 flags an uninitialized state). At present
+// runtime only supports a single device.
 static CUdevice  _kitrtCUdevice = -1;
+
+// Default CUDA context (a nullptr flags an uninitialized state).
+// At present the runtime only supports a single context.
 static CUcontext _kitrtCUcontext = nullptr;
 
-static bool   _kitrtReportTiming = false;
-static double _kitrtLastEventTime = 0.0f;
+
+// Enable auto-prefetching of UVM-managed pointers.  This is a
+// very simple approach that likely will have limited success
+// in most use cases.
+static bool _kitrtEnablePrefetch = true;
 
 
 // NOTE: Over a series of CUDA releases it is worthwhile to
@@ -139,6 +164,8 @@ declare(cuMemcpy);
 declare(cuMemcpyHtoD_v2);
 declare(cuOccupancyMaxPotentialBlockSize);
 
+
+
 #define CU_SAFE_CALL(x)                                      \
   {                                                          \
     CUresult result = x;                                     \
@@ -154,50 +181,75 @@ declare(cuOccupancyMaxPotentialBlockSize);
   }
 
 
+
+// The runtime maintains a map from fat binary images to CUDA modules
+// (CUmodule).  This avoids a redundant load of the fat binary into a
+// module when looking up kernels from the generated code.
+//
+// TODO: Is there a faster path here for lookup?  Is a map more
+// complicated than necessary?
+typedef std::map<const void*, CUmodule>  KitRTModuleMap;
+static KitRTModuleMap _kitrtModuleMap;
+
+// Alongside the module map the runtime also maintains a map from
+// kernel name to CUDA function (CUfunction).  Like the modules this
+// avoids a call into the module to search for the kernel.
+//
+// TODO: Ditto from above.  Is there a faster path here for lookup?
+// Is a map more complicated than necessary?
 typedef std::map<const char *, CUfunction>  KitRTKernelMap;
 static KitRTKernelMap _kitrtKernelMap;
 
 
-// The runtime cooperates with the compiler to manage the
-// prefetching (simple for now) of data for both GPU and
-// host and gpu computations.  This is geared specifically
-// to support UVM and avoid developers having to manually
-// insert synchronization calls between host and gpu-side
-// computations.
+// The runtime cooperates with the compiler to manage the prefetching
+// (simple for now) of UVM-allcoated data for both GPU and host and
+// computations.  This is still experimental and geared specifically
+// avoid forcing explicit host/device synchronization calls in
+// application code.
 //
-// This includes tracking allocated UVM memory (via address)
-// and also information about the state of the allocation.
-// For example, the size in bytes of the allocation and the
-// location of the data's last known write (most recent
-// update).  This currently assumes synchronous launches as
-// details have to coordinated with the compiler analysis in
-// this regard.
-
-// Location of the most recently updated UVM allocated memory.
-// This can be either host or device, or host AND device meaning
-// there is valid data in both locations (e.g., computed on host
-// and then prefetched and used as a read-only variable on the
-// GPU).
+// This includes tracking allocated UVM memory (via address) and also
+// information about the state of the allocation (e.g., size in
+// bytes).
+//
+// With more advanced data flow analysis by the compiler this should
+// also enabled more advanced optimizations.
 struct AllocMapEntry {
-  size_t         size;
-  bool           prefetched;
+  size_t         size;       // size of allocated buffer in bytes.
+  bool           prefetched; // data previously prefetched?
 };
 
+// The state of a UVM-allocated region of memory is tracked by the
+// runtime via a map from the UVM pointer to an allocation map entry
+// (see above).
 typedef std::map<void *, AllocMapEntry> KitRTAllocMap;
 static KitRTAllocMap _kitrtAllocMap;
 
+
+/// Register a memory allocation with the runtime.  This registration
+/// requires the allocated pointer and the size in bytes of the
+/// allocation.
+///
+/// TODO: We could also consider doing this for all memory allocations
+/// and then determining if we should do a memcpy() or a
+/// UVM-prefetch...
 static void __kitrt_registerMemAlloc(void *addr, size_t size) {
   assert(addr != nullptr && "unexpected null pointer!");
   assert(_kitrtAllocMap.find(addr) == _kitrtAllocMap.end() && "insertion of existing mem alloc pointer!");
   AllocMapEntry E;
   E.size = size;
-  E.prefetched = false; // by default we are not prefetched.
-  #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: registering memory allocation (%p).\n", addr);
-  #endif
+  // TODO: Technically the residency of an allocation is undetermined
+  // at the time of the allocation -- it is only upon first-touch that
+  // the allocation occurs (at least for UVM memory).
+  E.prefetched = false;
   _kitrtAllocMap[addr] = E;
+
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: registered memory allocation (%p).\n", addr);
+  #endif
 }
 
+
+/// Register the allocated block of memory pointed by addr as prefetched.
 static void __kitrt_registerMemPrefetched(void *addr) {
   KitRTAllocMap::iterator cit = _kitrtAllocMap.find(addr);
   if (cit != _kitrtAllocMap.end()) {
@@ -208,16 +260,24 @@ static void __kitrt_registerMemPrefetched(void *addr) {
   }
 }
 
+
+/// Return the allocated size (in bytes) of the given registered memory
+/// allocation pointed to by addr.  If the given pointer is not
+/// registered with the runtime zero size will be returned.
 static size_t __kitrt_getMemAllocSize(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMap::const_iterator cit = _kitrtAllocMap.find(addr);
-  if (cit != _kitrtAllocMap.end()) {
-    AllocMapEntry E = cit->second;
-    return E.size;
-  } else
+  if (cit != _kitrtAllocMap.end())
+    return (cit->second).size;
+  else
     return 0;
 }
 
+
+/// Return the prefetched status of the given registered memory
+/// allocation pointed to by addr. It is currently considered
+/// to be a hard runtime error if the given pointer is not from
+/// a registered allocation.
 static bool __kitrt_isMemPrefetched(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMap::const_iterator cit = _kitrtAllocMap.find(addr);
@@ -230,9 +290,12 @@ static bool __kitrt_isMemPrefetched(void *addr) {
       fprintf(stderr, "kitrt: check allocation (%p) not prefetched.\n", addr);
     #endif
     return E.prefetched;
-  } else
+  } else {
     return false;
+  }
 }
+
+
 
 void __kitrt_cuMemNeedsPrefetch(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
@@ -485,7 +548,6 @@ void __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size) {
 void __kitrt_cuMemPrefetchAsync(void *vp, size_t size) {
   CUdeviceptr devp = (CUdeviceptr)vp;
   CU_SAFE_CALL(cuMemPrefetchAsync_p(devp, size, _kitrtCUdevice, NULL));
-
   __kitrt_registerMemPrefetched(vp);
 }
 
@@ -506,6 +568,9 @@ void __kitrt_cuMemPrefetch(void *vp) {
 
 __attribute__((malloc))
 void *__kitrt_cuMemAllocManaged(size_t size) {
+  if (not _kitrtIsInitialized)
+    __kitrt_cuInit();
+
   CUdeviceptr devp;
   CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_GLOBAL));
   __kitrt_registerMemAlloc((void*)devp, size);
@@ -513,10 +578,12 @@ void *__kitrt_cuMemAllocManaged(size_t size) {
                              _kitrtCUdevice));
   CU_SAFE_CALL(cuMemAdvise_p(devp, size, CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
                              _kitrtCUdevice));
+  /*
   int enable = 1;
   CU_SAFE_CALL(cuPointerSetAttribute_p(&enable,
                                        CU_POINTER_ATTRIBUTE_SYNC_MEMOPS,
                                        devp));
+  */
   return (void *)devp;
 }
 
@@ -684,9 +751,12 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
   // TODO: We need a better path here for binding and tracking
   // allcoated resources -- as it stands we will "leak"
   // modules, streams, functions, etc.
-  CUmodule module;
-  //CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
-  CU_SAFE_CALL(cuModuleLoadFatBinary_p(&module, fatBin));
+  static bool module_built = false;
+  static CUmodule module;
+  if(!module_built) {
+    CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
+    module_built = true;
+  }
   CUfunction kFunc;
   CU_SAFE_CALL(cuModuleGetFunction_p(&kFunc, module, kernelName));
   CUstream stream = nullptr;
@@ -746,14 +816,13 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
 
 
 // Launch a kernel on the default stream.
-  void *__kitrt_cuLaunchFBKernel(const void *fatBin,
-                                 const char *kernelName,
-                                 void **fatBinArgs,
-                                 uint64_t numElements) {
+void *__kitrt_cuLaunchFBKernel(const void *fatBin,
+			       const char *kernelName,
+			       void **fatBinArgs,
+			       uint64_t numElements) {
     assert(fatBin && "request to launch with null fat binary image!");
     assert(kernelName && "request to launch kernel w/ null name!");
     assert(fatBinArgs && "request to launch kernel w/ null fatbin args!");
-
     int threadsPerBlock, blocksPerGrid;
     CUfunction kFunc;
 
@@ -765,7 +834,14 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
               kernelName);
       #endif
       CUmodule module;
-      CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
+      KitRTModuleMap::iterator mod_it = _kitrtModuleMap.find(fatBin);
+      if (mod_it == _kitrtModuleMap.end()) {
+	CUmodule module;
+	CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
+	_kitrtModuleMap[fatBin] = module;
+      } else
+	module = mod_it->second;
+
       CU_SAFE_CALL(cuModuleGetFunction_p(&kFunc, module, kernelName));
       _kitrtKernelMap[kernelName] = kFunc;
     } else
@@ -811,7 +887,6 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
         cuEventDestroy_v2_p(start);
         cuEventDestroy_v2_p(stop);
       }
-
     return nullptr;  // default stream...
   }
 
@@ -847,7 +922,7 @@ void *__kitrt_cuLaunchKernel(llvm::Module &m, void **args, size_t n) {
 void __kitrt_cuStreamSynchronize(void *vs) {
   if (_kitrtEnableTiming)
     return; // TODO: Is this really safe?  We sync with events for timing.
-  CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
+  //CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
 }
 
 void __kitrt_cuCheckCtxState() {

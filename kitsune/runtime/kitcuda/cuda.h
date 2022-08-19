@@ -54,6 +54,7 @@
 #ifndef __KITRT_CUDA_H__
 #define __KITRT_CUDA_H__
 
+#include <stdint.h>
 #include <stdlib.h>
 
 #ifdef __cplusplus

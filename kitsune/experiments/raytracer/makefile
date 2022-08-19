@@ -20,7 +20,7 @@ tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor
 ####
 
 #### CUDA flags
-nvcc_flags=--std c++17 -m64 -arch=${NVARCH} --resource-usage -O3 --no-exceptions -I${kitsune_prefix}/include
+nvcc_flags=-allow-unsupported-compiler --std c++17 -m64 -arch=${NVARCH} --resource-usage -O3 --no-exceptions -I${kitsune_prefix}/include
 clang_cuda_flags=-xcuda --cuda-gpu-arch=${NVARCH} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include
 ####
 
@@ -51,7 +51,7 @@ raytrace.cuda.nvcc.${host_arch}: raytrace.cu
 raytrace.cuda.clang.${host_arch}: raytrace.cu
 	${clangxx} ${clang_cuda_flags} -o $@ $< -L${CUDA_HOME}/lib64 -lcudart_static -ldl -lrt -pthread
 raytrace.kokkos.nvcc.${host_arch}: raytrace-kokkos.cpp
-	${nvcc_wrapper} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+	${nvcc_wrapper} -allow-unsupported-compiler ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 raytrace.kokkos.clang.${host_arch}: raytrace-kokkos.cpp
 	${clangxx} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
