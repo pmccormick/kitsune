@@ -15,8 +15,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include "kitsune/timer.h"
-#include "kitsune/llvm-gpu-abi/llvm-gpu.h"
-#include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
+#include "kitsune/kitrt/llvm-gpu.h"
+#include "kitsune/kitrt/kitrt-cuda.h"
 #include "Kokkos_DualView.hpp"
 
 typedef Kokkos::DualView<float*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> SaxpyDualView;

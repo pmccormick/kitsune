@@ -26,17 +26,18 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/local CACHE STRING "")
 # link stages below to make sure all is within the capabilities of
 # the system you are developing on (see compile+link thread count
 # settings below).
-set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
+#set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
+set(CMAKE_BUILD_TYPE Release CACHE STRING "")
 
 # You'll want to tweak this to reduce build times based on what
 # you are working on.  By default we provide the full suite of
 # clang+tools, openmp, lld, and a debugger via lldb.
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;mlir;openmp;
+  clang;clang-tools-extra;openmp;
   CACHE STRING "")
 
-set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 70 CACHE STRING "")
-set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_75 CACHE STRING "")
+set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 80 CACHE STRING "")
+set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_80 CACHE STRING "")
 
 # CUDA/NVCC is really only happy with older host compilers.  You
 # may need to tweak this to make things happy but we typically
@@ -81,27 +82,24 @@ set(CLANG_PLUGIN_SUPPORT ON CACHE BOOL "")
 set(CLANG_VENDOR "kitsune+tapir" CACHE STRING "")
 set(CLANG_VENDOR_UTI "gov.lanl.kitsune" CACHE STRING "")
 
-set(LLVM_TARGETS_TO_BUILD X86;AArch64;AMDGPU;NVPTX;RISCV CACHE STRING "")
+#set(LLVM_TARGETS_TO_BUILD X86;AArch64;AMDGPU;NVPTX;RISCV CACHE STRING "")
+set(LLVM_TARGETS_TO_BUILD X86;NVPTX CACHE STRING "")
 
 # Enable Kitsune mode within the toolchain.
 set(CLANG_ENABLE_KITSUNE ON CACHE BOOL
   "Enable Kitsune features in Clang.")
+set(KITSUNE_ENABLE_GPU_ABI_TARGET ON CACHE BOOL "")
+set(KITSUNE_ENABLE_CUDA_ABI_TARGET ON CACHE BOOL "")
+set(KITSUNE_ENABLE_OPENMP_ABI_TARGET OFF CACHE BOOL "")
+set(KITSUNE_ENABLE_QTHREADS_ABI_TARGET OFF CACHE BOOL "")
+set(KITSUNE_ENABLE_OPENCL_ABI_TARGET OFF CACHE BOOL "")
 
 # Enable tailored Kokkos compilation.
 set(KITSUNE_ENABLE_KOKKOS_SUPPORT ON CACHE BOOL
   "Enable custom recognition and compilation of Kokkos.")
 
-# NOTE: The OpenCilk runtime is always enabled within our builds
-# so it is no longer necessary to explicitly list it (the runtime
-# will be downloaded and built as part of the full llvm build
-# process).
-set(KITSUNE_ENABLE_RUNTIME_ABIS ON CACHE BOOL "")
-set(KITSUNE_ENABLE_ABI_LIBRARIES "realm;llvm-gpu" CACHE STRING "")
-set(KITSUNE_ENABLE_GPU_ABI_TARGET ON CACHE BOOL "")
-set(KITSUNE_ENABLE_CUDA_ABI_TARGET ON CACHE BOOL "")
-set(KITSUNE_ENABLE_OPENMP_ABI_TARGET OFF CACHE BOOL "")
-set(KITSUNE_ENABLE_QTHREADS_ABI_TARGET OFF CACHE BOOL "")
-
+# Enable the Kitsune runtime.
+set(KITSUNE_ENABLE_KITRT ON CACHE BOOL "Enable the kitsune runtime.")
 set(LLVM_ENABLE_RUNTIMES ${_runtimes_list} CACHE STRING "")
 message(DEBUG "  --> KITSUNE-DEV - enabled LLVM runtimes: ${LLVM_ENABLE_RUNTIMES}")
 

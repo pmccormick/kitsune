@@ -54,6 +54,7 @@ autoconf/autom4te.cache
 # CLion project configuration
 /.idea
 
+.vscode 
 .vscode/settings.json
 .vscode/launch.json
 

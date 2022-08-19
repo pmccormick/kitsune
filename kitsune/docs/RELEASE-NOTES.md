@@ -5,6 +5,24 @@ functionality of the corresponding LLVM release.  In the sections below each
 release includes this version number for reference and a pointer to the corresponding
 set of LLVM release notes.
 
+### Release 13.0.1 RC 2 
+
+  * Added features for correct registration of generated executables with the
+    CUDA toolchain.  This allows common tools such as the compute sanitizer and
+    cuobjdump to work correctly with Kitsune generated exeutables.
+  * Restructuring of the runtime system for more flexible targeting of both
+    just-in-time and static compilation targets.  This incldues a bit more
+    separation of targets (e.g., AMD and NVIDIA).  
+  * New experiments and testing codes for validation of correctness, performance,
+    and profiling across architectures.
+  * New code generation and runtime features to support improved management, and
+    semi-automatic data movement.
+  * Support for multiple levels of tailored optimization passes in the mid-stage
+    of compilation.
+  * Bug fixes, performance enhancements, and feature enhancements for
+    troubleshooting and debugging the compiler and runtime. 
+
+
 ### Release 13.0.1 
 
   * Updated support for LLVM 13.x feature set, including a merge with a 
