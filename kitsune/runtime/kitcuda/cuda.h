@@ -143,8 +143,6 @@ extern "C" {
 
 
 #ifdef __cplusplus
-  void *__kitrt_cuLaunchKernel(llvm::Module & m, void **args,
-                               size_t n);
 } // extern "C"
 #endif
 
