@@ -38,6 +38,7 @@ if(KITSUNE_RT_ENABLE_CUDA)
   list(APPEND KITRT_HDRS
        kitcuda/cuda.h
        kitcuda/llvm-cuda.h)
+
   list(APPEND KITRT_SRCS
        kitcuda/cuda.cpp
        kitcuda/llvm-cuda.cpp)
@@ -68,7 +69,11 @@ if(KITSUNE_RT_ENABLE_CUDA)
     LIBRARY DESTINATION lib COMPONENT kitrt
     ARCHIVE DESTINATION lib COMPONENT kitrt)
 
-    install(FILES ${KITRT_HDRS}
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kitrt
+  install(FILES ${KITRT_HDRS}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kitrt)
+  install(DIRECTORY kitcuda kithip kitrealm
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kitrt/
+    FILES_MATCHING PATTERN "*.h"
     )
+   
 
