@@ -57,6 +57,7 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/Inliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Tapir/Outline.h"
@@ -146,6 +147,14 @@ static cl::opt<unsigned>
     OptLevel("cuabi-opt-level", cl::init(3), cl::NotHidden,
              cl::desc("Specify the GPU kernel optimization level."));
 
+/// Enable an extra set of passes over the host-side code after the
+/// code has been transformed (e.g., loops replaced with kernel launch
+/// calls).
+static cl::opt<bool>
+  RunHostPostOpt("cuabi-run-post-opts", cl::init(false), cl::NotHidden,
+            cl::desc("Run an additional, post transform, optimization pass."));
+
+
 /// Enable expensive optimizations to allow the compiler to use the
 /// maximum amount of resources (memory and time).  This will follow
 /// the behavior of 'ptxas' -- if the optimization level is >= 2 this
@@ -232,6 +241,7 @@ static cl::opt<unsigned>
 /*
  * TODO: work here needs to be done to support these additional arguments
  * to expose more of the ptxas feature set within the ABI transform.
+ *
  *
  /// Specify the maximum number of registers that GPU functions can use.
  /// Until a function-specific limit, a higher value will generally
@@ -1092,14 +1102,16 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   IRBuilder<> EB(&EBB.front());
 
   ArrayType *ArrayTy = ArrayType::get(VoidPtrTy, OrderedInputs.size());
-  Value *ArgArray = B.CreateAlloca(ArrayTy);
+  Value *ArgArray = EB.CreateAlloca(ArrayTy);
   unsigned int i = 0;
   for (Value *V : OrderedInputs) {
-    Value *VP = B.CreateAlloca(V->getType());
+    Value *VP = EB.CreateAlloca(V->getType());
     B.CreateStore(V, VP);
     Value *VoidVPtr = B.CreateBitCast(VP, VoidPtrTy);
-    Value *ArgPtr = B.CreateConstInBoundsGEP2_32(ArrayTy, ArgArray, 0, i++);
+    Value *ArgPtr = B.CreateConstInBoundsGEP2_32(ArrayTy, ArgArray, 0, i);
     B.CreateStore(VoidVPtr, ArgPtr);
+    i++;
+
     // TODO: This is still experimental and obviously lacking any
     // significant hueristics about when to issue a prefetch (e.g.,
     // prefetched but not written in a previous launch).
@@ -1526,6 +1538,18 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
         }
       }
     }
+  }
+
+  GlobalVariable *DummyFB = M.getGlobalVariable("_cuabi.dummy_fatbin", true);
+  if (DummyFB) {
+    Constant *CFB = ConstantExpr::getPointerCast(Fatbin,
+                                        VoidPtrTy->getPointerTo());
+    LLVM_DEBUG( dbgs() << "\tcleaning up dummy fatbin global.\n");
+    DummyFB->replaceAllUsesWith(CFB);
+    DummyFB->eraseFromParent();
+  } else {
+    LLVM_DEBUG(dbgs() << "\twarning! "
+                      << "Unable to find dummy fatbin for clean-up!.\n");
   }
 }
 
@@ -2004,7 +2028,6 @@ void CudaABI::postProcessModule() {
     L.linkInModule(std::move(LibDeviceModule), Linker::LinkOnlyNeeded);
   }
 
-  //runKernelOptimizationPasses(KM, OptLevel);
   CudaABIOutputFile PTXFile = generatePTX();
   CudaABIOutputFile AsmFile = assemblePTXFile(PTXFile);
   CudaABIOutputFile FatbinFile = createFatbinaryFile(AsmFile);
@@ -2012,18 +2035,32 @@ void CudaABI::postProcessModule() {
 
   finalizeLaunchCalls(M, Fatbinary);
   registerFatbinary(Fatbinary);
+  if (RunHostPostOpt) {
+    legacy::PassManager PM;
+    legacy::FunctionPassManager FPM(&M);
+    PassManagerBuilder PMB;
+    PMB.Inliner = createFunctionInliningPass(OptLevel, 0, false);
+    PMB.OptLevel = OptLevel;
+    PMB.SizeLevel = 0;  // No size optimizations.
+    PMB.VerifyInput = 1;
+    PMB.DisableUnrollLoops = false;
+    PMB.LoopVectorize = true;
+    PMB.SLPVectorize = true;
+    PMB.populateFunctionPassManager(FPM);
+    PMB.populateModulePassManager(PM);
+    FPM.doInitialization();
+    for (Function &Fn : M)
+      FPM.run(Fn);
+    FPM.doFinalization();
+    PM.run(M);
+  }
 
   if (! KeepIntermediateFiles) {
     sys::fs::remove(PTXFile->getFilename());
     sys::fs::remove(AsmFile->getFilename());
     sys::fs::remove(FatbinFile->getFilename());
   }
-/*
-  std::error_code ec;
-  llvm::raw_fd_ostream fs("kitsune-module.ll", ec);
-  fs << M;
-  fs.close();
- */
+
 }
 
 LoopOutlineProcessor *

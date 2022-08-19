@@ -536,7 +536,6 @@ int main(int argc, char** argv)
   float* fluxes = alloc<float>(nelr*NVAR);
   float* step_factors = alloc<float>(nelr);
 
-  cout << "Starting " << ITERATIONS << " iterations..." << endl;
   auto start = chrono::steady_clock::now();
   double copy_total = 0.0;
   double sf_total = 0.0;
@@ -570,15 +569,10 @@ int main(int argc, char** argv)
   }
 
   auto end = chrono::steady_clock::now();
-  cout << "Compute time: " << chrono::duration<double>(end-start).count() << endl;
-  cout << "\ttotal copy time: " << copy_total << endl;
-  cout << "\tstep factor time: " << sf_total << endl;
-  cout << "\trk loop time: " << rk_total << endl;
-
-  cout << "Saving solution..." << endl;
+  cout << copy_total << " "
+       << sf_total << " "
+       << rk_total << " "
+       << chrono::duration<double>(end-start).count() << endl;
   dump(variables, nel, nelr);
-  cout << "Saved solution..." << endl;
-  cout << "Done..." << endl;
-
   return 0;
 }
