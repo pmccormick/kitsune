@@ -825,6 +825,7 @@ void *__kitrt_cuLaunchFBKernel(const void *fatBin,
     assert(fatBinArgs && "request to launch kernel w/ null fatbin args!");
     int threadsPerBlock, blocksPerGrid;
     CUfunction kFunc;
+    CUmodule module;
 
     KitRTKernelMap::iterator kern_it = _kitrtKernelMap.find(kernelName);
     if (kern_it == _kitrtKernelMap.end()) {
@@ -833,14 +834,12 @@ void *__kitrt_cuLaunchFBKernel(const void *fatBin,
               "kitrt: module load+kernel lookup for kernel '%s'...\n",
               kernelName);
       #endif
-      CUmodule module;
       KitRTModuleMap::iterator mod_it = _kitrtModuleMap.find(fatBin);
       if (mod_it == _kitrtModuleMap.end()) {
-	CUmodule module;
-	CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
-	_kitrtModuleMap[fatBin] = module;
+        CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
+        _kitrtModuleMap[fatBin] = module;
       } else
-	module = mod_it->second;
+        module = mod_it->second;
 
       CU_SAFE_CALL(cuModuleGetFunction_p(&kFunc, module, kernelName));
       _kitrtKernelMap[kernelName] = kFunc;
