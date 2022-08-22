@@ -43,11 +43,11 @@ for sc in (2**p for p in range(2, 6)):
 img_width = 1920
 img_height = 1080
 
-executables = ["raytrace.clang."+march,
-               "raytrace.nvcc."+march,
-               "raytrace.kokkos."+march,
-               "raytrace.kokkos.noview."+march,
-               "raytrace.openmp.clang."+march,
+executables = ["raytrace-cuda.clang."+march,
+               "raytrace-cuda.nvcc."+march,
+               "raytrace-kokkos.clang."+march,
+               "raytrace-kokkos.nvcc."+march,
+               "raytrace-openmp.clang."+march,
                "raytrace-forall.cuda."+march]
 
 csv_filename = str("raytracer-benchmark-") + march + "-" + date_str + ".csv";

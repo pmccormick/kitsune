@@ -43,7 +43,7 @@ set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_80 CACHE STRING "")
 # may need to tweak this to make things happy but we typically
 # need to fall back to older compilers than what we use to build
 # LLVM/Clang/etc.  gcc 8.x and 9.x are typically safe here...
- set(CUDA_HOST_COMPILER "/usr/bin/gcc" CACHE STRING "")
+set(CUDA_HOST_COMPILER "gcc" CACHE STRING "")
 
 set(_runtimes_list "cheetah;cilktools;kitsune")
 
@@ -83,7 +83,7 @@ set(CLANG_VENDOR "kitsune+tapir" CACHE STRING "")
 set(CLANG_VENDOR_UTI "gov.lanl.kitsune" CACHE STRING "")
 
 #set(LLVM_TARGETS_TO_BUILD X86;AArch64;AMDGPU;NVPTX;RISCV CACHE STRING "")
-set(LLVM_TARGETS_TO_BUILD X86;NVPTX CACHE STRING "")
+set(LLVM_TARGETS_TO_BUILD "X86;NVPTX" CACHE STRING "")
 
 # Enable Kitsune mode within the toolchain.
 set(CLANG_ENABLE_KITSUNE ON CACHE BOOL
