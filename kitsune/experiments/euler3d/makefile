@@ -55,7 +55,7 @@ euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
 	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
 euler3d-kokkos-noview.clang.${host_arch}: euler3d-kokkos-noview.cpp
-	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -lkitrt -Xlinker -rpath=${kokkos_cu_prefix}/lib
+	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -lkitrt -lLLVM -Xlinker -rpath=${kokkos_cu_prefix}/lib
 clean:
 	-rm -f *.${host_arch}
 	-rm -f *.fatbin
