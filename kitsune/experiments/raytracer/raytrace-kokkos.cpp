@@ -10,8 +10,6 @@
 #include "kitsune/timer.h"
 
 #include "Kokkos_DualView.hpp"
-
-
 #define DEFAULT_WIDTH 2048
 #define DEFAULT_HEIGHT  1024
 #define BPP 3
@@ -190,12 +188,14 @@ int main(int argc, char **argv) {
         const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
         const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / imageWidth);
         // Cross-product to get the up vector
-        const Vec up(goal.y *left.z - goal.z * left.y, goal.z *left.x - goal.x * left.z, goal.x *left.y - goal.y * left.x);
+        const Vec up(goal.y *left.z - goal.z * left.y, goal.z *left.x -
+		     goal.x * left.z, goal.x *left.y - goal.y * left.x);
         Vec color;
         for (int p = samplesCount; p--;) {
           Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;
-          color = color + Trace(position, !((goal+rand_left) + left * ((x+randomVal(v)) - imageWidth / 2.0f + randomVal(v)) + up * ((y+randomVal(v)) - imageHeight / 2.0f + randomVal
-                                                                                                                               (v))), v);
+          color = color + Trace(position, !((goal+rand_left) +
+                    left * ((x+randomVal(v)) - imageWidth / 2.0f + randomVal(v)) +
+		    up * ((y+randomVal(v)) - imageHeight / 2.0f + randomVal(v))), v);
         }
         // Reinhard tone mapping
         color = color * (1.0f / samplesCount) + 14.0f / 241.0f;

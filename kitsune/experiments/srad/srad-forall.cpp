@@ -5,8 +5,7 @@
 #include <chrono>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-#include "kitsune/kitrt/llvm-gpu.h"
-#include "kitsune/kitrt/kitrt-cuda.h"
+#include "kitrt/kitcuda/cuda.h"
 
 using namespace std;
 using namespace kitsune;

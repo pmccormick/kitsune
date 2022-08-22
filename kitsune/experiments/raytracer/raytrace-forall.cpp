@@ -7,10 +7,9 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <time.h>
-#include "kitsune/timer.h"
 #include <kitsune.h>
-#include "kitsune/kitrt/llvm-gpu.h"
-#include "kitsune/kitrt/kitrt-cuda.h"
+#include "kitsune/timer.h"
+#include "kitrt/kitcuda/cuda.h"
 
 #define DEFAULT_WIDTH  2048
 #define DEFAULT_HEIGHT 1024
@@ -189,11 +188,8 @@ int main(int argc, char **argv)
     }
   }
 
-  //fprintf(stderr, "image size: %d x %d\n", imageWidth, imageHeight);
-  //fprintf(stderr, "sample count %d\n", samplesCount);
   Pixel *img = (Pixel*)__kitrt_cuMemAllocManaged(sizeof(Pixel) * imageWidth * imageHeight);
-
-  __kitrt_cuEnableEventTiming(1);
+  kitsune::timer t;
   unsigned totalPixels = imageWidth * imageHeight;
   forall(size_t i = 0; i < totalPixels; ++i) { 
     int x = i % imageWidth;
@@ -222,7 +218,9 @@ int main(int argc, char **argv)
     img[i].g = (unsigned char)color.y;
     img[i].b = (unsigned char)color.z;
   }
-  __kitrt_cuDisableEventTiming();
+  
+  double loop_secs = t.seconds();
+  std::cout << loop_secs << std::endl;  
 
   std::ofstream myfile;
   myfile.open ("raytrace-forall.ppm");

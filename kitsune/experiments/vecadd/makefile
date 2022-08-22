@@ -21,7 +21,7 @@ tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor
 ####
 
 #### CUDA flags
-nvcc_flags = --std c++17 -m64 -arch ${NVARCH} --resource-usage --optimize 3 --no-exceptions -I${kitsune_prefix}/include
+nvcc_flags = -allow-unsupported-compiler --std c++17 -m64 -arch ${NVARCH} --resource-usage --optimize 3 --no-exceptions -I${kitsune_prefix}/include
 nvcc_kokkos_flags=${nvcc_flags} -I${kokkos_cuda_prefix}/include -I${kitsune_prefix}/include
 clang_cuda_flags = -xcuda --cuda-gpu-arch=${NVARCH} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include
 ####

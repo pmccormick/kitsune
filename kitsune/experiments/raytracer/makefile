@@ -30,33 +30,34 @@ kokkos_clang_cu_flags=-I${kokkos_cu_prefix}/include ${clang_cuda_flags} -I${kits
 
 
 all: raytrace-forall.cuda.${host_arch} \
-     raytrace.cuda.nvcc.${host_arch} \
-     raytrace.cuda.clang.${host_arch} \
-     raytrace.kokkos.nvcc.${host_arch} \
-     raytrace.kokkos.clang.${host_arch} \
-     raytrace.kokkos.noview.${host_arch} \
-     raytrace.openmp.clang.${host_arch} 
+     raytrace-cuda.nvcc.${host_arch} \
+     raytrace-cuda.clang.${host_arch} \
+     raytrace-kokkos.nvcc.${host_arch} \
+     raytrace-kokkos.clang.${host_arch} \
+     raytrace-kokkos.noview.${host_arch} \
+     raytrace-openmp.clang.${host_arch} 
 
 
 # Kitsune-Tapir versions.
 raytrace-forall.cuda.${host_arch}: raytrace-forall.cpp
 	${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-raytrace.kokkos.noview.${host_arch}: raytrace-kokkos-noview.cpp
+
+raytrace-kokkos.noview.${host_arch}: raytrace-kokkos-noview.cpp
 	${clangxx} ${clang_flags} ${tapir_cu_flags} ${kit_kokkos_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 
 
 # Cuda version.
-raytrace.cuda.nvcc.${host_arch}: raytrace.cu
+raytrace-cuda.nvcc.${host_arch}: raytrace.cu
 	${nvcc} ${nvcc_flags} -o $@ $<
-raytrace.cuda.clang.${host_arch}: raytrace.cu
+raytrace-cuda.clang.${host_arch}: raytrace.cu
 	${clangxx} ${clang_cuda_flags} -o $@ $< -L${CUDA_HOME}/lib64 -lcudart_static -ldl -lrt -pthread
-raytrace.kokkos.nvcc.${host_arch}: raytrace-kokkos.cpp
+raytrace-kokkos.nvcc.${host_arch}: raytrace-kokkos.cpp
 	${nvcc_wrapper} -allow-unsupported-compiler ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-raytrace.kokkos.clang.${host_arch}: raytrace-kokkos.cpp
-	${clangxx} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+raytrace-kokkos.clang.${host_arch}: raytrace-kokkos.cpp
+	${clangxx} ${kokkos_clang_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
 # OpenMP version.
-raytrace.openmp.clang.${host_arch}: raytrace-openmp.cpp
+raytrace-openmp.clang.${host_arch}: raytrace-openmp.cpp
 	${clangxx} ${clang_flags} -fopenmp -fopenmp-targets=nvptx64-cuda -Xopenmp-target -march=${NVARCH} -I${kitsune_prefix}/include -fopenmp -o $@ $<
 
 clean:

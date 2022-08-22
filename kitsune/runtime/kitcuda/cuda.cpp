@@ -921,7 +921,7 @@ void *__kitrt_cuLaunchKernel(llvm::Module &m, void **args, size_t n) {
 void __kitrt_cuStreamSynchronize(void *vs) {
   if (_kitrtEnableTiming)
     return; // TODO: Is this really safe?  We sync with events for timing.
-  //CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
+  CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
 }
 
 void __kitrt_cuCheckCtxState() {

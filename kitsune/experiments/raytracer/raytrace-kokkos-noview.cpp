@@ -8,8 +8,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "Kokkos_Core.hpp"
-#include "kitsune/kitrt/llvm-gpu.h"
-#include "kitsune/kitrt/kitrt-cuda.h"
+#include "kitrt/kitcuda/cuda.h"
 
 #define DEFAULT_WIDTH  2048
 #define DEFAULT_HEIGHT 1024
