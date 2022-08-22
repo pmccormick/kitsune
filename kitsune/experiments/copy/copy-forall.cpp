@@ -4,10 +4,8 @@
 #include <chrono>
 #include <kitsune.h>
 #include <cmath>
-
 #include "kitsune/timer.h"
-#include "kitsune/llvm-gpu-abi/llvm-gpu.h"
-#include "kitsune/llvm-gpu-abi/kitrt-cuda.h"
+#include "kitrt/kitcuda/cuda.h"
 
 using namespace std;
 using namespace kitsune;
@@ -68,8 +66,8 @@ int main(int argc, char** argv) {
   if (argc == 3)
     iterations = atoi(argv[2]);
 
-  fprintf(stderr, "array size: %ld\n", array_size);
-  fprintf(stderr, "iterations = %d\n", iterations);
+  fprintf(stdout, "array size: %ld\n", array_size);
+  fprintf(stdout, "iterations = %d\n", iterations);
   float *data0 = alloc<float>(array_size);
   float *data1 = alloc<float>(array_size);
 
