@@ -16,8 +16,7 @@
 #include <string>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-#include "kitsune/kitrt/llvm-gpu.h"
-#include "kitsune/kitrt/kitrt-cuda.h"
+#include "kitrt/kitcuda/cuda.h"
 
 using namespace std;
 using namespace kitsune;
@@ -48,10 +47,6 @@ int main (int argc, char* argv[]) {
   float *B = (float *)__kitrt_cuMemAllocManaged(sizeof(float) * size);
   float *C = (float *)__kitrt_cuMemAllocManaged(sizeof(float) * size);
 
-  printf("address of A: %p\n", A);
-  printf("address of B: %p\n", B);
-  printf("address of C: %p\n", C);
-  
   random_fill(A, size);
   random_fill(B, size);
 
@@ -62,7 +57,11 @@ int main (int argc, char* argv[]) {
   double time = __kitrt_cuGetLastEventTime();
   fprintf(stdout, "kernel time: %7lg\n", time);
 
-  // Sanity check the results...
+  // Sanity check the results...  We will take a hit here on 
+  // page faults back on the CPU side.  This will show up on
+  // the overall runtime of the program (e.g., the forall 
+  // might be faster but the overhead of page faults will 
+  // wipe that out). 
   size_t error_count = 0;
   for(size_t i = 0; i < size; i++) {
     float sum = A[i] + B[i];

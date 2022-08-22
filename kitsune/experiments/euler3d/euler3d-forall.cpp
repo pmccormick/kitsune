@@ -62,6 +62,8 @@ void dealloc(T* array) {
 
 template <typename T>
 void cpy(T* dst, const T* src, int N) {
+  __kitrt_cuMemNeedsPrefetch((void *)dst);
+  __kitrt_cuMemNeedsPrefetch((void *)src);
   forall(int i = 0; i < N; i++)
     dst[i] = src[i];
 }
