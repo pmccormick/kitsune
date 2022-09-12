@@ -6128,3 +6128,32 @@ strategies are:
   forall(...) {
   }];
 }
+
+def KitsuneMemAccessDocs : Documentation {
+  let Category = TapirDocs;
+  let Content = [{
+
+The kitsune memaccess attribute lets programmers inform the compiler of what
+variables their function or loop accesses and how they use them so the compiler
+can make better decisions.  This information is not verified in any way; it's
+entirely up to the programmer to understand their code and communicate this
+information correctly.
+
+- read	    : these variables are only read, never written to
+- write	    : these variables are only written to, never read
+- readwrite : these variables are both read and written, but no ordering of
+  	      those two operations is implied
+
+.. code-block:: c++
+
+   [[kitsune:memaccess("read", "n;x;p;")]]
+   [[kitsune:memaccess("write", "acc;")]]
+   forall(...){
+
+   OR
+
+   [[kitsune:memaccess("readwrite", "n;")]]
+   bool funcname (int n) {
+   
+  }];
+}

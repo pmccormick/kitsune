@@ -1414,6 +1414,11 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
     // OpenCL pipe
   case tok::kw_pipe:
 
+    // Kitsune memaccess qualifiers
+  case tok::kw_readonly:
+  case tok::kw_writeonly:
+  case tok::kw_readwrite:
+
     // GNU
   case tok::kw_restrict:
   case tok::kw__Complex:

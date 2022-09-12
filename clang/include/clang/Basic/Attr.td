@@ -3882,4 +3882,18 @@ def TapirStrategy : StmtAttr {
   let Documentation = [TapirStrategyDocs];
 }
 
+def KitsuneMemAccess : InheritableAttr {
+    let Spellings = [Keyword<"readonly">, Keyword<"ReadOnly">, Keyword<"READONLY">,
+    		     Keyword<"writeonly">, Keyword<"WriteOnly">, Keyword<"WRITEONLY">,
+		     Keyword<"readwrite">, Keyword<"ReadWrite">, Keyword<"READWRITE">];
+
+    let Subjects = SubjectList<[Function, LocalVar, ParmVar, TypedefName], ErrorDiag>; //not sure about the Loop parts
+    let Accessors = [
+    	Accessor<"isReadOnly", [Keyword<"readonly">, Keyword<"ReadOnly">, Keyword<"READONLY">]>,
+    	Accessor<"isWriteOnly", [Keyword<"writeonly">, Keyword<"WriteOnly">, Keyword<"WRITEONLY">]>,
+	Accessor<"isReadWrite", [Keyword<"readwrite">, Keyword<"ReadWrite">, Keyword<"READWRITE">]>
+    ];
+
+    let Documentation = [KitsuneMemAccessDocs];
+}
 // =====+
