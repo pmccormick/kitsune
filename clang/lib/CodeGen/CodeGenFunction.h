@@ -2492,6 +2492,9 @@ private:
   void EmitOpenCLKernelMetadata(const FunctionDecl *FD,
                                 llvm::Function *Fn);
 
+  /// Add Kitsune metadata to the function metadata.
+  void EmitKitsuneMetadata(const FunctionDecl *FD, llvm::Function *Fn);
+
 public:
   CodeGenFunction(CodeGenModule &cgm, bool suppressNewContext=false);
   ~CodeGenFunction();

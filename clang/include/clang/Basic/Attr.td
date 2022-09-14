@@ -3851,7 +3851,7 @@ def StrandMalloc : InheritableAttr {
   let Documentation = [StrandMallocDocs];
 }
 
-// +===== kitsune-/tapir-centric attributes 
+// +===== kitsune-/tapir-centric attributes
 def TapirTarget : StmtAttr {
   let Spellings = [CXX11<"tapir","target">];
   let Subjects = SubjectList<[ForallStmt, CXXForallRangeStmt],
@@ -3864,7 +3864,7 @@ def TapirTarget : StmtAttr {
      "qthreads",   "realm",  "rocm",
      "serial",     "zero",   "opencl"],
     ["CheetahRT",  "CilkRT",  "CudaRT",
-     "HipRT",      "OmpRT",   "QthreadsRT", 
+     "HipRT",      "OmpRT",   "QthreadsRT",
      "RealmRT",    "RocmRT",  "SequentialRT",
      "ZeroRT",     "OpenCLRT"], 0>
   ];
@@ -3882,4 +3882,19 @@ def TapirStrategy : StmtAttr {
   let Documentation = [TapirStrategyDocs];
 }
 
+def KitsuneMemAccess : InheritableAttr {
+    let Spellings = [Keyword<"_readonly">,
+                     Keyword<"_writeonly">,
+                     Keyword<"_readwrite">];
+
+    let Subjects = SubjectList<[Function, LocalVar, ParmVar, TypedefName],
+                                ErrorDiag>; // TODO: not sure about Loops
+    let Accessors = [
+      Accessor<"isReadOnly", [Keyword<"_readonly">]>,
+      Accessor<"isWriteOnly", [Keyword<"_writeonly">]>,
+      Accessor<"isReadWrite", [Keyword<"_readwrite">]>
+    ];
+
+    let Documentation = [KitsuneMemAccessDocs];
+}
 // =====+
