@@ -36,12 +36,12 @@ if(KITSUNE_RT_ENABLE_CUDA)
   add_definitions(-DKITRT_CUDA_ENABLED)
 
   list(APPEND KITRT_HDRS
-       kitcuda/cuda.h
-       kitcuda/llvm-cuda.h)
+       cuda/cuda.h
+       cuda/llvm-cuda.h)
 
   list(APPEND KITRT_SRCS
-       kitcuda/cuda.cpp
-       kitcuda/llvm-cuda.cpp)
+       cuda/cuda.cpp
+       cuda/llvm-cuda.cpp)
 
   link_directories(${CUDAToolkit_LIBRARY_DIR})
   include_directories(${CUDAToolkit_INCLUDE_DIRS}
@@ -75,5 +75,5 @@ if(KITSUNE_RT_ENABLE_CUDA)
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kitrt/
     FILES_MATCHING PATTERN "*.h"
     )
-   
+
 

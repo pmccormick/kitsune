@@ -52,62 +52,16 @@
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Tapir/TapirGPUUtils.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Vectorize.h"
 
 using namespace llvm;
 #define DEBUG_TYPE "hip-abi"
-
-// Adapted from Transforms/Utils/ModuleUtils.cpp
-// TODO: Technically we only use this to add a global ctor for
-// dealing with the nuances of HIP kernels so perhaps we'd be
-// off renaming this to match our specific use case???
-static void appendToGlobalArray(const char *Array, Module &M, Constant *C,
-                                int Priority, Constant *Data) {
-
-  IRBuilder<> IRB(M.getContext());
-  FunctionType *FnTy = FunctionType::get(IRB.getVoidTy(), false);
-
-  // Get the current set of static global constructors and add
-  // the new ctor to the list.
-  SmallVector<Constant *, 16> CurrentCtors;
-  StructType *EltTy = StructType::get(
-      IRB.getInt32Ty(), PointerType::getUnqual(FnTy), IRB.getInt8PtrTy());
-  if (GlobalVariable *GVCtor = M.getNamedGlobal(Array)) {
-    if (Constant *Init = GVCtor->getInitializer()) {
-      unsigned N = Init->getNumOperands();
-      CurrentCtors.reserve(N + 1);
-      for (unsigned i = 0; i != N; ++i)
-        CurrentCtors.push_back(cast<Constant>(Init->getOperand(i)));
-    }
-    GVCtor->eraseFromParent();
-  }
-
-  // Build a 3 field global_ctor entry.  We don't take a comdat key.
-  Constant *CSVals[3];
-  CSVals[0] = IRB.getInt32(Priority);
-  CSVals[1] = C;
-  CSVals[2] = Data ? ConstantExpr::getPointerCast(Data, IRB.getInt8PtrTy())
-                   : Constant::getNullValue(IRB.getInt8PtrTy());
-  Constant *RuntimeCtorInit =
-      ConstantStruct::get(EltTy, makeArrayRef(CSVals, EltTy->getNumElements()));
-
-  CurrentCtors.push_back(RuntimeCtorInit);
-
-  // Create a new initializer.
-  ArrayType *AT = ArrayType::get(EltTy, CurrentCtors.size());
-  Constant *NewInit = ConstantArray::get(AT, CurrentCtors);
-
-  // Create the new global variable and replace all uses of
-  // the old global variable with the new one.
-  (void)new GlobalVariable(M, NewInit->getType(), false,
-                           GlobalValue::AppendingLinkage, NewInit, Array);
-}
-
-
 static const std::string HIPABI_PREFIX = "__hipabi";
 static const std::string HIPABI_KERNEL_NAME_PREFIX = HIPABI_PREFIX + "_kern_";
+
 
 // ---- HIP transformation-specific command line arguments.
 // The transform has its own set of command line arguments that provide

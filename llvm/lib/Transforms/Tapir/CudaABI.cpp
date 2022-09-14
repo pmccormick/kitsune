@@ -1183,7 +1183,9 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
 }
 
 CudaABI::CudaABI(Module &M)
-    : TapirTarget(M), KM(CUABI_PREFIX + M.getName().str(), M.getContext()) {
+    : TapirTarget(M),
+      KM(CUABI_PREFIX + M.getName().str(),
+      M.getContext()) {
 
   LLVM_DEBUG(dbgs() << "cuabi: creating tapir target for module: "
                     << M.getName() << "\n");
