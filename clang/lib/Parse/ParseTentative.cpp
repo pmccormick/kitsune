@@ -1416,6 +1416,10 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
 
     // Cilk
   case tok::kw__Hyperobject:
+    // Kitsune memaccess qualifiers
+  case tok::kw__readonly:
+  case tok::kw__writeonly:
+  case tok::kw__readwrite:
 
     // GNU
   case tok::kw_restrict:
