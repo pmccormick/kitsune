@@ -14,7 +14,7 @@ clang_flags=${cxx_flags} ${opt_flags} ${clang_info_flags}
 #   -cuabi-keep-files saves intermediate files (.ll, .ptx, .fatbin) on disk for a closer look at codegen details.
 #
 tapir_cu_launch_flags=-I${CUDA_HOME}/include
-tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags}
+tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-keep-files 
 tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1 -mllvm -cuabi-default-grainsize=1
 ####
 

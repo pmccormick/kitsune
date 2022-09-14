@@ -9,12 +9,17 @@
 set(KITSUNE_RUNTIME_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(KITSUNE_RUNTIME_INCLUDE_DIR ${KITSUNE_RUNTIME_DIR})
 option(KITRT_ENABLE_DEBUG "Enable debug mode features for the runtime." OFF)
+option(KITRT_ENABLE_VERBOSE "Enable verbose mode features for the runtime." OFF)
 
 include_directories(${KITSUNE_SOURCE_DIR}/include)
 include_directories(${KITSUNE_RUNTIME_INCLUDE_DIR})
 
 if (KITRT_ENABLE_DEBUG)
   add_definitions(-DKITRT_DEBUG)
+endif()
+
+if (KITRT_ENABLE_VERBOSE)
+  add_defintions(-D_KITRT_VERBOSE_)
 endif()
 
 set(KITRT_HDRS
@@ -75,5 +80,5 @@ if(KITSUNE_RT_ENABLE_CUDA)
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kitrt/
     FILES_MATCHING PATTERN "*.h"
     )
-   
+
 
