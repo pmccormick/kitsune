@@ -19,7 +19,7 @@ if (KITRT_ENABLE_DEBUG)
 endif()
 
 if (KITRT_ENABLE_VERBOSE)
-  add_defintions(-D_KITRT_VERBOSE_)
+  add_definitions(-D_KITRT_VERBOSE_)
 endif()
 
 set(KITRT_HDRS
