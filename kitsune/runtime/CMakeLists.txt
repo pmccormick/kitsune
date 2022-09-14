@@ -9,7 +9,7 @@
 set(KITSUNE_RUNTIME_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(KITSUNE_RUNTIME_INCLUDE_DIR ${KITSUNE_RUNTIME_DIR})
 option(KITRT_ENABLE_DEBUG "Enable debug mode features for the runtime." OFF)
-option(KITRT_ENABLE_VERBOSE "Enable verbose mode features for the runtime." OFF)
+option(KITRT_ENABLE_VERBOSE "Enable verbose mode features for the runtime." ON)
 
 include_directories(${KITSUNE_SOURCE_DIR}/include)
 include_directories(${KITSUNE_RUNTIME_INCLUDE_DIR})
