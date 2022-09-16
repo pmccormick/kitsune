@@ -43,22 +43,19 @@ if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
 
 endif()
 
-
-option(KITSUNE_ENABLE_KITRT "Build the Kitsune runtime library (kitrt)." ON)
+option(KITSUNE_ENABLE_KITRT "Build and install the Kitsune runtime library (kitrt)." ON)
 if (KITSUNE_ENABLE_KITRT)
-  set(KITSUNE_ALL_KITRT_TARGETS "cuda;hip;llvm;realm;spirv" CACHE STRING "List of all Kitsune runtime targets.")
+  # TODO: Need to update to add JIT GPU target and Realm back into the mix. 
+  set(KITSUNE_ALL_KITRT_TARGETS "cuda;hip" CACHE STRING "List of all Kitsune runtime targets.")
   set(KITSUNE_ENABLE_KITRT_TARGETS "" CACHE STRING
     "Semicolon-separated list of runtime targets to build (or \"all\".)")
-
   # When building the full suite (LLVM + runtime) we use the
   # compiler-side flags to also enable runtime target support.
-
   message(STATUS "kitsune: checking compiler build settings to enable runtime components...")
 
   if (KITSUNE_ENABLE_KITRT_TARGETS STREQUAL "all")
     set(KITSUNE_ENABLE_KITRT_TARGETS ${KITSUNE_ALL_KITRT_TARGETS})
   else()
-
     if (KITSUNE_ENABLE_CUDA_ABI_TARGET)
       message(STATUS "kitsune: cuda compiler target enabled -- enabling runtime support.")
       list(APPEND KITSUNE_ENABLE_KITRT_TARGETS "cuda")
@@ -93,12 +90,12 @@ if (KITSUNE_ENABLE_KITRT)
       if (${target} IN_LIST KITSUNE_ENABLE_KITRT_TARGETS)
         message(STATUS "Kitsune runtime target '${target}' ENABLED.")
         message(STATUS "    KITSUNE_RT_ENABLE_${upper_target} ON")
-        set(KITSUNE_RT_ENABLE_${upper_target} ON CACHE
+        set(KITRT_ENABLE_${upper_target} ON CACHE
             BOOL "Build kitsune runtime support for ${upper_lib} target.")
       else()
         message(STATUS "Kitsune runtime target ${target} DISABLED.")
         message(STATUS "    KITSUNE_RT_ENABLE_${upper_target} OFF")
-        set(KITSUNE_RT_ENABLE_${upper_target} OFF CACHE
+        set(KITRT_ENABLE_${upper_target} OFF CACHE
             BOOL "Build kitsune runtime support for ${upper_lib} target.")
       endif()
     endforeach()
@@ -107,10 +104,4 @@ endif()
 
 add_subdirectory(runtime)
 add_subdirectory(include)
-
-#option(KITSUNE_BUILD_EXAMPLES "Build the Kitsune example programs." OFF)
-#if (KITSUNE_BUILD_EXAMPLES)
-#  add_subdirectory(examples)
-#endif()
-
 

@@ -54,7 +54,7 @@
 #ifndef __KITSUNE_RUNTIME_ABI_CUDA_H__
 #define __KITSUNE_RUNTIME_ABI_CUDA_H__
 
-#include "kitrt-debug.h"
+#include "../debug.h"
 #include "llvm/IR/Module.h"
 #include <cuda.h>
 #include <cuda_runtime_api.h>

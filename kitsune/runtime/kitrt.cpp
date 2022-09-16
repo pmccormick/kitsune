@@ -52,7 +52,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "kitrt.h"
-#include "kitrt-debug.h"
+#include "debug.h"
 #include <stdlib.h>
 
 static bool _kitrtVerboseMode         = false;

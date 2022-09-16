@@ -52,7 +52,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm-cuda.h"
-#include "kitrt-debug.h"
 #include "llvm/ADT/APInt.h"
 #include <cstdio>
 #include <cstdlib>

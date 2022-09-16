@@ -63,16 +63,82 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
-/// Initialize the runtime.  This call may be made mulitple
-/// times -- only the intial call will initialize CUDA and
-/// subsequent calls are essentially no-ops.
+// ---- Initialization, properties, clean up, etc.
+
+
+/// @brief Initialize HIP support within the kitsune runtime.
+/// @return True on success, false otherwise.
 bool __kitrt_hipInit();
 
-/// Clean up and destroy runtime components.
+/// @brief Clean up -- release resources for HIP support.
 void __kitrt_hipDestroy();
 
+// ---- Managed memory allocation, tracking, etc.
+
+/// @brief Allocate a region of managed memory.
+/// @param size: The number of bytes to allocate.
+/// @return A pointer to the allcoated region.
 __attribute__((malloc)) void *__kitrt_hipMemAllocManaged(size_t size);
+
+/// @brief Free an allocated region of managed memory.
+/// @param vp The pointer to the allocated region.
 void __kitrt_hipMemFree(void *vp);
+
+/// @brief Is the given pointer within a managed memory allocation?
+/// @param vp The pointer in question.
+/// @return True if the pointer is within a managed region, false otherwise.
+bool __kitrt_hipIsMemManaged(void *vp);
+
+/// @brief Enable "auto" prefetch mode for managed memory kernel parameters.
+void __kitrt_hipEnablePrefetch();
+
+/// @brief Disable  "auto" prefetch mode for managed memory kernel parameters.
+void __kitrt_hipDisablePrefetch();
+
+/// @brief Asynchronously prefetch data to the GPU.
+/// @param vp: The starting address to prefetch.
+/// @param size: The number of bytes to prefetch.
+void __kitrt_hipMemPrefetchAsync(void *vp, size_t size);
+
+/// @brief Prefetch data to the GPU if it managed memory.
+/// @param vp: The starting address to prefetch.
+/// @param size: The number of bytes to prefetch.
+void __kitrt_hipMemPrefetchIfManaged(void *vp, size_t size);
+
+/// @brief  Prefetch the specified data to the GPU.
+/// @param vp: Pointer to kitsune runtime managed memory.
+void __kitrt_hipMemPrefetch(void *vp);
+
+/// @brief Copy the given symbol from host to device.
+/// @param hostPtr: Pointer to the host-side symbol.
+/// @param devPtr: Pointer to the destination symbol on the GPU.
+/// @param size: Size in bytes to copy.
+void __kitrt_hipMemcpySymbolToDevice(void *hostPtr, void *devPtr, size_t size);
+
+// ---- Kernel operations, launching, streams, etc.
+
+
+void *__kitrt_hipCreateObjectModule(const void *image);
+
+uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod);
+
+void *__kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
+                                    void **args, uint64_t numElements);
+
+void __kitrt_hipStreamSynchronize(void *vStream);
+
+
+// ---- Event management and handling.
+
+void *__kitrt_hipCreateEvent();
+
+void __kitrt_hipDestroyEvent(void *E);
+
+void __kitrt_hipEventRecord(void *E);
+
+void __kitrt_hipSynchronizeEvent(void *E);
+
+float __kitrt_hipElapsedEventTime(void *start, void *stop);
 
 #ifdef __cplusplus
 } // extern "C"

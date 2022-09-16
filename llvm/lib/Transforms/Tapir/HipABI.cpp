@@ -25,9 +25,9 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
@@ -36,6 +36,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -49,12 +50,12 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/Inliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
-#include "llvm/Transforms/Tapir/TapirGPUUtils.h"
 #include "llvm/Transforms/Tapir/Outline.h"
+#include "llvm/Transforms/Tapir/TapirGPUUtils.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Vectorize.h"
 
 using namespace llvm;
@@ -173,8 +174,6 @@ static Constant *createConstantStr(const std::string &Str, Module &M,
 //
 // See the AMDGPU Target source for more details...
 //
-
-
 Value *HipLoop::emitDispatchPtr(IRBuilder<> &Builder) {
   LLVMContext &Ctx = KernelModule.getContext();
 
@@ -261,35 +260,19 @@ HipLoop::HipLoop(Module &M, Module &KModule,
   PointerType *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
   PointerType *CharPtrTy = Type::getInt8PtrTy(Ctx);
 
-  HIPWorkitemIdX = Intrinsic::getDeclaration(&KernelModule,
-                              Intrinsic::amdgcn_workitem_id_x);
-  HIPWorkitemIdY = Intrinsic::getDeclaration(&KernelModule,
-                              Intrinsic::amdgcn_workitem_id_y);
-  HIPWorkitemIdZ = Intrinsic::getDeclaration(&KernelModule,
+  KitHipWorkItemIdXFn = Intrinsic::getDeclaration(&KernelModule,
+                               Intrinsic::amdgcn_workitem_id_x);
+  KitHipWorkItemIdYFn = Intrinsic::getDeclaration(&KernelModule,
+                               Intrinsic::amdgcn_workitem_id_y);
+  KitHipWorkItemIdZFn = Intrinsic::getDeclaration(&KernelModule,
                                Intrinsic::amdgcn_workitem_id_z);
 
-  HIPWorkgroupIdX = Intrinsic::getDeclaration(&KernelModule,
+  KitHipWorkGroupIdXFn = Intrinsic::getDeclaration(&KernelModule,
                                Intrinsic::amdgcn_workgroup_id_x);
-  HIPWorkgroupIdY = Intrinsic::getDeclaration(&KernelModule,
+  KitHipWorkGroupIdYFn = Intrinsic::getDeclaration(&KernelModule,
                                Intrinsic::amdgcn_workgroup_id_y);
-  HIPWorkgroupIdZ = Intrinsic::getDeclaration(&KernelModule,
+  KitHipWorkGroupIdZFn = Intrinsic::getDeclaration(&KernelModule,
                                Intrinsic::amdgcn_workgroup_id_z);
-
-/*
-  HIPWorkgroupSizeX = Intrinsic::getDeclaration(&KernelModule,
-                               Intrinsic::amdgcn_workgroup_size_x);
-  HIPWorkgroupSizeY = Intrinsic::getDeclaration(&KernelModule,
-                               Intrinsic::amdgcn_workgroup_size_y);
-  HIPWorkgroupSizeZ = Intrinsic::getDeclaration(&KernelModule,
-                               Intrinsic::amdgcn_workgroup_size_z);
-
-  HIPGridSizeX = Intrinsic::getDeclaration(&KernelModule,
-                               Intrinsic::amdgcn_grid_size_x);
-  HIPGridSizeY = Intrinsic::getDeclaration(&KernelModule,
-                               Intrinsic::amdgcn_grid_size_y);
-  HIPGridSizeZ = Intrinsic::getDeclaration(&KernelModule,
-                               Intrinsic::amdgcn_grid_size_z);
-*/
 
   // Get entry points into the Hip-centric portion of the Kitsune GPU
   // runtime.
@@ -311,7 +294,7 @@ HipLoop::HipLoop(Module &M, Module &KModule,
                             CharPtrTy,  // symbol name
                             VoidPtrTy); // HIP module
 
-  KitHipMemcpySymbolToDeviceFn =
+  KitHipMemcpySymbolToDevFn =
       M.getOrInsertFunction("__kitrt_hipMemcpySymbolToDevice",
                             VoidTy,   // returns
                             Int32Ty,  // host pointer
@@ -528,7 +511,7 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL,
       if (not DeviceF) {
         LLVM_DEBUG(dbgs() << "\t\tanalyzing missing kernel function '"
                           << F->getName() << "'...\n");
-        Function *LF = resolveLibDeviceFunction(F);
+        Function *LF = resolveDeviceFunction(F);
         if (LF && not KernelModule.getFunction(LF->getName())) {
           LLVM_DEBUG(dbgs() << "\t\t\tcreated *libdevice* function for '"
                             << LF->getName() << "'.\n");
@@ -641,13 +624,14 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI,
   // This is the classic thread ID calculation:
   //      i = blockDim.x * blockIdx.x + threadIdx.x;
   // For now we only generate 1-D thread IDs.
-  Value *ThreadIdx = B.CreateCall(HIPWorkitemIdX);
-  Value *BlockIdx = B.CreateCall(HIPWorkgroupIdX);
-  Value *BlockDim = B.CreateCall(HIPWorkgroupSizeX);
-  Value *ThreadIV = B.CreateIntCast(
-      B.CreateAdd(ThreadIdx, B.CreateMul(BlockIdx, BlockDim, "blk_offset"),
-                  "hipthread_id"),
-      PrimaryIV->getType(), false, "thread_iv");
+  Value *ThreadIdx = B.CreateCall(KitHipWorkItemIdXFn);
+  Value *BlockIdx = B.CreateCall(KitHipWorkGroupIdXFn);
+  Value *BlockDim = emitWorkGroupSize(B, 0);
+  Value *ThreadIV = B.CreateIntCast(B.CreateAdd(ThreadIdx,
+                            B.CreateMul(BlockIdx, BlockDim, "blk_offset"),
+                           "hipthread_id"),
+                           PrimaryIV->getType(),
+                           false, "thread_iv");
 
   // NOTE/TODO: Assuming that the grainsize is fixed at 1 for the
   // current codegen...
@@ -671,6 +655,7 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI,
   ClonedCond->setOperand(TripCountIdx, ThreadEnd);
 }
 
+/*
 Function *HipLoop::resolveLibDeviceFunction(Function *F) {
   std::unique_ptr<Module> &LDM = TTarget->getLibDeviceModule();
   const std::string HIPPrefix = "__hip_";
@@ -695,6 +680,11 @@ Function *HipLoop::resolveLibDeviceFunction(Function *F) {
   }
   return nullptr;
 }
+*/
+
+Function *HipLoop::resolveDeviceFunction(Function *Fn) {
+  return nullptr;
+}
 
 void HipLoop::transformForGCN(Function &F) {
 
@@ -705,11 +695,11 @@ void HipLoop::transformForGCN(Function &F) {
   IRBuilder<> B(F.getEntryBlock().getFirstNonPHI());
 
   // Compute blockDim.x * blockIdx.x + threadIdx.x;
-  Value *tidv = B.CreateCall(HIPWorkitemIdX, {}, "thread_idx");
-  Value *ntidv = B.CreateCall(HIPWorkgroupIdX, {}, "block_idx");
-  Value *ctaidv = B.CreateCall(HIPWorkgroupSizeX, {}, "block_dimx");
+  Value *tidv = B.CreateCall(KitHipWorkItemIdXFn, {}, "thread_idx");
+  Value *ntidv = B.CreateCall(KitHipWorkGroupIdXFn, {}, "block_idx");
+  Value *ctaidv = emitWorkGroupSize(B, 0);
   Value *tidoff = B.CreateMul(ctaidv, ntidv, "block_off");
-  Value *gtid = B.CreateAdd(tidoff, tidv, "cu_idx");
+  Value *gtid = B.CreateAdd(tidoff, tidv, "t_idx");
 
   // We now need to walk the kernel (outlined loop) and look for
   // unresolved function calls.  In particular we need to check
@@ -721,7 +711,7 @@ void HipLoop::transformForGCN(Function &F) {
     if (auto CI = dyn_cast<CallInst>(&*I)) {
       Function *CF = CI->getCalledFunction();
       if (CF->size() == 0) {
-        Function *DF = resolveLibDeviceFunction(CF);
+        Function *DF = resolveDeviceFunction(CF);
         if (DF != nullptr) {
           CallInst *NCI = dyn_cast<CallInst>(CI->clone());
           NCI->insertAfter(CI);
@@ -861,10 +851,10 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
     LLVM_DEBUG(dbgs() << "\t\tcreating kernel launch w/ globals.\n");
     Value *CM = B.CreateCall(KitHipCreateFBModuleFn, {DummyFBPtr});
     if (TCCI)
-      Stream = B.CreateCall(KitHipLaunchModuleFn,
+      Stream = B.CreateCall(KitHipModuleLaunchFn,
                             {CM, KNameParam, argsPtr, TCCI}, "stream");
     else
-      Stream = B.CreateCall(KitHipLaunchModuleFn,
+      Stream = B.CreateCall(KitHipModuleLaunchFn,
                             {CM, KNameParam, argsPtr, TripCount}, "stream");
   }
 
@@ -872,33 +862,29 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   B.CreateCall(KitHipWaitFn, Stream);
 }
 
-// --- Target support
+// ----- Hip Target
+
+// As is the pattern with the GPU targets, the HipABI is setup to process
+// all Tapir constructs within a given input Module (M).  It then creates
+// a corresponding module that contains the transformed device-side code.
+// This is the KernelModule that is created below in the target
+// constructor.
 
 HipABI::HipABI(Module &InputModule)
     : TapirTarget(InputModule), // This becomes 'M' inside the Target.
       KernelModule(HIPABI_PREFIX + InputModule.getName().str(),
                    InputModule.getContext()) {
 
-  LLVM_DEBUG(dbgs() << "hipabi: creating target for module: "
-                    << M.getName() << "\n");
+  LLVM_DEBUG(dbgs() << "hipabi: creating target for module: '"
+                    << M.getName() << "'\n");
 
-  // The constructed kernel module will hold all device side functions
-  // for all parallel constructs within the input module ('M', via Tapir
-  // inheritance).  At present the external Tapir support will create
-  // a loop processor, per parallel construct in the input module, that
-  // is responsible for generating the appropriate code in the kernel
-  // module.  The ABI target must configure the code transformation and
-  // generation enviornment for these loop processors.
-
-  // The first step is to create the details for the target GPU
-  // architecture.
+  // Build the details we need for the LLVM-side target.
   std::string ArchString = "amdgcn";
   Triple TargetTriple(ArchString, "amd", "amdhsa");
-
   std::string Error;
   const Target *AMDGPUTarget = TargetRegistry::lookupTarget("",
                                                 TargetTriple, Error);
-  if (!AMDGPUTarget) {
+  if (not AMDGPUTarget) {
     errs() << "hipabi: target lookup failed! '" << Error << "'\n";
     report_fatal_error("hipabi: unable to find registered HIP target. "
                        "Was LLVM built with the AMDGPU target enabled?");
@@ -907,13 +893,13 @@ HipABI::HipABI(Module &InputModule)
   AMDTargetMachine = AMDGPUTarget->createTargetMachine(TargetTriple.getTriple(),
                       GPUArch, "", TargetOptions(),
                       Reloc::PIC_,
-                      CodeModel::Small,   // TODO: do we want small?
+                      CodeModel::Kernel,
                       CodeGenOpt::Aggressive);
 
   KernelModule.setTargetTriple(TargetTriple.str());
   KernelModule.setDataLayout(AMDTargetMachine->createDataLayout());
 
-  LLVM_DEBUG(dbgs() << "\ttarget triple: "
+  LLVM_DEBUG(dbgs() << "\tcreated target: "
                     << TargetTriple.getTriple() << "\n");
 }
 
@@ -921,6 +907,21 @@ HipABI::~HipABI() {
   LLVM_DEBUG(dbgs() << "hipabi: destroying target.\n");
 }
 
+Value *HipABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
+  // TODO: The grain size on the GPU is a completely different beast
+  // than the CPU cases Tapir was originally designed for.  At present
+  // keeping the grain size at 1 has almost always shown to yield the
+  // best results in terms of performance but we should take a closer
+  // look...  We have some tweaks for experimenting with this via the
+  // command line but it remains unexplored.
+  Value *Grainsize;
+  Grainsize = ConstantInt::get(GrainsizeCall->getType(), DefaultGrainSize);
+  // Replace uses of grain size intrinsic call with a computed
+  // grain size value.
+  GrainsizeCall->replaceAllUsesWith(Grainsize);
+  GrainsizeCall->eraseFromParent();
+  return Grainsize;
+}
 
 // We can't create a correct launch sequence until all the kernels
 // within a (LLVM) module are generated.  When post-processing the
@@ -1033,10 +1034,8 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
 // Create a AMD equivalent of a "fat binary" object file for
 // inclusion in the final generated executable.  This is done
 // per module.
-HipABIOutputFile HipABI::createGCNFile() {
-
-  assert(AMDTargetMachine && "require a valid target machine!");
-  LLVM_DEBUG(dbgs() << "hipabi: generating AMD GCN file...\n");
+HipABIOutputFile HipABI::createBundleFile() {
+  LLVM_DEBUG(dbgs() << "hipabi: generating AMD GCN file.\n");
 
   // At this point we assume the kernel module has all the
   // necessary code for kernels, device side functions,
@@ -1203,11 +1202,12 @@ HipABIOutputFile HipABI::createGCNFile() {
   );
 
   ExecStat = sys::ExecuteAndWait(*Bundler, BundleArgs, None, {},
-                                 0, // secs to wait -- 0 --> unlimited.
-                                 0, // memory limit -- 0 --> unlimited.
+                                 0, // secs to wait. 0 is unlimited.
+                                 0, // memory limit. 0 is unlimited.
                                  &ErrMsg, &ExecFailed);
   if (ExecFailed)
     report_fatal_error("hipabi: 'clang-offload-bundler' execution failed!");
+
   if (ExecStat != 0)
     report_fatal_error("hipabi: 'clang-offload-bundler' failure - " + ErrMsg);
 
@@ -1426,32 +1426,37 @@ void HipABI::registerBundle(GlobalVariable *Bundle) {
     FunctionType *CtorFnTy = FunctionType::get(VoidTy, false);
     Type *CtorFnPtrTy =
         PointerType::get(CtorFnTy, M.getDataLayout().getProgramAddressSpace());
-    appendToGlobalArray("llvm.global_ctors", M,
-                        ConstantExpr::getBitCast(CtorFn, CtorFnPtrTy), 65536,
-                        nullptr);
+    tapir::appendToGlobalCtors(M,
+                               ConstantExpr::getBitCast(CtorFn, CtorFnPtrTy),
+                               65536, nullptr);
   }
 }
 
 void HipABI::postProcessModule() {
-  // At this point we know all constructs in the module (M) have
-  // been processed by the outliner(s).  This means that the
-  // kernel module to be populated with LLVM IR suitable for
-  // transformation into AMD (GCN) GPU code.
-  LLVM_DEBUG(dbgs() << "hipabi: post processing module '"
+  LLVM_DEBUG(dbgs() << "hipabi: post processing and finalizing module '"
                     << M.getName() << "'.\n");
 
-  auto L = Linker(KernelModule);
-  if (LibDeviceModule) {
-    LLVM_DEBUG(dbgs() << "hipabi: linking in device-side module.\n");
-    L.linkInModule(std::move(LibDeviceModule), Linker::LinkOnlyNeeded);
-  }
-
-  HipABIOutputFile GCNFile = createGCNFile();
-  GlobalVariable *Bundle = embedBundle(GCNFile);
+  // At this point we know all tapir constructs in the
+  // input module (M) have been processed and the kernel
+  // module is populated with the corresponding transformed
+  // code.
+  // TODO: This is not entirely accurate...  Right now the
+  // process of mixing non-GPU parallel constructs (e.g.,
+  // spawn + sync) is not well defined for this
+  // transformation.
+  HipABIOutputFile BundleFile = createBundleFile();
+  GlobalVariable *Bundle = embedBundle(BundleFile);
   finalizeLaunchCalls(M, Bundle);
   registerBundle(Bundle);
 
+  // TODO: Is it worth doing any of this????
+  //
+  // EXPERIMENTAL:  (re)run a series of optimization passes
+  // over the original input module now that we've outlined
+  // the parallel constructs.  It is not at all clear there
+  // are any benefits to this at all.
   if (RunHostPostOpt) {
+    LLVM_DEBUG(dbgs() << "\trunning post-outlining optimization passes.\n");
     legacy::PassManager PassMgr;
     legacy::FunctionPassManager FnPassMgr(&M);
     PassManagerBuilder Builder;
@@ -1472,109 +1477,29 @@ void HipABI::postProcessModule() {
   }
 
   if (not KeepIntermediateFiles) {
-    sys::fs::remove(GCNFile->getFilename());
+    sys::fs::remove(BundleFile->getFilename());
     // TODO: Check the bundling code for cleanup details...
   }
 }
 
 LoopOutlineProcessor *
 HipABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
-  // Create a HIP loop outline processor for transforming
-  // parallel tapir loop constructs into suitable GPU device
-  // code.  We hand the outliner the kernel module (KernelModule) as
-  // the destination for all generated (device-side) code.
   std::string ModuleName = M.getName().str();
-  std::string KN;
+  std::string KernelName;
 
   if (M.getNamedMetadata("llvm.dbg")) {
-    // If we have debug info in the module go ahead and use a line number
-    // based naming scheme for kernel names. This is purely for some extra
-    // context (and sanity?) on the compiler development side...
+    // If we have debug info in the module, use a line number-based
+    // naming scheme for kernels.
     unsigned LineNumber = TL->getLoop()->getStartLoc()->getLine();
-    KN = HIPABI_KERNEL_NAME_PREFIX + ModuleName + "_" + Twine(LineNumber).str();
-  } else {
-    // In the non-debug mode we use a consecutive numbering scheme for our
-    // kernel names (this is currently handled via the 'make unique' parameter).
-    KN = HIPABI_KERNEL_NAME_PREFIX + ModuleName;
-  }
+    KernelName = HIPABI_KERNEL_NAME_PREFIX + ModuleName +
+                 "_" + Twine(LineNumber).str();
+  } else
+    KernelName = HIPABI_KERNEL_NAME_PREFIX + ModuleName;
 
-  HipLoop *HLOP = new HipLoop(M, KernelModule, KN, this);
-  return HLOP;
+  HipLoop *Outliner = new HipLoop(M, KernelModule, KernelName, this);
+  return Outliner;
 }
 
 void HipABI::pushGlobalVariable(GlobalVariable *GV) {
   GlobalVars.push_back(GV);
 }
-
-std::unique_ptr<Module> &HipABI::getLibDeviceModule() {
-
-  if (not LibDeviceModule) {
-    LLVMContext &Ctx = KernelModule.getContext();
-    llvm::SMDiagnostic SMD;
-    Optional<std::string> CudaPath = sys::Process::FindInEnvPath(
-        "CUDA_HOME", "nvvm/libdevice/libdevice.10.bc");
-    if (!CudaPath)
-      report_fatal_error("Unable to load cuda libdevice.10.bc!");
-
-    LibDeviceModule = parseIRFile(*CudaPath, SMD, Ctx);
-    if (not LibDeviceModule)
-      report_fatal_error("Failed to parse cuda libdevice.10.bc!");
-  }
-
-  return LibDeviceModule;
-}
-
-Value *HipABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
-  // TODO: The grain size on the GPU is a completely different beast
-  // than the CPU cases Tapir was originally designed for.  At present
-  // keeping the grain size at 1 has almost always shown to yield the
-  // best results in terms of performance.  We have yet to really do
-  // a detailed study of the aspects here so consider anything done
-  // here as a lot of remaining work and exploration.
-  Value *Grainsize =
-      ConstantInt::get(GrainsizeCall->getType(), DefaultGrainSize);
-  // Replace uses of grain size intrinsic call with a computed
-  // grain size value.
-  GrainsizeCall->replaceAllUsesWith(Grainsize);
-  // TODO: ??? GrainsizeCall->eraseFromParent();
-  return Grainsize;
-}
-
-void HipABI::lowerSync(SyncInst &SI) { /* no-op */ }
-
-void HipABI::addHelperAttributes(Function &F) { /* no-op */ }
-
-void HipABI::preProcessFunction(Function &F, TaskInfo &TI,
-                                bool OutliningTapirLoops) {
-  /* no-op */
-}
-
-void HipABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-  /* no-op */
-}
-
-void HipABI::postProcessHelper(Function &F) { /* no-op */ }
-
-void HipABI::preProcessOutlinedTask(llvm::Function &, llvm::Instruction *,
-                                    llvm::Instruction *, bool, BasicBlock *) {
-  /* no-op */
-}
-
-void HipABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
-                                     Instruction *TaskFrameCreate,
-                                     bool IsSpawner, BasicBlock *TFEntry) {
-  /* no-op */
-}
-
-void HipABI::postProcessRootSpawner(Function &F, BasicBlock *TFEntry) {
-  /* no-op */
-}
-
-void HipABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
-  /* no-op */
-}
-
-void HipABI::preProcessRootSpawner(llvm::Function &, BasicBlock *TFEntry) {
-  /* no-op */
-}
-

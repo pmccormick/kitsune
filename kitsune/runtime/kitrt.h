@@ -60,11 +60,11 @@
 #include "llvm/kitrt-llvm.h"
 
 #ifdef KITRT_CUDA_ENABLED
-#include "kitcuda/cuda.h"
+#include "cuda/cuda.h"
 #endif
 
 #ifdef KITRT_HIP_ENABLED
-#include "kithip/kitrt-hit.h"
+#include "hip/hip.h"
 #endif
 
 #ifdef __cplusplus

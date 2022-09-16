@@ -53,9 +53,9 @@
 
 #include <cstdio>
 #include "kitrt.h"
-#include "kitrt-debug.h"
-#include "kitcuda/cuda.h"
-#include "kithip/hip.h"
+#include "debug.h"
+#include "cuda/cuda.h"
+#include "hip/hip.h"
 
 enum KitRTRuntimes {
   KITRT_CudaSupport = 0x001,
