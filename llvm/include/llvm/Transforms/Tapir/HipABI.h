@@ -38,21 +38,25 @@ public:
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
 
   /// Lower the given Tapir sync instruction (SI).
-  void lowerSync(SyncInst &SI) override final { }
+  void lowerSync(SyncInst &SI) override final 
+  { /* no-op */ }
 
   /// Process Function F before any function outlining is performed.  This
   /// routine should not modify the CFG structure.
   virtual void preProcessFunction(Function &F, TaskInfo &TI,
-                                  bool ProcessingTapirLoops) { }
+                                  bool ProcessingTapirLoops) 
+  { /* no-op */ }
 
   // Add attributes to the Function Helper produced from outlining a task.
-  void addHelperAttributes(Function &F) { /* no-op */ }
+  void addHelperAttributes(Function &F) 
+  { /* no-op */ }
 
   // Pre-process the Function F that has just been outlined from a task.  This
   // routine is executed on each outlined function by traversing in post-order
   // the tasks in the original function.
   void preProcessOutlinedTask(Function &F,
-                              Instruction *I,
+                              Instruction *DetachPt,
+                              Instruction *TaskFrameCreate,
                               bool isSpawner,
                               BasicBlock *BB)
   { /* no-op */ }
@@ -96,7 +100,8 @@ public:
 
   // Process a generated helper Function F produced via outlining, at the end of
   // the lowering process.
-  void postProcessHelper(Function &F) { /* no-op */ }
+  void postProcessHelper(Function &F) 
+  { /* no-op */ }
 
   // Return the HIP outline processor associated with this target.
   LoopOutlineProcessor *getLoopOutlineProcessor(const TapirLoopInfo *TL)

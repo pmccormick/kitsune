@@ -17,6 +17,15 @@
 #include "llvm/IR/Module.h"
 
 namespace tapir {
+  using namespace llvm;
+
+  extern Constant *getOrInsertFBGlobal(Module &M, StringRef Name, Type *Ty);
+
+  Constant *createConstantStr(const std::string &Str, Module &M,
+                                   const std::string &Name = "",
+                                   const std::string &SectionName = "",
+                                   unsigned Alignment = 0);
+
   extern void appendToGlobalCtors(llvm::Module &M,
                                   llvm::Constant *C,
                                   int Priority,

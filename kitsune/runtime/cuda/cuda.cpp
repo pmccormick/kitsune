@@ -168,8 +168,6 @@ DECLARE_DLSYM(cuMemcpy);
 DECLARE_DLSYM(cuMemcpyHtoD_v2);
 DECLARE_DLSYM(cuOccupancyMaxPotentialBlockSize);
 
-
-
 // The runtime maintains a map from fat binary images to CUDA modules
 // (CUmodule).  This avoids a redundant load of the fat binary into a
 // module when looking up kernels from the generated code.

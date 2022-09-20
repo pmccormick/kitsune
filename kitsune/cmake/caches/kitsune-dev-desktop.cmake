@@ -12,7 +12,7 @@
 #      $ cmake ...  --log-level=DEBUG ...
 #
 
-message(DEBUG "KITSUNE-DEV - loading developer's cache file...")
+message(DEBUG "KITSUNE-DEV - loading developer's desktop cache file...")
 cmake_policy(SET CMP0057 NEW)
 
 # Pick a path for the install location -- note you can use the
@@ -33,7 +33,7 @@ set(CMAKE_BUILD_TYPE Release CACHE STRING "")
 # you are working on.  By default we provide the full suite of
 # clang+tools, openmp, lld, and a debugger via lldb.
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;openmp;
+  clang;clang-tools-extra
   CACHE STRING "")
 
 set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 80 CACHE STRING "")
@@ -43,9 +43,9 @@ set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_80 CACHE STRING "")
 # may need to tweak this to make things happy but we typically
 # need to fall back to older compilers than what we use to build
 # LLVM/Clang/etc.  gcc 8.x and 9.x are typically safe here...
- set(CUDA_HOST_COMPILER "/usr/bin/gcc" CACHE STRING "")
+ set(CUDA_HOST_COMPILER "gcc-11" CACHE STRING "")
 
-set(_runtimes_list "cheetah;cilktools;kitsune")
+set(_runtimes_list "openmp;cheetah;cilktools;kitsune")
 
 # Various helpful LLVM-level settings for development/debugging.
 set(CLANG_ROUND_TRIP_CC1_ARGS OFF CACHE BOOL "")
@@ -71,8 +71,8 @@ set(LLVM_LINK_LLVM_DYLIB ON CACHE BOOL "")
 # scalability of the parallel build.
 #
 # desktop:
-set(LLVM_PARALLEL_COMPILE_JOBS 12 CACHE STRING "")
-set(LLVM_PARALLEL_LINK_JOBS 4 CACHE STRING "")
+set(LLVM_PARALLEL_COMPILE_JOBS 16 CACHE STRING "")
+set(LLVM_PARALLEL_LINK_JOBS 5 CACHE STRING "")
 
 # Various helpful Clang-level settings for development/debugging.
 set(CLANG_BUILD_TOOLS ON CACHE BOOL "")
@@ -83,14 +83,14 @@ set(CLANG_VENDOR "kitsune+tapir" CACHE STRING "")
 set(CLANG_VENDOR_UTI "gov.lanl.kitsune" CACHE STRING "")
 
 #set(LLVM_TARGETS_TO_BUILD X86;AArch64;AMDGPU;NVPTX;RISCV CACHE STRING "")
-set(LLVM_TARGETS_TO_BUILD X86;NVPTX CACHE STRING "")
+set(LLVM_TARGETS_TO_BUILD X86;NVPTX;AMDGPU CACHE STRING "")
 
 # Enable Kitsune mode within the toolchain.
 set(CLANG_ENABLE_KITSUNE ON CACHE BOOL
   "Enable Kitsune features in Clang.")
-set(KITSUNE_ENABLE_GPU_ABI_TARGET ON CACHE BOOL "")
+set(KITSUNE_ENABLE_GPU_ABI_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_CUDA_ABI_TARGET ON CACHE BOOL "")
-set(KITSUNE_ENABLE_CUDA_HIP_TARGET ON CACHE BOOL "")
+set(KITSUNE_ENABLE_HIP_TARGET ON CACHE BOOL "")
 set(KITSUNE_ENABLE_OPENMP_ABI_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_QTHREADS_ABI_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_OPENCL_ABI_TARGET OFF CACHE BOOL "")
@@ -115,8 +115,7 @@ message(DEBUG "  --> KITSUNE-DEV: fixing gcc prefix path.")
 execute_process(
   COMMAND /bin/bash --norc --noprofile -c "dirname \$(dirname `which gcc`)"
   OUTPUT_VARIABLE _gcc_prefix
-  ECHO_OUTPUT_VARIABLE
-  )
+  ECHO_OUTPUT_VARIABLE)
 string(LENGTH ${_gcc_prefix} _gcc_prefix_len)
 if (_gcc_prefix_len GREATER 0)
   string(REGEX REPLACE "\n$" "" _gcc_prefix "${_gcc_prefix}")

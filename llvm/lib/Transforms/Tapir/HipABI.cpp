@@ -59,12 +59,14 @@
 #include "llvm/Transforms/Vectorize.h"
 
 using namespace llvm;
+
 #define DEBUG_TYPE "hip-abi"
 static const std::string HIPABI_PREFIX = "__hipabi";
 static const std::string HIPABI_KERNEL_NAME_PREFIX = HIPABI_PREFIX + "_kern_";
 
 
 // ---- HIP transformation-specific command line arguments.
+//
 // The transform has its own set of command line arguments that provide
 // additional functionality, debugging, etc.  As a reminder, these can
 // used in the form:
@@ -72,16 +74,26 @@ static const std::string HIPABI_KERNEL_NAME_PREFIX = HIPABI_PREFIX + "_kern_";
 //    -mllvm -hipabi-option[...]
 //
 
-/// Selected target GPU architecture.
+// Select a specific target AMD GPU architecture.  At present this 
+// directly matches those available with the AMDGPU backend target. 
+//
+// TODO: Might be nice to allow build-time setting of this default.
+//
 static cl::opt<std::string>
-    GPUArch("hipabi-arch", cl::init("gfx960"), cl::NotHidden,
+    GPUArch("hipabi-arch", cl::init("gfx906"), cl::NotHidden,
             cl::desc("Target GPU architecture for HIP ABI transformation."
-                     "(default: gfx960 (MI50)"));
+                     "(default: gfx906 (MI50/60)"));
+
+/// Enable verbose mode.  Handled internally as well as passed on to
+/// any extra toolchain components (when available).
+static cl::opt<bool> 
+    Verbose("hipabi-verbose", cl::init(false), cl::Hidden, 
+    cl::desc("Provide verbose details as the transformation runs."));
+
 
 /// Set the optimization level for use within the transformation.  This
-/// level is used internally on transformed/generated LLVM IR as well
-/// handed off any external toolchain elements (e.g., the clang offload
-/// bundler).
+/// level is used internally within the transform IR as well handed off 
+/// to any external toolchain elements (e.g., the clang offload bundler).
 static cl::opt<unsigned>
     OptLevel("hipabi-opt-level", cl::init(3), cl::NotHidden,
              cl::desc("Specify the GPU kernel optimization level."));
@@ -89,16 +101,16 @@ static cl::opt<unsigned>
 /// Enable an extra set of passes over the host-side code after the
 /// code has been transformed (e.g., loops replaced with kernel launch
 /// calls).
-static cl::opt<bool> RunHostPostOpt(
-    "hipabi-run-post-opts", cl::init(false), cl::NotHidden,
-    cl::desc("Run an additional, post transform, optimization pass."));
+static cl::opt<bool> 
+    RunHostPostOpt("hipabi-run-post-opts", cl::init(false), cl::NotHidden,
+    cl::desc("Run a post-transform optimization pass on the host-side code."));
 
 /// Keep the complete set of intermediate files around after compilation.  This
-/// includes LLVM IR, GCN, and the fatbinary file.
-static cl::opt<bool> KeepIntermediateFiles(
-    "hipabi-keep-files", cl::init(false), cl::Hidden,
+/// includes LLVM IR, GCN, and the fatbinary/bundle file.
+static cl::opt<bool> 
+    KeepIntermediateFiles("hipabi-keep-files", cl::init(false), cl::Hidden,
     cl::desc("Keep all the intermediate files on disk after"
-             "successsful completion of the transforms "
+             "successful completion of the transforms "
              "various steps."));
 
 /// Generate code to prefetch data prior to kernel launches.  This is literally
@@ -112,49 +124,13 @@ static cl::opt<bool>
 
 /// Set the HIP ABI's default grain size value.  This is used internally
 /// by the transform.
-static cl::opt<unsigned> DefaultGrainSize(
-    "hipabi-default-grainsize", cl::init(1), cl::Hidden,
+static cl::opt<unsigned> 
+    DefaultGrainSize("hipabi-default-grainsize", cl::init(1), cl::Hidden,
     cl::desc("The default grainsize used by the transform "
              "when analysis fails to determine one. (default=1)"));
 
-static Constant *getOrInsertFBGlobal(Module &M, StringRef Name, Type *Ty) {
-  return M.getOrInsertGlobal(Name, Ty, [&] {
-    return new GlobalVariable(M, Ty, true, GlobalValue::InternalLinkage,
-                              nullptr, Name, nullptr);
-  });
-}
 
-// --- Loop
-
-// TODO: This call assumes we want to create the constant string
-// in a fixed module ('M' in this case).  Perhaps should consider
-// passing a Module to make things a bit more flexible?
-static Constant *createConstantStr(const std::string &Str, Module &M,
-                                   const std::string &Name = "",
-                                   const std::string &SectionName = "",
-                                   unsigned Alignment = 0) {
-  LLVMContext &Ctx = M.getContext();
-  Constant *CSN = ConstantDataArray::getString(Ctx, Str);
-  GlobalVariable *GV = new GlobalVariable(
-      M, CSN->getType(), true, GlobalVariable::PrivateLinkage, CSN, Name);
-  Type *StrTy = GV->getType();
-
-  const DataLayout &DL = M.getDataLayout();
-  Constant *Zeros[] = {ConstantInt::get(DL.getIndexType(StrTy), 0),
-                       ConstantInt::get(DL.getIndexType(StrTy), 0)};
-  if (!SectionName.empty()) {
-    GV->setSection(SectionName);
-    // Mark the address as used which make sure that this section isn't
-    // merged and we will really have it in the object file.
-    GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::None);
-  }
-
-  if (Alignment)
-    GV->setAlignment(llvm::Align(Alignment));
-
-  Constant *CS = ConstantExpr::getGetElementPtr(GV->getValueType(), GV, Zeros);
-  return CS;
-}
+// --- Loop Outliner
 
 
 // For some clarity (that is documented elsewhere) many fields are
@@ -230,6 +206,8 @@ Value *HipLoop::emitGridSize(IRBuilder<> &Builder, unsigned Index) {
                   MDNode::get(Ctx, None));
   return LD;
 }
+
+
 
 /// Static ID for kernel naming -- each encountered kernel (loop)
 /// during compilation will receive a unique ID.
@@ -655,35 +633,23 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI,
   ClonedCond->setOperand(TripCountIdx, ThreadEnd);
 }
 
-/*
-Function *HipLoop::resolveLibDeviceFunction(Function *F) {
-  std::unique_ptr<Module> &LDM = TTarget->getLibDeviceModule();
-  const std::string HIPPrefix = "__hip_";
-  std::string UName = F->getName().str();
-
-  if (Function *KF = KernelModule.getFunction(HIPPrefix + F->getName().str())) {
-    LLVM_DEBUG(dbgs() << "\t\tfound device function '" << KF->getName()
-                      << "'.\n");
-    return KF;
-  }
-
-  for (auto &DF : *LDM) {
-    std::string DFName = DF.getName().str();
-    auto Match =
-        std::mismatch(HIPPrefix.begin(), HIPPrefix.end(), DFName.begin());
-    auto BaseName = DFName.substr(Match.second - DFName.begin());
-    if (BaseName == UName) {
-      LLVM_DEBUG(dbgs() << "Found libdevice function: '" << DF.getName()
-                        << "' to resolve function '" << F->getName() << "'.\n");
-      return &DF;
-    }
-  }
-  return nullptr;
-}
-*/
-
 Function *HipLoop::resolveDeviceFunction(Function *Fn) {
-  return nullptr;
+
+  if (Function *KernFn = KernelModule.getFunction(Fn->getName())) {
+    LLVM_DEBUG(dbgs() << "\tfound device function: "
+                      << Fn->getName() << "()\n");
+    return KernFn;
+  }
+  Function *DevFn = nullptr;
+  const std::string AMDGCN_PREFIX = "llvm.amdgcn.";
+  std::string IntrinsicName = AMDGCN_PREFIX + Fn->getName().str();
+  Intrinsic::ID IntrinsicID = Fn->lookupIntrinsicID(IntrinsicName);
+  if (IntrinsicID != Intrinsic::not_intrinsic) {
+    DevFn = Intrinsic::getDeclaration(&KernelModule, IntrinsicID);
+    LLVM_DEBUG(dbgs() << "\tfound device intrinsic: "
+                      << IntrinsicName << "()\n");
+  } 
+  return DevFn;
 }
 
 void HipLoop::transformForGCN(Function &F) {
@@ -826,7 +792,7 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   // Because of this we create a "stand in" (dummy) here and will replace
   // it later in the ABI's transformation pipeline.
   Constant *DummyFBGV =
-      getOrInsertFBGlobal(M, "_hipabi.dummy_fatbin", VoidPtrTy);
+      tapir::getOrInsertFBGlobal(M, "_hipabi.dummy_fatbin", VoidPtrTy);
   Value *DummyFBPtr = B.CreateLoad(VoidPtrTy, DummyFBGV);
 
   Value *Stream;
@@ -999,7 +965,7 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
               assert(NI && "unexpected null instruction!");
               for (auto &HostGV : GlobalVars) {
                 std::string DevVarName = HostGV->getName().str() + "_devvar";
-                Value *SymName = createConstantStr(DevVarName, M, DevVarName);
+                Value *SymName = tapir::createConstantStr(DevVarName, M, DevVarName);
                 Value *DevPtr =
                     CallInst::Create(KitHipGetGlobalSymbolFn, {SymName, CI},
                                      ".hipabi_devptr", NI);
@@ -1169,8 +1135,6 @@ HipABIOutputFile HipABI::createBundleFile() {
   if (ExecStat != 0)
     report_fatal_error("hipabi: 'ldd' failure - " + ErrMsg);
 
-  // NM
-
   auto Bundler = sys::findProgramByName("clang-offload-bundler");
   if ((EC = Bundler.getError()))
     report_fatal_error("'clang-offload-bundler' not found! "
@@ -1259,9 +1223,9 @@ void HipABI::bindGlobalVariables(Value *Handle, IRBuilder<> &B) {
       CharPtrTy, IntTy, VarSizeTy, IntTy, IntTy);
   for (auto &HostGV : GlobalVars) {
     uint64_t VarSize = DL.getTypeAllocSize(HostGV->getType());
-    Value *VarName = createConstantStr(HostGV->getName().str(), M);
+    Value *VarName = tapir::createConstantStr(HostGV->getName().str(), M);
     std::string DevVarName = HostGV->getName().str() + "_devvar";
-    Value *DevName = createConstantStr(DevVarName, M, DevVarName);
+    Value *DevName = tapir::createConstantStr(DevVarName, M, DevVarName);
     llvm::Value *Args[] = {
         Handle,
         B.CreateBitCast(HostGV, VoidPtrTy),

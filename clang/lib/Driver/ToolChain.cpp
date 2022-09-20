@@ -1588,6 +1588,17 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     }
     break;
 
+  case TapirTargetID::Hip:
+    if (! KITSUNE_ENABLE_HIP_ABI_TARGET)
+      getDriver().Diag(diag::warn_drv_tapir_hip_target_disabled);
+    else {
+      CmdArgs.push_back("-lkitrt");
+      #if defined(KITSUNE_HIP_EXTRA_LINK_LIBS)
+      ExtractArgsFromString(KITSUNE_HIP_EXTRA_LINK_LIBS, CmdArgs, Args);
+      #endif
+    }
+    break;
+
   case TapirTargetID::OpenCL:
     if (! KITSUNE_ENABLE_OPENCL_ABI_TARGET)
       getDriver().Diag(diag::warn_drv_tapir_opencl_target_disabled);
@@ -1610,7 +1621,8 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     break;
 
   default:
-    llvm::report_fatal_error("enternal error -- unhandled tapir target ID!");
+    llvm::report_fatal_error("Internal clang toolchain error, "
+		             " unhandled tapir target ID!");
     break;
   }
 

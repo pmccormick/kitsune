@@ -156,10 +156,12 @@ if (KITSUNE_ENABLE_CUDA_ABI_TARGET)
       ${LLVM_BINARY_DIR}/share/kitsune/${TAPIR_CUDA_ABI_TARGET_CFG_FILENAME})
 endif()
 
-# TODO: This needs to be connected to reality... --PM
 option(KITSUNE_ENABLE_HIP_ABI_TARGET
     "Enable the Kitsune+Tapir HIP target and codegen library." OFF)
 if (KITSUNE_ENABLE_HIP_ABI_TARGET)
+  # TODO: There has to be a better way to specify the search path here.
+  list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
+  find_package(hip REQUIRED)
   set(TAPIR_HIP_TARGET_CFG_FILENAME
       "hip.cfg"
       CACHE
@@ -169,7 +171,7 @@ if (KITSUNE_ENABLE_HIP_ABI_TARGET)
       CACHE
       STRING "Additional link flags needed for the HIP runtime ABI target.")
   set(KITSUNE_HIP_TARGET_LINK_LIBS_FLAGS
-      "-L${-lhip" # I made this up... --PM
+      "-lhip -lrocm"
       CACHE STRING "Link library flags (-L, -lxxx) needed for the for the HIP runtime ABI target.")
   #
   configure_file(${CLANG_SOURCE_DIR}/kitsune/hip.cfg.in

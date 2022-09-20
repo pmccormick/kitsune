@@ -25,6 +25,7 @@ enum class TapirTargetID {
   Cheetah,  // Lower to the Cheetah ABI
   Cilk,     // Lower to the Cilk Plus ABI
   Cuda,     // Lower to Cuda ABI
+  Hip,      // Lower to Hip ABI
   OpenCilk, // Lower to OpenCilk ABI
   OpenCL,   // Lower to OpenCL ABI
   OpenMP,   // Lower to OpenMP

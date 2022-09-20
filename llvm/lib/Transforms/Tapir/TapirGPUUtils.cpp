@@ -30,6 +30,42 @@ using namespace llvm;
 
 namespace tapir {
 
+
+Constant *getOrInsertFBGlobal(Module &M, StringRef Name, Type *Ty) {
+  return M.getOrInsertGlobal(Name, Ty, [&] {
+    return new GlobalVariable(M, Ty, true, GlobalValue::InternalLinkage,
+                              nullptr, Name, nullptr);
+  });
+}
+
+Constant *createConstantStr(const std::string &Str, 
+                            Module &M,
+                            const std::string &Name,
+                            const std::string &SectionName,
+                            unsigned Alignment) {
+  LLVMContext &Ctx = M.getContext();
+  Constant *CSN = ConstantDataArray::getString(Ctx, Str);
+  GlobalVariable *GV = new GlobalVariable(
+      M, CSN->getType(), true, GlobalVariable::PrivateLinkage, CSN, Name);
+  Type *StrTy = GV->getType();
+
+  const DataLayout &DL = M.getDataLayout();
+  Constant *Zeros[] = {ConstantInt::get(DL.getIndexType(StrTy), 0),
+                       ConstantInt::get(DL.getIndexType(StrTy), 0)};
+  if (!SectionName.empty()) {
+    GV->setSection(SectionName);
+    // Mark the address as used which make sure that this section isn't
+    // merged and we will really have it in the object file.
+    GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::None);
+  }
+
+  if (Alignment)
+    GV->setAlignment(llvm::Align(Alignment));
+
+  Constant *CS = ConstantExpr::getGetElementPtr(GV->getValueType(), GV, Zeros);
+  return CS;
+}
+
 // Adapted from Transforms/Utils/ModuleUtils.cpp
 void appendToGlobalCtors(Module &M, Constant *C,
                          int Priority, Constant *Data) {

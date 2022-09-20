@@ -55,10 +55,10 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/Inliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Transforms/Utils/Mem2Reg.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Tapir/Outline.h"
+#include "llvm/Transforms/Tapir/TapirGPUUtils.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Vectorize.h"
 
@@ -68,29 +68,31 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "cuda-abi"
-
-
-// Some default naming conventions.  Use some care here as it appears that
-// the PTX path (sometimes?) dislikes names that contains periods '.'.
 static const std::string CUABI_PREFIX = "__cuabi";
 static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 
+
+// ---- CUDA transformation-specific command line arguments.
 //
-// The transform relies on some of the CUDA command line tools to build the
-// final binary/executable.  In particular it uses 'ptxas' and 'fatbinary'.
-// Given this usage, we attempt to expose similar options via additions to
-// LLVM command line options. Recall these can be provided using the -mllvm
-// option followed by one of the options below.
+// The transform has its own set of command line arguments that provide 
+// additional control and functionality, debugging, etc.  As a reminder, 
+// these can be used in the form: 
 //
-// NOTE: At this point in time we do not provide support for the older range
-// of GPU architectures supported by CUDA.  This is primarily due to the fact
-// that we do not have older architectures to test on.  Our defaults tend to
-// lean towards newer host and GPU architectures (e.g., 64-bit and SM_60 or
-// newer -- following trends of CUDA's support as well).  Note we have not
-// tested 32-bit host support.
+//   -mllvm -cudabi-option[...]
 //
 
-/// Selected target GPU architecture. Passed directly to ptxas.
+
+// Select a specific target NVIDIA GPU architecture. 
+// 
+// This will be passed directly on to ptxas.  
+//
+// NOTE: At this point in time we do not provide support for the older range
+// of GPU architectures (e.g., we favor 64-bit and SM_60 or newer, which 
+// follows the trends of longer term CUDA support.  Although exposed here, we 
+// have not tested 32-bit host support.
+// 
+// TODO: Might be nice to allow build-time setting of this default.
+//
 static cl::opt<std::string>
     GPUArch("cuabi-arch", cl::init("sm_75"), cl::NotHidden,
             cl::desc("Target GPU architecture for CUDA ABI transformation."
@@ -101,8 +103,9 @@ static cl::opt<std::string>
     HostMArch("cuabi-march", cl::init("64"), cl::NotHidden,
               cl::desc("Specify 32- or 64-bit host architecture."
                        "(default=64-bit)."));
+
 /// Enable verbose mode.  Handled internally as well as passed on to
-/// ptxas to reveal PTX info (register use, etc.).
+/// ptxas to provide additional details (register use, etc.).
 static cl::opt<bool>
     Verbose("cuabi-verbose", cl::init(false), cl::NotHidden,
             cl::desc("Enable verbose mode and also print out code "
@@ -435,47 +438,6 @@ void runKernelOptimizationPasses(Module &KM, unsigned OptLevel = OptLevel3,
     PM.run(KM);
     LLVM_DEBUG(dbgs() << "\t\tpasses complete...\n");
   }
-}
-
-// TODO: This call assumes we want to create the constant string
-// in a fixed module ('M' in this case).  Perhaps should consider
-// passing a Module to make things a bit more flexible?
-static Constant *createConstantStr(const std::string &Str,
-                                   Module &M,
-                                   const std::string &Name = "",
-                                   const std::string &SectionName = "",
-                                   unsigned Alignment = 0) {
-  LLVMContext &Ctx = M.getContext();
-  Constant *CSN = ConstantDataArray::getString(Ctx, Str);
-  GlobalVariable *GV = new GlobalVariable(M, CSN->getType(),
-                                          true,
-                                          GlobalVariable::PrivateLinkage,
-                                          CSN,
-                                          Name);
-  Type *StrTy = GV->getType();
-
-  const DataLayout &DL = M.getDataLayout();
-  Constant *Zeros[] = {ConstantInt::get(DL.getIndexType(StrTy), 0),
-                       ConstantInt::get(DL.getIndexType(StrTy), 0)};
-  if (!SectionName.empty()) {
-    GV->setSection(SectionName);
-    // Mark the address as used which make sure that this section isn't
-    // merged and we will really have it in the object file.
-    GV->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::None);
-  }
-
-  if (Alignment)
-    GV->setAlignment(llvm::Align(Alignment));
-
-  Constant *CS = ConstantExpr::getGetElementPtr(GV->getValueType(), GV, Zeros);
-  return CS;
-}
-
-static Constant *getOrInsertFBGlobal(Module &M, StringRef Name, Type *Ty) {
-  return M.getOrInsertGlobal(Name, Ty, [&] {
-    return new GlobalVariable(M, Ty, true, GlobalValue::InternalLinkage,
-                              nullptr, Name, nullptr);
-  });
 }
 
 // NOTE: The NextKernelID variable below is not thread safe.
@@ -1143,8 +1105,8 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   // poplated, converted to PTX, turned into an assembled binary, etc.).
   // Because of this we create a "stand in" (dummy) here and will replace
   // it later in the ABI's transformaiton pipeline.
-  Constant *DummyFBGV = getOrInsertFBGlobal(M, "_cuabi.dummy_fatbin",
-                                            VoidPtrTy);
+  Constant *DummyFBGV = tapir::getOrInsertFBGlobal(M, "_cuabi.dummy_fatbin",
+                                                    VoidPtrTy);
   Value *DummyFBPtr = B.CreateLoad(VoidPtrTy, DummyFBGV);
 
   Value * Stream;
@@ -1521,7 +1483,7 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
               assert(NI && "unexpected null instruction!");
               for(auto &HostGV : GlobalVars) {
                 std::string DevVarName = HostGV->getName().str() + "_devvar";
-                Value *SymName = createConstantStr(DevVarName, M, DevVarName);
+                Value *SymName = tapir::createConstantStr(DevVarName, M, DevVarName);
                 Value *DevPtr = CallInst::Create(KitCudaGetGlobalSymbolFn,
                                                  {SymName, CI},
                                                  ".cuabi_devptr", NI);
@@ -1699,9 +1661,9 @@ void CudaABI::bindGlobalVariables(Value *Handle, IRBuilder<> &B) {
             IntTy, VarSizeTy, IntTy, IntTy);
   for(auto &HostGV : GlobalVars) {
     uint64_t VarSize = DL.getTypeAllocSize(HostGV->getType());
-    Value *VarName = createConstantStr(HostGV->getName().str(), M);
+    Value *VarName = tapir::createConstantStr(HostGV->getName().str(), M);
     std::string DevVarName = HostGV->getName().str() + "_devvar";
-    Value *DevName = createConstantStr(DevVarName, M, DevVarName);
+    Value *DevName = tapir::createConstantStr(DevVarName, M, DevVarName);
     llvm::Value *Args[] = {
       Handle, B.CreateBitCast(HostGV, VoidPtrTy),
       VarName,
