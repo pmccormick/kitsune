@@ -17,7 +17,11 @@ set(KITRT_INCLUDE_DIR ${KITSUNE_RUNTIME_DIR})
 # give a general feel for what is going on (memory allocations, kernel
 # launches, etc.).
 option(KITRT_ENABLE_DEBUG "Enable debug mode features for the runtime." OFF)
+<<<<<<< HEAD
 option(KITRT_ENABLE_VERBOSE "Enable verbose execution mode for debuggin." OFF)
+=======
+option(KITRT_ENABLE_VERBOSE "Enable verbose mode features for the runtime." ON)
+>>>>>>> dev/13.x
 
 include_directories(${KITSUNE_SOURCE_DIR}/include)
 include_directories(${KITSUNE_RUNTIME_INCLUDE_DIR})
@@ -30,7 +34,10 @@ if (KITRT_ENABLE_VERBOSE)
   add_definitions(-D_KITRT_VERBOSE_)
 endif()
 
+<<<<<<< HEAD
 # Common headers and source files.
+=======
+>>>>>>> dev/13.x
 set(KITRT_HDRS
   kitrt.h
   debug.h
@@ -93,10 +100,9 @@ target_link_libraries(kitrt
 install(TARGETS kitrt
   LIBRARY DESTINATION lib COMPONENT kitrt
   ARCHIVE DESTINATION lib COMPONENT kitrt)
-
 install(FILES ${KITRT_HDRS}
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kitrt)
-install(DIRECTORY kitcuda kithip kitrealm
+install(DIRECTORY cuda hip realm
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/kitrt/
   FILES_MATCHING PATTERN "*.h")
 
