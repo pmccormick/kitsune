@@ -4109,9 +4109,9 @@ void Parser::ParseDeclarationSpecifiers(DeclSpec &DS,
       ParseOpenCLQualifiers(DS.getAttributes());
       break;
     // Kitsune memaccess qualifiers:
-    case tok::kw_readonly:
-    case tok::kw_writeonly:
-    case tok::kw_readwrite:
+    case tok::kw__readonly:
+    case tok::kw__writeonly:
+    case tok::kw__readwrite:
       ParseKitsuneMemAccessQualifiers(DS.getAttributes());
       break;
 
@@ -5578,9 +5578,9 @@ void Parser::ParseTypeQualifierListOpt(
     case tok::kw___read_write:
       ParseOpenCLQualifiers(DS.getAttributes());
       break;
-    case tok::kw_readonly:
-    case tok::kw_writeonly:
-    case tok::kw_readwrite:
+    case tok::kw__readonly:
+    case tok::kw__writeonly:
+    case tok::kw__readwrite:
       ParseKitsuneMemAccessQualifiers(DS.getAttributes());
       break;
 

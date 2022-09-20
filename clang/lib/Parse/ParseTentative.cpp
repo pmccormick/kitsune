@@ -1415,9 +1415,9 @@ Parser::isCXXDeclarationSpecifier(Parser::TPResult BracedCastResult,
   case tok::kw_pipe:
 
     // Kitsune memaccess qualifiers
-  case tok::kw_readonly:
-  case tok::kw_writeonly:
-  case tok::kw_readwrite:
+  case tok::kw__readonly:
+  case tok::kw__writeonly:
+  case tok::kw__readwrite:
 
     // GNU
   case tok::kw_restrict:
