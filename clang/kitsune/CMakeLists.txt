@@ -166,8 +166,7 @@ if (KITSUNE_ENABLE_HIP_ABI_TARGET)
       "hip.cfg"
       CACHE
       STRING "Default HIP runtime ABI target Clang .cfg filename.")
-  set(KITSUNE_HIP_TARGET_EXTRA_LINK_FLAGS
-      ""
+  set(KITSUNE_HIP_TARGET_EXTRA_LINK_FLAGS ""
       CACHE
       STRING "Additional link flags needed for the HIP runtime ABI target.")
   set(KITSUNE_HIP_TARGET_LINK_LIBS_FLAGS

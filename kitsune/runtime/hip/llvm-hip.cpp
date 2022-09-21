@@ -21,64 +21,19 @@
 #define __HIP_PLATFORM_HCC__ 1
 #include<hip/hip_runtime.h>
 
-#define declare(name) decltype(name)* name##_p = NULL
-#define tryLoad(name) name##_p = (decltype(name)*)dlsym(hiphandle, #name)
-
 void* hiphandle;
-declare(hipGetDevice);
-declare(hipGetDeviceCount);
-declare(hipGetDeviceProperties);
-declare(hipStreamCreate);
-declare(hipModuleLoadData);
-declare(hipModuleLaunchKernel);
-declare(hipModuleGetFunction);
-declare(hipGetErrorString);
-declare(hipStreamSynchronize);
-declare(hipStreamDestroy);
-declare(hipInit);
-hipError_t (*hipHostMalloc_p)(void** res, size_t n, int f);
+
+/*
+ *  Unsupported at present -- need to sync up with non-JIT version.
+ */
+#if 0
 
 extern "C" {
 
-  void checkHIP(hipError_t in){
-    if(in !=  HIP_SUCCESS){
-      std::cerr << "Error: " << hipGetErrorString_p(in) << std::endl;
-      exit(in);
-    }
-  }
-
-  using namespace llvm;
-
-  int initHIP(){
-    if(hiphandle) return true;
-    hiphandle = dlopen("libamdhip64.so", RTLD_LAZY);
-    if(!hiphandle) return false;
-    tryLoad(hipGetDevice);
-    tryLoad(hipGetDeviceCount);
-    tryLoad(hipGetDeviceProperties);
-    tryLoad(hipStreamCreate);
-    tryLoad(hipStreamDestroy);
-    tryLoad(hipStreamSynchronize);
-    tryLoad(hipModuleLoadData);
-    tryLoad(hipModuleLaunchKernel);
-    tryLoad(hipModuleGetFunction);
-    tryLoad(hipInit);
-    tryLoad(hipGetErrorString);
-    hipHostMalloc_p = (decltype(hipHostMalloc_p))(dlsym(hiphandle, "hipHostMalloc"));
-    hipInit_p(0);
-    int count;
-    hipGetDeviceCount_p(&count);
-    if(count == 0) return false;
-    return hiphandle != NULL;
-  }
-
-  void* hipManagedMalloc(size_t n){
-    void* res;
-    checkHIP(hipHostMalloc_p(&res, n, 0));
-    return res;
-  }
-
   void* launchHIPKernel(llvm::Module& m, void** args, size_t n) {
+
+    using namespace llvm;
+
     LLVMContext& ctx = m.getContext();
     legacy::PassManager PM;
     legacy::FunctionPassManager FPM(&m);
@@ -135,7 +90,7 @@ extern "C" {
     std::string LinkedObjectFile = "/tmp/kernel.hip-l.o";
     std::string BundledObjectFile = "/tmp/kernel.hip-b.o";
     std::error_code EC;
-    sys::fs::OpenFlags OpenFlags = sys::fs::F_None;
+    sys::fs::OpenFlags OpenFlags = sys::fs::OF_None;
     std::unique_ptr<ToolOutputFile> FDOut =
         std::make_unique<ToolOutputFile>(ObjectFile, EC, OpenFlags);
     raw_pwrite_stream *fostr = &FDOut->os();
@@ -216,8 +171,5 @@ extern "C" {
 
     return (void*) stream;
   }
-
-  void waitHIPKernel(void* wait) {
-    hipStreamSynchronize_p((hipStream_t)wait);
-  }
 }
+#endif

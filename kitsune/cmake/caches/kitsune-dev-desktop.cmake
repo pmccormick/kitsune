@@ -33,7 +33,7 @@ set(CMAKE_BUILD_TYPE Release CACHE STRING "")
 # you are working on.  By default we provide the full suite of
 # clang+tools, openmp, lld, and a debugger via lldb.
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra
+  clang;clang-tools-extra;lld
   CACHE STRING "")
 
 set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 80 CACHE STRING "")
@@ -67,7 +67,7 @@ set(LLVM_LINK_LLVM_DYLIB ON CACHE BOOL "")
 # LLVM builds can easily swamp systems if the level of parallelism
 # exceeds system resources -- especially memory during the linking
 # stages.  Also use care when building on network mounted file
-# systems as parallel I/O operations can also bog down the
+# systems as parallel file operations can also bog down the
 # scalability of the parallel build.
 #
 # desktop:
@@ -88,12 +88,8 @@ set(LLVM_TARGETS_TO_BUILD X86;NVPTX;AMDGPU CACHE STRING "")
 # Enable Kitsune mode within the toolchain.
 set(CLANG_ENABLE_KITSUNE ON CACHE BOOL
   "Enable Kitsune features in Clang.")
-set(KITSUNE_ENABLE_GPU_ABI_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_CUDA_ABI_TARGET ON CACHE BOOL "")
-set(KITSUNE_ENABLE_HIP_TARGET ON CACHE BOOL "")
-set(KITSUNE_ENABLE_OPENMP_ABI_TARGET OFF CACHE BOOL "")
-set(KITSUNE_ENABLE_QTHREADS_ABI_TARGET OFF CACHE BOOL "")
-set(KITSUNE_ENABLE_OPENCL_ABI_TARGET OFF CACHE BOOL "")
+set(KITSUNE_ENABLE_HIP_ABI_TARGET ON CACHE BOOL "")
 
 # Enable tailored Kokkos compilation.
 set(KITSUNE_ENABLE_KOKKOS_SUPPORT ON CACHE BOOL

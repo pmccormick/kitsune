@@ -370,6 +370,26 @@ void *__kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
   return nullptr;
 }
 
+void *__kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
+                                void **fatBinArgs, uint64_t numElements) {
+  assert(fatBin && "request to launch null fat binary image!");
+  assert(kernelName && "request to launch kernel w/ null name!");
+  int threadsPerBlock, blocksPerGrid;
+
+  // TODO: We need a better path here for binding and tracking
+  // allocated resources -- as it stands we will "leak" modules,
+  // streams, functions, etc.
+  static bool module_built = false;
+  hipModule_t module;
+  if (!module_built) {
+    HIP_SAFE_CALL(hipModuleLoadData_p(&module, fatBin));
+    module_built = true;
+  }
+
+  return __kitrt_hipLaunchModuleKernel(module, kernelName, fatBinArgs,
+                                       numElements);
+}
+
 void __kitrt_hipStreamSynchronize(void *vStream) {
   // TODO: The HIP documentation is not entirely clear about the
   // existence of a default stream... This could break...

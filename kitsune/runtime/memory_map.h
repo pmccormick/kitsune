@@ -109,6 +109,9 @@ size_t __kitrt_getMemAllocSize(void *addr);
 /// that management is assumed to be managed elsewhere.
 extern void __kitrt_unregisterMemAlloc(void *addr);
 
+/// @brief  Mark the given managed memory allocation to need prefetching.
+/// @param addr: The pointer to the managed memory allocation.
+extern void __kitrt_memNeedsPrefetch(void *addr);
 
 /// Destroy the memory map and call the function pointed to by
 /// 'freeFP' to free the actual memory allocation (runtime target

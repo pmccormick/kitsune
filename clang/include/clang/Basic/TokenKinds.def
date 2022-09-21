@@ -469,21 +469,9 @@ KEYWORD(_kitsune_spawn              , KEYKITSUNE)
 KEYWORD(_kitsune_sync               , KEYKITSUNE)
 KEYWORD(_kitsune_forall             , KEYKITSUNE)
 // Kitsune memaccess qualifiers
-<<<<<<< HEAD
-KEYWORD(readonly                    , KEYKITSUNE)
-KEYWORD(writeonly                   , KEYKITSUNE)
-KEYWORD(readwrite                   , KEYKITSUNE)
-ALIAS("ReadOnly", readonly          , KEYKITSUNE)
-ALIAS("WriteOnly", writeonly        , KEYKITSUNE)
-ALIAS("ReadWrite", readwrite        , KEYKITSUNE)
-ALIAS("READONLY", readonly          , KEYKITSUNE)
-ALIAS("WRITEONLY", writeonly        , KEYKITSUNE)
-ALIAS("READWRITE", readwrite        , KEYKITSUNE)
-=======
 KEYWORD(_readonly                    , KEYKITSUNE)
 KEYWORD(_writeonly                   , KEYKITSUNE)
 KEYWORD(_readwrite                   , KEYKITSUNE)
->>>>>>> dev/13.x
 
 // MSVC12.0 / VS2013 Type Traits
 TYPE_TRAIT_1(__is_destructible, IsDestructible, KEYMS)

@@ -122,8 +122,11 @@ void *__kitrt_hipCreateObjectModule(const void *image);
 
 uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod);
 
-void *__kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
-                                    void **args, uint64_t numElements);
+void *__kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
+                                void **fatBinArgs, uint64_t numElements);
+
+void  *__kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
+                                   void **args, uint64_t numElements);
 
 void __kitrt_hipStreamSynchronize(void *vStream);
 

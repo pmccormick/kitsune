@@ -5,7 +5,8 @@
 #include <kitsune.h>
 #include <cmath>
 #include "kitsune/timer.h"
-#include "kitrt/kitcuda/cuda.h"
+#include "kitrt/cuda/cuda.h"
+#include "kitrt/memory_map.h"
 
 using namespace std;
 using namespace kitsune;
@@ -30,7 +31,7 @@ void random_fill(T* data, size_t N) {
   // we've updated the data array -- flag it for
   // prefetching the next time we launch a kernel
   // (forall loop) that uses it...
-  __kitrt_cuMemNeedsPrefetch(data);
+  __kitrt_memNeedsPrefetch(data);
 }
 
 template <typename T>
@@ -46,7 +47,7 @@ bool check(const T* data0, const T* data1, size_t N) {
   // This highlights an issue with UVM usage as we
   // would really like a copy resident on the GPU and
   // here to be checked on the CPU...
-  __kitrt_cuMemNeedsPrefetch((void *)data1);
+  __kitrt_memNeedsPrefetch((void *)data1);
   return true;
 }
 

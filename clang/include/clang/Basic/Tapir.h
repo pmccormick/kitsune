@@ -18,7 +18,6 @@
 namespace clang {
 
 using TapirTargetID = llvm::TapirTargetID;
-using TapirNVArchTargetID = llvm::TapirNVArchTargetID;
 
 } // end namespace clang
 

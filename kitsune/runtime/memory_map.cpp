@@ -142,9 +142,21 @@ void __kitrt_unregisterMemAlloc(void *addr) {
   }
 }
 
-extern "C"
-void __kitrt_destroyMemoryMap(void (*freeMem)(void*)) {
-  for(auto &mapEntry: _kitrtAllocMap) {
-    freeMem(mapEntry.first);
+void __kitrt_memNeedsPrefetch(void *addr) {
+  assert(addr != nullptr && "unexpected null pointer!");
+  KitRTAllocMap::iterator it = _kitrtAllocMap.find(addr);
+  if (it != _kitrtAllocMap.end()) {
+    #ifdef _KITRT_VERBOSE_
+    fprintf(stderr,
+            "kitrt: allocation (%p) needs prefetching (updated on host).\n",
+            addr);
+    #endif
+    // TODO: Logic is a bit "backwards" here at first glance...
+    it->second.prefetched = false;
   }
+}
+
+extern "C" void __kitrt_destroyMemoryMap(void (*freeMem)(void *)) {
+  for (auto &mapEntry : _kitrtAllocMap)
+    freeMem(mapEntry.first);
 }

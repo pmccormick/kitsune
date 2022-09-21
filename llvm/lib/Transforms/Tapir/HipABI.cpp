@@ -74,8 +74,8 @@ static const std::string HIPABI_KERNEL_NAME_PREFIX = HIPABI_PREFIX + "_kern_";
 //    -mllvm -hipabi-option[...]
 //
 
-// Select a specific target AMD GPU architecture.  At present this 
-// directly matches those available with the AMDGPU backend target. 
+// Select a specific target AMD GPU architecture.  At present this
+// directly matches those available with the AMDGPU backend target.
 //
 // TODO: Might be nice to allow build-time setting of this default.
 //
@@ -86,13 +86,13 @@ static cl::opt<std::string>
 
 /// Enable verbose mode.  Handled internally as well as passed on to
 /// any extra toolchain components (when available).
-static cl::opt<bool> 
-    Verbose("hipabi-verbose", cl::init(false), cl::Hidden, 
+static cl::opt<bool>
+    Verbose("hipabi-verbose", cl::init(false), cl::Hidden,
     cl::desc("Provide verbose details as the transformation runs."));
 
 
 /// Set the optimization level for use within the transformation.  This
-/// level is used internally within the transform IR as well handed off 
+/// level is used internally within the transform IR as well handed off
 /// to any external toolchain elements (e.g., the clang offload bundler).
 static cl::opt<unsigned>
     OptLevel("hipabi-opt-level", cl::init(3), cl::NotHidden,
@@ -101,13 +101,13 @@ static cl::opt<unsigned>
 /// Enable an extra set of passes over the host-side code after the
 /// code has been transformed (e.g., loops replaced with kernel launch
 /// calls).
-static cl::opt<bool> 
+static cl::opt<bool>
     RunHostPostOpt("hipabi-run-post-opts", cl::init(false), cl::NotHidden,
     cl::desc("Run a post-transform optimization pass on the host-side code."));
 
 /// Keep the complete set of intermediate files around after compilation.  This
 /// includes LLVM IR, GCN, and the fatbinary/bundle file.
-static cl::opt<bool> 
+static cl::opt<bool>
     KeepIntermediateFiles("hipabi-keep-files", cl::init(false), cl::Hidden,
     cl::desc("Keep all the intermediate files on disk after"
              "successful completion of the transforms "
@@ -124,7 +124,7 @@ static cl::opt<bool>
 
 /// Set the HIP ABI's default grain size value.  This is used internally
 /// by the transform.
-static cl::opt<unsigned> 
+static cl::opt<unsigned>
     DefaultGrainSize("hipabi-default-grainsize", cl::init(1), cl::Hidden,
     cl::desc("The default grainsize used by the transform "
              "when analysis fails to determine one. (default=1)"));
@@ -177,14 +177,15 @@ Value *HipLoop::emitWorkGroupSize(IRBuilder<> &Builder, unsigned Index) {
   const unsigned XOffset = 4;
   Value *DispatchPtr = emitDispatchPtr(Builder);
   Constant *Offset = ConstantInt::get(Int32Ty, XOffset + Index * 2);
-  Value *GEP = Builder.CreateInBoundsGEP(Int32Ty,
-                                         DispatchPtr,
-                                         Offset);
-  auto *DstTy = Int16Ty->getPointerTo(GEP->getType()->getPointerAddressSpace());
-  auto *Cast = Builder.CreateBitCast(GEP, DstTy);
-  auto *LD = Builder.CreateLoad(DstTy, Cast);
+  Value *GEP = Builder.CreateGEP(Int8Ty, DispatchPtr, Offset);
+  auto *DestTy =
+        Int16Ty->getPointerTo(GEP->getType()->getPointerAddressSpace());
+  auto *Cast = Builder.CreateBitCast(GEP, DestTy);
+
+  auto *LD = Builder.CreateLoad(Int16Ty, Cast);
   LD->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(Ctx, None));
-  return LD;
+  Value *WGSize = Builder.CreateIntCast(LD, Int32Ty, false);
+  return WGSize;
 }
 
 // Index is 0, 1, or 2 for x, y, and z dimensions.
@@ -605,6 +606,7 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI,
   Value *ThreadIdx = B.CreateCall(KitHipWorkItemIdXFn);
   Value *BlockIdx = B.CreateCall(KitHipWorkGroupIdXFn);
   Value *BlockDim = emitWorkGroupSize(B, 0);
+
   Value *ThreadIV = B.CreateIntCast(B.CreateAdd(ThreadIdx,
                             B.CreateMul(BlockIdx, BlockDim, "blk_offset"),
                            "hipthread_id"),
@@ -648,7 +650,7 @@ Function *HipLoop::resolveDeviceFunction(Function *Fn) {
     DevFn = Intrinsic::getDeclaration(&KernelModule, IntrinsicID);
     LLVM_DEBUG(dbgs() << "\tfound device intrinsic: "
                       << IntrinsicName << "()\n");
-  } 
+  }
   return DevFn;
 }
 
@@ -664,6 +666,10 @@ void HipLoop::transformForGCN(Function &F) {
   Value *tidv = B.CreateCall(KitHipWorkItemIdXFn, {}, "thread_idx");
   Value *ntidv = B.CreateCall(KitHipWorkGroupIdXFn, {}, "block_idx");
   Value *ctaidv = emitWorkGroupSize(B, 0);
+  LLVM_DEBUG(dbgs() << "launch details:\n";
+                    ctaidv->getType()->dump();
+                    tidv->getType()->dump());
+
   Value *tidoff = B.CreateMul(ctaidv, ntidv, "block_off");
   Value *gtid = B.CreateAdd(tidoff, tidv, "t_idx");
 
@@ -676,7 +682,7 @@ void HipLoop::transformForGCN(Function &F) {
   for (auto I = inst_begin(&F); I != inst_end(&F); I++) {
     if (auto CI = dyn_cast<CallInst>(&*I)) {
       Function *CF = CI->getCalledFunction();
-      if (CF->size() == 0) {
+      if (CF->size() == 0 && not CF->isIntrinsic()) {
         Function *DF = resolveDeviceFunction(CF);
         if (DF != nullptr) {
           CallInst *NCI = dyn_cast<CallInst>(CI->clone());
@@ -856,11 +862,9 @@ HipABI::HipABI(Module &InputModule)
                        "Was LLVM built with the AMDGPU target enabled?");
   }
 
-  AMDTargetMachine = AMDGPUTarget->createTargetMachine(TargetTriple.getTriple(),
-                      GPUArch, "", TargetOptions(),
-                      Reloc::PIC_,
-                      CodeModel::Kernel,
-                      CodeGenOpt::Aggressive);
+  AMDTargetMachine = AMDGPUTarget->createTargetMachine(
+      TargetTriple.getTriple(), GPUArch, "", TargetOptions(), Reloc::PIC_,
+      CodeModel::Large, CodeGenOpt::Aggressive);
 
   KernelModule.setTargetTriple(TargetTriple.str());
   KernelModule.setDataLayout(AMDTargetMachine->createDataLayout());
@@ -1012,18 +1016,16 @@ HipABIOutputFile HipABI::createBundleFile() {
   std::error_code EC;
 
   SmallString<255> ObjFileName(Twine(HIPABI_PREFIX + M.getName()).str());
-  sys::path::replace_extension(ObjFileName, "-hip.o");
+  sys::path::replace_extension(ObjFileName, ".hip.o");
   std::unique_ptr<ToolOutputFile> ObjFile;
   ObjFile = std::make_unique<ToolOutputFile>(ObjFileName,
-                        EC,
-                        sys::fs::OpenFlags::OF_None);
+                        EC, sys::fs::OpenFlags::OF_None);
 
   SmallString<255> LinkedObjFileName(ObjFileName.str());
   sys::path::replace_extension(LinkedObjFileName, ".ld.o");
   std::unique_ptr<ToolOutputFile> LinkedObjFile;
   LinkedObjFile = std::make_unique<ToolOutputFile>(LinkedObjFileName,
-                        EC,
-                        sys::fs::OpenFlags::OF_None);
+                        EC, sys::fs::OpenFlags::OF_None);
 
   if (KeepIntermediateFiles) {
     ObjFile->keep();
@@ -1033,8 +1035,8 @@ HipABIOutputFile HipABI::createBundleFile() {
   SmallString<255> BundleFileName(ObjFileName.str());
   sys::path::replace_extension(BundleFileName, ".bndl.o");
   std::unique_ptr<ToolOutputFile> BundleFile;
-  BundleFile = std::make_unique<ToolOutputFile>(BundleFileName,
-                        EC,
+  BundleFile =
+        std::make_unique<ToolOutputFile>(BundleFileName, EC,
                         sys::fs::OpenFlags::OF_None);
   // TODO: Check EC!
 
@@ -1091,16 +1093,16 @@ HipABIOutputFile HipABI::createBundleFile() {
   std::string optlevel_arg = "-plugin-opt=";
   switch (OptLevel) {
     case 0:
-      optlevel_arg += "0";
+      optlevel_arg += "O0";
       break;
     case 1:
-      optlevel_arg += "1";
+      optlevel_arg += "O1";
       break;
     case 2:
-      optlevel_arg += "2";
+      optlevel_arg += "O2";
       break;
     case 3:
-      optlevel_arg += "3";
+      optlevel_arg += "O3";
       break;
     default:
       llvm_unreachable_internal("unhandled/unexpected optimization level",
@@ -1110,15 +1112,17 @@ HipABIOutputFile HipABI::createBundleFile() {
   LDDArgList.push_back("-plugin-opt=-amdgpu-early-inline-all=true");
   LDDArgList.push_back("-plugin-opt=-amdgpu-function-calls=false");
   LDDArgList.push_back("-o");
-  LDDArgList.push_back(LinkedObjFile->getFilename().str().c_str());
-  LDDArgList.push_back(ObjFile->getFilename().str().c_str());
+  std::string linked_objfile(LinkedObjFile->getFilename().str().c_str());
+  LDDArgList.push_back(linked_objfile.c_str());
+  std::string objfilename (ObjFile->getFilename().str().c_str());
+  LDDArgList.push_back(objfilename.c_str());
   LDDArgList.push_back(nullptr);
 
   auto LDDArgs = toStringRefArray(LDDArgList.data());
   LLVM_DEBUG(dbgs() << "hipabi: ld.lld command line:\n";
              unsigned c = 0;
              for(auto dbg_arg : LDDArgs) {
-               dbgs() << "\t" << c << dbg_arg << "\n";
+               dbgs() << "\t" << c << ". " << dbg_arg << "\n";
                c++;
              }
              dbgs() << "\n\n";
@@ -1141,15 +1145,15 @@ HipABIOutputFile HipABI::createBundleFile() {
                        "check your path?");
   opt::ArgStringList BundleArgList;
   BundleArgList.push_back(Bundler->c_str());
-  std::string target_arg = "targets=" + M.getTargetTriple() +
-                           ",hipv4-" + KernelModule.getTargetTriple() +
-                           "--" + GPUArch.c_str();
-  BundleArgList.push_back(target_arg.c_str());
-
   BundleArgList.push_back("-type=o");
   std::string input_args = "-inputs=/dev/null," +
                            LinkedObjFile->getFilename().str();
   BundleArgList.push_back(input_args.c_str());
+
+  std::string target_arg = "-targets=host-" + M.getTargetTriple() +
+                           ",hipv4-" + KernelModule.getTargetTriple() +
+                           "--" + GPUArch.c_str();
+  BundleArgList.push_back(target_arg.c_str());
 
   std::string output_arg = "--outputs=" + BundleFile->getFilename().str();
   BundleArgList.push_back(output_arg.c_str());
@@ -1159,7 +1163,7 @@ HipABIOutputFile HipABI::createBundleFile() {
   LLVM_DEBUG(dbgs() << "hipabi: clang offload bundler command line:\n";
              unsigned c = 0;
              for(auto dbg_arg : BundleArgs) {
-               dbgs() << "\t" << c << dbg_arg << "\n";
+               dbgs() << "\t" << c << ". " << dbg_arg << "\n";
                c++;
              }
              dbgs() << "\n\n";
@@ -1289,6 +1293,7 @@ Function *HipABI::createCtor(GlobalVariable *Bundle,
     bindGlobalVariables(HandlePtr, CtorBuilder);
   }
 
+  #if 0 // do we need this for HIP?
   // Wrap up bundle/fatbinary registration steps...
   FunctionCallee EndFBRegistrationFn =
       M.getOrInsertFunction("__hipRegisterFatBinaryEnd",
@@ -1296,6 +1301,7 @@ Function *HipABI::createCtor(GlobalVariable *Bundle,
                                     VoidPtrPtrTy, // cubin handle.
                                     false));
   CtorBuilder.CreateCall(EndFBRegistrationFn, RegFatbin);
+  #endif
 
   // Now add a Dtor to help us clean up at program exit...
   if (Function *CleanupFn = createDtor(Handle)) {

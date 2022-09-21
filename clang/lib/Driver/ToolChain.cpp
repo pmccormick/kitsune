@@ -1549,18 +1549,6 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     CmdArgs.push_back("-lpthread");
     break;
   }
-  case TapirTargetID::Cilk:
-    CmdArgs.push_back("-lcilkrts");
-    break;
-  case TapirTargetID::OpenMP:
-    if (! KITSUNE_ENABLE_OPENMP_ABI_TARGET)
-      getDriver().Diag(diag::warn_drv_tapir_openmp_target_disabled);
-    break;
-
-  case TapirTargetID::Qthreads:
-    if (! KITSUNE_ENABLE_QTHREADS_ABI_TARGET)
-      getDriver().Diag(diag::warn_drv_tapir_qthreads_target_disabled);
-    break;
 
   case TapirTargetID::Realm:
     if (! KITSUNE_ENABLE_REALM_ABI_TARGET)
@@ -1597,11 +1585,6 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       ExtractArgsFromString(KITSUNE_HIP_EXTRA_LINK_LIBS, CmdArgs, Args);
       #endif
     }
-    break;
-
-  case TapirTargetID::OpenCL:
-    if (! KITSUNE_ENABLE_OPENCL_ABI_TARGET)
-      getDriver().Diag(diag::warn_drv_tapir_opencl_target_disabled);
     break;
 
   case TapirTargetID::GPU:

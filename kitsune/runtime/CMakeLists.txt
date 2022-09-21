@@ -17,11 +17,7 @@ set(KITRT_INCLUDE_DIR ${KITSUNE_RUNTIME_DIR})
 # give a general feel for what is going on (memory allocations, kernel
 # launches, etc.).
 option(KITRT_ENABLE_DEBUG "Enable debug mode features for the runtime." OFF)
-<<<<<<< HEAD
 option(KITRT_ENABLE_VERBOSE "Enable verbose execution mode for debuggin." OFF)
-=======
-option(KITRT_ENABLE_VERBOSE "Enable verbose mode features for the runtime." ON)
->>>>>>> dev/13.x
 
 include_directories(${KITSUNE_SOURCE_DIR}/include)
 include_directories(${KITSUNE_RUNTIME_INCLUDE_DIR})
@@ -34,10 +30,7 @@ if (KITRT_ENABLE_VERBOSE)
   add_definitions(-D_KITRT_VERBOSE_)
 endif()
 
-<<<<<<< HEAD
 # Common headers and source files.
-=======
->>>>>>> dev/13.x
 set(KITRT_HDRS
   kitrt.h
   debug.h
@@ -52,6 +45,7 @@ set(KITRT_SRCS
 set(KITRT_LINK_LIBS "")
 
 if (KITRT_ENABLE_CUDA)
+  message(STATUS "Kitsune runtime adding CUDA components to build...")
   find_package(CUDAToolkit REQUIRED)
   add_definitions(-DKITRT_CUDA_ENABLED)
   list(APPEND KITRT_HDRS
@@ -68,6 +62,7 @@ if (KITRT_ENABLE_CUDA)
 endif() 
 
 if (KITRT_ENABLE_HIP) 
+  message(STATUS "Kitsune runtime adding HIP components to build...")
   # TODO: This probably needs external settings in order to 
   # manage moudles and other ways to install rocm... 
   list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
@@ -79,12 +74,11 @@ if (KITRT_ENABLE_HIP)
   list(APPEND KITRT_SRCS 
     hip/hip.cpp
     hip/llvm-hip.cpp)
-  # NOTE: The hip::host target provides all the usage requirements needed to use HIP 
-  # without compiling GPU device code.
   list(APPEND KITRT_LINK_LIBS
       "hip::host")
 endif()
 
+message(STATUS "kitsune runtime library source files: ${KITRT_SRCS}")
 add_library(kitrt SHARED ${KITRT_SRCS})
 target_include_directories(kitrt
   BEFORE PRIVATE

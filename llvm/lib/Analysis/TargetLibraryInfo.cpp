@@ -40,20 +40,19 @@ static cl::opt<TapirTargetID> ClTapirTarget(
                           "none", "None"),
                clEnumValN(TapirTargetID::Serial,
                           "serial", "Serial code"),
-               clEnumValN(TapirTargetID::Cilk,
-                          "cilk", "Cilk Plus"),
-               clEnumValN(TapirTargetID::OpenMP,
-                          "openmp", "OpenMP"),
-               clEnumValN(TapirTargetID::OpenCL,
-                          "opencl", "OpenCL"),
-               clEnumValN(TapirTargetID::Qthreads,
-                          "qthreads", "Qthreads"),
                clEnumValN(TapirTargetID::Realm,
                           "realm", "Realm"),
                clEnumValN(TapirTargetID::Cheetah,
                           "cheetah", "Cheetah"),
                clEnumValN(TapirTargetID::OpenCilk,
-                          "opencilk", "OpenCilk")));
+                          "opencilk", "OpenCilk"),
+	       clEnumValN(TapirTargetID::Cuda, 
+		       	  "cuda", "Cuda"),
+	       clEnumValN(TapirTargetID::Hip, 
+		       	  "hip", "Hip"),
+	       clEnumValN(TapirTargetID::GPU,
+		       	  "gpu", "GPU")
+	       ));
 
 StringLiteral const TargetLibraryInfoImpl::StandardNames[LibFunc::NumLibFuncs] =
     {
@@ -1733,7 +1732,6 @@ void TargetLibraryInfoImpl::addVectorizableFunctionsFromVecLib(
 void TargetLibraryInfoImpl::addTapirTargetLibraryFunctions(
     TapirTargetID TargetID) {
   switch (TargetID) {
-  case TapirTargetID::Cilk:
   case TapirTargetID::OpenCilk: {
     const StringLiteral TTFuncs[] = {
     #define TLI_DEFINE_CILK_LIBS
@@ -1747,8 +1745,9 @@ void TargetLibraryInfoImpl::addTapirTargetLibraryFunctions(
   case TapirTargetID::Serial:
   case TapirTargetID::Cheetah:
   case TapirTargetID::Cuda:
-  case TapirTargetID::OpenMP:
-  case TapirTargetID::Qthreads:
+  case TapirTargetID::Hip: 
+  case TapirTargetID::GPU:
+  case TapirTargetID::Realm:
   case TapirTargetID::Last_TapirTargetID:
     break;
   }

@@ -205,30 +205,15 @@ Driver::Driver(StringRef ClangExecutable, StringRef TargetTriple,
 #else
   TapirCudaCfgFile = "cuda.cfg";
 #endif
-#if defined(TAPIR_REALM_ABI_TARGET_CFG_FILENAME)
-  TapirRealmCfgFile = TAPIR_REALM_ABI_TARGET_CFG_FILENAME;
-#else
-  TapirRealmCfgFile = "realm.cfg";
-#endif
-#if defined(TAPIR_OPENMP_ABI_TARGET_CFG_FILENAME)
-  TapirOpenMPCfgFile = TAPIR_OPENMP_ABI_TARGET_CFG_FILENAME;
-#else
-  TapirOpenMPCfgFile = "openmp.cfg";
-#endif
-#if defined(TAPIR_QTHREADS_ABI_TARGET_CFG_FILENAME)
-  TapirQthreadsCfgFile = TAPIR_QTHREADS_ABI_TARGET_CFG_FILENAME;
-#else
-  TapirQthreadsCfgFile = "qthreads.cfg";
-#endif
-#if defined(TAPIR_OPENCL_ABI_TARGET_CFG_FILENAME)
-  TapirOpenCLCfgFile = TAPIR_OPENCL_ABI_TARGET_CFG_FILENAME;
-#else
-  TapirOpenCLCfgFile = "opencl.cfg";
-#endif
 #if defined(TAPIR_HIP_ABI_TARGET_CFG_FILENAME)
   TapirHIPCfgFile = TAPIR_HIP_ABI_TARGET_CFG_FILENAME;
 #else
   TapirHIPCfgFile = "hip.cfg";
+#endif
+#if defined(TAPIR_REALM_ABI_TARGET_CFG_FILENAME)
+  TapirRealmCfgFile = TAPIR_REALM_ABI_TARGET_CFG_FILENAME;
+#else
+  TapirRealmCfgFile = "realm.cfg";
 #endif
 
   // Compute the path to the resource directory.

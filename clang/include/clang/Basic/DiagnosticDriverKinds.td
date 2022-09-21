@@ -571,24 +571,8 @@ def err_cc1_round_trip_ok_then_fail : Error<"Generated arguments parse failed in
 def err_cc1_round_trip_mismatch : Error<"Generated arguments do not match in round-trip">;
 
 // +----- kitsune  FIXME: should probably use kitsune-centric naming here.
-// deprecate cilkrts (opencilk should no be default)
-//def warn_cilkrts_missing_build_params : Warning<
-//  "'-ftapir=cilk' enabled but build configuration missing details for "
-//  "automatic argument generation. Target-centric link arguments must be"
-//  "provided on command line.">, InGroup<UnknownRuntime>;
-
 def warn_opencilkrts_missing_build_params : Warning<
   "'-ftapir=opencilk' enabled but build configuration missing details for "
-  "automatic argument generation. Target-centric link arguments must be"
-  "provided on command line.">, InGroup<UnknownRuntime>;
-
-def warn_qthreads_missing_build_params : Warning<
-  "'-ftapir=qthreads' enabled but build configuration missing details for "
-  "automatic argument generation. Target-centric link arguments must be"
-  "provided on command line.">, InGroup<UnknownRuntime>;
-
-def warn_realm_missing_build_params : Warning<
-  "'-ftapir=realm' enabled but build configuration missing details for "
   "automatic argument generation. Target-centric link arguments must be"
   "provided on command line.">, InGroup<UnknownRuntime>;
 
@@ -597,8 +581,14 @@ def warn_cuda_missing_build_params : Warning<
   "automatic argument generation. Target-centric link arguments must be"
   "provided on command line.">, InGroup<UnknownRuntime>;
 
-def warn_opencl_missing_build_params : Warning<
-  "'-ftapir=opencl' enabled but build configuration missing details for "
+def warn_hip_missing_build_params : Warning<
+  "'-ftapir=hip' enabled but build configuration missing details for "
+  "automatic argument generation. Target-centric link arguments must be"
+  "provided on command line.">, InGroup<UnknownRuntime>;
+
+
+def warn_realm_missing_build_params : Warning<
+  "'-ftapir=realm' enabled but build configuration missing details for "
   "automatic argument generation. Target-centric link arguments must be"
   "provided on command line.">, InGroup<UnknownRuntime>;
 
@@ -611,10 +601,6 @@ def warn_missing_tapir_opencilk_config_opts : Warning<
   "Unable to find configuration options file ('opencilk-opts.cfg') for "
   "'-ftapir=opencilk' option.">, InGroup<UnknownRuntime>;
 
-def warn_missing_tapir_qthreads_config_opts : Warning<
-  "Unable to find configuration options file ('qtheads-opts.cfg') for "
-  "'-ftapir=qthreads' option.">, InGroup<UnknownRuntime>;
-
 def warn_missing_tapir_realm_config_opts : Warning<
   "Unable to find configuration options file ('realm-opts.cfg') for "
   "'-ftapir=realm' option.">, InGroup<UnknownRuntime>;
@@ -623,9 +609,9 @@ def warn_missing_tapir_cuda_config_opts : Warning<
   "Unable to find configuration options file ('cuda-opts.cfg') for "
   "'-ftapir=cuda' option.">, InGroup<UnknownRuntime>;
 
-def warn_missing_tapir_opencl_config_opts : Warning<
-  "Unable to find configuration options file ('opencl-opts.cfg') for "
-  "'-ftapir=opencl' option.">, InGroup<UnknownRuntime>;
+def warn_missing_tapir_hip_config_opts : Warning<
+  "Unable to find configuration options file ('cuda-opts.cfg') for "
+  "'-ftapir=hip' option.">, InGroup<UnknownRuntime>;
 
 def warn_missing_kitsune_kokkos_opts : Warning<
   "'Unable to find configuration options file ('kokkos-opts.cfg') for "

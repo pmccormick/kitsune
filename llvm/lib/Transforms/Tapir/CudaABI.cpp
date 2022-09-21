@@ -74,23 +74,23 @@ static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 
 // ---- CUDA transformation-specific command line arguments.
 //
-// The transform has its own set of command line arguments that provide 
-// additional control and functionality, debugging, etc.  As a reminder, 
-// these can be used in the form: 
+// The transform has its own set of command line arguments that provide
+// additional control and functionality, debugging, etc.  As a reminder,
+// these can be used in the form:
 //
 //   -mllvm -cudabi-option[...]
 //
 
 
-// Select a specific target NVIDIA GPU architecture. 
-// 
-// This will be passed directly on to ptxas.  
+// Select a specific target NVIDIA GPU architecture.
+//
+// This will be passed directly on to ptxas.
 //
 // NOTE: At this point in time we do not provide support for the older range
-// of GPU architectures (e.g., we favor 64-bit and SM_60 or newer, which 
-// follows the trends of longer term CUDA support.  Although exposed here, we 
+// of GPU architectures (e.g., we favor 64-bit and SM_60 or newer, which
+// follows the trends of longer term CUDA support.  Although exposed here, we
 // have not tested 32-bit host support.
-// 
+//
 // TODO: Might be nice to allow build-time setting of this default.
 //
 static cl::opt<std::string>
@@ -796,7 +796,7 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
   // global values that need to be remapped.
   for (GlobalValue *v : UsedGlobalValues) {
     if (Function *F = dyn_cast<Function>(v)) {
-      if (F->size()) {
+      if (F->size() && not F->isIntrinsic()) {
         SmallVector<ReturnInst *, 8> Returns;
         Function *DeviceF = cast<Function>(VMap[F]);
         CloneFunctionInto(DeviceF, F, VMap,

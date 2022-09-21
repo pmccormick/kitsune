@@ -80,28 +80,23 @@ if (KITSUNE_ENABLE_KITRT)
       message(STATUS "kitsune: spirv compiler target enabled -- enabling runtime support.")
       list(APPEND KITSUNE_ENABLE_KITRT_TARGETS "spirv")
     endif()
-
   endif()
 
   if (NOT KITSUNE_ENABLE_KITRT_TARGETS STREQUAL "'")
-    foreach(target ${KITSUNE_ALL_KITRT_TARGETS})
-      string(TOUPPER "${target}" upper_target)
-      message(STATUS "Kitsune runtime: ${target} --> ${upper_target}")
-      if (${target} IN_LIST KITSUNE_ENABLE_KITRT_TARGETS)
-        message(STATUS "Kitsune runtime target '${target}' ENABLED.")
-        message(STATUS "    KITSUNE_RT_ENABLE_${upper_target} ON")
-        set(KITRT_ENABLE_${upper_target} ON CACHE
-            BOOL "Build kitsune runtime support for ${upper_lib} target.")
-      else()
-        message(STATUS "Kitsune runtime target ${target} DISABLED.")
-        message(STATUS "    KITSUNE_RT_ENABLE_${upper_target} OFF")
-        set(KITRT_ENABLE_${upper_target} OFF CACHE
-            BOOL "Build kitsune runtime support for ${upper_lib} target.")
+    message(STATUS "Kitsune runtime targets list: ${KITSUNE_ENABLE_KITRT_TARGETS}") 
+    foreach(rt_target IN LISTS KITSUNE_ENABLE_KITRT_TARGETS)
+      message(STATUS "  runtime target: ${rt_target}")
+      string(TOUPPER "${rt_target}" upper_target)
+      if (rt_target IN_LIST KITSUNE_ENABLE_KITRT_TARGETS)
+        set(KITRT_ENABLE_${upper_target} ON) 
+	    # CACHE
+	    # BOOL "Build kitsune runtime support for ${upper_target} target.")
       endif()
+      message(STATUS "Kitsune runtime target KITRT_ENABLE_${upper_target} is ${KITRT_ENABLE_${upper_target}}.")
     endforeach()
+    add_subdirectory(runtime)
   endif()
 endif()
 
-add_subdirectory(runtime)
 add_subdirectory(include)
 

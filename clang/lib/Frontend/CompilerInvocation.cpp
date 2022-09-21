@@ -4559,26 +4559,16 @@ bool CompilerInvocation::CreateFromArgsImpl(
     StringRef Name = A->getValue();
     if (Name == "none")
       LangOpts.Tapir = TapirTargetID::None;
-    else if (Name == "cilk")
-      // for now, our deprecation path for cilk is to 
-      // use the opencilk ABI. 
-      LangOpts.Tapir = TapirTargetID::OpenCilk;
     else if (Name == "opencilk")
       LangOpts.Tapir = TapirTargetID::OpenCilk;
-    else if (Name == "openmp")
-      LangOpts.Tapir = TapirTargetID::OpenMP;
-    else if (Name == "qthreads")
-      LangOpts.Tapir = TapirTargetID::Qthreads;
     else if (Name == "realm")
       LangOpts.Tapir = TapirTargetID::Realm;
     else if (Name == "cuda")
       LangOpts.Tapir = TapirTargetID::Cuda;
-    else if (Name == "realm")
-      LangOpts.Tapir = TapirTargetID::Realm;
-    else if (Name == "opencl")
-      LangOpts.Tapir = TapirTargetID::OpenCL;
     else if (Name == "gpu")
       LangOpts.Tapir = TapirTargetID::GPU;
+    else if (Name == "hip")
+      LangOpts.Tapir = TapirTargetID::Hip;
     else if (Name == "serial")
       LangOpts.Tapir = TapirTargetID::Serial;
     else
