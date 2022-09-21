@@ -239,11 +239,11 @@ bool __kitrt_hipInit() {
 
   // The runtime model requires managed memory support.
   // If it is not available, we fail initialization.
-  int hasManagedMemory = 0;
-  HIP_SAFE_CALL(hipDeviceGetAttribute_p(&hasManagedMemory,
-                   hipDeviceAttributeManagedMemory,
-                   _kitrt_hipDeviceID));
-  if (hasManagedMemory)
+  int concurrentManagedAccess = 0;
+  HIP_SAFE_CALL(hipDeviceGetAttribute_p(&concurrentManagedAccess,
+                        hipDeviceAttributeConcurrentManagedAccess,
+                        _kitrt_hipDeviceID));
+  if (concurrentManagedAccess)
     _kitrt_hipIsInitialized = true;
   else {
     fprintf(stderr, "kitrt: no support for managed memory.\n");

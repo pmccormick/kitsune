@@ -57,21 +57,21 @@ if (KITRT_ENABLE_CUDA)
   link_directories(${CUDAToolkit_LIBRARY_DIR})
   include_directories(${CUDAToolkit_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
-  list(APPEND KITRT_LINK_LIBS 
+  list(APPEND KITRT_LINK_LIBS
     "-lnvptxcompiler_static -lcudart -lcuda")
-endif() 
+endif()
 
-if (KITRT_ENABLE_HIP) 
+if (KITRT_ENABLE_HIP)
   message(STATUS "Kitsune runtime adding HIP components to build...")
-  # TODO: This probably needs external settings in order to 
-  # manage moudles and other ways to install rocm... 
+  # TODO: This probably needs external settings in order to
+  # manage moudles and other ways to install rocm...
   list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
-  find_package(hip REQUIRED) 
+  find_package(hip REQUIRED)
   add_definitions(-DKITRT_HIP_ENABLED)
   list(APPEND KITRT_HDRS
     hip/hip.h
     hip/llvm-hip.h)
-  list(APPEND KITRT_SRCS 
+  list(APPEND KITRT_SRCS
     hip/hip.cpp
     hip/llvm-hip.cpp)
   list(APPEND KITRT_LINK_LIBS hip::host)
@@ -85,6 +85,7 @@ target_include_directories(kitrt
     ${LLVM_INCLUDE_DIR}
     ${KITSUNE_SOURCE_DIR}/include
     ${KITSUNE_RUNTIME_INCLUDE_DIR})
+
 target_link_libraries(kitrt
   PUBLIC
     ${KITRT_LINK_LIBS}
