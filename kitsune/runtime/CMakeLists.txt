@@ -74,8 +74,7 @@ if (KITRT_ENABLE_HIP)
   list(APPEND KITRT_SRCS 
     hip/hip.cpp
     hip/llvm-hip.cpp)
-  list(APPEND KITRT_LINK_LIBS
-      "hip::host")
+  list(APPEND KITRT_LINK_LIBS hip::host)
 endif()
 
 message(STATUS "kitsune runtime library source files: ${KITRT_SRCS}")
@@ -88,8 +87,8 @@ target_include_directories(kitrt
     ${KITSUNE_RUNTIME_INCLUDE_DIR})
 target_link_libraries(kitrt
   PUBLIC
-    LLVM -lrt -ldl -lpthread
-    ${KITRT_LINK_LIBS})
+    ${KITRT_LINK_LIBS}
+    LLVM -lrt -ldl)
 
 install(TARGETS kitrt
   LIBRARY DESTINATION lib COMPONENT kitrt
