@@ -80,9 +80,9 @@ static const std::string HIPABI_KERNEL_NAME_PREFIX = HIPABI_PREFIX + "_kern_";
 // TODO: Might be nice to allow build-time setting of this default.
 //
 static cl::opt<std::string>
-    GPUArch("hipabi-arch", cl::init("gfx906"), cl::NotHidden,
+    GPUArch("hipabi-arch", cl::init("gfx908"), cl::NotHidden,
             cl::desc("Target GPU architecture for HIP ABI transformation."
-                     "(default: gfx906 (MI50/60)"));
+                     "(default: gfx908 (MI100)"));
 
 /// Enable verbose mode.  Handled internally as well as passed on to
 /// any extra toolchain components (when available).

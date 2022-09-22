@@ -55,13 +55,18 @@
 #include "debug.h"
 #include <stdlib.h>
 
-static bool _kitrtVerboseMode         = false;
-static const char *_KITRT_ENV_VERBOSE = "KITRT_VERBOSE";
 
-static bool _kitrtReportRuntimes      = false;
-static const char *_KITRT_ENV_TIMIMG  = "KITRT_TIMING_REPORTS";
+// Overall runtime configuration settings.
+static bool _kitrtVerboseMode          = false;
+static bool _kitrtReportKernelRuntimes = false;
+static bool _kitrtEnableStackTraces    = false;
 
-static bool _kitrtStackTraceMode = true;
+// Shared GPU parameter settings/interface.
+static unsigned _kitrtDefaultThreadsPerBlock = 256;
+static bool _kitrtUseCustomLaunchParameters = false;
+static unsigned _kitrtThreadsPerBlock = 0;
+static unsigned _kitrtBlocksPerGrid = 0;
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,21 +85,21 @@ extern "C" {
   void __kitrt_setReportRuntimes(bool Enable) {
     KITRT_DEBUG( kitrt::kitdbgs() << "kitrt: execution time reporting "
                                   << Enable : "on.\n" ? "off.\n");
-    _kitrtReportRuntimes = Enable;
+    _kitrtReportKernelRuntimes = Enable;
   }
 
   bool __kitrt_reportRuntimes() {
-    return _kitrtReportRuntimes;
+    return _kitrtReportKernelRuntimes;
   }
 
   void __kitrt_setReportStackTraces(bool Enable) {
     KITRT_DEBUG( kitrt::kitdbgs() << "kitrt: stack trace reporting "
                                   << Enable : "on.\n" ? "off.\n");
-    _kitrtStackTraceMode = Enable;
+    _kitrtEnableStackTraces = Enable;
   }
 
   bool __kitrt_ReportStackTraces() {
-    return _kitrtStackTraceMode;
+    return _kitrtEnableStackTraces;
   }
 
   bool __kitrt_init() {
@@ -119,6 +124,33 @@ extern "C" {
     // Initialize the supported runtime layer(s).
     bool __kitrt_runtimesInit();
     return __kitrt_runtimesInit();
+  }
+
+  void __kitrt_getLaunchParameters(size_t numElements,
+                                   int &threadsPerBlock,
+                                   int &blocksPerGrid) {
+    if (not _kitrtUseCustomLaunchParameters) {
+      threadsPerBlock = _kitrtDefaultThreadsPerBlock;
+      blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+    } else {
+      threadsPerBlock = _kitrtThreadsPerBlock;
+      blocksPerGrid = _kitrtBlocksPerGrid;
+    }
+  }
+
+  void __kitrt_setDefaultGPUThreadsPerBlock(unsigned threadsPerBlock) {
+    _kitrtDefaultThreadsPerBlock = threadsPerBlock;
+  }
+
+  void __kitrt_overrideLaunchParameters(unsigned threadsPerBlock,
+                                        unsigned blocksPerGrid) {
+    _kitrtUseCustomLaunchParameters = true;
+    _kitrtThreadsPerBlock = threadsPerBlock;
+    _kitrtBlocksPerGrid = blocksPerGrid;
+  }
+
+  void __kitrt_resetLaunchParameters() {
+    _kitrtUseCustomLaunchParameters = false;
   }
 
 #ifdef __cplusplus

@@ -73,8 +73,8 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
-  /// Initialize the runtime.
-  extern bool __kitrtInit();
+  /// Initialize the shared portion of the runtime.
+  extern bool __kitrt_CommonInit();
 
 
   /// Enable/Disable the runtime's verbose operating mode.  This will
@@ -126,7 +126,6 @@ extern "C" {
   /// reporting mode.
   extern bool __kitrt_reportRuntimes();
 
-
   /// Enable/Disable stack trace reports for any internal runtime
   /// failures.
   ///
@@ -153,6 +152,11 @@ extern "C" {
   extern bool __kitrt_isCheetahSupported();
   extern bool __kitrt_isRealmSuported();
 
+  extern void __kitrt_setDefaultGPUThreadsPerBlock(unsigned threadsPerBlock);
+  extern void __kitrt_getLaunchParameters(size_t numElements,
+                                          int &threadsPerBlock,
+                                          int &blocksPerGrid);
+  extern void __kitrt_resetLaunchParameters();
 
 #ifdef __cplusplus
 } // extern "C"
