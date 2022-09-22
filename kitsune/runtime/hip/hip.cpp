@@ -309,8 +309,8 @@ bool __kitrt_hipInit() {
 
 void __kitrt_hipDestroy() {
   if (_kitrt_hipIsInitialized) {
-    extern void __kitrt_hipMemFree(void*);
-    __kitrt_destroyMemoryMap(__kitrt_hipMemFree);
+    extern void __kitrt_hipFreeManagedMem(void*);
+    __kitrt_destroyMemoryMap(__kitrt_hipFreeManagedMem);
     HIP_SAFE_CALL(hipDeviceReset_p());
     _kitrt_hipIsInitialized = false;
     #ifdef _KITRT_VERBOSE_
@@ -334,11 +334,15 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
 
 void __kitrt_hipMemFree(void *memPtr) {
   assert(memPtr != nullptr && "unexpected null pointer!");
-  HIP_SAFE_CALL(hipFree_p(memPtr));
   #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: freed hip managed memory @ %p.\n",  memPtr);
+  fprintf(stderr, "kitrt: freed hip managed memory @ %p.\n", memPtr);
   #endif
   __kitrt_unregisterMemAlloc(memPtr);
+  HIP_SAFE_CALL(hipFree_p(memPtr));
+}
+
+void __kitrt_hipFreeManagedMem(void *memPtr) {
+  HIP_SAFE_CALL(hipFree_p(memPtr));
 }
 
 bool __kitrt_hipIsMemManaged(void *vp) {

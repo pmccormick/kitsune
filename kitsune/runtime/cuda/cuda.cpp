@@ -371,11 +371,11 @@ void __kitrt_cuMemFree(void *vp) {
   // here -- a non-v2 version will actually result in
   // crashes...
   __kitrt_unregisterMemAlloc(vp);
-  CU_SAFE_CALL(cuMemFree((CUdeviceptr)vp));
+  CU_SAFE_CALL(cuMemFree_v2_p((CUdeviceptr)vp));
 }
 
 void __kitrt_cuFreeManagedMem(void *vp) {
-  CU_SAFE_CALL(cuMemFree((CUdeviceptr)vp));
+  CU_SAFE_CALL(cuMemFree_v2_p((CUdeviceptr)vp));
 }
 
 bool __kitrt_cuIsMemManaged(void *vp) {
