@@ -60,7 +60,6 @@
 #include <sstream>
 #include <stdbool.h>
 
-
 // NOTE: HIP sprinkles some templated functions into the API and
 // that can trip up our code for handling dynamic symbol handling.
 // Fortunately we can "disable" these with the following...
@@ -68,6 +67,7 @@
 #define __HIP_PLATFORM_HCC__ 1
 #include <hip/hip_runtime.h>
 
+#include "../kitrt.h"
 #include "../debug.h"
 #include "../dlutils.h"
 #include "../memory_map.h"
@@ -112,6 +112,7 @@ static bool _kitrt_hipEnablePrefetch = true;
 
 // ---- Initialize, properties, error handling, clean up, etc.
 DECLARE_DLSYM(hipInit);
+DECLARE_DLSYM(hipSetDevice);
 DECLARE_DLSYM(hipGetDevice);
 DECLARE_DLSYM(hipGetDeviceCount);
 DECLARE_DLSYM(hipGetDeviceProperties);
@@ -158,6 +159,7 @@ static bool __kitrt_hipLoadDLSyms() {
   if (dlHandle = dlopen(HIP_DSO_LIBNAME, RTLD_LAZY)) {
     // ---- Initialize, properties, error handling, clean up, etc.
     DLSYM_LOAD(hipInit);
+    DLSYM_LOAD(hipSetDevice);
     DLSYM_LOAD(hipGetDevice);
     DLSYM_LOAD(hipGetDeviceCount);
     DLSYM_LOAD(hipGetDeviceProperties);
@@ -216,8 +218,10 @@ extern "C" {
 
 bool __kitrt_hipInit() {
 
-  if (_kitrt_hipIsInitialized)
+  if (_kitrt_hipIsInitialized) {
+    fprintf(stderr, "kitrt: warning, multiple hip initialization paths!\n");
     return true;
+  }
 
   if (!__kitrt_hipLoadDLSyms()) {
     fprintf(stderr, "kitrt: unable to resolve dynamic symbols for HIP.\n");
@@ -226,29 +230,78 @@ bool __kitrt_hipInit() {
     abort();
   }
 
+  // We follow the CUDA-style path for initialization (per the AMD docs,
+  // "most HIP APIs implicitly initialize the HIP runtime. This [call]
+  // provides control over the timing of the initialization.").
   HIP_SAFE_CALL(hipInit_p(0));
+
+
+  // Make sure we have at least one compute device available.
   int count;
   HIP_SAFE_CALL(hipGetDeviceCount_p(&count));
-  if (count == 0) {
+  if (count <= 0) {
     fprintf(stderr, "kitrt: warning -- no HIP devices found!\n");
     return false;
   }
-  HIP_SAFE_CALL(hipGetDevice_p(&_kitrt_hipDeviceID));
+
+  // At present we only support a single device.  HIP diverges a
+  // bit here from CUDA.  We first set the device for all subsequent
+  // calls to use...
+  _kitrt_hipDeviceID = 0;
+  HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
   HIP_SAFE_CALL(hipGetDeviceProperties_p(&_kitrt_hipDeviceProps,
                                          _kitrt_hipDeviceID));
 
-  // The runtime model requires managed memory support.
-  // If it is not available, we fail initialization.
-  int concurrentManagedAccess = 0;
-  HIP_SAFE_CALL(hipDeviceGetAttribute_p(&concurrentManagedAccess,
-                        hipDeviceAttributeConcurrentManagedAccess,
+  // Our current code base relies on managed memory to make the
+  // portability of code a bit easier (e.g., the programmer does
+  // not need to explicitly move/synchronize data between host
+  // and device.  However, this requires the target platform
+  // and GPU to support managed memory.
+  //
+  // The current ROCm documentation has a couple of different
+  // (perhaps contrary?) pieces of documentation about what is
+  // needed for this support...  We'll do our best to attempt
+  // to nail it all down here before we proceed (as calling the
+  // managed memory routines on unsupported platforms can lead
+  // to undefined behavior).  The following paragraph captures
+  // what is currently documented.
+  //
+  // "Managed memory [snip] is supported in the HIP combined
+  // host/device compilation. Through unified memory allocation,
+  // managed memory allows data to be shared and accessible to
+  // both the CPU and GPU using a single pointer. The allocation
+  // is managed by the AMD GPU driver using the Linux
+  // Heterogeneous Memory Management (HMM) mechanism. The user
+  // can call managed memory API hipMallocManaged to allocate a
+  // large chunk of HMM memory, execute kernels on a device, and
+  // fetch data between the host and device as needed.
+  //
+  // In a HIP application,  it is recommended to do a capability
+  // check before calling the managed memory APIs."
+  int hasManagedMemory = 0;
+  HIP_SAFE_CALL(hipDeviceGetAttribute(&hasManagedMemory,
+                        hipDeviceAttributeManagedMemory,
                         _kitrt_hipDeviceID));
-  if (concurrentManagedAccess)
+  if (!hasManagedMemory) {
+    fprintf(stderr, "kitrt: hip -- device does not support managed memory!\n");
+    abort(); // TODO: eventually want to return false so JIT runtime won't fail.
+  }
+
+  // Example code suggests this is a preferred (additional?) check
+  // prior to using managed memory...
+  int supportsConcurrentManagedAccess = 0;
+  HIP_SAFE_CALL(hipDeviceGetAttribute_p(&supportsConcurrentManagedAccess,
+                               hipDeviceAttributeConcurrentManagedAccess,
+                               _kitrt_hipDeviceID));
+  if (!supportsConcurrentManagedAccess) {
+    fprintf(stderr, "kitrt: hip -- device does not support concurrent "
+                    "managed memory accesses!\n");
+    abort(); // TODO: eventually want to return false so JIT runtime won't fail.
+  } else {
+    #ifdef _KITRT_VERBOSE_
+    fprintf(stderr, "kitrt: hip runtime component successfully initialized.\n");
+    #endif
     _kitrt_hipIsInitialized = true;
-  else {
-    fprintf(stderr, "kitrt: no support for managed memory.\n");
-    fprintf(stderr, "       HIP runtime initialization failed!\n");
-    _kitrt_hipIsInitialized = false;
   }
 
   return _kitrt_hipIsInitialized;
@@ -260,6 +313,9 @@ void __kitrt_hipDestroy() {
     __kitrt_destroyMemoryMap(__kitrt_hipMemFree);
     HIP_SAFE_CALL(hipDeviceReset_p());
     _kitrt_hipIsInitialized = false;
+    #ifdef _KITRT_VERBOSE_
+    fprintf(stderr, "kitrt: shutdown hip runtime component.\n");
+    #endif
   }
 }
 
@@ -269,6 +325,9 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
   assert(_kitrt_hipIsInitialized && "kitrt: hip has not been initialized!");
   void *memPtr;
   HIP_SAFE_CALL(hipMallocManaged_p(&memPtr, size, hipMemAttachGlobal));
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: allocated hip managed memory (%ld bytes @ %p).\n", size, memPtr);
+  #endif
   __kitrt_registerMemAlloc(memPtr, size);
   return (void*)memPtr;
 }
@@ -276,6 +335,9 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
 void __kitrt_hipMemFree(void *memPtr) {
   assert(memPtr != nullptr && "unexpected null pointer!");
   HIP_SAFE_CALL(hipFree_p(memPtr));
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: freed hip managed memory @ %p.\n",  memPtr);
+  #endif
   __kitrt_unregisterMemAlloc(memPtr);
 }
 
@@ -314,7 +376,8 @@ void __kitrt_hipMemPrefetch(void *vp) {
       size_t size = __kitrt_getMemAllocSize(vp);
       if (size > 0) {
         #ifdef _KITRT_VERBOSE_
-        fprintf(stderr, "kitrt: prefetch(%p).\n", vp);
+        fprintf(stderr, "kitrt: prefetch managed memory @ %p, %ld bytes.\n",
+                vp, size);
         #endif
         __kitrt_hipMemPrefetchAsync(vp, size);
       }
@@ -328,6 +391,10 @@ void __kitrt_hipMemcpySymbolToDevice(void *hostPtr,
   assert(devPtr != 0 && "unexpected null device pointer!");
   assert(hostPtr != nullptr && "unexpected null host pointer!");
   assert(size != 0 && "requested a 0 byte copy!");
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: hip copy symbol (%ld bytes) to device (%p --> %p).\n",
+          size, hostPtr, devPtr);
+  #endif
   HIP_SAFE_CALL(hipMemcpyHtoD_p((hipDeviceptr_t)devPtr, hostPtr, size));
 }
 
@@ -344,8 +411,12 @@ uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod) {
   assert(symName && "unexpected null symbol name!");
   assert(mod && "unexpected null module pointer!");
 
-  // TODO: some of these details might be a bit off here for HIP vs.
-  // CUDA...
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: get hip global symbol (%s).\n", symName);
+  #endif
+
+  // TODO: Might need to revisit the details here to make sure they
+  // fit the HIP API details.
   hipModule_t *module = (hipModule_t*)mod;
   hipDeviceptr_t devPtr;
   size_t bytes;
@@ -360,11 +431,21 @@ void *__kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
                                        (hipModule_t)module,
                                        kernelName));
 
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: module-launch of hip kernel '%s'.\n", kernelName);
+  #endif
+
   // TODO: The HIP documentation is not entirely clear about the
   // existence of a default stream...  This could break...
+
+  // TODO: need to set launch parameters!
+  int threadsPerBlock, blocksPerGrid;
+
+  __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
+
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(function,
-                                        1, 1, 1,
-                                        numElements, 1, 1, 0,
+                                        blocksPerGrid, 1, 1,
+                                        threadsPerBlock, 1, 1, 0,
                                         nullptr, /* default stream */
                                         args, NULL));
   return nullptr;
@@ -374,7 +455,6 @@ void *__kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
                                 void **fatBinArgs, uint64_t numElements) {
   assert(fatBin && "request to launch null fat binary image!");
   assert(kernelName && "request to launch kernel w/ null name!");
-  int threadsPerBlock, blocksPerGrid;
 
   // TODO: We need a better path here for binding and tracking
   // allocated resources -- as it stands we will "leak" modules,
@@ -391,8 +471,6 @@ void *__kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
 }
 
 void __kitrt_hipStreamSynchronize(void *vStream) {
-  // TODO: The HIP documentation is not entirely clear about the
-  // existence of a default stream... This could break...
   HIP_SAFE_CALL(hipStreamSynchronize_p((hipStream_t)vStream));
 }
 
