@@ -23,7 +23,7 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Vectorize.h"
-#include "llvm/Support/TargetRegistry.h"
+#include "llvm/MC/TargetRegistry.h"
 #ifdef KITSUNE_ENABLE_OPENCL_TARGET
 #include <LLVMSPIRVLib/LLVMSPIRVLib.h>
 #endif

@@ -26,7 +26,7 @@
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IRReader/IRReader.h"
-#include "llvm/Support/TargetRegistry.h"
+#include "llvm/MC/TargetRegistry.h"
 #include <sstream>
 #include <fstream>
 

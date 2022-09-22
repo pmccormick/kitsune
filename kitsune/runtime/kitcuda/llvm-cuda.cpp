@@ -73,7 +73,7 @@
 #include <llvm/Support/InitLLVM.h>
 #include <llvm/Support/Process.h>
 #include <llvm/Support/SourceMgr.h>
-#include <llvm/Support/TargetRegistry.h>
+#include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Support/circular_raw_ostream.h>
