@@ -306,21 +306,11 @@ bool __kitrt_cuInit() {
 void __kitrt_cuDestroy() {
 
   if (_kitrt_cuIsInitialized) {
-    __kitrt_destroyMemoryMap(__kitrt_cuMemFree);
-
+    void __kitrt_cuFreeManagedMem(void *vp);
+    __kitrt_destroyMemoryMap(__kitrt_cuFreeManagedMem);
     // Note that all resources associated with the context will be destroyed.
     CU_SAFE_CALL(cuDevicePrimaryCtxRelease_v2_p(_kitrtCUdevice));
-    // TODO: Right now we call this via a compiler-generated dtor so
-    // it should be safe.  However, it may have adverse consequences in
-    // some cases -- we should pin this down a bit further...
     CU_SAFE_CALL(cuDevicePrimaryCtxReset_v2_p(_kitrtCUdevice));
-
-    // TODO: We can't destroy the primary context but if we switch to running
-    // multiple context we will have to revisit this aspect of cleaning things
-    // up.
-    // CU_SAFE_CALL(cuCtxDestroy_v2_p(_kitrtCUcontext));
-
-    // purely for completeness...
     _kitrt_cuIsInitialized = false;
   }
 }
@@ -381,7 +371,11 @@ void __kitrt_cuMemFree(void *vp) {
   // here -- a non-v2 version will actually result in
   // crashes...
   __kitrt_unregisterMemAlloc(vp);
-  CU_SAFE_CALL(cuMemFree_v2_p((CUdeviceptr)vp));
+  CU_SAFE_CALL(cuMemFree((CUdeviceptr)vp));
+}
+
+void __kitrt_cuFreeManagedMem(void *vp) {
+  CU_SAFE_CALL(cuMemFree((CUdeviceptr)vp));
 }
 
 bool __kitrt_cuIsMemManaged(void *vp) {
