@@ -50,7 +50,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
-#include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
@@ -879,14 +878,13 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   //Helper->setLinkage(Function::ExternalLinkage);
 
   // Set the target features for the helper.
-  AttrBuilder Attrs;
-  Attrs.addAttribute("target-cpu", GPUArch);
-  Attrs.addAttribute("target-features",
+  Helper->addFnAttr("target-cpu", GPUArch);
+  Helper->addFnAttr("target-features",
                      PTXVersionFromCudaVersion() + "," + GPUArch);
   Helper->removeFnAttr("target-cpu");
   Helper->removeFnAttr("target-features");
   Helper->removeFnAttr("personality");
-  Helper->addAttributes(AttributeList::FunctionIndex, Attrs);
+  //Helper->addAttributes(AttributeList::FunctionIndex, Attrs);
 
   NamedMDNode *Annotations =
       KernelModule.getOrInsertNamedMetadata("nvvm.annotations");
@@ -1437,7 +1435,7 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
 
   if (ExecStat != 0)
     // 'ptxas' ran but returned an error state.
-    report_fatal_error("fatal error: 'ptxas' failure: " + ErrMsg);
+    report_fatal_error("fatal error: 'ptxas' failure: " + StringRef(ErrMsg));
 
   // TODO: Not sure we need to force 'keep' here as we return
   // the output file but will keep it here for now just to play it
@@ -1592,7 +1590,7 @@ CudaABI::createFatbinaryFile(CudaABIOutputFile &AsmFile) {
     std::string VArchStr = virtualArchForCudaArch(GPUArch);
     if (VArchStr == "unknown")
       report_fatal_error("cuabi: no virtual target for given gpuarch '"
-                         + GPUArch + "'!");
+                         + StringRef(GPUArch) + "'!");
 
     std::string PTXFixedArgStr = "--image=profile=" + VArchStr + ",file=";
     for (auto &PTXFile : ModulePTXFileList) {
@@ -1629,7 +1627,7 @@ CudaABI::createFatbinaryFile(CudaABIOutputFile &AsmFile) {
     // TODO: Need to check what sort of actual state 'fatbinary'
     // returns to the environment -- currently assuming it
     // matches standard practices...
-    report_fatal_error("'fatbinary' error:" + ErrMsg);
+    report_fatal_error("'fatbinary' error:" + StringRef(ErrMsg));
 
   if (EmbedPTXInFatbinaries) {
     std::list<std::string>::iterator it = PTXFilesArgList.begin();
@@ -1654,7 +1652,7 @@ CudaABI::embedFatbinary(CudaABIOutputFile &FatbinaryFile) {
           MemoryBuffer::getFile(FatbinaryFile->getFilename());
   if (std::error_code EC = FBBufferOrErr.getError()) {
     report_fatal_error("cuabi: failed to load fat binary image: " +
-                       EC.message());
+                       StringRef(EC.message()));
   }
   Fatbinary = std::move(FBBufferOrErr.get());
   LLVM_DEBUG(dbgs() << "\tread fat binary image, "

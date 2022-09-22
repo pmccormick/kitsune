@@ -18,7 +18,7 @@ using namespace sema;
 
 StmtResult
 Sema::ActOnSpawnStmt(SourceLocation SpawnLoc, StringRef sv, Stmt *SubStmt) {
-  DiagnoseUnusedExprResult(SubStmt);
+  DiagnoseUnusedExprResult(SubStmt, diag::warn_unused_expr);
 
   PushFunctionScope();
   // TODO: Figure out how to prevent jumps into and out of the spawned

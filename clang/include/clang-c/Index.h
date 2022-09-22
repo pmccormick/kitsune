@@ -2668,10 +2668,10 @@ enum CXCursorKind {
    */
   CXCursor_CilkScopeStmt = 300,
 
-  CXCursor_ForallStmt               = 299,
-  CXCursor_CXXForallRangeStmt       = 300,
-  CXCursor_SpawnStmt                 = 301,
-  CXCursor_SyncStmt                 = 302,
+  CXCursor_ForallStmt               = 301,
+  CXCursor_CXXForallRangeStmt       = 302,
+  CXCursor_SpawnStmt                 = 303,
+  CXCursor_SyncStmt                 = 304,
 
 
   CXCursor_LastStmt = CXCursor_SyncStmt,
