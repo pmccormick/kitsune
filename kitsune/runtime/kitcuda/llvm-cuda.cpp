@@ -196,7 +196,7 @@ std::string __kitrt_cuLLVMtoPTX(Module& m, CUdevice device) {
   m.setTargetTriple(TT.str());
   Function& F = *m.getFunction("kitsune_kernel");
 
-  AttrBuilder Attrs;
+  AttrBuilder Attrs = AttrBuilder(ctx);
   Attrs.addAttribute("target-cpu", cudaarch);
   Attrs.addAttribute("target-features", cudafeatures + ",+" + cudaarch);
   /*
@@ -209,7 +209,7 @@ std::string __kitrt_cuLLVMtoPTX(Module& m, CUdevice device) {
   F.removeFnAttr(Attribute::StackProtectStrong);
   F.removeFnAttr(Attribute::UWTable);
   */
-  F.addAttributes(AttributeList::FunctionIndex, Attrs);
+  F.addFnAttrs(Attrs);
   NamedMDNode *Annotations =
     m.getOrInsertNamedMetadata("nvvm.annotations");
 

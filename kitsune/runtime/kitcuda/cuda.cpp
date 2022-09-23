@@ -70,6 +70,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdbool.h>
+#include <map>
 
 // Has the runtime been initialized (successfully)?
 static bool _kitrtIsInitialized = false;
