@@ -28,12 +28,15 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/local CACHE STRING "")
 # settings below).
 #set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
 set(CMAKE_BUILD_TYPE Release CACHE STRING "")
+set(COMPILER_RT_BUILD_SANITIZERS OFF CACHE STRING "")
+set(COMPILER_RT_BUILD_XRAY OFF CACHE STRING "")
+set(COMPILER_RT_BUILD_MEMPROF OFF CACHE STRING "")
 
 # You'll want to tweak this to reduce build times based on what
 # you are working on.  By default we provide the full suite of
 # clang+tools, openmp, lld, and a debugger via lldb.
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;lld
+  clang;clang-tools-extra;lld;compiler-rt
   CACHE STRING "")
 
 set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 80 CACHE STRING "")
