@@ -1085,7 +1085,7 @@ HipABIOutputFile HipABI::createBundleFile() {
   opt::ArgStringList LDDArgList;
 
   LDDArgList.push_back(LLDExe->c_str());
-  std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch;
+  std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch + ":xnack+";
   LDDArgList.push_back(mcpu_arg.c_str());
   LDDArgList.push_back("-shared");
   LDDArgList.push_back("-plugin-opt=-amdgpu-internalize-symbols");
