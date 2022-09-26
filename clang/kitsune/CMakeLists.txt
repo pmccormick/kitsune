@@ -160,7 +160,9 @@ option(KITSUNE_ENABLE_HIP_ABI_TARGET
     "Enable the Kitsune+Tapir HIP target and codegen library." OFF)
 if (KITSUNE_ENABLE_HIP_ABI_TARGET)
   # TODO: There has to be a better way to specify the search path here.
-  list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
+  list(APPEND CMAKE_PREFIX_PATH
+       $ENV{ROCM_PATH}/hip $ENV{ROCM_PATH}       
+       /opt/rocm/hip /opt/rocm)
   find_package(hip REQUIRED)
   set(TAPIR_HIP_TARGET_CFG_FILENAME
       "hip.cfg"

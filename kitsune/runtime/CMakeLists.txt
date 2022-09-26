@@ -65,7 +65,9 @@ if (KITRT_ENABLE_HIP)
   message(STATUS "Kitsune runtime adding HIP components to build...")
   # TODO: This probably needs external settings in order to
   # manage moudles and other ways to install rocm...
-  list(APPEND CMAKE_PREFIX_PATH /opt/rocm/hip /opt/rocm)
+  list(APPEND CMAKE_PREFIX_PATH 
+       $ENV{ROCM_PATH}/hip $ENV{ROCM_PATH}
+       /opt/rocm/hip /opt/rocm)
   find_package(hip REQUIRED)
   add_definitions(-DKITRT_HIP_ENABLED)
   list(APPEND KITRT_HDRS
