@@ -276,7 +276,7 @@ bool __kitrt_hipInit() {
   // large chunk of HMM memory, execute kernels on a device, and
   // fetch data between the host and device as needed.
   //
-  // In a HIP application,  it is recommended to do a capability
+  // In a HIP application, it is recommended to do a capability
   // check before calling the managed memory APIs."
   int hasManagedMemory = 0;
   HIP_SAFE_CALL(hipDeviceGetAttribute(&hasManagedMemory,
