@@ -110,6 +110,7 @@ extern "C" {
   void  __kitrt_cuDisablePrefetch();
   void  __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size);
   void  __kitrt_cuMemPrefetchAsync(void *vp, size_t size);
+  void *__kitrt_cuStreamMemPrefetchAsync(void *vp, size_t size);
   void  __kitrt_cuMemPrefetch(void *vp);
   void  __kitrt_cuMemNeedsPrefetch(void *vp);
   __attribute__((malloc))
@@ -133,6 +134,13 @@ extern "C" {
                                  const char *kernelName,
                                  void **fatBinArgs,
                                  uint64_t numElements);
+
+  void _kitrt_cuLaunchStreamedFBKernel(const void *fatBin,
+                                     const char *kernelName,
+                                     void **fatBinArgs,
+                                     uint64_t numElements,
+                                     void *stream);
+
   void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
                                        const char *kernelName,
                                        void **fatBinArgs,

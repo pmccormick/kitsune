@@ -1146,7 +1146,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
 
 CudaABI::CudaABI(Module &M)
     : TapirTarget(M),
-      KM(CUABI_PREFIX + M.getName().str(),
+      KM(Twine(CUABI_PREFIX + sys::path::filename(M.getName())).str(),
       M.getContext()) {
 
   LLVM_DEBUG(dbgs() << "cuabi: creating tapir target for module: "
@@ -1901,7 +1901,7 @@ CudaABIOutputFile CudaABI::generatePTX() {
 
   if (KeepIntermediateFiles) {
     std::unique_ptr<ToolOutputFile> IRFile;
-    SmallString<255> IRFileName(Twine(KM.getName()).str());
+    SmallString<255> IRFileName(KM.getName());
     sys::path::replace_extension(IRFileName, ".tapir");
     IRFile = std::make_unique<ToolOutputFile>(IRFileName, EC,
                 sys::fs::OpenFlags::OF_None);
@@ -1911,9 +1911,10 @@ CudaABIOutputFile CudaABI::generatePTX() {
 
   // Take the intermediate form code in the kernel module (KM) and
   // generate a PTX file.  The PTX file will be named the same as
-  // the original input source modle (M) with the extension changed
+  // the original input source module (M) with the extension changed
   // to PTX.
-  SmallString<255> PTXFileName(Twine(CUABI_PREFIX + M.getName()).str());
+  StringRef filename = sys::path::filename(M.getName());
+  SmallString<255> PTXFileName({CUABI_PREFIX, filename});
   sys::path::replace_extension(PTXFileName, ".ptx");
 
   LLVM_DEBUG(dbgs() << "\tgenerating PTX file '"
@@ -2031,7 +2032,7 @@ CudaABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
   // parallel tapir loop constructs into suitable GPU device
   // code.  We hand the outliner the kernel module (KM) as
   // the destination for all generated (device-side) code.
-  std::string ModuleName = M.getName().str();
+  std::string ModuleName = sys::path::filename(M.getName()).str();
 
   // PTX dislikes names containing '.' -- replace them with
   // underscores.  TODO: Is this still true?

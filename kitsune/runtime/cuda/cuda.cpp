@@ -414,6 +414,14 @@ void __kitrt_cuMemPrefetchAsync(void *vp, size_t size) {
   __kitrt_markMemPrefetched(vp);
 }
 
+void *__kitrt_cuStreamMemPrefetchAsync(void *vp, size_t size) {
+  CUstream stream = nullptr;
+  CU_SAFE_CALL(cuStreamCreate_p(&stream, CU_STREAM_NON_BLOCKING));
+  CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size,
+                                     _kitrtCUdevice, stream));
+  return (void*)stream;
+}
+
 void __kitrt_cuMemPrefetch(void *vp) {
   assert(vp && "unexpected null pointer!");
   if (_kitrt_cuEnablePrefetch && __kitrt_cuIsMemManaged(vp)) {
