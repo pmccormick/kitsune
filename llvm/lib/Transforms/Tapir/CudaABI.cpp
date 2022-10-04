@@ -1235,7 +1235,8 @@ Value *CudaABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   return Grainsize;
 }
 
-void CudaABI::lowerSync(SyncInst &SI) { /* no-op */
+void CudaABI::lowerSync(SyncInst &SI) {
+  LLVM_DEBUG(dbgs() << "lowering sync instruction...\n");
 }
 
 void CudaABI::addHelperAttributes(Function &F) { /* no-op */

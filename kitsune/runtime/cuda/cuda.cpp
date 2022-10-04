@@ -629,6 +629,77 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin, const char *kernelName,
   return (void *)stream;
 }
 
+void __kitrt_cuLaunchFBKernelOnStream(const void *fatBin,
+                                      const char *kernelName,
+                                      void **fatBinArgs,
+                                      uint64_t numElements,
+                                      void *stream) {
+  assert(fatBin && "request to launch null fat binary image!");
+  assert(kernelName && "request to launch kernel w/ null name!");
+  int threadsPerBlock, blocksPerGrid;
+
+  // TODO: We need a better path here for binding and tracking
+  // allcoated resources -- as it stands we will "leak"
+  // modules, streams, functions, etc.
+  static bool module_built = false;
+  static CUmodule module;
+  if (!module_built) {
+    CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
+    module_built = true;
+  }
+  CUfunction kFunc;
+  CU_SAFE_CALL(cuModuleGetFunction_p(&kFunc, module, kernelName));
+  CUstream cu_stream = (CUstream)stream;
+  if (_kitrtUseHeuristicLaunchParameters)
+    __kitrt_cuMaxPotentialBlockSize(blocksPerGrid, threadsPerBlock, kFunc,
+                                    numElements);
+  else {
+    __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
+  }
+
+  CUevent start, stop;
+  if (_kitrtEnableTiming) {
+    // Recall that we have to take a bit of care about how we time the
+    // launched kernel's execution time.  The problem with using host-device
+    // synchronization points is that they can potentially stall the entire
+    // GPU pipeline, which we want to avoid to enable asynchronous data
+    // movement and the execution of other kernels on the GPU.
+    //
+    // A nice overview for measuring performance in CUDA:
+    //
+    //   https://developer.nvidia.com/blog/how-implement-performance-metrics-cuda-cc/
+    //
+    // TODO: What event creation flags do we really want here?   See:
+    //
+    //   https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EVENT.html
+    //
+    cuEventCreate_p(&start, CU_EVENT_DEFAULT);
+    cuEventCreate_p(&stop, CU_EVENT_DEFAULT);
+    cuEventRecord_p(start, cu_stream);
+  }
+
+#ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "launch parameters:\n");
+  fprintf(stderr, "\tnumber of overall elements: %ld\n", numElements);
+  fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
+  fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
+#endif
+
+  CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
+                                1, 0, cu_stream, fatBinArgs, NULL));
+  if (_kitrtEnableTiming) {
+    cuEventRecord_p(stop, cu_stream);
+    cuEventSynchronize_p(stop);
+    float msecs = 0;
+    cuEventElapsedTime_p(&msecs, start, stop);
+    if (_kitrtReportTiming)
+      printf("%.8lg\n", msecs / 1000.0);
+    _kitrtLastEventTime = msecs / 1000.0;
+    cuEventDestroy_v2_p(start);
+    cuEventDestroy_v2_p(stop);
+  }
+}
+
 // Launch a kernel on the default stream.
 void *__kitrt_cuLaunchFBKernel(const void *fatBin, const char *kernelName,
                                void **fatBinArgs, uint64_t numElements) {

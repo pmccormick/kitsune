@@ -135,11 +135,11 @@ extern "C" {
                                  void **fatBinArgs,
                                  uint64_t numElements);
 
-  void _kitrt_cuLaunchStreamedFBKernel(const void *fatBin,
-                                     const char *kernelName,
-                                     void **fatBinArgs,
-                                     uint64_t numElements,
-                                     void *stream);
+  void _kitrt_cuLaunchFBKernelOnStream(const void *fatBin,
+                                       const char *kernelName,
+                                       void **fatBinArgs,
+                                       uint64_t numElements,
+                                       void *stream);
 
   void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
                                        const char *kernelName,
