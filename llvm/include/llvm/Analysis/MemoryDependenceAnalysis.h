@@ -351,6 +351,7 @@ private:
   DominatorTree &DT;
   PhiValues &PV;
   PredIteratorCache PredCache;
+
   unsigned DefaultBlockScanLimit;
   TaskInfo *TI;
 

@@ -251,8 +251,6 @@ void darwin::Linker::AddLinkArgs(Compilation &C, const ArgList &Args,
     }
   }
 
-  
-
   // Use -lto_library option to specify the libLTO.dylib path. Try to find
   // it in clang installed libraries. ld64 will only look at this argument
   // when it actually uses LTO, so libLTO.dylib only needs to exist at link

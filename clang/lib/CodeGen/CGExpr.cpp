@@ -44,7 +44,6 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Transforms/Utils/SanitizerStats.h"
 
-#include <cstdio>
 #include <string>
 
 using namespace clang;

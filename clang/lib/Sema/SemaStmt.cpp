@@ -2217,6 +2217,7 @@ namespace {
 
 } // end namespace
 
+
 void Sema::CheckBreakContinueBinding(Expr *E) {
   if (!E || getLangOpts().CPlusPlus)
     return;

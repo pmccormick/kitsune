@@ -1980,14 +1980,12 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
   if (PTO.MergeFunctions)
     MPM.addPass(MergeFunctionsPass());
 
-<<<<<<< HEAD
   if (PTO.CallGraphProfile)
     MPM.addPass(CGProfilePass());
 
   for (auto &C : FullLinkTimeOptimizationLastEPCallbacks)
     C(MPM, Level);
 
-=======
   // Add passes to run just before Tapir lowering.
   for (auto &C : TapirLateEPCallbacks)
     C(MPM, Level);
@@ -2000,7 +1998,6 @@ PassBuilder::buildLTODefaultPipeline(OptimizationLevel Level,
     for (auto &C : TapirLoopEndEPCallbacks)
       C(MPM, Level);
 
->>>>>>> d357b3ed82a9 ([PassBuilder] Adding support for Tapir lowering pipeline to new pass manager.)
   // Emit annotation remarks.
   addAnnotationRemarksPass(MPM);
 

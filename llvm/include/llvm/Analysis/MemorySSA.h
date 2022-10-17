@@ -118,7 +118,6 @@ class Module;
 class Use;
 class Value;
 class TaskInfo;
-class LLVMContext;
 class raw_ostream;
 
 namespace MSSAHelpers {

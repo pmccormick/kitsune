@@ -1453,6 +1453,7 @@ void MemorySSA::OptimizeUses::optimizeUsesInBlock(
       MU->setDefiningAccess(MSSA->getLiveOnEntryDef(), true, None);
       continue;
     }
+
     MemoryLocOrCall UseMLOC(MU);
     auto &LocInfo = LocStackInfo[UseMLOC];
     // If the pop epoch changed, it means we've removed stuff from top of

@@ -9,7 +9,7 @@
 //  This file implements stmt-related attribute processing.
 //
 //===----------------------------------------------------------------------===//
-#include "clang/Sema/SemaInternal.h"
+
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/EvaluatedExprVisitor.h"
 #include "clang/Basic/SourceManager.h"

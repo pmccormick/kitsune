@@ -141,10 +141,6 @@ Improvements to clang-tidy
 
 - .clang-tidy files can now use the more natural dictionary syntax for specifying `CheckOptions`.
 
-- Fixed a regression introduced in clang-tidy 14.0.0, which prevented NOLINTs
-  from suppressing diagnostics associated with macro arguments. This fixes
-  `Issue 55134 <https://github.com/llvm/llvm-project/issues/55134>`_.
-
 New checks
 ^^^^^^^^^^
 
@@ -298,15 +294,6 @@ Changes in existing checks
 - Expanded :doc:`readability-simplify-boolean-expr
   <clang-tidy/checks/readability/simplify-boolean-expr>` to simplify expressions
   using DeMorgan's Theorem.
-
-- Fixed a crash in :doc:`readability-suspicious-call-argument
-  <clang-tidy/checks/readability-suspicious-call-argument>` related to passing
-  arguments that refer to program elements without a trivial identifier.
-
-- Fixed a bug in :doc:`bugprone-use-after-move
-  <clang-tidy/checks/bugprone-use-after-move> where a move in a lambda capture
-  was treated as if it happened within the body of the lambda, not within the
-  function that defines the lambda.
 
 Removed checks
 ^^^^^^^^^^^^^^

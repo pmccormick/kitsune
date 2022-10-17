@@ -2658,21 +2658,29 @@ enum CXCursorKind {
    */
   CXCursor_CilkSyncStmt = 307,
 
-
-
   /** A _Cilk_for statement.
    */
   CXCursor_CilkForStmt = 308,
 
   /** A _Cilk_scope statement.
    */
-  CXCursor_CilkScopeStmt = 300,
+  CXCursor_CilkScopeStmt = 309,
 
-  CXCursor_ForallStmt               = 301,
-  CXCursor_CXXForallRangeStmt       = 302,
-  CXCursor_SpawnStmt                 = 303,
-  CXCursor_SyncStmt                 = 304,
+  /** Kitsune forall statement.
+   */
+  CXCursor_ForallStmt               = 310,
 
+  /** Kitsune range-based forall statement.
+   */
+  CXCursor_CXXForallRangeStmt       = 311,
+
+  /** Kitsune spawn statement.
+   */
+  CXCursor_SpawnStmt                 = 312,
+
+  /** Kitsune sync statement.
+   */
+  CXCursor_SyncStmt                 = 313,
 
   CXCursor_LastStmt = CXCursor_SyncStmt,
   /**

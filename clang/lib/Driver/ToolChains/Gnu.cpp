@@ -2060,7 +2060,6 @@ static llvm::StringRef getGCCToolchainDir(const ArgList &Args,
   return GCC_INSTALL_PREFIX;
 }
 
-
 /// Initialize a GCCInstallationDetector from the driver.
 ///
 /// This performs all of the autodetection and sets up the various paths.

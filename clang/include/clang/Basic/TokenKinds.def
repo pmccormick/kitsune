@@ -468,10 +468,12 @@ KEYWORD(_Cilk_spawn                 , KEYALL)
 KEYWORD(_Cilk_sync                  , KEYALL)
 KEYWORD(_Cilk_for                   , KEYALL)
 KEYWORD(_Cilk_scope                 , KEYALL)
+
 // Kitsune Extensions
 KEYWORD(_kitsune_spawn              , KEYKITSUNE)
 KEYWORD(_kitsune_sync               , KEYKITSUNE)
 KEYWORD(_kitsune_forall             , KEYKITSUNE)
+
 // Kitsune memaccess qualifiers
 KEYWORD(_readonly                    , KEYKITSUNE)
 KEYWORD(_writeonly                   , KEYKITSUNE)

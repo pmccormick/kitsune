@@ -1452,7 +1452,7 @@ uptr internal_clone(int (*fn)(void *), void *child_stack, int flags, void *arg,
       : "memory");
   return res;
 }
-#elif defined(__aarch64__) && defined(__linux__)
+#elif defined(__aarch64__)
 uptr internal_clone(int (*fn)(void *), void *child_stack, int flags, void *arg,
                     int *parent_tidptr, void *newtls, int *child_tidptr) {
   register long long res __asm__("x0");
@@ -2112,14 +2112,9 @@ static void GetPcSpBp(void *context, uptr *pc, uptr *sp, uptr *bp) {
   *sp = ucontext->uc_mcontext.mc_gpregs.gp_sp;
 # else
   ucontext_t *ucontext = (ucontext_t*)context;
-# if defined (__linux__)
   *pc = ucontext->uc_mcontext.pc;
   *bp = ucontext->uc_mcontext.regs[29];
   *sp = ucontext->uc_mcontext.sp;
-# else
-  *pc = ucontext->uc_mcontext.mc_gpregs.gp_elr;
-  *bp = ucontext->uc_mcontext.mc_gpregs.gp_x[29];
-  *sp = ucontext->uc_mcontext.mc_gpregs.gp_sp;
 # endif
 #elif defined(__hppa__)
   ucontext_t *ucontext = (ucontext_t*)context;

@@ -1076,7 +1076,7 @@ void CodeGenModule::DecorateInstructionWithTBAA(llvm::Instruction *Inst,
                                                 TBAAAccessInfo TBAAInfo) {
   if (llvm::MDNode *Tag = getTBAAAccessTagInfo(TBAAInfo)) {
     Inst->setMetadata(llvm::LLVMContext::MD_tbaa, Tag);
-    /* A good sanity check for TBAA issues but slows down compilation...  
+    /* A good sanity check for TBAA issues but slows down compilation...
      * llvm::TBAAVerifier V;
      * assert(V.visitTBAAMetadata(*Inst, Tag) && "invalid TBAA metadata!");
      */
@@ -1886,39 +1886,47 @@ void CodeGenModule::GenKernelArgMetadata(llvm::Function *Fn,
 }
 
 void CodeGenModule::GenKitsuneArgMetadata(llvm::Function *Fn,
-					  const FunctionDecl *FD,
-					  CodeGenFunction *CGF) {
+                                          const FunctionDecl *FD,
+                                          CodeGenFunction *CGF) {
   assert(((FD && CGF) || (!FD && !CGF)) &&
          "Incorrect use - FD and CGF should either be both null or not!");
 
-  if (FD && CGF)
+  if (FD && CGF) {
     for (unsigned i = 0, e = FD->getNumParams(); i != e; ++i) {
       const ParmVarDecl *parm = FD->getParamDecl(i);
       QualType ty = parm->getType();
       if (ty.getTypePtr()->isStructureOrClassType()) {
-	ErrorUnsupported(parm,"cannot handle kitsune memaccess attribute on a struct or class");
-	break;
+        ErrorUnsupported(
+            parm,
+            "cannot handle kitsune memaccess attribute on a struct or class");
+        break;
       }
-      
+
       const Decl *PDecl = parm;
       if (auto *TD = dyn_cast<TypedefType>(ty))
-	PDecl = TD->getDecl();
-      
+        PDecl = TD->getDecl();
+
       llvm::LLVMContext &Context = getLLVMContext();
-      for(llvm::Argument* fnArg = Fn->arg_begin(); fnArg != Fn->arg_end(); ++fnArg) {
-	if (fnArg->getArgNo() == i) { //Note: this will break for structs passed by value
-	  if (const KitsuneMemAccessAttr *A = PDecl->getAttr<KitsuneMemAccessAttr>()) {
-	    if (A->isWriteOnly())
-	      fnArg->addAttr(llvm::Attribute::get(Context, "kitsune.writeonly"));
-	    else if (A->isReadOnly())
-	      fnArg->addAttr(llvm::Attribute::get(Context, "kitsune.readonly"));
-	    else
-	      fnArg->addAttr(llvm::Attribute::get(Context, "kitsune.readwrite"));
-	  }
-	  break;
-	}
+      for (llvm::Argument *fnArg = Fn->arg_begin(); fnArg != Fn->arg_end();
+           ++fnArg) {
+        if (fnArg->getArgNo() ==
+            i) { // Note: this will break for structs passed by value
+          if (const KitsuneMemAccessAttr *A =
+                  PDecl->getAttr<KitsuneMemAccessAttr>()) {
+            if (A->isWriteOnly())
+              fnArg->addAttr(
+                  llvm::Attribute::get(Context, "kitsune.writeonly"));
+            else if (A->isReadOnly())
+              fnArg->addAttr(llvm::Attribute::get(Context, "kitsune.readonly"));
+            else
+              fnArg->addAttr(
+                  llvm::Attribute::get(Context, "kitsune.readwrite"));
+          }
+          break;
+        }
       }
     }
+  }
 }
 
 /// Determines whether the language options require us to model
@@ -4731,13 +4739,13 @@ void CodeGenModule::EmitGlobalVarDefinition(const VarDecl *D,
   bool NeedsGlobalCtor = false;
   bool NeedsGlobalDtor = false;
   switch (D->needsDestruction(getContext())) {
-    case QualType::DK_cxx_destructor:
-      NeedsGlobalDtor = true;
-      break;
-    case QualType::DK_hyperobject:
-      NeedsGlobalCtor = true;
-      NeedsGlobalDtor = true;
-      break;
+  case QualType::DK_cxx_destructor:
+    NeedsGlobalDtor = true;
+    break;
+  case QualType::DK_hyperobject:
+    NeedsGlobalCtor = true;
+    NeedsGlobalDtor = true;
+    break;
   default:
     break;
   }

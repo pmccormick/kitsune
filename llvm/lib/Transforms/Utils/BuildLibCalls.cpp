@@ -1283,7 +1283,6 @@ static void markRegisterParameterAttributes(Function *F) {
   }
 }
 
-<<<<<<< HEAD
 FunctionCallee llvm::getOrInsertLibFunc(Module *M, const TargetLibraryInfo &TLI,
                                         LibFunc TheLibFunc, FunctionType *T,
                                         AttributeList AttributeList) {

@@ -92,7 +92,7 @@ public:
   explicit SSAUpdaterImpl(UpdaterT *U, AvailableValsTy *A,
                           SmallVectorImpl<PhiT *> *Ins,
                           ValIsDetachedTy *D = nullptr) :
-      Updater(U), AvailableVals(A), InsertedPHIs(Ins), ValIsDetached(D) {}
+    Updater(U), AvailableVals(A), InsertedPHIs(Ins), ValIsDetached(D) {}
 
   /// GetValue - Check to see if AvailableVals has an entry for the specified
   /// BB and if so, return it.  If not, construct SSA form by first
