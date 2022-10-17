@@ -958,8 +958,6 @@ def hip_link : Flag<["--"], "hip-link">,
   HelpText<"Link clang-offload-bundler bundles for HIP">;
 def no_hip_rt: Flag<["-"], "no-hip-rt">,
   HelpText<"Do not link against HIP runtime libraries">;
-def hip_link : Flag<["--"], "hip-link">,
-HelpText<"Link clang-offload-bundler bundles for HIP">;
 def no_offload_arch_EQ : Joined<["--"], "no-offload-arch=">, Flags<[NoXarchOption]>,
   HelpText<"Remove CUDA/HIP offloading device architecture (e.g. sm_35, gfx906) from the list of devices to compile for. "
            "'all' resets the list to its default value.">;
