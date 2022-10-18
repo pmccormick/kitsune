@@ -518,23 +518,46 @@ CudaLoop::CudaLoop(Module &M, Module &KM, const std::string &KN,
   // These are a layer deeper than the interface used by the GPUABI.  While we
   // could codegen straight to the Cuda (Driver) API, the higher level calls
   // help to simplify codegen calls.
-  KitCudaLaunchFn = M.getOrInsertFunction("__kitrt_cuLaunchFBKernel",
-                                          VoidPtrTy, // returns an opaque stream
-                                          VoidPtrTy, // fat-binary
-                                          VoidPtrTy, // kernel name
-                                          VoidPtrPtrTy, // arguments
-                                          Int64Ty);     // trip count
-  KitCudaLaunchModuleFn =
-                    M.getOrInsertFunction("__kitrt_cuLaunchModuleKernel",
-                                          VoidPtrTy, // returns opaque stream
-                                          VoidPtrTy, // CUDA module
-                                          VoidPtrTy, // kernel name
-                                          VoidPtrPtrTy, // arguments
-                                          Int64Ty); // trip count
-  KitCudaWaitFn =
-      M.getOrInsertFunction("__kitrt_cuStreamSynchronize", VoidTy, VoidPtrTy);
+  KitCudaLaunchFn =
+      M.getOrInsertFunction("__kitrt_cuLaunchKernel",
+                            VoidTy,       // no return
+                            VoidPtrTy,    // fat-binary
+                            VoidPtrTy,    // kernel name
+                            VoidPtrPtrTy, // arguments
+                            Int64Ty,      // trip count
+                            VoidPtrTy);   // stream
+
+  KitCudaModuleLaunchFn =
+      M.getOrInsertFunction("__kitrt_cuLaunchModuleKernel",
+                            VoidTy,       // no return
+                            VoidPtrTy,    // CUDA module
+                            VoidPtrTy,    // kernel name
+                            VoidPtrPtrTy, // arguments
+                            Int64Ty,      // trip count
+                            VoidPtrTy);   // stream
+
+  KitCudaSyncFn =
+      M.getOrInsertFunction("__kitrt_cuSynchronizeStreams",
+                            VoidTy); // no return & no parameters
+
+  // Interface to runtime's prefetching support.
   KitCudaMemPrefetchFn =
-      M.getOrInsertFunction("__kitrt_cuMemPrefetch", VoidTy, VoidPtrTy);
+      M.getOrInsertFunction("__kitrt_cuMemPrefetch", // on default stream
+                            VoidTy,     // no return.
+                            VoidPtrTy); // pointer to prefetch
+
+  KitCudaStreamMemPrefetchFn =
+      M.getOrInsertFunction("__kitrt_cuStreamMemPrefetch", // create new stream.
+                            VoidPtrTy,  // corresponding stream.
+                            VoidPtrTy); // pointer to prefetch.
+
+  KitCudaMemPrefetchOnStreamFn =
+      M.getOrInsertFunction("__kitrt_cuMemPrefetchOnStream", // on given stream.
+                            VoidTy,     // no return.
+                            VoidPtrTy,  // pointer to prefetch.
+                            VoidPtrTy); // run in this stream.
+
+
   KitCudaCreateFBModuleFn =
       M.getOrInsertFunction("__kitrt_cuCreateFBModule", VoidPtrTy, VoidPtrTy);
   KitCudaGetGlobalSymbolFn =
@@ -708,6 +731,7 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
                     << KernelName << "', in module '"
                     << KernelModule.getName() << "'.\n");
 
+
   // Collect the top-level entities (Function, GlobalVariable, GlobalAlias
   // and GlobalIFunc) that are used in the outlined loop. Since the outlined
   // loop will live in the KernelModule, any GlobalValue's used in it will
@@ -812,11 +836,23 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
   }
 
   LLVM_DEBUG(dbgs() << "\tfinished preprocessing tapir loop.\n");
+  if (KeepIntermediateFiles) {
+    std::error_code EC;
+    std::unique_ptr<ToolOutputFile> PreLoopIRFile;
+    SmallString<255> IRFileName("preprocess-loop.ll");
+    PreLoopIRFile = std::make_unique<ToolOutputFile>(
+        IRFileName, EC, sys::fs::OpenFlags::OF_None);
+    M.print(PreLoopIRFile->os(), nullptr);
+    PreLoopIRFile->keep();
+  }
 }
 
 void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
                                   TaskOutlineInfo &Out,
                                   ValueToValueMapTy &VMap) {
+
+  //addSyncToOutlineReturns(TLI, Out, VMap);
+
   LLVMContext &Ctx = M.getContext();
   Task *T = TLI.getTask();
   Loop *TL = TLI.getLoop();
@@ -827,9 +863,16 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   PHINode *PrimaryIV = cast<PHINode>(VMap[TLI.getPrimaryInduction().first]);
   Value *PrimaryIVInput = PrimaryIV->getIncomingValueForBlock(Entry);
 
-  Instruction *ClonedSyncReg =
-      cast<Instruction>(VMap[T->getDetach()->getSyncRegion()]);
+  Value *SyncR = T->getDetach()->getSyncRegion();
+  for(Use& U:SyncR->uses()) {
+    if (auto *SyncI = dyn_cast<SyncInst>(U.getUser())) {
+      LLVM_DEBUG(dbgs() << "saving sync instruction for post-processing...\n");
+      TTarget->pushSync(SyncI);
+    }
+  }
 
+  Instruction *ClonedSyncReg =
+       cast<Instruction>(VMap[T->getDetach()->getSyncRegion()]);
   // We no longer need the cloned sync region.
   ClonedSyncReg->eraseFromParent();
 
@@ -913,6 +956,16 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   assert(ClonedCond->getOperand(TripCountIdx) == End &&
          "End argument not used in condition!");
   ClonedCond->setOperand(TripCountIdx, ThreadEnd);
+
+  if (KeepIntermediateFiles) {
+    std::error_code EC;
+    std::unique_ptr<ToolOutputFile> PostLoopIRFile;
+    SmallString<255> IRFileName("post-loop.ll");
+    PostLoopIRFile = std::make_unique<ToolOutputFile>(
+        IRFileName, EC, sys::fs::OpenFlags::OF_None);
+    KernelModule.print(PostLoopIRFile->os(), nullptr);
+    PostLoopIRFile->keep();
+  }
 }
 
 Function *CudaLoop::resolveLibDeviceFunction(Function *F) {
@@ -1054,7 +1107,6 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   TOI.ReplCall->eraseFromParent();
 
   IRBuilder<> B(&NBB->front());
-
   Function &F = *KernelModule.getFunction(KernelName.c_str());
   transformForPTX(F);
 
@@ -1064,6 +1116,8 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   ArrayType *ArrayTy = ArrayType::get(VoidPtrTy, OrderedInputs.size());
   Value *ArgArray = EB.CreateAlloca(ArrayTy);
   unsigned int i = 0;
+  Value *prefetchStream = nullptr;
+
   for (Value *V : OrderedInputs) {
     Value *VP = EB.CreateAlloca(V->getType());
     B.CreateStore(V, VP);
@@ -1072,20 +1126,29 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
     B.CreateStore(VoidVPtr, ArgPtr);
     i++;
 
-    // TODO: This is still experimental and obviously lacking any
-    // significant hueristics about when to issue a prefetch (e.g.,
-    // prefetched but not written in a previous launch).
-    // NOTE: In fact, this path is less than ideal if the pages are
-    // already on the device -- CUDA documentation seems to imply
-    // this will create a new device-side set of pages?
-    if (! CodeGenDisablePrefetch) {
+    if (not CodeGenDisablePrefetch) {
       Type *VT = V->getType();
       if (VT->isPointerTy()) {
         Value *VoidPP = B.CreateBitCast(V, VoidPtrTy);
-        B.CreateCall(KitCudaMemPrefetchFn, {VoidPP});
+        if (not prefetchStream) {
+          LLVM_DEBUG(dbgs() << "creating initial prefetch and stream  "
+                            << "for parameter.\n");
+          prefetchStream = B.CreateCall(KitCudaStreamMemPrefetchFn,
+                                        {VoidPP},
+                                        "_cuabi.prefetch_stream");
+        } else {
+          LLVM_DEBUG(dbgs() << "creating stream-bound prefetch "
+                            << "for parameter.\n");
+          B.CreateCall(KitCudaMemPrefetchOnStreamFn,
+                       {VoidPP, prefetchStream});
+        }
       }
+    } else {
+      LLVM_DEBUG(dbgs() << "prefetching disabled... using default stream...\n");
+      prefetchStream = ConstantPointerNull::get(VoidPtrTy);
     }
   }
+
   const DataLayout &DL = M.getDataLayout();
   Value *argsPtr = B.CreateConstInBoundsGEP2_32(ArrayTy, ArgArray, 0, 0);
   // Generate a call to launch the kernel.
@@ -1108,40 +1171,24 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
   Constant *DummyFBGV = tapir::getOrInsertFBGlobal(M, "_cuabi.dummy_fatbin",
                                                     VoidPtrTy);
   Value *DummyFBPtr = B.CreateLoad(VoidPtrTy, DummyFBGV);
-
-  Value * Stream;
   Type *Int64Ty = Type::getInt64Ty(Ctx);
-  CastInst *TCCI = nullptr;
+  Value *TCCI = nullptr;
   if (TripCount->getType() != Int64Ty) {
     TCCI = CastInst::CreateIntegerCast(TripCount, Int64Ty, false);
     B.Insert(TCCI, "tcci");
-  }
+  } else
+    TCCI = TripCount; // Simplify cases in launch code gen below...
 
-  if (! TTarget->hasGlobalVariables()) {
-    LLVM_DEBUG(dbgs() << "\t\tcreating no-globals kernel launch.\n");
-    if (TCCI)
-      Stream = B.CreateCall(KitCudaLaunchFn,
-                            {DummyFBPtr, KNameParam, argsPtr, TCCI},
-                            "stream");
-
-    else
-      Stream = B.CreateCall(KitCudaLaunchFn,
-                            {DummyFBPtr, KNameParam, argsPtr, TripCount},
-                            "stream");
+  if (not TTarget->hasGlobalVariables()) {
+    LLVM_DEBUG(dbgs() << "creating non-globals kernel launch.\n");
+    B.CreateCall(KitCudaLaunchFn,
+                 {DummyFBPtr, KNameParam, argsPtr, TCCI, prefetchStream});
   } else {
-    LLVM_DEBUG(dbgs() << "\t\tcreating kernel launch w/ globals.\n");
-    Value *CM = B.CreateCall(KitCudaCreateFBModuleFn, {DummyFBPtr});
-    if (TCCI)
-      Stream = B.CreateCall(KitCudaLaunchModuleFn,
-                            {CM, KNameParam, argsPtr, TCCI},
-                            "stream");
-    else
-      Stream = B.CreateCall(KitCudaLaunchModuleFn,
-                       {CM, KNameParam, argsPtr, TripCount}, "stream");
+    LLVM_DEBUG(dbgs() << "creating kernel launch w/ globals.\n");
+    Value *CuModule = B.CreateCall(KitCudaCreateFBModuleFn, {DummyFBPtr});
+    B.CreateCall(KitCudaModuleLaunchFn,
+                   {CuModule, KNameParam, argsPtr, TCCI, prefetchStream});
   }
-
-  //LLVM_DEBUG(dbgs() << "\t\tfinishing outlined loop with sync call.\n");
-  B.CreateCall(KitCudaWaitFn, Stream);
 }
 
 CudaABI::CudaABI(Module &M)
@@ -1236,7 +1283,9 @@ Value *CudaABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
 }
 
 void CudaABI::lowerSync(SyncInst &SI) {
-  LLVM_DEBUG(dbgs() << "lowering sync instruction...\n");
+  // no-op...
+  // The CUDA transformations split the code into device and host
+  // side modules ()
 }
 
 void CudaABI::addHelperAttributes(Function &F) { /* no-op */
@@ -1247,8 +1296,18 @@ void CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
 }
 
 void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-  if (!OutliningTapirLoops)
-    return;
+  if (OutliningTapirLoops) {
+    LLVMContext &Ctx = M.getContext();
+    Type *VoidTy = Type::getVoidTy(Ctx);
+    FunctionCallee KitCudaSyncFn =
+        M.getOrInsertFunction("__kitrt_cuSynchronizeStreams", VoidTy);
+
+    for(SyncInst *SI : SyncList) {
+      CallInst *KitCuSync = CallInst::Create(KitCudaSyncFn, "",
+                                    &*SI->getSuccessor(0)->begin());
+    }
+    SyncList.clear();
+  }
 }
 
 void CudaABI::postProcessHelper(Function &F) { /* no-op */
@@ -1262,7 +1321,7 @@ void CudaABI::preProcessOutlinedTask(llvm::Function &, llvm::Instruction *,
 void CudaABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
                                       Instruction *TaskFrameCreate,
                                       bool IsSpawner,
-                                      BasicBlock *TFEntry) { /* no-op */
+                                      BasicBlock *TFEntry) {
 }
 
 void CudaABI::postProcessRootSpawner(Function &F,
@@ -1462,9 +1521,11 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
   for(auto &Fn : FnList) {
     for (auto &BB : Fn) {
       for(auto &I : BB) {
+
         if (CallInst *CI = dyn_cast<CallInst>(&I)) {
+
           if (Function *CFn = CI->getCalledFunction()) {
-            if (CFn->getName().startswith("__kitrt_cuLaunchFBKernel")) {
+            if (CFn->getName().startswith("__kitrt_cuLaunchKernel")) {
               Value *CFatbin;
               CFatbin = CastInst::CreateBitOrPointerCast(Fatbin, VoidPtrTy,
                                                          "_cubin.fatbin",
@@ -1478,9 +1539,8 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
 
               Instruction *NI = CI->getNextNonDebugInstruction();
               // Unless someting else has monkeyed with our generated code
-              // NI should be the launch call...  However, that's not critical
-              // but we do need the following instructions to codegen between
-              // CI and the launch...
+              // NI should be the launch call.  We need the following code
+              // to go between the call instruction and the launch.
               assert(NI && "unexpected null instruction!");
               for(auto &HostGV : GlobalVars) {
                 std::string DevVarName = HostGV->getName().str() + "_devvar";
@@ -1496,6 +1556,8 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
                                  {VGVPtr, DevPtr, ConstantInt::get(Int64Ty,
                                  NumBytes)}, "", NI);
               }
+            //} else if (CFn->getIntrinsicID() == Intrinsic::prefetch_sync) {
+            //  CFn->setCalledFunction(KitCudaStreamSyncFn);
             }
           }
         }

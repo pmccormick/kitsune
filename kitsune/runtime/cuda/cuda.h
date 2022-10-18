@@ -105,17 +105,14 @@ extern "C" {
     _KITRT_HostAndDevice = 0x04
   };
 
-  bool  __kitrt_cuIsMemManaged(void *vp);
   void  __kitrt_cuEnablePrefetch();
   void  __kitrt_cuDisablePrefetch();
-  void  __kitrt_cuMemPrefetchIfManaged(void *vp, size_t size);
-  void  __kitrt_cuMemPrefetchAsync(void *vp, size_t size);
-  void *__kitrt_cuStreamMemPrefetchAsync(void *vp, size_t size);
-  void  __kitrt_cuMemPrefetch(void *vp);
-  void  __kitrt_cuMemNeedsPrefetch(void *vp);
-  __attribute__((malloc))
-  void *__kitrt_cuMemAllocManaged(size_t size);
-  void  __kitrt_cuMemFree(void *vp);
+  bool __kitrt_cuIsMemManaged(void *vp);
+  __attribute__((malloc)) void *__kitrt_cuMemAllocManaged(size_t size);
+  void __kitrt_cuMemFree(void *vp);
+  void __kitrt_cuMemPrefetch(void *vp);
+  void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream);
+  void *__kitrt_cuStreamMemPrefetch(void *vp);
   void  __kitrt_cuAdviseRead(void *vp, size_t size);
 
   bool  __kitrt_cuMemHasHostAffinity(const void *vp);
@@ -130,16 +127,18 @@ extern "C" {
   void  __kitrt_cuMemcpySymbolToDevice(void *hostSym,
                                        uint64_t devSym,
                                        size_t size);
-  void *__kitrt_cuLaunchFBKernel(const void *fatBin,
-                                 const char *kernelName,
-                                 void **fatBinArgs,
-                                 uint64_t numElements);
 
-  void _kitrt_cuLaunchFBKernelOnStream(const void *fatBin,
-                                       const char *kernelName,
-                                       void **fatBinArgs,
-                                       uint64_t numElements,
-                                       void *stream);
+  void __kitrt_cuLaunchKernel(const void *fatBin,     // fat binary w/ kernel
+                              const char *kernelName, // kernel to launch
+                              void **fatBinArgs,      // args to kernel
+                              uint64_t numElements,   // trip count
+                              void *stream);    // stream to run in
+
+  void __kitrt_cuModuleLaunchKernel(const void *,     // module w/ kernel
+                                    const char *kernelName, // kernel to launch
+                                    void **fatBinArgs,      // args to kernel
+                                    uint64_t numElements,   // trip count
+                                    void *stream);    // stream to run in.
 
   void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
                                        const char *kernelName,
@@ -148,6 +147,7 @@ extern "C" {
   void *__kitrt_cuLaunchELFKernel(const void *elf, void **args,
                                   size_t numElements);
   void __kitrt_cuStreamSynchronize(void *vs);
+  void __kitrt_cuSynchronizeStreams();
 
 
 #ifdef __cplusplus

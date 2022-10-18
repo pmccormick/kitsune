@@ -5,7 +5,7 @@
 #include <chrono>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-#include "kitrt/kitcuda/cuda.h"
+#include "kitrt/cuda/cuda.h"
 
 using namespace std;
 using namespace kitsune;
@@ -90,10 +90,10 @@ int main(int argc, char* argv[])
   jW = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * cols);
   jE = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * cols);
 
-  dN = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
-  dS = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
-  dW = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
-  dE = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
+  dN = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
+  dS = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
+  dW = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
+  dE = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
 
   forall(int i=0; i < rows; i++) {
     iN[i] = i-1;

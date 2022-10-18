@@ -7,7 +7,8 @@
 #include <kitsune.h>
 #include <cmath>
 
-#include "kitrt/kitcuda/cuda.h"
+#include "kitrt/cuda/cuda.h"
+#include "kitrt/memory_map.h"
 
 using namespace std;
 
@@ -62,8 +63,8 @@ void dealloc(T* array) {
 
 template <typename T>
 void cpy(T* dst, const T* src, int N) {
-  __kitrt_cuMemNeedsPrefetch((void *)dst);
-  __kitrt_cuMemNeedsPrefetch((void *)src);
+  __kitrt_memNeedsPrefetch((void *)dst);
+  __kitrt_memNeedsPrefetch((void *)src);
   forall(int i = 0; i < N; i++)
     dst[i] = src[i];
 }
@@ -102,8 +103,8 @@ void initialize_variables(int nelr,
                           float* variables,
                           const float* ff_variable)
 {
-  __kitrt_cuMemNeedsPrefetch((void *)variables);
-  __kitrt_cuMemNeedsPrefetch((void *)ff_variable);
+  __kitrt_memNeedsPrefetch((void *)variables);
+  __kitrt_memNeedsPrefetch((void *)ff_variable);
   forall(int i = 0; i < nelr; i++) {
     for(int j = 0; j < NVAR; j++)
       variables[i + j*nelr] = ff_variable[j];
