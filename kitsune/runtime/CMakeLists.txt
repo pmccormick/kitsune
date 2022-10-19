@@ -91,7 +91,7 @@ target_include_directories(kitrt
 target_link_libraries(kitrt
   PUBLIC
     ${KITRT_LINK_LIBS}
-    LLVM -lrt -ldl)
+    LLVM -lpthread -lrt -ldl)
 
 install(TARGETS kitrt
   LIBRARY DESTINATION lib COMPONENT kitrt
