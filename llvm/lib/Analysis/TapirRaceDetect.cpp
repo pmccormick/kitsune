@@ -1715,7 +1715,7 @@ bool RTPtrCheckAnalysis::createCheckForAccess(
     DepId = RunningDepId++;
 
   bool IsWrite = Access.getInt();
-  RtCheck.insert(TheLoop, Ptr, IsWrite, DepId, ASId, SymbolicStrides, PSE);
+  // RtCheck.insert(TheLoop, Ptr, IsWrite, DepId, ASId, SymbolicStrides, PSE);
   LLVM_DEBUG(dbgs() << "TapirRD: Found a runtime check ptr:" << *Ptr << '\n');
 
   return true;
@@ -1846,7 +1846,7 @@ void AccessPtrAnalysis::getRTPtrChecks(Loop *L, RaceInfo::ResultTy &Result,
                                        RaceInfo::PtrChecksTy &AllPtrRtChecks) {
   LLVM_DEBUG(dbgs() << "getRTPtrChecks: " << *L << "\n");
 
-  AllPtrRtChecks[L] = std::make_unique<RuntimePointerChecking>(&SE);
+  // AllPtrRtChecks[L] = std::make_unique<RuntimePointerChecking>(&SE);
 
   RTPtrCheckAnalysis RPCA(L, *AllPtrRtChecks[L].get(), AA, SE);
   SmallPtrSet<const Value *, 16> Seen;

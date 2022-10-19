@@ -1508,7 +1508,7 @@ bool CSIImpl::getAllocFnArgs(const Instruction *I,
 
   // Return the old pointer argument for realloc-like functions or nullptr for
   // other allocation functions.
-  if (isReallocLikeFn(CB, &TLI))
+  if (isReallocLikeFn(CB->getCalledFunction(), &TLI))
     AllocFnArgs.push_back(CB->getArgOperand(0));
   else
     AllocFnArgs.push_back(Constant::getNullValue(AddrTy));
@@ -2351,7 +2351,7 @@ void CSIImpl::computeLoadAndStoreProperties(
       WriteTargets.insert(Addr);
       CsiLoadStoreProperty Prop;
       // Update alignment property data
-      Alignment = Store->getAlignment();
+      Alignment = Store->getAlign().value();
       Prop.setAlignment(Alignment);
       // Set vtable-access property
       Prop.setIsVtableAccess(isVtableAccess(Store));
@@ -2371,7 +2371,7 @@ void CSIImpl::computeLoadAndStoreProperties(
       Value *Addr = Load->getPointerOperand();
       CsiLoadStoreProperty Prop;
       // Update alignment property data
-      Alignment = Load->getAlignment();
+      Alignment = Load->getAlign().value();
       Prop.setAlignment(Alignment);
       // Set vtable-access property
       Prop.setIsVtableAccess(isVtableAccess(Load));

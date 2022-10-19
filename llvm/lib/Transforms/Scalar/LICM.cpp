@@ -612,7 +612,7 @@ bool llvm::sinkRegionForLoopNest(
     DomTreeNode *N, AAResults *AA, LoopInfo *LI, DominatorTree *DT,
     BlockFrequencyInfo *BFI, TargetLibraryInfo *TLI, TargetTransformInfo *TTI,
     Loop *CurLoop, MemorySSAUpdater &MSSAU, ICFLoopSafetyInfo *SafetyInfo,
-    SinkAndHoistLICMFlags &Flags, TaskInfo *TI, 
+    SinkAndHoistLICMFlags &Flags, TaskInfo *TI,
     OptimizationRemarkEmitter *ORE) {
 
   bool Changed = false;
@@ -2125,7 +2125,7 @@ bool llvm::promoteLoopAccessesToScalars(
         // raise the alignment on the promoted store.
         Align InstAlignment = Store->getAlign();
         bool GuaranteedToExecute =
-            SafetyInfo->isGuaranteedToExecute(*UI, DT, CurLoop);
+            SafetyInfo->isGuaranteedToExecute(*UI, DT, TI, CurLoop);
         StoreIsGuanteedToExecute |= GuaranteedToExecute;
         if (!DereferenceableInPH || !SafeToInsertStore ||
             (InstAlignment > Alignment)) {

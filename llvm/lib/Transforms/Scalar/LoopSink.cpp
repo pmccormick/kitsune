@@ -313,7 +313,7 @@ static bool sinkLoopInvariantInstructions(Loop &L, AAResults &AA, LoopInfo &LI,
     assert(L.hasLoopInvariantOperands(&I) &&
            "Insts in a loop's preheader should have loop invariant operands!");
     if (!canSinkOrHoistInst(I, &AA, &DT, &L, MSSAU, false,
-                            TI, LICMFlags))
+                            LICMFlags, TI))
       continue;
     if (sinkInstruction(L, I, ColdLoopBBs, LoopBlockNumber, LI, DT, BFI,
                         &MSSAU))
@@ -360,9 +360,9 @@ PreservedAnalyses LoopSinkPass::run(Function &F, FunctionAnalysisManager &FAM) {
     // Note that we don't pass SCEV here because it is only used to invalidate
     // loops in SCEV and we don't preserve (or request) SCEV at all making that
     // unnecessary.
-    Changed |= sinkLoopInvariantInstructions(L, AA, LI, DT, BFI,
+    Changed |= sinkLoopInvariantInstructions(L, AA, LI, DT, BFI, MSSA,
                                              /*ScalarEvolution*/ nullptr,
-                                             CurAST.get(), MSSA, &TI);
+                                             &TI);
   } while (!PreorderLoops.empty());
 
   if (!Changed)

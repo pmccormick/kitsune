@@ -126,7 +126,7 @@ void llvm::simplifyLoopAfterStripMine(Loop *L, bool SimplifyIVs, LoopInfo *LI,
     for (BasicBlock::iterator I = BB->begin(), E = BB->end(); I != E;) {
       Instruction *Inst = &*I++;
 
-      if (Value *V = SimplifyInstruction(Inst, {DL, nullptr, DT, AC}))
+      if (Value *V = simplifyInstruction(Inst, {DL, nullptr, DT, AC}))
         if (LI->replacementPreservesLCSSAForm(Inst, V))
           Inst->replaceAllUsesWith(V);
       if (isInstructionTriviallyDead(Inst))

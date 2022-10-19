@@ -325,12 +325,12 @@ UseCaptureKind llvm::DetermineUseCaptureKind(
       if (ConstantPointerNull *CPN =
               dyn_cast<ConstantPointerNull>(CE->getOperand(1)))
         if (CPN->getType()->getAddressSpace() == 0)
-          if (isNoAliasCall(V->stripPointerCasts()))
+          if (isNoAliasCall(U.get()->stripPointerCasts()))
             return UseCaptureKind::NO_CAPTURE;
       // Comparison against value stored in global variable. Given the pointer
       // does not escape, its value cannot be guessed and stored separately in
       // a global variable.
-      unsigned OtherIndex = (CE->getOperand(0) == V) ? 1 : 0;
+      unsigned OtherIndex = (CE->getOperand(0) == U.get()) ? 1 : 0;
       auto *LI = dyn_cast<LoadInst>(CE->getOperand(OtherIndex));
       if (LI && isa<GlobalVariable>(LI->getPointerOperand()))
         return UseCaptureKind::NO_CAPTURE;
@@ -342,7 +342,6 @@ UseCaptureKind llvm::DetermineUseCaptureKind(
       // Something else - be conservative and say it is captured.
       return UseCaptureKind::MAY_CAPTURE;
     }
-    continue;
   }
 
   Instruction *I = cast<Instruction>(U.getUser());

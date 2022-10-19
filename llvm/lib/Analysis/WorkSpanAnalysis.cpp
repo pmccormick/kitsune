@@ -95,11 +95,11 @@ static void estimateLoopCostHelper(const Loop *L, CodeMetrics &Metrics,
     if (LI->getLoopFor(BB) == L) {
       // Check if this BB suffices to make loop L huge.
       if (std::numeric_limits<int64_t>::max() - LoopCost.Work <
-          Metrics.NumBBInsts[BB]) {
+          Metrics.NumBBInsts[BB].getValue()) {
         LoopCost.Work = std::numeric_limits<int64_t>::max();
         return;
       }
-      LoopCost.Work += Metrics.NumBBInsts[BB];
+      LoopCost.Work += *Metrics.NumBBInsts[BB].getValue();
     }
 }
 

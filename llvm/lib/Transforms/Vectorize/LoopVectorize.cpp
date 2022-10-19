@@ -3102,20 +3102,6 @@ void InnerLoopVectorizer::createVectorLoopSkeleton(StringRef Prefix) {
     // middle block to exit blocks  and thus no need to update the immediate
     // dominator of the exit blocks.
     DT->changeImmediateDominator(LoopExitBlock, LoopMiddleBlock);
-
-  // Create and register the new vector loop.
-  Loop *Lp = LI->AllocateLoop();
-  Loop *ParentLoop = OrigLoop->getParentLoop();
-
-  // Insert the new loop into the loop nest and register the new basic blocks
-  // before calling any utilities such as SCEV that require valid LoopInfo.
-  if (ParentLoop) {
-    ParentLoop->addChildLoop(Lp);
-  } else {
-    LI->addTopLevelLoop(Lp);
-  }
-  Lp->addBasicBlockToLoop(LoopVectorBody, *LI);
-  return Lp;
 }
 
 void InnerLoopVectorizer::createInductionResumeValues(

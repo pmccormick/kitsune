@@ -525,6 +525,7 @@ public:
   void registerFullLinkTimeOptimizationLastEPCallback(
       const std::function<void(ModulePassManager &, OptimizationLevel)> &C) {
     FullLinkTimeOptimizationLastEPCallbacks.push_back(C);
+  }
 
   /// Register a callback for a default optimizer pipeline extension point.
   ///

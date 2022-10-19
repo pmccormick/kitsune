@@ -81,7 +81,8 @@ Value *getReallocatedOperand(const CallBase *CB, const TargetLibraryInfo *TLI);
 bool isLibFreeFunction(const Function *F, const LibFunc TLIFn);
 
 /// If this if a call to a free function, return the freed operand.
-Value *getFreedOperand(const CallBase *CB, const TargetLibraryInfo *TLI);
+Value *getFreedOperand(const CallBase *CB, const TargetLibraryInfo *TLI,
+                       bool IgnoreBuiltinAttr = false);
 
 /// isFreeCall - Returns non-null if the value is a call to the builtin free()
 const CallInst *isFreeCall(const Value *I, const TargetLibraryInfo *TLI,

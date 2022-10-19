@@ -94,22 +94,7 @@ void llvm::initializeInstrumentation(PassRegistry &Registry) {
   initializeMemProfilerLegacyPassPass(Registry);
   initializeModuleMemProfilerLegacyPassPass(Registry);
   initializeBoundsCheckingLegacyPassPass(Registry);
-  initializeControlHeightReductionLegacyPassPass(Registry);
-  initializeGCOVProfilerLegacyPassPass(Registry);
-  initializePGOInstrumentationGenLegacyPassPass(Registry);
-  initializePGOInstrumentationUseLegacyPassPass(Registry);
-  initializePGOIndirectCallPromotionLegacyPassPass(Registry);
-  initializePGOMemOPSizeOptLegacyPassPass(Registry);
-  initializeCGProfileLegacyPassPass(Registry);
-  initializeInstrOrderFileLegacyPassPass(Registry);
-  initializeInstrProfilingLegacyPassPass(Registry);
-  initializeMemorySanitizerLegacyPassPass(Registry);
-  initializeHWAddressSanitizerLegacyPassPass(Registry);
-  initializeThreadSanitizerLegacyPassPass(Registry);
-  initializeModuleSanitizerCoverageLegacyPassPass(Registry);
   initializeDataFlowSanitizerLegacyPassPass(Registry);
-  initializeComprehensiveStaticInstrumentationLegacyPassPass(Registry);
-  initializeCilkSanitizerLegacyPassPass(Registry);
 }
 
 /// LLVMInitializeInstrumentation - C binding for

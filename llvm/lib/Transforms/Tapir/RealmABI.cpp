@@ -9,7 +9,7 @@
 //
 // This file implements the RealmABI interface, which is used to convert Tapir
 // instructions -- detach, reattach, and sync -- to calls into the Realm
-// runtime system.  
+// runtime system.
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,7 +36,7 @@ FunctionCallee RealmABI::get_realmGetNumProcs() {
   if(RealmGetNumProcs)
     return RealmGetNumProcs;
 
-  LLVMContext &C = M.getContext(); 
+  LLVMContext &C = M.getContext();
   const DataLayout &DL = M.getDataLayout();
   AttributeList AL;
   std::vector<Type*> TypeArray;
@@ -49,15 +49,15 @@ FunctionCallee RealmABI::get_realmGetNumProcs() {
 
 static StructType* getBarrierType(LLVMContext &C){
   auto eventTy = StructType::get(Type::getInt64Ty(C));
-  return StructType::get(eventTy, Type::getInt64Ty(C)); 
+  return StructType::get(eventTy, Type::getInt64Ty(C));
 }
 
 FunctionCallee RealmABI::get_createRealmBarrier(){
-  if(CreateBar) 
-    return CreateBar; 
-  LLVMContext &C = M.getContext(); 
+  if(CreateBar)
+    return CreateBar;
+  LLVMContext &C = M.getContext();
 
-  AttributeList AL; 
+  AttributeList AL;
   FunctionType *FTy = FunctionType::get(
     getBarrierType(C), {}, false);
   CreateBar = M.getOrInsertFunction("createRealmBarrier", FTy, AL);
@@ -65,11 +65,11 @@ FunctionCallee RealmABI::get_createRealmBarrier(){
 }
 
 FunctionCallee RealmABI::get_destroyRealmBarrier(){
-  if(DestroyBar) 
-    return DestroyBar; 
-  LLVMContext &C = M.getContext(); 
+  if(DestroyBar)
+    return DestroyBar;
+  LLVMContext &C = M.getContext();
 
-  AttributeList AL; 
+  AttributeList AL;
   FunctionType *FTy = FunctionType::get(
     Type::getInt8Ty(C), {PointerType::getUnqual(getBarrierType(C))}, false);
   DestroyBar = M.getOrInsertFunction("destroyRealmBarrier", FTy, AL);
@@ -80,12 +80,12 @@ FunctionCallee RealmABI::get_realmSpawn() {
   if(RealmSpawn)
     return RealmSpawn;
 
-  LLVMContext &C = M.getContext(); 
+  LLVMContext &C = M.getContext();
   const DataLayout &DL = M.getDataLayout();
   AttributeList AL;
 
-  Type* TypeArray[] = { 
-      PointerType::getUnqual(getBarrierType(C)), 
+  Type* TypeArray[] = {
+      PointerType::getUnqual(getBarrierType(C)),
                         RealmFTy,              // RealmFTy fxn
 			Type::getInt8PtrTy(C), // void *args
 			DL.getIntPtrType(C)};  // size_t argsize
@@ -103,13 +103,13 @@ FunctionCallee RealmABI::get_realmSync() {
   if(RealmSync)
     return RealmSync;
 
-  LLVMContext &C = M.getContext(); 
+  LLVMContext &C = M.getContext();
   AttributeList AL;
-  
+
   Type* TypeArray[] = { PointerType::getUnqual(getBarrierType(C)) };
   // TODO: Set appropriate function attributes.
-  FunctionType *FTy = FunctionType::get(Type::getInt8Ty(C), 
-					TypeArray, 
+  FunctionType *FTy = FunctionType::get(Type::getInt8Ty(C),
+					TypeArray,
 					false);
   RealmSync = M.getOrInsertFunction("realmSync", FTy, AL);
   return RealmSync;
@@ -119,9 +119,9 @@ FunctionCallee RealmABI::get_realmInitRuntime() {
   if(RealmInitRuntime)
     return RealmInitRuntime;
 
-  LLVMContext &C = M.getContext(); 
+  LLVMContext &C = M.getContext();
   AttributeList AL;
-  
+
   Type* TypeArray[] = { Type::getInt32Ty(C),                            // int argc
 			PointerType::getUnqual(Type::getInt8PtrTy(C))}; // char **argv
 
@@ -139,13 +139,13 @@ FunctionCallee RealmABI::get_realmFinalize() {
   if(RealmFinalize)
     return RealmFinalize;
 
-  LLVMContext &C = M.getContext(); 
+  LLVMContext &C = M.getContext();
   AttributeList AL;
 
   std::vector<Type*> TypeArray;
   // TODO: Set appropriate function attributes.
-  FunctionType *FTy = FunctionType::get(Type::getInt8PtrTy(C), 
-					TypeArray, 
+  FunctionType *FTy = FunctionType::get(Type::getInt8PtrTy(C),
+					TypeArray,
 					false);
   RealmFinalize = M.getOrInsertFunction("realmFinalize", FTy, AL);
   return RealmFinalize;
@@ -168,16 +168,16 @@ RealmABI::~RealmABI() {
 
 /// Lower a call to get the grainsize of this Tapir loop.
 ///
-///     Grainsize = ceil(limit / # workers) 
-///               = (limit + # workers - 1) / # workers       
+///     Grainsize = ceil(limit / # workers)
+///               = (limit + # workers - 1) / # workers
 ///
 /// This computation is inserted into the preheader of the loop.
 Value *RealmABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
   Value *Limit = GrainsizeCall->getArgOperand(0);
   IRBuilder<> Builder(GrainsizeCall);
-  Value *Workers = Builder.CreateIntCast(Builder.CreateCall(get_realmGetNumProcs()), 
+  Value *Workers = Builder.CreateIntCast(Builder.CreateCall(get_realmGetNumProcs()),
                                   Limit->getType(), false);
-  Value *Ceiling = Builder.CreateSub(Builder.CreateAdd(Limit, Workers), 
+  Value *Ceiling = Builder.CreateSub(Builder.CreateAdd(Limit, Workers),
                                   ConstantInt::get(Workers->getType(), 1));
   Value *Grainsize = Builder.CreateUDiv(Ceiling, Workers);
   // Replace uses of grainsize intrinsic call with this grainsize value.
@@ -192,10 +192,10 @@ Value *RealmABI::getOrCreateBarrier(Value *SyncRegion, Function *F) {
     return barrier;
   else {
     IRBuilder<> builder(F->getEntryBlock().getFirstNonPHIOrDbg());
-    AllocaInst* ab = builder.CreateAlloca(getBarrierType(C)); 
-    barrier = ab; 
+    AllocaInst* ab = builder.CreateAlloca(getBarrierType(C));
+    barrier = ab;
     Value *barrierVal = builder.CreateCall(get_createRealmBarrier(), {}, "");
-    builder.CreateAlignedStore(barrierVal, barrier, MaybeAlign(ab->getAlignment())); 
+    builder.CreateAlignedStore(barrierVal, barrier, MaybeAlign(ab->getAlign()));
     SyncRegionToBarrier[SyncRegion] = barrier;
 
     // Make sure we destroy the barrier at all exit points to prevent memory leaks
@@ -205,18 +205,18 @@ Value *RealmABI::getOrCreateBarrier(Value *SyncRegion, Function *F) {
                          BB.getTerminator());
       }
     }
-    
+
     return barrier;
   }
 }
 
 void RealmABI::lowerSync(SyncInst &SI) {
-  IRBuilder<> builder(&SI); 
-  auto F = SI.getParent()->getParent(); 
-  auto& C = M.getContext(); 
-  Value* SR = SI.getSyncRegion(); 
-  auto barrier = getOrCreateBarrier(SR, F); 
-  std::vector<Value *> args = {barrier}; 
+  IRBuilder<> builder(&SI);
+  auto F = SI.getParent()->getParent();
+  auto& C = M.getContext();
+  Value* SR = SI.getSyncRegion();
+  auto barrier = getOrCreateBarrier(SR, F);
+  std::vector<Value *> args = {barrier};
   builder.CreateCall(get_realmSync(), args);
 
   BranchInst *PostSync = BranchInst::Create(SI.getSuccessor(0));
@@ -229,12 +229,12 @@ void RealmABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
   Instruction *ReplStart = TOI.ReplStart;
   CallBase *ReplCall = cast<CallBase>(TOI.ReplCall);
   BasicBlock *CallBlock = ReplStart->getParent();
-  Value* SR = TOI.SR; 
+  Value* SR = TOI.SR;
   if(!SR){
     // If there's no syncregion, we leave it as a function call
     return;
   }
-  auto barrier = getOrCreateBarrier(SR, CallBlock->getParent()); 
+  auto barrier = getOrCreateBarrier(SR, CallBlock->getParent());
   LLVMContext &C = M.getContext();
   const DataLayout &DL = M.getDataLayout();
 
@@ -288,13 +288,13 @@ void RealmABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
   //TODO: handle the case where main actually has an argc and argv
   Value* zero = ConstantInt::get(Type::getInt32Ty(C), 0);
   Value* null = Constant::getNullValue(PointerType::getUnqual(Type::getInt8PtrTy(C)));
-  
+
   Value* initArgs[2];
   initArgs[0] = zero;
   initArgs[1] = null;
-  
+
   builder.CreateCall(REALM_FUNC(realmInitRuntime), initArgs);
- 
+
   return;
 }
 

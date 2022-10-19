@@ -19,6 +19,7 @@
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
@@ -35,6 +36,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/SourceMgr.h"
 
 using namespace llvm;
 
@@ -145,17 +147,17 @@ void OpenCilkABI::prepareModule() {
     if ("" != ClOpenCilkRuntimeBCPath)
       RuntimeBCPath = ClOpenCilkRuntimeBCPath;
 
-    Optional<std::string> path; 
+    Optional<std::string> path;
     if("" == RuntimeBCPath){
       path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk-abi.bc");
       if (! path.hasValue())
-        // TODO: This is an in-tree build solution for now... 
+        // TODO: This is an in-tree build solution for now...
         #if defined(OPENCILK_BC_PATH)
         path = OPENCILK_BC_PATH;
-        #else  
-        report_fatal_error("Could not find OpenCilk runtime bitcode file " 
+        #else
+        report_fatal_error("Could not find OpenCilk runtime bitcode file "
                            "(libopencilk-abi.bc) in LD_LIBRARY_PATH.");
-        #endif 
+        #endif
     } else {
       path = ClOpenCilkRuntimeBCPath.getValue();
     }
