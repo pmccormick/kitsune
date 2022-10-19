@@ -72,12 +72,16 @@ public:
 
   std::unique_ptr<Module>& getLibDeviceModule();
 
-      void pushGlobalVariable(GlobalVariable *GV);
+  void pushGlobalVariable(GlobalVariable *GV);
   bool hasGlobalVariables() const {
     return !GlobalVars.empty();
   }
   int globalVarCount() const {
     return GlobalVars.size();
+  }
+
+  void pushSync(SyncInst *SI) {
+    SyncList.push_back(SI);
   }
 
   private:
@@ -93,10 +97,13 @@ public:
 
     std::unique_ptr<Module> LibDeviceModule;
 
-        typedef std::list<std::string> StringListTy;
+    typedef std::list<std::string> StringListTy;
     StringListTy ModulePTXFileList;
     typedef std::list<GlobalVariable *> GlobalVarListTy;
     GlobalVarListTy GlobalVars;
+
+    typedef std::list<SyncInst*> SyncListTy;
+    SyncListTy SyncList;
 
     Module   KM;
     TargetMachine *PTXTargetMachine;
@@ -147,9 +154,14 @@ private:
   Function *CUSyncThreads = nullptr;
 
   FunctionCallee KitCudaLaunchFn = nullptr;
-  FunctionCallee KitCudaLaunchModuleFn = nullptr;
-  FunctionCallee KitCudaWaitFn   = nullptr;
+  FunctionCallee KitCudaModuleLaunchFn = nullptr;
+  FunctionCallee KitCudaSyncFn = nullptr;
+
+  // Runtime prefetch support entry points.
   FunctionCallee KitCudaMemPrefetchFn = nullptr;
+  FunctionCallee KitCudaMemPrefetchOnStreamFn = nullptr;
+  FunctionCallee KitCudaStreamMemPrefetchFn = nullptr;
+
   FunctionCallee KitCudaCreateFBModuleFn = nullptr;
   FunctionCallee KitCudaGetGlobalSymbolFn = nullptr;
   FunctionCallee KitCudaMemcpySymbolToDeviceFn = nullptr;

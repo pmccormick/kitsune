@@ -16,7 +16,7 @@
 #include <math.h>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-#include "kitrt/kitcuda/cuda.h"
+#include "kitrt/cuda/cuda.h"
 
 using namespace std;
 using namespace kitsune;

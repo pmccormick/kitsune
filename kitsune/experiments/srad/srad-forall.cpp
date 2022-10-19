@@ -5,7 +5,7 @@
 #include <chrono>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-#include "kitrt/kitcuda/cuda.h"
+#include "kitrt/cuda/cuda.h"
 
 using namespace std;
 using namespace kitsune;
@@ -59,14 +59,14 @@ int main(int argc, char* argv[])
     niter = atoi(argv[8]); //number of iterations
   } else if (argc == 1) {
     // run with a default configuration.
-    rows = 16000;
-    cols = 16000;
+    rows = 12800;
+    cols = 12800;
     r1 = 0;
     r2 = 127;
     c1 = 0;
     c2 = 127;
     lambda = 0.5;
-    niter = 20;
+    niter = 10;
   } else {
     usage(argc, argv);
   }
@@ -75,6 +75,10 @@ int main(int argc, char* argv[])
     fprintf(stderr, "rows and cols must be multiples of 16\n");
     exit(1);
   }
+
+  fprintf(stdout, "rows = %d\n", rows);
+  fprintf(stdout, "columns = %d\n", cols);
+  fprintf(stdout, "number of iterations = %d\n", niter);
   
   timer r;
   
@@ -90,10 +94,10 @@ int main(int argc, char* argv[])
   jW = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * cols);
   jE = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * cols);
 
-  dN = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
-  dS = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
-  dW = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
-  dE = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I) ;
+  dN = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
+  dS = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
+  dW = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
+  dE = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
 
   forall(int i=0; i < rows; i++) {
     iN[i] = i-1;
