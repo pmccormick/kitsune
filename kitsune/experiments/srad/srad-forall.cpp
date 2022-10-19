@@ -59,14 +59,14 @@ int main(int argc, char* argv[])
     niter = atoi(argv[8]); //number of iterations
   } else if (argc == 1) {
     // run with a default configuration.
-    rows = 16000;
-    cols = 16000;
+    rows = 12800;
+    cols = 12800;
     r1 = 0;
     r2 = 127;
     c1 = 0;
     c2 = 127;
     lambda = 0.5;
-    niter = 20;
+    niter = 10;
   } else {
     usage(argc, argv);
   }
@@ -75,6 +75,10 @@ int main(int argc, char* argv[])
     fprintf(stderr, "rows and cols must be multiples of 16\n");
     exit(1);
   }
+
+  fprintf(stdout, "rows = %d\n", rows);
+  fprintf(stdout, "columns = %d\n", cols);
+  fprintf(stdout, "number of iterations = %d\n", niter);
   
   timer r;
   
