@@ -1040,9 +1040,9 @@ Value *CudaLooop::emitPrintfCall(const Function *PrintFn) {
 }
 */
 
-Function *CudaLoop::resolveLibDeviceFunction(Function *F) {
+Function *CudaLoop::resolveLibDeviceFunction(Function *Fn) {
   std::unique_ptr<Module>& LDM = TTarget->getLibDeviceModule();
-  std::string UName = F->getName().str();
+  std::string FnName = Fn->getName().str();
   const std::string NVPrefix = "__nv_";
 
   // Handle special cases where code generation can be a bit more
@@ -1058,7 +1058,6 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *F) {
     report_fatal_error("sorry, we still need to support llvm intrinsic to device transforms... :-(\n");
   }
 
-  const std::string NVPrefix = "__nv_";
   if (Function *KF = KernelModule.getFunction(NVPrefix + FnName)) {
     LLVM_DEBUG(dbgs() << "\t\tfound existing device function '" << KF->getName()
                       << "'.\n");
