@@ -77,6 +77,7 @@
 #include "../memory_map.h"
 #include "./cuda.h"
 
+#define _KITRT_VERBOSE_
 // Has the runtime been initialized?
 static bool _kitrt_cuIsInitialized = false;
 
@@ -346,7 +347,8 @@ void *__kitrt_cuMemAllocManaged(size_t size) {
     __kitrt_cuInit();
 
   CUdeviceptr devp;
-  CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_GLOBAL));
+  //CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_GLOBAL));
+  CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_HOST));
 
   // Register this allocation so the runtime can help track the
   // locality (and affinity) of data.
@@ -391,10 +393,6 @@ void __kitrt_cuFreeManagedMem(void *vp) {
 bool __kitrt_cuIsMemManaged(void *vp) {
   assert(vp && "unexpected null pointer!");
   CUdeviceptr devp = (CUdeviceptr)vp;
-  /* For a tad bit of flexibility we don't wrap this call in a
-   * safe call -- we want to return false if the given pointer
-   * is "junk" as far as CUDA is concerned.
-   */
   unsigned int is_managed;
   CUresult r = cuPointerGetAttribute_p(&is_managed,
                                        CU_POINTER_ATTRIBUTE_IS_MANAGED, devp);
@@ -413,16 +411,17 @@ void __kitrt_cuDisablePrefetch() {
 
 void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: prefetch request for pointer %p on stream %p.\n", 
+          vp, stream);
+  #endif 
   if (_kitrt_cuEnablePrefetch && __kitrt_cuIsMemManaged(vp)) {
     size_t size = __kitrt_getMemAllocSize(vp);
     if (size > 0) {
-      //fprintf(stderr, "prefetching %ld bytes.\n", size);
       CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size,
                                         _kitrtCUdevice,
                                         (CUstream)stream));
       __kitrt_markMemPrefetched(vp);
-    } else {
-      fprintf(stderr, "kitrt: warning, zero-sized prefetch request!\n");
     }
   }
 }
@@ -820,7 +819,7 @@ void __kitrt_cuSynchronizeStreams() {
   // default stream.  Otherwise, we need to sync on each of the active
   // streams.
   if (_kitrtActiveStreams.empty()) {
-    __kitrt_cuStreamSynchronize(nullptr);
+    CU_SAFE_CALL(cuStreamSynchronize_p(NULL));
   } else {
     // TODO: Revisit logic here relative to the use of internal
     // event timing mode.

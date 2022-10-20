@@ -56,6 +56,9 @@
 #include <map>
 #include "memory_map.h"
 
+#define _KITRT_VERBOSE_
+
+
 typedef std::map<void *, KitRTAllocMapEntry> KitRTAllocMap;
 static KitRTAllocMap _kitrtAllocMap;
 
@@ -69,7 +72,8 @@ void __kitrt_registerMemAlloc(void *addr, size_t size, bool prefetched) {
   _kitrtAllocMap[addr] = entry;
 
   #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: registered memory allocation (%p).\n", addr);
+  fprintf(stderr, "kitrt: registered memory allocation (%p) "
+		  "of %ld bytes.\n", addr, size);
   #endif
 }
 
@@ -80,7 +84,7 @@ void __kitrt_setMemPrefetch(void *addr, bool prefetched) {
     ait->second.prefetched = prefetched;
     #ifdef _KITRT_VERBOSE
     fprintf(stderr, "kitrt: __kitrt_setMemPrefetch() -- "
-            "marked memory at %p as '%s'.\n", addr,
+            "marked memory at %p, size %ld, as '%s'.\n", addr, ait->second.size,
             prefetched ? "prefetched" : "not prefetched");
     #endif
   } else {
@@ -151,7 +155,6 @@ void __kitrt_memNeedsPrefetch(void *addr) {
             "kitrt: allocation (%p) needs prefetching (updated on host).\n",
             addr);
     #endif
-    // TODO: Logic is a bit "backwards" here at first glance...
     it->second.prefetched = false;
   }
 }
@@ -160,3 +163,4 @@ extern "C" void __kitrt_destroyMemoryMap(void (*freeMem)(void *)) {
   for (auto &mapEntry : _kitrtAllocMap)
     freeMem(mapEntry.first);
 }
+
