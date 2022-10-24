@@ -77,7 +77,7 @@
 #include "../memory_map.h"
 #include "./cuda.h"
 
-#define _KITRT_VERBOSE_
+//#define _KITRT_VERBOSE_
 // Has the runtime been initialized?
 static bool _kitrt_cuIsInitialized = false;
 
@@ -412,9 +412,9 @@ void __kitrt_cuDisablePrefetch() {
 void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
   #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: prefetch request for pointer %p on stream %p.\n", 
+  fprintf(stderr, "kitrt: prefetch request for pointer %p on stream %p.\n",
           vp, stream);
-  #endif 
+  #endif
   if (_kitrt_cuEnablePrefetch && __kitrt_cuIsMemManaged(vp)) {
     size_t size = __kitrt_getMemAllocSize(vp);
     if (size > 0) {
@@ -559,8 +559,10 @@ void *__kitrt_cuLaunchModuleKernel(void *mod, const char *kernelName,
   return nullptr;
 }
 
-void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin, const char *kernelName,
-                                     void **fatBinArgs, uint64_t numElements) {
+void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
+                                     const char *kernelName,
+                                     void **fatBinArgs,
+                                     uint64_t numElements) {
   assert(fatBin && "request to launch null fat binary image!");
   assert(kernelName && "request to launch kernel w/ null name!");
   int threadsPerBlock, blocksPerGrid;

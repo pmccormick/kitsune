@@ -56,7 +56,7 @@
 #include <map>
 #include "memory_map.h"
 
-#define _KITRT_VERBOSE_
+//#define _KITRT_VERBOSE_
 
 
 typedef std::map<void *, KitRTAllocMapEntry> KitRTAllocMap;

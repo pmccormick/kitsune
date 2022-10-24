@@ -218,7 +218,7 @@ void compute_flux(int nelr,
                   const Float3 ff_flux_contribution_momentum_z,
                   const Float3 ff_flux_contribution_density_energy) {
   using namespace std;
-  const float smoothing_coefficient = float(0.2f);
+  const float smoothing_coefficient = 0.2f;
 
   forall(int blk = 0; blk < nelr/block_length; ++blk) {
     int b_start = blk*block_length;
@@ -252,12 +252,12 @@ void compute_flux(int nelr,
                                 flux_contribution_i_momentum_z,
                                 flux_contribution_i_density_energy);
 
-      float flux_i_density = float(0.0f);
+      float flux_i_density = 0.0f;
       Float3 flux_i_momentum;
-      flux_i_momentum.x = float(0.0f);
-      flux_i_momentum.y = float(0.0f);
-      flux_i_momentum.z = float(0.0f);
-      float flux_i_density_energy = float(0.0f);
+      flux_i_momentum.x = 0.0f;
+      flux_i_momentum.y = 0.0f;
+      flux_i_momentum.z = 0.0f;
+      float flux_i_density_energy = 0.0f;
 
       Float3 velocity_nb;
       float density_nb, density_energy_nb;
@@ -299,7 +299,7 @@ void compute_flux(int nelr,
                                     flux_contribution_nb_density_energy);
 
           // artificial viscosity
-          factor = -normal_len*smoothing_coefficient*float(0.5f) *
+          factor = -normal_len*smoothing_coefficient*0.5f *
                         (speed_i + sqrtf(speed_sqd_nb) +
                          speed_of_sound_i + speed_of_sound_nb);
           flux_i_density += factor*(density_i-density_nb);
@@ -309,7 +309,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(momentum_i.z-momentum_nb.z);
 
           // accumulate cell-centered fluxes
-          factor = float(0.5f)*normal.x;
+          factor = 0.5f*normal.x;
           flux_i_density += factor*(momentum_nb.x+momentum_i.x);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.x
                                     + flux_contribution_i_density_energy.x);
@@ -320,7 +320,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(flux_contribution_nb_momentum_z.x
                                     + flux_contribution_i_momentum_z.x);
 
-          factor = float(0.5f)*normal.y;
+          factor = 0.5f*normal.y;
           flux_i_density += factor*(momentum_nb.y+momentum_i.y);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.y
                                     + flux_contribution_i_density_energy.y);
@@ -331,7 +331,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(flux_contribution_nb_momentum_z.y
                                     + flux_contribution_i_momentum_z.y);
 
-          factor = float(0.5f)*normal.z;
+          factor = 0.5f*normal.z;
           flux_i_density += factor*(momentum_nb.z+momentum_i.z);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.z
                                     + flux_contribution_i_density_energy.z);
@@ -346,8 +346,8 @@ void compute_flux(int nelr,
           flux_i_momentum.y += normal.y*pressure_i;
           flux_i_momentum.z += normal.z*pressure_i;
         } else if(nb == -2) { // a far field boundary
-          factor = float(0.5f)*normal.x;
-          flux_i_density += factor*(ff_variable[VAR_MOMENTUM]+momentum_i.x);
+          factor = 0.5f*normal.x;
+          flux_i_density += factor * (ff_variable[VAR_MOMENTUM] + momentum_i.x);
           flux_i_density_energy += factor*(ff_flux_contribution_density_energy.x
                                     + flux_contribution_i_density_energy.x);
           flux_i_momentum.x += factor*(ff_flux_contribution_momentum_x.x
@@ -461,6 +461,7 @@ int main(int argc, char** argv)
   ff_variable[VAR_DENSITY_ENERGY] = ff_variable[VAR_DENSITY]*(float(0.5f)*
                                            (ff_speed*ff_speed)) +
     (ff_pressure / float(GAMMA-1.0f));
+
 
   Float3 ff_momentum;
   ff_momentum.x = *(ff_variable+VAR_MOMENTUM+0);
