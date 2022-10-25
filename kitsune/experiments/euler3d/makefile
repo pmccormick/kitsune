@@ -15,7 +15,7 @@ clang_flags=${cxx_flags} ${opt_flags} ${clang_info_flags}
 #
 kitsune_kokkos_flags = -fkokkos -fkokkos-no-init -I${kitsune_prefix}/include
 tapir_cu_launch_flags=-I${CUDA_HOME}/include
-tapir_cu_flags=-ftapir=cuda -mllvm -cuabi-prefetch=true -mllvm -cuabi-streams=false -ffp-contract=fast -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-opt-level=3 -mllvm -cuabi-run-post-opts=false -mllvm -debug-only="cuda-abi"
+tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-opt-level=3 -mllvm -cuabi-run-post-opts=false -mllvm -debug-only="cuda-abi"
 tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1 -mllvm -cuabi-default-grainsize=1
 ####
 
@@ -46,7 +46,6 @@ euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
 
 euler3d-kokkos-noview.kitsune.${host_arch}: euler3d-kokkos-noview.cpp
 	/usr/bin/time ${clangxx} ${clang_flags} ${kitsune_kokkos_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-
 
 euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp
 	 /usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib

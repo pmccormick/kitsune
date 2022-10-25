@@ -56,15 +56,15 @@ T* alloc(int N) {
 
 template <typename T>
 void dealloc(T* array) {
-  // We don't really need this -- we cleanup all runtime
-  // allocations via a global dtor at program exit.
+  // We don't really need this in the forall version.  The 
+  // runtime will cleanup allocations. 
   __kitrt_cuMemFree((void*)array);
 }
 
 template <typename T>
 void cpy(T* dst, const T* src, int N) {
-  __kitrt_memNeedsPrefetch((void *)dst);
-  __kitrt_memNeedsPrefetch((void *)src);
+  //__kitrt_memNeedsPrefetch((void *)dst);
+  //__kitrt_memNeedsPrefetch((void *)src);
   forall(int i = 0; i < N; i++)
     dst[i] = src[i];
 }
@@ -103,8 +103,8 @@ void initialize_variables(int nelr,
                           float* variables,
                           const float* ff_variable)
 {
-  __kitrt_memNeedsPrefetch((void *)variables);
-  __kitrt_memNeedsPrefetch((void *)ff_variable);
+  //__kitrt_memNeedsPrefetch((void *)variables);
+  //__kitrt_memNeedsPrefetch((void *)ff_variable);
   forall(int i = 0; i < nelr; i++) {
     for(int j = 0; j < NVAR; j++)
       variables[i + j*nelr] = ff_variable[j];

@@ -7,7 +7,7 @@
 #include <cmath>
 #include "Kokkos_Core.hpp"
 #include "kitsune/timer.h"
-#include "kitrt/kitcuda/cuda.h"
+#include "kitrt/cuda/cuda.h"
 
 using namespace std;
 using namespace kitsune;
@@ -105,8 +105,8 @@ void initialize_variables(int nelr,
                           float* variables,
                           const float* ff_variable)
 {
-  __kitrt_cuMemNeedsPrefetch((void *)variables);
-  __kitrt_cuMemNeedsPrefetch((void *)ff_variable);
+  //__kitrt_memNeedsPrefetch((void *)variables);
+  //__kitrt_memNeedsPrefetch((void *)ff_variable);
   Kokkos::parallel_for(nelr, KOKKOS_LAMBDA(const size_t i) {		       
     for(int j = 0; j < NVAR; j++)
       variables[i + j*nelr] = ff_variable[j];

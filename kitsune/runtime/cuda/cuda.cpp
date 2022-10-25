@@ -144,6 +144,7 @@ DECLARE_DLSYM(cuCtxGetCurrent);
 DECLARE_DLSYM(cuStreamCreate);
 DECLARE_DLSYM(cuStreamDestroy_v2);
 DECLARE_DLSYM(cuStreamSynchronize);
+DECLARE_DLSYM(cuStreamAttachMemAsync);
 DECLARE_DLSYM(cuLaunchKernel);
 DECLARE_DLSYM(cuEventCreate);
 DECLARE_DLSYM(cuEventRecord);
@@ -235,6 +236,7 @@ static bool __kitrt_cuLoadDLSyms() {
     DLSYM_LOAD(cuStreamCreate);
     DLSYM_LOAD(cuStreamDestroy_v2);
     DLSYM_LOAD(cuStreamSynchronize);
+    DLSYM_LOAD(cuStreamAttachMemAsync);
     DLSYM_LOAD(cuLaunchKernel);
 
     DLSYM_LOAD(cuEventCreate);
@@ -347,12 +349,7 @@ void *__kitrt_cuMemAllocManaged(size_t size) {
     __kitrt_cuInit();
 
   CUdeviceptr devp;
-  //CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_GLOBAL));
-  CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_HOST));
-
-  // Register this allocation so the runtime can help track the
-  // locality (and affinity) of data.
-  __kitrt_registerMemAlloc((void *)devp, size);
+  CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_GLOBAL));
 
   // Flag the allocation with some CUDA specific flags.  At present these
   // have little impact given the use of a single device and the default
@@ -366,12 +363,16 @@ void *__kitrt_cuMemAllocManaged(size_t size) {
   CU_SAFE_CALL(cuMemAdvise_p(devp, size,
                CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
                _kitrtCUdevice));
-  /*
+
   int enable = 1;
   CU_SAFE_CALL(cuPointerSetAttribute_p(&enable,
-                                       CU_POINTER_ATTRIBUTE_SYNC_MEMOPS,
-                                       devp));
-  */
+               CU_POINTER_ATTRIBUTE_SYNC_MEMOPS,
+               devp));
+
+  // Register this allocation so the runtime can help track the
+  // locality (and affinity) of data.
+  __kitrt_registerMemAlloc((void *)devp, size);
+  
   return (void *)devp;
 }
 
@@ -415,9 +416,13 @@ void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   fprintf(stderr, "kitrt: prefetch request for pointer %p on stream %p.\n",
           vp, stream);
   #endif
-  if (_kitrt_cuEnablePrefetch && __kitrt_cuIsMemManaged(vp)) {
+  if (__kitrt_cuIsMemManaged(vp) && not __kitrt_isMemPrefetched(vp)) {
     size_t size = __kitrt_getMemAllocSize(vp);
     if (size > 0) {
+      if (stream != NULL)
+        CU_SAFE_CALL(cuStreamAttachMemAsync_p((CUstream)stream,
+                                              (CUdeviceptr)vp,
+                                              0, CU_MEM_ATTACH_HOST));
       CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size,
                                         _kitrtCUdevice,
                                         (CUstream)stream));
@@ -825,9 +830,10 @@ void __kitrt_cuSynchronizeStreams() {
   } else {
     // TODO: Revisit logic here relative to the use of internal
     // event timing mode.
+    CU_SAFE_CALL(cuCtxSynchronize());
     while(not _kitrtActiveStreams.empty()) {
       CUstream stream = _kitrtActiveStreams.front();
-      CU_SAFE_CALL(cuStreamSynchronize_p(stream));
+      //CU_SAFE_CALL(cuStreamSynchronize_p(stream));
       CU_SAFE_CALL(cuStreamDestroy(stream));
       _kitrtActiveStreams.pop_front();
     }
@@ -884,7 +890,6 @@ float __kitrt_cuElapsedEventTime(void *start, void *stop) {
   CU_SAFE_CALL(cuEventElapsedTime_p(&msecs, (CUevent)start, (CUevent)stop));
   return(msecs/1000.0f);
 }
-
 
 
 } // extern "C"

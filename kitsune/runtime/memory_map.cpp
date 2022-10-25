@@ -66,11 +66,8 @@ void __kitrt_registerMemAlloc(void *addr, size_t size, bool prefetched) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMapEntry entry;
   entry.size = size;
-  entry.prefetched = prefetched;
-
-  // TODO: should we check for duplicate registrations?
+  entry.prefetched = false;
   _kitrtAllocMap[addr] = entry;
-
   #ifdef _KITRT_VERBOSE_
   fprintf(stderr, "kitrt: registered memory allocation (%p) "
 		  "of %ld bytes.\n", addr, size);
@@ -110,7 +107,7 @@ bool __kitrt_isMemPrefetched(void *addr) {
             "returning false state!\n",
             addr);
     #endif
-    return false;
+    return true;
   }
 }
 

@@ -1223,16 +1223,19 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
     B.CreateStore(VoidVPtr, ArgPtr);
     i++;
 
-    Type *VT = V->getType();
-    if (CodeGenPrefetch && VT->isPointerTy()) {
-      Value *VoidPP = B.CreateBitCast(V, VoidPtrTy);
-      if (prefetchStream == nullptr) { // stream codegen enabled...
-        LLVM_DEBUG(dbgs() << "creating initial prefetch stream.\n");
-        prefetchStream = B.CreateCall(KitCudaStreamMemPrefetchFn,
-                                      {VoidPP}, "_cuabi.prefetch_stream");
-      } else {
-        B.CreateCall(KitCudaMemPrefetchOnStreamFn,
-                     {VoidPP, prefetchStream});
+    if (CodeGenPrefetch) {  // TODO: Only for >= 2 opt level?
+      Type *VT = V->getType();
+      if (VT->isPointerTy()) {
+        Value *VoidPP = B.CreateBitCast(V, VoidPtrTy);
+        if (prefetchStream == nullptr) { // stream codegen enabled...
+          LLVM_DEBUG(dbgs() << "creating initial prefetch stream.\n");
+          prefetchStream = B.CreateCall(KitCudaStreamMemPrefetchFn,
+                                        {VoidPP}, "_cuabi.prefetch_stream");
+        } else {
+          LLVM_DEBUG(dbgs() << "code gen prefetch.\n");	  
+          B.CreateCall(KitCudaMemPrefetchOnStreamFn,
+                       {VoidPP, prefetchStream});
+        }
       }
     }
   }
@@ -1278,7 +1281,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
                    {CuModule, KNameParam, argsPtr, TCCI, prefetchStream});
   }
 
-  B.CreateCall(KitCudaSyncFn);
+  //B.CreateCall(KitCudaSyncFn);
 }
 
 CudaABI::CudaABI(Module &M)
@@ -1386,7 +1389,6 @@ void CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
 }
 
 void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-/*
   if (OutliningTapirLoops) {
     LLVMContext &Ctx = M.getContext();
     Type *VoidTy = Type::getVoidTy(Ctx);
@@ -1402,7 +1404,6 @@ void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
     }
     SyncList.clear();
   }
-*/
 }
 
 void CudaABI::postProcessHelper(Function &F) { /* no-op */
