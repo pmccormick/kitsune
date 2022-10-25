@@ -17,7 +17,7 @@ pfor.detach.preheader:                            ; preds = %entry
 ; CHECK-NEXT: invoke fastcc void @_Z12pragma_testsi.outline_pfor.detach.ls1(i32 0, i32 %n, i32 4)
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %entry
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.detach.preheader, %pfor.inc
   %__begin.024 = phi i32 [ %inc, %pfor.inc ], [ 0, %pfor.detach.preheader ]
@@ -51,7 +51,7 @@ lpad3.loopexit:                                   ; preds = %pfor.detach, %lpad
 
 lpad3:                                            ; preds = %lpad3.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad3.loopexit ]
-  sync within %syncreg, label %sync.continue7
+  tapir_sync within %syncreg, label %sync.continue7
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   ret i32 0

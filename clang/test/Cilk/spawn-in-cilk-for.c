@@ -75,10 +75,10 @@ void Quadtree_findAllIntersectingPairs(Quadtree* quadtree,
       _Cilk_spawn Quadtree_findAllIntersectingPairsWithLine(quadtree->RU, collisionWorld, line);
     // CHECK: detach within %[[INNERSR]],
     }
-    // CHECK: sync within %[[INNERSR]],
+    // CHECK: tapir_sync within %[[INNERSR]],
     // CHECK: reattach within %[[OUTERSR]],
   }
-  // CHECK: sync within %[[OUTERSR]],
+  // CHECK: tapir_sync within %[[OUTERSR]],
 
   // Find intersections within the subtrees
   if (quadtree->LD->numLines > 1) {
@@ -97,5 +97,5 @@ void Quadtree_findAllIntersectingPairs(Quadtree* quadtree,
     Quadtree_findAllIntersectingPairs(quadtree->RU, collisionWorld);
   }
   _Cilk_sync;
-  // CHECK: sync within %[[OUTERSR2]],
+  // CHECK: tapir_sync within %[[OUTERSR2]],
 }

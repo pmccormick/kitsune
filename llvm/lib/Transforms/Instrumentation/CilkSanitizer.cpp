@@ -1620,8 +1620,11 @@ bool CilkSanitizerImpl::SimpleInstrumentor::InstrumentCalls(
   bool Result = false;
   for (Instruction *I : Calls) {
     // Allocation-function and free calls are handled separately.
-    if (isAllocFn(I, TLI) || isFreeCall(I, TLI, true))
+    if (isAllocFn(I, TLI))
       continue;
+    else if(auto* CB = dyn_cast<CallBase>(I))
+      if (getFreedOperand(CB, TLI, true))
+        continue;
 
     bool LocalResult = false;
     if (isa<IntrinsicInst>(I))
@@ -1919,8 +1922,11 @@ bool CilkSanitizerImpl::Instrumentor::InstrumentCalls(
   bool Result = false;
   for (Instruction *I : Calls) {
     // Allocation-function and free calls are handled separately.
-    if (isAllocFn(I, TLI) || isFreeCall(I, TLI, true))
+    if (isAllocFn(I, TLI))
       continue;
+    else if (auto* CB = dyn_cast<CallBase>(I))
+      if (getFreedOperand(CB, TLI, true))
+        continue;
 
     bool LocalResult = false;
     bool GetDetaches = false;
@@ -3342,7 +3348,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
           AtomicAccesses.push_back(&Inst);
         else if (isa<AllocaInst>(Inst))
           Allocas.insert(&Inst);
-        else if (isa<CallBase>(Inst)) {
+        else if (CallBase* CB = dyn_cast<CallBase>(&Inst)) {
           // if (CallInst *CI = dyn_cast<CallInst>(&Inst))
           //   maybeMarkSanitizerLibraryCallNoBuiltin(CI, TLI);
 
@@ -3365,7 +3371,7 @@ bool CilkSanitizerImpl::instrumentFunctionUsingRI(Function &F) {
           // call.
           if (isAllocFn(&Inst, TLI))
             AllocationFnCalls.insert(&Inst);
-          else if (isFreeCall(&Inst, TLI, /*IgnoreBuiltinAttr*/ true))
+          else if (getFreedOperand(CB, TLI, /*IgnoreBuiltinAttr*/ true))
             FreeCalls.insert(&Inst);
           else if (isa<AnyMemIntrinsic>(Inst))
             MemIntrinCalls.push_back(&Inst);

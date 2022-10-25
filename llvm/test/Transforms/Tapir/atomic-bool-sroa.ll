@@ -84,7 +84,7 @@ pfor.inc:                                         ; preds = %pfor.preattach, %pf
   br i1 %cmp24, label %pfor.cond, label %pfor.cond.cleanup, !llvm.loop !10
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg26, label %sync.continue
+  tapir_sync within %syncreg26, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   call void @llvm.sync.unwind(token %syncreg26)
@@ -130,7 +130,7 @@ if.then50:                                        ; preds = %pfor.body44
 ; LICM: pfor.preattach57.epil:
 ; LICM-NOT: phi i8
 ; LICM-NOT: store i8 %{{.+}}, i8* %stop.sroa.0
-; LICM: sync within %{{.+}}, label
+; LICM: tapir_sync within %{{.+}}, label
 
 pfor.preattach57:                                 ; preds = %pfor.body44, %if.then50
   reattach within %syncreg26, label %pfor.inc58
@@ -141,7 +141,7 @@ pfor.inc58:                                       ; preds = %pfor.preattach57, %
   br i1 %cmp60, label %pfor.cond38, label %pfor.cond.cleanup61, !llvm.loop !12
 
 pfor.cond.cleanup61:                              ; preds = %pfor.inc58
-  sync within %syncreg26, label %sync.continue63
+  tapir_sync within %syncreg26, label %sync.continue63
 
 sync.continue63:                                  ; preds = %pfor.cond.cleanup61
   call void @llvm.sync.unwind(token %syncreg26)

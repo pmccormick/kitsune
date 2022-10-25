@@ -34,7 +34,7 @@ pfor.inc:                                         ; preds = %pfor.body, %pfor.co
   br i1 %cmp2, label %pfor.cond.cleanup, label %pfor.cond, !dbg !17, !llvm.loop !21
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %cleanup, !dbg !17
+  tapir_sync within %syncreg, label %cleanup, !dbg !17
 
 cleanup:                                          ; preds = %pfor.cond.cleanup
   %accum.0.load19 = load i64, i64* %accum, align 8, !dbg !23

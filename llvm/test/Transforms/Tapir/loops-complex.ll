@@ -95,7 +95,7 @@ pfor.detach.lr.ph:                                ; preds = %entry
   br label %pfor.detach
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %entry
-  sync within %syncreg, label %pfor.cond.cleanup.split
+  tapir_sync within %syncreg, label %pfor.cond.cleanup.split
 
 pfor.cond.cleanup.split:                          ; preds = %pfor.cond.cleanup
   br label %for.body41.i.i
@@ -225,7 +225,7 @@ pfor.detach36.lr.ph:                              ; preds = %_ZNKSt5ctypeIcE5wid
   br label %pfor.detach36
 
 pfor.cond.cleanup35:                              ; preds = %pfor.inc50, %_ZNKSt5ctypeIcE5widenEc.exit
-  sync within %syncreg24, label %sync.continue52
+  tapir_sync within %syncreg24, label %sync.continue52
 
 pfor.detach36:                                    ; preds = %pfor.inc50, %pfor.detach36.lr.ph
   %indvars.iv1142 = phi i64 [ 0, %pfor.detach36.lr.ph ], [ %indvars.iv.next1143, %pfor.inc50 ]
@@ -665,7 +665,7 @@ for.body62:                                       ; preds = %for.body62.preheade
   br i1 %cmp59, label %for.body62, label %for.cond.cleanup60, !llvm.loop !48
 
 pfor.cond.cleanup88:                              ; preds = %pfor.inc119, %pfor.inc119.us, %_ZNKSt5ctypeIcE5widenEc.exit977
-  sync within %syncreg77, label %sync.continue121
+  tapir_sync within %syncreg77, label %sync.continue121
 
 pfor.detach90:                                    ; preds = %pfor.detach90.preheader, %pfor.inc119
   %indvars.iv1138 = phi i64 [ %indvars.iv.next1139, %pfor.inc119 ], [ 0, %pfor.detach90.preheader ]
@@ -1017,7 +1017,7 @@ pfor.detach.lr.ph.i:                              ; preds = %_ZNSt7__cxx1112basi
   br label %pfor.detach.i
 
 pfor.cond.cleanup.i:                              ; preds = %pfor.inc.i
-  sync within %syncreg.i770, label %sync.continue.i
+  tapir_sync within %syncreg.i770, label %sync.continue.i
 
 pfor.detach.i:                                    ; preds = %pfor.inc.i, %pfor.detach.lr.ph.i
   %indvars.iv.i = phi i64 [ 0, %pfor.detach.lr.ph.i ], [ %indvars.iv.next.i, %pfor.inc.i ]
@@ -1043,7 +1043,7 @@ pfor.inc.i:                                       ; preds = %pfor.body.i, %pfor.
 lpad10.i:                                         ; preds = %pfor.detach.i
   %219 = landingpad { i8*, i32 }
           cleanup
-  sync within %syncreg.i770, label %sync.continue14.i
+  tapir_sync within %syncreg.i770, label %sync.continue14.i
 
 sync.continue.i:                                  ; preds = %pfor.cond.cleanup.i
   %call.i.i776 = call { %struct.seg*, i64 } @_ZN8sequence4packI3segjNS_4getAIS1_jEEEE4_seqIT_EPS5_PbT0_S9_T1_(%struct.seg* %193, i8* %call1.i775, i32 0, i32 %nKeys.0, %struct.seg* %181)
@@ -1161,7 +1161,7 @@ pfor.detach186.lr.ph:                             ; preds = %_ZN8sequence6filter
   br label %pfor.detach186
 
 pfor.cond.cleanup185:                             ; preds = %pfor.inc197
-  sync within %syncreg175, label %sync.continue199
+  tapir_sync within %syncreg175, label %sync.continue199
 
 pfor.detach186:                                   ; preds = %pfor.inc197, %pfor.detach186.lr.ph
   %indvars.iv1114 = phi i64 [ 0, %pfor.detach186.lr.ph ], [ %indvars.iv.next1115, %pfor.inc197 ]
@@ -1283,7 +1283,7 @@ if.then.i.i861:                                   ; preds = %invoke.cont215
   br label %pfor.detach230.preheader
 
 pfor.cond.cleanup229:                             ; preds = %pfor.inc292
-  sync within %syncreg219, label %sync.continue296
+  tapir_sync within %syncreg219, label %sync.continue296
 
 lpad214:                                          ; preds = %_ZN5timer10reportNextEv.exit.i852, %call2.i.i.noexc853, %_ZNKSt5ctypeIcE5widenEc.exit989
   %257 = landingpad { i8*, i32 }
@@ -1318,7 +1318,7 @@ pfor.detach254.lr.ph:                             ; preds = %pfor.body235
   br label %pfor.detach254
 
 pfor.cond.cleanup252:                             ; preds = %pfor.inc270, %pfor.body235
-  sync within %syncreg242, label %sync.continue272
+  tapir_sync within %syncreg242, label %sync.continue272
 
 pfor.detach254:                                   ; preds = %pfor.inc270, %pfor.detach254.lr.ph
   %indvars.iv1118 = phi i64 [ 0, %pfor.detach254.lr.ph ], [ %indvars.iv.next1119, %pfor.inc270 ]
@@ -1388,7 +1388,7 @@ lpad294:                                          ; preds = %lpad294.loopexit
   %lpad.phi1004 = phi { i8*, i32 } [ %lpad.loopexit1002, %lpad294.loopexit ]
   %266 = extractvalue { i8*, i32 } %lpad.phi1004, 0
   %267 = extractvalue { i8*, i32 } %lpad.phi1004, 1
-  sync within %syncreg219, label %ehcleanup425
+  tapir_sync within %syncreg219, label %ehcleanup425
 
 sync.continue296:                                 ; preds = %pfor.cond.cleanup229
   store %union.anon* %202, %union.anon** %203, align 8, !tbaa !10
@@ -1443,7 +1443,7 @@ if.then.i.i909:                                   ; preds = %invoke.cont308
   br label %pfor.detach323.preheader
 
 pfor.cond.cleanup322:                             ; preds = %pfor.inc349
-  sync within %syncreg312, label %sync.continue358
+  tapir_sync within %syncreg312, label %sync.continue358
 
 lpad307:                                          ; preds = %_ZN5timer10reportNextEv.exit.i900, %call2.i.i.noexc901, %sync.continue296
   %274 = landingpad { i8*, i32 }
@@ -1502,7 +1502,7 @@ lpad351:                                          ; preds = %lpad351.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad351.loopexit ]
   %282 = extractvalue { i8*, i32 } %lpad.phi, 0
   %283 = extractvalue { i8*, i32 } %lpad.phi, 1
-  sync within %syncreg312, label %ehcleanup425
+  tapir_sync within %syncreg312, label %ehcleanup425
 
 sync.continue358:                                 ; preds = %pfor.cond.cleanup322
   store %union.anon* %207, %union.anon** %208, align 8, !tbaa !10
@@ -1578,7 +1578,7 @@ pfor.detach388.lr.ph:                             ; preds = %while.end
   br label %pfor.detach388
 
 pfor.cond.cleanup387:                             ; preds = %pfor.inc400, %while.end
-  sync within %syncreg376, label %sync.continue403
+  tapir_sync within %syncreg376, label %sync.continue403
 
 pfor.detach388:                                   ; preds = %pfor.inc400, %pfor.detach388.lr.ph
   %indvars.iv = phi i64 [ 0, %pfor.detach388.lr.ph ], [ %indvars.iv.next, %pfor.inc400 ]

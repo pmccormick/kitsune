@@ -20,7 +20,7 @@ void needs_implicit_sync(int n) {
   // CHECK: detach within %[[SYNCREGION]]
   _Cilk_spawn foo(n);
   foo(n);
-  // CHECK: sync within %[[SYNCREGION]], label %[[SYNCCONT:.+]]
+  // CHECK: tapir_sync within %[[SYNCREGION]], label %[[SYNCCONT:.+]]
   // CHECK: [[SYNCCONT]]:
   // CHECK-NEXT: ret void
 }
@@ -38,12 +38,12 @@ void needs_nested_implicit_sync(int n) {
     // CHECK: %[[SYNCREGIONINNER:.+]] = call token @llvm.syncregion.start()
     // CHECK: detach within %[[SYNCREGIONINNER]]
     _Cilk_spawn foo(n);
-    // CHECK: sync within %[[SYNCREGIONINNER]], label %[[INNERSYNCCONT:.+]]
+    // CHECK: tapir_sync within %[[SYNCREGIONINNER]], label %[[INNERSYNCCONT:.+]]
     // CHECK: [[INNERSYNCCONT]]:
     // CHECK-NEXT: reattach within %[[SYNCREGION]]
   }
   foo(n);
-  // CHECK: sync within %[[SYNCREGION]], label %[[SYNCCONT:.+]]
+  // CHECK: tapir_sync within %[[SYNCREGION]], label %[[SYNCCONT:.+]]
   // CHECK: [[SYNCCONT]]:
   // CHECK-NEXT: ret void
 }

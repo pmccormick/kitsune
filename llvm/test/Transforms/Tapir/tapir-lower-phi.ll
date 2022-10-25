@@ -295,11 +295,11 @@ det.cont45:                                       ; preds = %det.achd44, %for.in
   br i1 %or.cond93, label %if.then54, label %if.end55
 
 if.then54:                                        ; preds = %det.cont45
-  sync within %syncreg, label %cleanup
+  tapir_sync within %syncreg, label %cleanup
 
 if.end55:                                         ; preds = %det.cont45
   tail call void @detectCollisionsSlow2(i32 %l, i32 %sub17, i32 %10, i32 %r)
-  sync within %syncreg, label %cleanup
+  tapir_sync within %syncreg, label %cleanup
 
 cleanup:                                          ; preds = %if.end55, %if.then54
   call void @llvm.lifetime.end.p0i8(i64 24, i8* nonnull %3) #6

@@ -27,14 +27,14 @@ void foo(int x) {
 // CHECK-NEXT: br i1 %[[CMP]], label %[[IF_THEN:.+]], label %[[IF_END:.+]]
 
 // CHECK: [[IF_THEN]]:
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNC_CONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNC_CONT:.+]]
 
 // CHECK: [[IF_END]]:
 // CHECK: call void @bar(
 // CHECK: br label %[[CLEANUP:.+]]
 
 // CHECK: [[CLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNC_CONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNC_CONT2:.+]]
 
 // CHECK: call void @llvm.tapir.runtime.end(token %[[TAPIR_RT_START]])
 

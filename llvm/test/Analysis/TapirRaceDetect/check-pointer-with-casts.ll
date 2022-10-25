@@ -1,4 +1,4 @@
-; RUN: opt < %s -enable-new-pm=0 -analyze -tapir-race-detect -evaluate-aa-metadata 2>&1 | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -passes='print<race-detect>' -evaluate-aa-metadata 2>&1 | FileCheck %s
 ; RUN: opt < %s -passes='print<race-detect>' -aa-pipeline=default -evaluate-aa-metadata -disable-output 2>&1 | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -173,7 +173,7 @@ pfor.inc:                                         ; preds = %for.cond.cleanup, %
   br i1 %cmp28, label %pfor.cond, label %pfor.cond.cleanup, !llvm.loop !12
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %cleanup32
+  tapir_sync within %syncreg, label %cleanup32
 
 cleanup32:                                        ; preds = %pfor.cond.cleanup, %entry
   %qt34 = getelementptr inbounds %struct.CollisionWorld.30.74.129.140.151, %struct.CollisionWorld.30.74.129.140.151* %collisionWorld, i32 0, i32 5

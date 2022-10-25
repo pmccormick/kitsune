@@ -25,7 +25,7 @@ pfor.inc:                                         ; preds = %pfor.cond
   br i1 undef, label %pfor.cond, label %pfor.cond.cleanup
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   invoke void @llvm.sync.unwind(token %syncreg)
@@ -41,7 +41,7 @@ cleanup:                                          ; preds = %sync.continue
 }
 
 ; CHECK: pfor.cond.cleanup:
-; CHECK-NEXT: sync within %syncreg, label %sync.continue
+; CHECK-NEXT: tapir_sync within %syncreg, label %sync.continue
 
 ; CHECK: sync.continue:
 ; CHECK-NEXT: invoke void @llvm.sync.unwind(token %syncreg)

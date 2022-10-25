@@ -13,10 +13,10 @@ int return_spawn_test(int i){
 // CHECK-NEXT: store i32 %[[CALL]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 // CHECK: [[CONTINUE]]
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 // CHECK: [[SYNCCONT2]]
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-NEXT: %[[RETVALLOAD:.+]] = load i32
@@ -69,10 +69,10 @@ void spawn_infinite_loop() {
 // CHECK-NEXT: store i32 %[[CALL]]
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONTINUE]]
 // CHECK: [[CONTINUE]]
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 // CHECK: [[SYNCCONT2]]
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-NEXT: %[[RETVALLOAD:.+]] = load i32

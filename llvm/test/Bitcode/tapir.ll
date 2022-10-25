@@ -35,7 +35,7 @@ loop.1.body.2:
     br label %loop.1.final
 
 loop.1.final:
-    sync within %syncreg, label %loop.1.entry
+    tapir_tapir_sync within %syncreg, label %loop.1.entry
 
 loop.1.exit:
     ret void

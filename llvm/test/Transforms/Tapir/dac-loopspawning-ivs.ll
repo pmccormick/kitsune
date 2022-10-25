@@ -132,7 +132,7 @@ pfor.cond.cleanup.i.loopexit:                     ; preds = %pfor.inc.i
   br label %pfor.cond.cleanup.i
 
 pfor.cond.cleanup.i:                              ; preds = %pfor.cond.cleanup.i.loopexit, %_ZN4pbbs17new_array_no_initIlEEPT_mb.exit.i
-  sync within %syncreg.i, label %_ZN8sequenceIlED2Ev.exit489
+  tapir_sync within %syncreg.i, label %_ZN8sequenceIlED2Ev.exit489
 
 pfor.detach.i:                                    ; preds = %pfor.inc.i, %pfor.detach.lr.ph.i
   %__begin.032.i = phi i64 [ 0, %pfor.detach.lr.ph.i ], [ %inc.i, %pfor.inc.i ]
@@ -154,7 +154,7 @@ pfor.inc.i:                                       ; preds = %pfor.body.i, %pfor.
 lpad8.i:                                          ; preds = %pfor.detach.i
   %16 = landingpad { i8*, i32 }
           cleanup
-  sync within %syncreg.i, label %ehcleanup17.thread
+  tapir_sync within %syncreg.i, label %ehcleanup17.thread
 
 _ZN8sequenceIlED2Ev.exit489:                      ; preds = %pfor.cond.cleanup.i
   %17 = bitcast %struct.sequence.46* %agg.result to i64*
@@ -258,7 +258,7 @@ pfor.cond.cleanup.loopexit:                       ; preds = %pfor.inc
   br label %pfor.cond.cleanup
 
 pfor.cond.cleanup:                                ; preds = %pfor.cond.cleanup.loopexit, %_ZN4pbbs9new_arrayIlEEPT_m.exit
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.inc, %pfor.detach.preheader
   %__begin.0668 = phi i64 [ %inc, %pfor.inc ], [ 0, %pfor.detach.preheader ]
@@ -298,7 +298,7 @@ lpad49:                                           ; preds = %pfor.detach
           cleanup
   %39 = extractvalue { i8*, i32 } %38, 0
   %40 = extractvalue { i8*, i32 } %38, 1
-  sync within %syncreg, label %ehcleanup284
+  tapir_sync within %syncreg, label %ehcleanup284
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   tail call void @_ZN4pbbs9quicksortIlSt4lessIlEEEvPT_mRKT0_(i64* %35, i64 %mul, %"struct.std::less"* nonnull dereferenceable(1) %f)
@@ -329,7 +329,7 @@ pfor.cond.cleanup69.loopexit:                     ; preds = %pfor.inc79
   br label %pfor.cond.cleanup69
 
 pfor.cond.cleanup69:                              ; preds = %pfor.cond.cleanup69.loopexit, %_ZN4pbbs9new_arrayIlEEPT_m.exit516
-  sync within %syncreg58, label %sync.continue81
+  tapir_sync within %syncreg58, label %sync.continue81
 
 pfor.detach70:                                    ; preds = %pfor.inc79, %pfor.detach70.preheader
   %__begin60.0666 = phi i64 [ %inc80, %pfor.inc79 ], [ 0, %pfor.detach70.preheader ]
@@ -383,7 +383,7 @@ pfor.cond.cleanup.i544.loopexit:                  ; preds = %pfor.inc.i548
   br label %pfor.cond.cleanup.i544
 
 pfor.cond.cleanup.i544:                           ; preds = %pfor.cond.cleanup.i544.loopexit, %if.end.i
-  sync within %syncreg.i538, label %_ZN8sequenceIlED2Ev.exit566
+  tapir_sync within %syncreg.i538, label %_ZN8sequenceIlED2Ev.exit566
 
 pfor.detach.i545:                                 ; preds = %pfor.inc.i548, %pfor.detach.i545.preheader
   %i.021.i = phi i64 [ %add5.i, %pfor.inc.i548 ], [ 0, %pfor.detach.i545.preheader ]
@@ -435,7 +435,7 @@ pfor.cond.cleanup.i581.loopexit:                  ; preds = %pfor.inc.i588
   br label %pfor.cond.cleanup.i581
 
 pfor.cond.cleanup.i581:                           ; preds = %pfor.cond.cleanup.i581.loopexit, %if.end.i578
-  sync within %syncreg.i572, label %invoke.cont109
+  tapir_sync within %syncreg.i572, label %invoke.cont109
 
 pfor.detach.i583:                                 ; preds = %pfor.inc.i588, %pfor.detach.i583.preheader
   %i.021.i582 = phi i64 [ %add5.i586, %pfor.inc.i588 ], [ 0, %pfor.detach.i583.preheader ]
@@ -464,7 +464,7 @@ invoke.cont109:                                   ; preds = %pfor.cond.cleanup.i
   br label %pfor.detach122
 
 pfor.cond.cleanup121:                             ; preds = %pfor.inc159
-  sync within %syncreg111, label %sync.continue168
+  tapir_sync within %syncreg111, label %sync.continue168
 
 pfor.detach122:                                   ; preds = %pfor.inc159, %invoke.cont109
   %indvars.iv = phi i64 [ 0, %invoke.cont109 ], [ %indvars.iv.next, %pfor.inc159 ]
@@ -921,7 +921,7 @@ lpad161:                                          ; preds = %lpad161.loopexit
   %lpad.phi656 = phi { i8*, i32 } [ %lpad.loopexit654, %lpad161.loopexit ]
   %187 = extractvalue { i8*, i32 } %lpad.phi656, 0
   %188 = extractvalue { i8*, i32 } %lpad.phi656, 1
-  sync within %syncreg111, label %ehcleanup284
+  tapir_sync within %syncreg111, label %ehcleanup284
 
 sync.continue168:                                 ; preds = %pfor.cond.cleanup121
   %189 = lshr i64 %sub.ptr.div.i, 3
@@ -949,7 +949,7 @@ pfor.cond.cleanup.i608.loopexit:                  ; preds = %pfor.inc.i615
   br label %pfor.cond.cleanup.i608
 
 pfor.cond.cleanup.i608:                           ; preds = %pfor.cond.cleanup.i608.loopexit, %if.end.i605
-  sync within %syncreg.i599, label %invoke.cont176
+  tapir_sync within %syncreg.i599, label %invoke.cont176
 
 pfor.detach.i610:                                 ; preds = %pfor.inc.i615, %pfor.detach.i610.preheader
   %i.021.i609 = phi i64 [ %add5.i613, %pfor.inc.i615 ], [ 0, %pfor.detach.i610.preheader ]
@@ -975,7 +975,7 @@ invoke.cont179:                                   ; preds = %invoke.cont176
   br label %pfor.detach192
 
 pfor.cond.cleanup191:                             ; preds = %pfor.inc229
-  sync within %syncreg181, label %sync.continue238
+  tapir_sync within %syncreg181, label %sync.continue238
 
 lpad178:                                          ; preds = %invoke.cont176
   %194 = landingpad { i8*, i32 }
@@ -1053,7 +1053,7 @@ lpad231:                                          ; preds = %lpad231.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad231.loopexit ]
   %204 = extractvalue { i8*, i32 } %lpad.phi, 0
   %205 = extractvalue { i8*, i32 } %lpad.phi, 1
-  sync within %syncreg181, label %ehcleanup284
+  tapir_sync within %syncreg181, label %ehcleanup284
 
 sync.continue238:                                 ; preds = %pfor.cond.cleanup191
   tail call void @free(i8* %call.i.i512) #4

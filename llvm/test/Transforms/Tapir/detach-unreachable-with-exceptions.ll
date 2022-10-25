@@ -196,7 +196,7 @@ pfor.cond.cleanup.loopexit:                       ; preds = %pfor.cond.cleanup.l
   br label %pfor.cond.cleanup
 
 pfor.cond.cleanup:                                ; preds = %pfor.cond.cleanup.loopexit, %entry
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.inc, %pfor.detach.lr.ph.split
   %indvars.iv = phi i64 [ 0, %pfor.detach.lr.ph.split ], [ %indvars.iv.next, %pfor.inc ]
@@ -339,7 +339,7 @@ lpad5.loopexit:                                   ; preds = %lpad5.loopexit.us-l
 
 lpad5:                                            ; preds = %lpad5.loopexit
   %lpad.phi = phi { i8*, i32 } [ %26, %lpad5.loopexit ]
-  sync within %syncreg, label %sync.continue9
+  tapir_sync within %syncreg, label %sync.continue9
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   %27 = bitcast %struct.vertex** %6 to i8*

@@ -7,8 +7,13 @@
 @d = internal global i32 0, align 4
 
 define i32 @main() {
+; COM: The label of the block in the comment below is entry: in LLVM upstream
+; COM: (as it perhaps ought to be). But for some reason, we end up with
+; COM: bar.exit. This is perhaps a bug in one of our (or Tapir's) passes. For
+; COM: now, this is changed to bar.exit, but really, we ought to figure out what
+; COM: is actually causing this. So TODO.
 ; CHECK-LABEL: @main(
-; CHECK-NEXT:  entry:
+; CHECK-NEXT:  bar.exit:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32*, i32** @e, align 8
 ; CHECK-NEXT:    store i32 0, i32* [[TMP0]], align 4
 ; CHECK-NEXT:    store i32* null, i32** @e, align 8

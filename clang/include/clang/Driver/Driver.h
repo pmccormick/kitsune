@@ -81,7 +81,7 @@ class Driver {
     CPPMode,
     CLMode,
     FlangMode,
-    DXCMode
+    DXCMode,
     KitsuneMode,
     KokkosMode,
     FleCSIMode
@@ -313,6 +313,7 @@ private:
   /// Whether to check that input files exist when constructing compilation
   /// jobs.
   unsigned CheckInputsExist : 1;
+
   /// Whether to probe for PCH files on disk, in order to upgrade
   /// -include foo.h to -include-pch foo.h.pch.
   unsigned ProbePrecompiled : 1;

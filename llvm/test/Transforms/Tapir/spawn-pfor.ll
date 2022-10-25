@@ -32,7 +32,7 @@ pfor.detach.preheader:                            ; preds = %det.cont2
   br label %pfor.detach
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %det.cont2
-  sync within %syncreg3, label %sync.continue
+  tapir_sync within %syncreg3, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.detach.preheader, %pfor.inc
   %__begin.020 = phi i32 [ %inc, %pfor.inc ], [ 0, %pfor.detach.preheader ]
@@ -50,7 +50,7 @@ pfor.inc:                                         ; preds = %pfor.body, %pfor.de
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   tail call void @bar(i32 %n) #3
-  sync within %syncreg, label %sync.continue10
+  tapir_sync within %syncreg, label %sync.continue10
 
 sync.continue10:                                  ; preds = %sync.continue
   ret void
@@ -61,11 +61,11 @@ sync.continue10:                                  ; preds = %sync.continue
 ; CHECK-NEXT: %syncreg3 = tail call token @llvm.syncregion.start
 
 ; CHECK: pfor.cond.cleanup:
-; CHECK-NEXT: sync within %syncreg3,
+; CHECK-NEXT: tapir_sync within %syncreg3,
 
 ; CHECK: sync.continue:
 ; CHECK-NEXT: tail call void @bar
-; CHECK-NEXT: sync within %syncreg,
+; CHECK-NEXT: tapir_sync within %syncreg,
 
 ; Function Attrs: argmemonly nounwind
 declare token @llvm.syncregion.start() #1

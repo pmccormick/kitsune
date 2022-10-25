@@ -5,7 +5,6 @@
 ; RUN: echo '!5 = !{!"%/t/detach-gcov.ll", !0}' > %t/1
 ; RUN: cat %s %t/1 > %t/2
 ;
-; RUN: opt -insert-gcov-profiling -S < %t/2 | FileCheck %s
 ; RUN: opt -passes=insert-gcov-profiling -S < %t/2 | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -61,7 +60,7 @@ pfor.inc:                                         ; preds = %pfor.body, %pfor.co
 ; CHECK: br i1 %cmp3, label %pfor.cond, label %pfor.cond.cleanup
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %sync.continue, !dbg !13
+  tapir_sync within %syncreg, label %sync.continue, !dbg !13
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   call void @llvm.sync.unwind(token %syncreg), !dbg !13

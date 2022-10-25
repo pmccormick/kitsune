@@ -4058,6 +4058,7 @@ def FunctionReturnThunks : InheritableAttr,
   >];
   let Subjects = SubjectList<[Function]>;
   let Documentation = [FunctionReturnThunksDocs];
+}
 
 // Cilk attributes
 
@@ -4126,7 +4127,7 @@ def TapirTarget : StmtAttr {
      "serial",     "zero",   "opencl"],
     ["CheetahRT",  "CilkRT",  "CudaRT",
      "HipRT",      "OmpRT",   "QthreadsRT",
-     "RealmRT",    "RocmRT",  "SequentialRT",
+	     "RealmRT",    "RocmRT",  "SequentialRT",
      "ZeroRT",     "OpenCLRT"], 0>
   ];
   let Documentation = [TapirRTDocs];

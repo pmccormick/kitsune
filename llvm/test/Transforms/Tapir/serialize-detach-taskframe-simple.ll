@@ -41,7 +41,7 @@ pfor.body.entry:                                  ; preds = %pfor.detach
 ; CHECK-NOT: call void @llvm.taskframe.use(
 ; CHECK: call void @_ZN13ParallelTools23parallel_for_each_spawnIZN4mold3elf15resolve_symbolsINS2_6X86_64EEEvRNS2_7ContextIT_EEEUlPNS2_10ObjectFileIS4_EEE0_St6vectorISB_SaISB_EEEEvRT0_S6_m()
 ; CHECK-NOT: reattach within
-; CHECK-NOT: sync within
+; CHECK-NOT: tapir_sync within
 ; CHECK: reattach within %syncreg, label %pfor.inc
 
 pfor.body:                                        ; preds = %pfor.body.entry
@@ -54,7 +54,7 @@ det.achd:                                         ; preds = %pfor.body
   reattach within %syncreg5, label %det.cont
 
 det.cont:                                         ; preds = %det.achd, %pfor.body
-  sync within %syncreg5, label %sync.continue
+  tapir_sync within %syncreg5, label %sync.continue
 
 sync.continue:                                    ; preds = %det.cont
   br label %pfor.preattach

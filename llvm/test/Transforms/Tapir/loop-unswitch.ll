@@ -1,7 +1,7 @@
 ; Thanks to Sai Sameer Pusapaty and Shreyas Balaji for the original
 ; source code for this test case.
 ;
-; RUN: opt < %s -enable-new-pm=0 -loop-unswitch -S -o - | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -simple-loop-unswitch -S -o - | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -204,7 +204,7 @@ det.cont:                                         ; preds = %if.else4, %invoke.c
           to label %invoke.cont14 unwind label %lpad7
 
 invoke.cont14:                                    ; preds = %det.cont
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %invoke.cont14
   %intersection_l.0.load54 = load i32, i32* %intersection_l, align 4
@@ -224,7 +224,7 @@ det.rethrow.unreachable:                          ; preds = %lpad
 lpad7:                                            ; preds = %det.cont, %if.else4, %lpad
   %2 = landingpad { i8*, i32 }
           cleanup
-  sync within %syncreg, label %sync.continue16
+  tapir_sync within %syncreg, label %sync.continue16
 
 sync.continue16:                                  ; preds = %lpad7
   call void @llvm.lifetime.end.p0i8(i64 4, i8* nonnull %intersection_l.0.intersection_l.0..sroa_cast)
@@ -310,7 +310,7 @@ pfor.inc:                                         ; preds = %pfor.cond22, %invok
   br i1 %exitcond, label %pfor.cond.cleanup, label %pfor.cond22, !llvm.loop !14
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg8, label %cleanup
+  tapir_sync within %syncreg8, label %cleanup
 
 lpad:                                             ; preds = %pfor.body27
   %7 = landingpad { i8*, i32 }
@@ -328,7 +328,7 @@ lpad52.loopexit:                                  ; preds = %pfor.cond22
 
 lpad52:                                           ; preds = %lpad52.loopexit.split-lp, %lpad52.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad52.loopexit ]
-  sync within %syncreg8, label %sync.continue57
+  tapir_sync within %syncreg8, label %sync.continue57
 
 sync.continue57:                                  ; preds = %lpad52
   invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg, { i8*, i32 } %lpad.phi)
@@ -345,7 +345,7 @@ pfor.inc60:                                       ; preds = %pfor.cond, %cleanup
   br i1 %exitcond140, label %pfor.cond.cleanup72, label %pfor.cond, !llvm.loop !16
 
 pfor.cond.cleanup72:                              ; preds = %pfor.inc60
-  sync within %syncreg, label %cleanup78
+  tapir_sync within %syncreg, label %cleanup78
 
 lpad62.loopexit:                                  ; preds = %pfor.cond
   %lpad.loopexit134 = landingpad { i8*, i32 }
@@ -354,7 +354,7 @@ lpad62.loopexit:                                  ; preds = %pfor.cond
 
 lpad62:                                           ; preds = %lpad62.loopexit.split-lp, %lpad62.loopexit
   %lpad.phi136 = phi { i8*, i32 } [ %lpad.loopexit134, %lpad62.loopexit ]
-  sync within %syncreg, label %sync.continue75
+  tapir_sync within %syncreg, label %sync.continue75
 
 sync.continue75:                                  ; preds = %lpad62
   resume { i8*, i32 } %lpad.phi136
@@ -365,40 +365,8 @@ cleanup78:                                        ; preds = %pfor.cond.cleanup72
 
 ; CHECK: define {{.+}}@_Z11algorithm_45graphIiE(
 
-; CHECK: pfor.cond.us:
-; CHECK: detach within %syncreg, label %pfor.body.us, label %pfor.inc60.us unwind label %lpad62.loopexit.us-lcssa.us
-
-; CHECK: pfor.body.us:
-; CHECK-NEXT: %[[USSYNCREG:.+]] = {{.+}}call token @llvm.syncregion
-
-; CHECK: pfor.cond22.us:
-; CHECK: detach within %[[USSYNCREG]], label %pfor.body27.us, label %pfor.inc.us unwind label %lpad52.loopexit.us
-
-; CHECK: pfor.body27.us:
-; CHECK: invoke i32 @_Z11p_intersectPKiiS0_i(
-; CHECK-NEXT: to label %invoke.cont.us unwind label %lpad.us
-
-; CHECK: lpad52.loopexit.us:
-; CHECK: br label %lpad52.us
-
-; CHECK: lpad52.us:
-; CHECK: sync within %[[USSYNCREG]], label %sync.continue57.us
-
-; CHECK: sync.continue57.us:
-; The sync region of this detached-rethrow should match that of the
-; detach in pfor.cond.us.
-; CHECK-NEXT: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %syncreg,
-
-; CHECK: lpad.us:
-; The sync region of this detached-rethrow should match that of the
-; detach in pfor.cond22.us.
-; CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[USSYNCREG]]
-
-; CHECK: lpad62.loopexit.us-lcssa.us:
-; CHECK: br label %lpad62.loopexit
-
 ; CHECK: pfor.cond:
-; CHECK: detach within %syncreg, label %pfor.body, label %pfor.inc60 unwind label %lpad62.loopexit.us-lcssa
+; CHECK: detach within %syncreg, label %pfor.body, label %pfor.inc60 unwind label %lpad62.loopexit
 
 ; CHECK: pfor.body:
 ; CHECK: %[[OGSYNCREG:.+]] = {{.+}}call token @llvm.syncregion
@@ -419,7 +387,7 @@ cleanup78:                                        ; preds = %pfor.cond.cleanup72
 ; CHECK: br label %lpad52
 
 ; CHECK: lpad52:
-; CHECK: sync within %[[OGSYNCREG]], label %sync.continue57
+; CHECK: tapir_sync within %[[OGSYNCREG]], label %sync.continue57
 
 ; CHECK: sync.continue57:
 ; The sync region of this detached-rethrow should match that of the
@@ -430,7 +398,7 @@ cleanup78:                                        ; preds = %pfor.cond.cleanup72
 ; CHECK: br label %lpad62
 
 ; CHECK: lpad62:
-; CHECK: sync within %syncreg
+; CHECK: tapir_sync within %syncreg
 
 ; Function Attrs: nofree nounwind
 declare dso_local noalias i8* @malloc(i64) local_unnamed_addr #9

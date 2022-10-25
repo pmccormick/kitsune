@@ -43,7 +43,7 @@ pfor.cond:                                        ; preds = %pfor.inc, %entry
   br i1 %cmp, label %pfor.detach, label %pfor.cond.cleanup
 
 pfor.cond.cleanup:                                ; preds = %pfor.cond
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.cond
   detach within %syncreg, label %pfor.body.entry, label %pfor.inc
@@ -76,7 +76,7 @@ pfor.cond13:                                      ; preds = %pfor.inc110, %sync.
   br i1 %cmp14, label %pfor.detach16, label %pfor.cond.cleanup15
 
 pfor.cond.cleanup15:                              ; preds = %pfor.cond13
-  sync within %syncreg5, label %sync.continue116
+  tapir_sync within %syncreg5, label %sync.continue116
 
 pfor.detach16:                                    ; preds = %pfor.cond13
   detach within %syncreg5, label %pfor.body.entry19, label %pfor.inc110 unwind label %lpad112
@@ -124,7 +124,7 @@ for.cond:                                         ; preds = %invoke.cont100, %if
 
 ; CHECK: for.cond:
 ; CHECK: %t.sroa.0.0 = phi %struct.tri* [ %arrayidx22, %if.then ], [ %52, %invoke.cont100 ]
-; CHECK: %t.sroa.11.sroa.0.0 = phi i32 [ 0, %if.then ], [ %t.sroa.11.sroa.0.0.extract.trunc, %invoke.cont100 ]
+; CHECK: %t.sroa.11.sroa.0.0 = phi i40 [ 0, %if.then ], [ %t.sroa.11.sroa.0.0.extract.trunc, %invoke.cont100 ]
 ; CHECK: %t.sroa.11.sroa.9.0 = phi i8 [ 0, %if.then ], [ %t.sroa.11.sroa.9.0.extract.trunc, %invoke.cont100 ]
 
 for.cond.cleanup:                                 ; preds = %for.cond
@@ -675,7 +675,7 @@ pfor.inc110:                                      ; preds = %pfor.detach16, %pfo
 lpad112:                                          ; preds = %pfor.detach16, %ehcleanup103
   %81 = landingpad { i8*, i32 }
           cleanup
-  sync within %syncreg5, label %sync.continue118
+  tapir_sync within %syncreg5, label %sync.continue118
 
 sync.continue116:                                 ; preds = %pfor.cond.cleanup15
   %call.i306 = call i32 @_ZN8sequence6reduceIiiN5utils4addFIiEENS_4getAIiiEEEET_T0_S7_T1_T2_(i32 0, i32 %n, i32* %0)

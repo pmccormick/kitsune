@@ -193,7 +193,7 @@ pfor.inc.strpm.outer:                             ; preds = %pfor.inc.reattach, 
   br i1 %niter.ncmp, label %pfor.cond.strpm.detachloop.sync, label %pfor.cond.strpm.outer, !dbg !1595, !llvm.loop !1616
 
 pfor.cond.strpm.detachloop.sync:                  ; preds = %pfor.inc.strpm.outer
-  sync within %syncreg.strpm.detachloop, label %pfor.cond.strpm.detachloop.reattach.split, !dbg !1595
+  tapir_sync within %syncreg.strpm.detachloop, label %pfor.cond.strpm.detachloop.reattach.split, !dbg !1595
 
 pfor.cond.strpm.detachloop.reattach.split:        ; preds = %pfor.cond.strpm.detachloop.sync
   reattach within %syncreg, label %pfor.cond.cleanup.strpm-lcssa, !dbg !1595
@@ -342,7 +342,7 @@ cond.end.epil.3:                                  ; preds = %cond.false.epil.3, 
   br i1 %epil.iter.cmp.not.3, label %pfor.cond.cleanup, label %pfor.cond.epil, !dbg !1612
 
 pfor.cond.cleanup:                                ; preds = %pfor.cond.epil.prol.loopexit, %cond.end.epil.3, %pfor.cond.cleanup.strpm-lcssa
-  sync within %syncreg, label %sync.continue, !dbg !1612
+  tapir_sync within %syncreg, label %sync.continue, !dbg !1612
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   tail call void @llvm.sync.unwind(token %syncreg), !dbg !1612
@@ -983,7 +983,7 @@ det.cont.i:                                       ; preds = %det.achd.i, %_ZL5sp
   %sub.ptr.sub6.i = sub i64 %sub.ptr.lhs.cast4.i, %sub.ptr.rhs.cast5.i, !dbg !1997
   %sub.ptr.div7.i = ashr exact i64 %sub.ptr.sub6.i, 3, !dbg !1997
   tail call fastcc void @_ZL14quickSort_testISt4pairIjjE9pairCompFlEvPT_T1_T0_(%"struct.std::pair"* noundef %M.1.lcssa94.i129, i64 noundef %sub.ptr.div7.i), !dbg !1998
-  sync within %syncreg, label %sync.continue.i, !dbg !1999
+  tapir_sync within %syncreg, label %sync.continue.i, !dbg !1999
 
 sync.continue.i:                                  ; preds = %det.cont.i
   tail call void @llvm.sync.unwind(token %syncreg), !dbg !1999
@@ -1044,7 +1044,7 @@ if.then:                                          ; preds = %if.then.loopexit, %
   %A.tr.lcssa = phi %"struct.std::pair"* [ %A, %entry ], [ %0, %if.then.loopexit ]
   %n.tr.lcssa = phi i64 [ %n, %entry ], [ %sub.ptr.div7, %if.then.loopexit ]
   tail call fastcc void @_ZL15quickSortSerialISt4pairIjjE9pairCompFlEvPT_T1_T0_(%"struct.std::pair"* noundef %A.tr.lcssa, i64 noundef %n.tr.lcssa), !dbg !2021
-  sync within %syncreg, label %if.end.split, !dbg !2022
+  tapir_sync within %syncreg, label %if.end.split, !dbg !2022
 
 if.else:                                          ; preds = %entry, %det.cont
   %n.tr22 = phi i64 [ %sub.ptr.div7, %det.cont ], [ %n, %entry ]

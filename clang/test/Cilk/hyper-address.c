@@ -11,7 +11,7 @@ void identity(void * value);
 void reduce(void* left, void* right);
 extern void consume_view(long *);
 extern void consume_hyper(long _Hyperobject *);
-// CHECK_LABEL: assorted_addresses
+// CHECK-LABEL: assorted_addresses
 void assorted_addresses()
 {
   // CHECK: call void @llvm.reducer.register

@@ -407,7 +407,7 @@ det.cont:                                         ; preds = %det.achd, %if.end19
   br i1 %cmp6, label %if.then7, label %if.end12
 
 cleanup:                                          ; preds = %if.then18, %if.then7
-  sync within %syncreg, label %cleanup.split
+  tapir_sync within %syncreg, label %cleanup.split
 
 cleanup.split:                                    ; preds = %cleanup
   ret void
@@ -462,7 +462,7 @@ det.cont11:                                       ; preds = %det.achd10, %det.co
   %0 = mul i64 %div, -3
   %sub = add i64 %0, %size
   tail call void @cilksort(i64* %add.ptr6, i64* %add.ptr7, i64 %sub)
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %det.cont11
   detach within %syncreg, label %det.achd16, label %det.cont17
@@ -478,7 +478,7 @@ det.cont17:                                       ; preds = %det.achd16, %sync.c
   %add.ptr20 = getelementptr inbounds i64, i64* %low, i64 %size
   %add.ptr21 = getelementptr inbounds i64, i64* %add.ptr20, i64 -1
   tail call void @cilkmerge(i64* %add.ptr4, i64* nonnull %add.ptr19, i64* %add.ptr6, i64* nonnull %add.ptr21, i64* %add.ptr5)
-  sync within %syncreg, label %sync.continue22
+  tapir_sync within %syncreg, label %sync.continue22
 
 sync.continue22:                                  ; preds = %det.cont17
   %add.ptr23 = getelementptr inbounds i64, i64* %add.ptr5, i64 -1

@@ -2022,7 +2022,9 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
 
   llvm::Type *BP = CGM.Int8Ty->getPointerTo(Loc.getAddressSpace());
   emitStoresForConstant(
-      CGM, D, (Loc.getType() == BP) ? Loc : Builder.CreateBitCast(Loc, BP),
+      CGM, D,
+      (Loc.getType() == BP) ? Loc
+                            : Builder.CreateElementBitCast(Loc, CGM.Int8Ty),
       type.isVolatileQualified(), Builder, constant, /*IsAutoInit=*/false);
 
   if (Reducer)

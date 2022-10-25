@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -csan -S -o - | FileCheck %s
 ; RUN: opt < %s -passes='cilksan' -S -o - | FileCheck %s
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -51,10 +50,10 @@ det.cont:                                         ; preds = %det.achd, %if.end
   %sub1 = sub nsw i32 %4, 2
   %call2 = call i32 @fib(i32 %sub1)
   store i32 %call2, i32* %y, align 4
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %det.cont
-  sync within %syncreg, label %sync.continue3
+  tapir_sync within %syncreg, label %sync.continue3
 
 sync.continue3:                                   ; preds = %sync.continue
   %5 = load i32, i32* %x, align 4
@@ -64,7 +63,7 @@ sync.continue3:                                   ; preds = %sync.continue
   br label %return
 
 return:                                           ; preds = %sync.continue3, %if.then
-  sync within %syncreg, label %sync.continue4
+  tapir_sync within %syncreg, label %sync.continue4
 
 sync.continue4:                                   ; preds = %return
   %7 = load i32, i32* %retval, align 4

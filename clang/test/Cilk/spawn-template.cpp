@@ -41,7 +41,7 @@ long foo() {
 // CHECK: [[CONTBLK]]:
 // CHECK: %[[RETVAL2:.+]] = call noundef i32 @_Z3fibIiET_S0_
 // CHECK-NEXT: store i32 %[[RETVAL2]]
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 
 // CHECK-LABEL: define {{.+}}i32 @_Z7fib_excIiET_S0_(i32 noundef %n)
@@ -64,7 +64,7 @@ long foo() {
 
 // CHECK: [[INVOKECONT2]]:
 // CHECK-NEXT: store i32 %[[RETVAL2]]
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 // CHECK: [[DETLPAD]]:
 // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],

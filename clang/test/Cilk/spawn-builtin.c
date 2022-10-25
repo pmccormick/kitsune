@@ -18,7 +18,7 @@ void spawn_memcpy(float *A, float *B, int n) {
 // CHECK-NEXT: call void @llvm.memcpy
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONT]]
 // CHECK: call void @llvm.memcpy
-// CHECK: sync within %[[SYNCREG]]
+// CHECK: tapir_sync within %[[SYNCREG]]
 
 void spawn_unreachable() {
   _Cilk_spawn __builtin_unreachable();
@@ -32,7 +32,7 @@ void spawn_unreachable() {
 // CHECK-NEXT: unreachable
 // CHECK-NOT: reattach
 // CHECK: [[CONT]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void cilkfor_unreachable() {
   _Cilk_for(int i = 0; i < 1; ++i)
@@ -47,7 +47,7 @@ void cilkfor_unreachable() {
 // reattach.
 // CHECK: reattach within %[[SYNCREG]], label %[[PFORINC]]
 // CHECK: [[PFORINC]]:
-// CHECK: sync within %[[SYNCREG]]
+// CHECK: tapir_sync within %[[SYNCREG]]
 
 void spawn_trap() {
   _Cilk_spawn __builtin_trap();
@@ -61,7 +61,7 @@ void spawn_trap() {
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: reattach within %[[SYNCREG]], label %[[CONT]]
 // CHECK: [[CONT]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void spawn_assume() {
   _Cilk_spawn __builtin_assume(0); // expected-warning{{Failed to emit spawn}}

@@ -26,8 +26,8 @@ pfor.cond.cleanup.loopexit:                       ; preds = %pfor.inc
 
 pfor.cond.cleanup:                                ; preds = %pfor.cond.cleanup.loopexit, %entry
 ; CHECK: pfor.cond.cleanup
-; CHECK: sync within %syncreg
-  sync within %syncreg, label %0
+; CHECK: tapir_sync within %syncreg
+  tapir_sync within %syncreg, label %0
 
 ; <label>:0:                                      ; preds = %pfor.cond.cleanup
   ret void
@@ -81,7 +81,7 @@ pfor.inc:                                         ; preds = %pfor.body, %pfor.de
 ; CHECK: br i1 [[LOCALCMP]]
   br i1 %exitcond, label %pfor.cond.cleanup.loopexit, label %pfor.detach, !llvm.loop !1
 
-; CHECK: sync within [[NEWSYNCREG]]
+; CHECK: tapir_sync within [[NEWSYNCREG]]
 }
 
 declare void @bar(i32) local_unnamed_addr #1

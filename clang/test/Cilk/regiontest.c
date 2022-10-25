@@ -18,7 +18,7 @@ int syncreg_spawn(int n) {
   // CHECK-NEXT: call void @llvm.taskframe.use(token %[[TASKFRAME2]])
   // CHECK-NEXT: call i32 @baz
   int y = _Cilk_spawn baz(n);
-  // CHECK: sync within %[[SYNCREGTOP]], label %[[SYNCCONT:.+]]
+  // CHECK: tapir_sync within %[[SYNCREGTOP]], label %[[SYNCCONT:.+]]
   _Cilk_sync;
   // CHECK: [[SYNCCONT]]:
   // CHECK: add
@@ -30,7 +30,7 @@ int syncreg_spawn(int n) {
 void syncreg_loop(int n) {
   // CHECK: %[[SYNCREGLOOP:.+]] = call token @llvm.syncregion.start()
   // CHECK-DAG: detach within %[[SYNCREGLOOP]]
-  // CHECK-DAG: sync within %[[SYNCREGLOOP]]
+  // CHECK-DAG: tapir_sync within %[[SYNCREGLOOP]]
   _Cilk_for(int i = 0; i < n; ++i) {
     baz(i);
   }
@@ -43,13 +43,13 @@ int mixed_spawn_and_loop(int n) {
   // CHECK: detach within %[[SYNCREGTOP]]
   int x = _Cilk_spawn bar();
   // CHECK-DAG: detach within %[[SYNCREGLOOP]]
-  // CHECK-DAG: sync within %[[SYNCREGLOOP]]
+  // CHECK-DAG: tapir_sync within %[[SYNCREGLOOP]]
   _Cilk_for(int i = 0; i < n; ++i) {
     baz(i);
   }
   // CHECK: detach within %[[SYNCREGTOP]]
   int y = _Cilk_spawn baz(n);
-  // CHECK: sync within %[[SYNCREGTOP]]
+  // CHECK: tapir_sync within %[[SYNCREGTOP]]
   _Cilk_sync;
   return x+y;
 }

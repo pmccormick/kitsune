@@ -143,7 +143,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.inc76, %if.end
   %__cur.0.lcssa.i.i.i.i.i368 = phi %"class.std::vector.0"* [ %__cur.0.lcssa.i.i.i.i.i, %invoke.cont4 ], [ null, %if.end.i ], [ %__cur.0.lcssa.i.i.i.i.i, %pfor.inc76 ]
   %cond.i.i.i.i275367 = phi %"class.std::vector.0"* [ %cond.i.i.i.i275, %invoke.cont4 ], [ null, %if.end.i ], [ %cond.i.i.i.i275, %pfor.inc76 ]
   %13 = phi i8* [ %12, %invoke.cont4 ], [ null, %if.end.i ], [ %12, %pfor.inc76 ]
-  sync within %syncreg, label %sync.continue85
+  tapir_sync within %syncreg, label %sync.continue85
 
 lpad:                                             ; preds = %_ZNSt12_Vector_baseISt5tupleIJidiEESaIS1_EE11_M_allocateEm.exit.i.i, %if.then.i
   %14 = landingpad { i8*, i32 }
@@ -222,7 +222,7 @@ pfor.detach29.preheader:                          ; preds = %invoke.cont17
   br label %pfor.detach29
 
 pfor.cond.cleanup28:                              ; preds = %pfor.inc, %invoke.cont17
-  sync within %syncreg18, label %sync.continue
+  tapir_sync within %syncreg18, label %sync.continue
 
 lpad10.loopexit:                                  ; preds = %_ZNSt16allocator_traitsISaIiEE8allocateERS0_m.exit.i.i.i.i
   %lpad.loopexit299 = landingpad { i8*, i32 }
@@ -292,7 +292,7 @@ lpad45:                                           ; preds = %lpad45.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad45.loopexit ]
   %34 = extractvalue { i8*, i32 } %lpad.phi, 0
   %35 = extractvalue { i8*, i32 } %lpad.phi, 1
-  sync within %syncreg18, label %ehcleanup
+  tapir_sync within %syncreg18, label %ehcleanup
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup28
   %sub.ptr.sub.i223 = sub i64 %26, %23
@@ -549,7 +549,7 @@ lpad78:                                           ; preds = %lpad78.loopexit
   %lpad.phi298 = phi { i8*, i32 } [ %lpad.loopexit296, %lpad78.loopexit ]
   %94 = extractvalue { i8*, i32 } %lpad.phi298, 0
   %95 = extractvalue { i8*, i32 } %lpad.phi298, 1
-  sync within %syncreg, label %sync.continue87
+  tapir_sync within %syncreg, label %sync.continue87
 
 sync.continue85:                                  ; preds = %pfor.cond.cleanup
   %cmp3.i.i.i.i150 = icmp eq %"class.std::vector.0"* %cond.i.i.i.i275367, %__cur.0.lcssa.i.i.i.i.i368

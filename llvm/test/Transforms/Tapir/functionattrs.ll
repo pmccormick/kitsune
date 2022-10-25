@@ -28,7 +28,7 @@ det.achd:                                         ; preds = %if.end
 det.cont:                                         ; preds = %det.achd, %if.end
   %sub1 = add nsw i32 %n, -2
   %call2 = call i32 @fib(i32 %sub1)
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %det.cont
   %x.0.load = load i32, i32* %x, align 4

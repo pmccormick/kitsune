@@ -11,7 +11,7 @@ entry:
   br label %pfor.detach
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %pfor.end.continue
+  tapir_sync within %syncreg, label %pfor.end.continue
 
 pfor.end.continue:                                ; preds = %pfor.cond.cleanup
   %1 = load i8, i8* %0, align 16, !tbaa !2

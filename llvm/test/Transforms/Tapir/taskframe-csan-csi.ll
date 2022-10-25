@@ -1,6 +1,4 @@
-; RUN: opt < %s -enable-new-pm=0 -csan -ignore-sanitize-cilk-attr -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSAN
 ; RUN: opt < %s -passes='csi-setup,cilksan' -ignore-sanitize-cilk-attr -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSAN
-; RUN: opt < %s -enable-new-pm=0 -csi -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSI
 ; RUN: opt < %s -passes='csi-setup,csi' -S -o - | FileCheck %s --check-prefixes=CHECK,CHECK-CSI
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -111,14 +109,14 @@ det.cont7:                                        ; preds = %det.cont, %invoke.c
 ; CHECK-NEXT: to label %invoke.cont15 unwind label %[[LPAD12_CONT:.+]]
 
 invoke.cont15:                                    ; preds = %det.cont7
-  sync within %syncreg1, label %sync.continue
+  tapir_sync within %syncreg1, label %sync.continue
 
 ; CHECK: invoke.cont15:
 ; CHECK-CSI: call void @__csi_after_call(
 ; CHECK-CSAN: call void @__csan_after_call(
 ; CHECK-CSI: call void @__csi_before_sync(
 ; CHECK-CSAN: call void @__csan_sync(
-; CHECK: sync within %syncreg1, label %sync.continue
+; CHECK: tapir_sync within %syncreg1, label %sync.continue
 
 sync.continue:                                    ; preds = %invoke.cont15
   invoke void @llvm.sync.unwind(token %syncreg1)
@@ -315,14 +313,14 @@ det.cont44:                                       ; preds = %try.cont, %invoke.c
 ; CHECK-NEXT: to label %invoke.cont53 unwind label %[[LPAD50_CONT:.+]]
 
 invoke.cont53:                                    ; preds = %det.cont44
-  sync within %syncreg30, label %sync.continue54
+  tapir_sync within %syncreg30, label %sync.continue54
 
 ; CHECK: invoke.cont53:
 ; CHECK-CSI: call void @__csi_after_call(
 ; CHECK-CSAN: call void @__csan_after_call(
 ; CHECK-CSI: call void @__csi_before_sync(
 ; CHECK-CSAN: call void @__csan_sync(
-; CHECK: sync within %syncreg30, label %sync.continue54
+; CHECK: tapir_sync within %syncreg30, label %sync.continue54
 
 sync.continue54:                                  ; preds = %invoke.cont53
   invoke void @llvm.sync.unwind(token %syncreg30)
@@ -478,13 +476,13 @@ invoke.cont63:                                    ; preds = %catch59
 
 try.cont65:                                       ; preds = %invoke.cont63, %invoke.cont55
   call void @llvm.taskframe.end(token %17)
-  sync within %syncreg, label %sync.continue72
+  tapir_sync within %syncreg, label %sync.continue72
 
 ; CHECK: try.cont65:
 ; CHECK: call void @llvm.taskframe.end(
 ; CHECK-CSI: call void @__csi_before_sync(
 ; CHECK-CSAN: call void @__csan_sync(
-; CHECK: sync within %syncreg, label %sync.continue72
+; CHECK: tapir_sync within %syncreg, label %sync.continue72
 
 sync.continue72:                                  ; preds = %try.cont65
   call void @llvm.sync.unwind(token %syncreg)

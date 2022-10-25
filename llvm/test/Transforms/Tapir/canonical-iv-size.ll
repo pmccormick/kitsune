@@ -166,7 +166,7 @@ pfor.inc:                                         ; preds = %for.cond.cleanup, %
   br i1 %exitcond, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !20
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %cleanup
+  tapir_sync within %syncreg, label %cleanup
 
 cleanup:                                          ; preds = %pfor.cond.cleanup, %while.body
   %minCollisionTime.0.minCollisionTime.0.minCollisionTime.0.66 = load float, float* %minCollisionTime, align 4, !tbaa !10

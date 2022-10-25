@@ -43,10 +43,10 @@ det.cont:                                         ; preds = %det.achd, %if.end
   %sub1 = sub nsw i32 %4, 2, !dbg !28
   %call2 = call i32 @fib(i32 %sub1), !dbg !29
   store i32 %call2, i32* %y, align 4, !dbg !26
-  sync within %syncreg, label %sync.continue, !dbg !11
+  tapir_sync within %syncreg, label %sync.continue, !dbg !11
 
 sync.continue:                                    ; preds = %det.cont
-  sync within %syncreg, label %sync.continue3, !dbg !30
+  tapir_sync within %syncreg, label %sync.continue3, !dbg !30
 
 sync.continue3:                                   ; preds = %sync.continue
   %5 = load i32, i32* %x, align 4, !dbg !31
@@ -56,7 +56,7 @@ sync.continue3:                                   ; preds = %sync.continue
   br label %return, !dbg !30
 
 return:                                           ; preds = %sync.continue3, %if.then
-  sync within %syncreg, label %sync.continue4, !dbg !34
+  tapir_sync within %syncreg, label %sync.continue4, !dbg !34
 
 sync.continue4:                                   ; preds = %return
   %7 = load i32, i32* %retval, align 4, !dbg !34

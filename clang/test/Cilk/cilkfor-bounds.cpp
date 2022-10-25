@@ -51,7 +51,7 @@ void up(size_t start, size_t end) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void up_leq(size_t start, size_t end) {
   _Cilk_for (size_t i = start; i <= end; ++i)
@@ -97,7 +97,7 @@ void up_leq(size_t start, size_t end) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD2:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void up_flip(size_t start, size_t end) {
   _Cilk_for (size_t i = start; end > i; ++i)
@@ -145,7 +145,7 @@ void up_flip(size_t start, size_t end) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD3:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void up_flip_geq(size_t start, size_t end) {
   _Cilk_for (size_t i = start; end >= i; ++i)
@@ -191,7 +191,7 @@ void up_flip_geq(size_t start, size_t end) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD4:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void up_stride(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = start; i < end; i += stride)
@@ -241,7 +241,7 @@ void up_stride(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD5:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void up_stride_leq(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = start; i <= end; i += stride)
@@ -289,7 +289,7 @@ void up_stride_leq(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD6:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void up_stride_flip(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = start; end > i; i += stride)
@@ -339,7 +339,7 @@ void up_stride_flip(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD7:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void up_stride_flip_geq(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = start; end >= i; i += stride)
@@ -387,7 +387,7 @@ void up_stride_flip_geq(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD8:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void up_ne_stride(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = start; i != end; i += stride)
@@ -435,7 +435,7 @@ void up_ne_stride(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD8:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void up_ne_stride_flip(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = start; end != i; i += stride)
@@ -483,7 +483,7 @@ void up_ne_stride_flip(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD9:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void down(size_t start, size_t end) {
   _Cilk_for (size_t i = end; i > start; --i)
@@ -531,7 +531,7 @@ void down(size_t start, size_t end) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD10:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void down_geq(size_t start, size_t end) {
   _Cilk_for (size_t i = end; i >= start; --i)
@@ -577,7 +577,7 @@ void down_geq(size_t start, size_t end) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD11:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void down_flip(size_t start, size_t end) {
   _Cilk_for (size_t i = end; start < i; --i)
@@ -625,7 +625,7 @@ void down_flip(size_t start, size_t end) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD12:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void down_flip_leq(size_t start, size_t end) {
   _Cilk_for (size_t i = end; start <= i; --i)
@@ -671,7 +671,7 @@ void down_flip_leq(size_t start, size_t end) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD13:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void down_stride(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = end; i > start; i -= stride)
@@ -721,7 +721,7 @@ void down_stride(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD14:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void down_stride_geq(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = end; i >= start; i -= stride)
@@ -769,7 +769,7 @@ void down_stride_geq(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD15:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void down_stride_flip(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = end; start < i; i -= stride)
@@ -819,7 +819,7 @@ void down_stride_flip(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD16:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void down_stride_flip_leq(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = end; start <= i; i -= stride)
@@ -867,7 +867,7 @@ void down_stride_flip_leq(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD17:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 void down_ne_stride(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = end; i != start; i -= stride)
@@ -915,7 +915,7 @@ void down_ne_stride(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD18:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 				   
 void down_ne_stride_flip(size_t start, size_t end, size_t stride) {
   _Cilk_for (size_t i = end; start != i; i -= stride)
@@ -963,7 +963,7 @@ void down_ne_stride_flip(size_t start, size_t end, size_t stride) {
 // CHECK-NEXT: br i1 %[[COND]], label %{{.+}}, label %[[PFORCONDCLEANUP:.+]], !llvm.loop ![[LOOPMD19:.+]]
 
 // CHECK: [[PFORCONDCLEANUP]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 // CHECK: ![[LOOPMD]] = distinct !{![[LOOPMD]], ![[SPAWNSTRATEGY:.+]]}
 // CHECK: ![[SPAWNSTRATEGY]] = !{!"tapir.loop.spawn.strategy", i32 1}

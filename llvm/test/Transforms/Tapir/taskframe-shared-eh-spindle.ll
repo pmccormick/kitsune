@@ -1633,7 +1633,7 @@ pfor.inc.i.i.4:                                   ; preds = %.noexc179.4, %pfor.
   %383 = load i64, i64* @__csi_unit_sync_base_id, align 8, !invariant.load !2
   %384 = add i64 %383, 146
   call void @__csan_sync(i64 %384, i8 0)
-  sync within %syncreg19.i.i, label %sync.continue.i.i
+  tapir_sync within %syncreg19.i.i, label %sync.continue.i.i
 }
 
 ; CHECK-LABEL: define {{.*}}void @_ZN6parlay8to_charsIjjEENS_8sequenceIcNS_9allocatorIcEEEERKSt4pairIT_T0_E.outline_pfor.body.i.i.4.otd1(

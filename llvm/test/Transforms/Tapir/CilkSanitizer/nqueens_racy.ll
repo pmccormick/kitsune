@@ -1,4 +1,3 @@
-; RUN: opt %s -enable-new-pm=0 -csan -S | FileCheck %s
 ; RUN: opt %s -aa-pipeline=default -passes='cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -143,7 +142,7 @@ for.body.lr.ph:                                   ; preds = %if.end
   br label %for.body, !dbg !119
 
 for.cond.cleanup:                                 ; preds = %for.inc, %if.end
-  sync within %syncreg, label %sync.continue, !dbg !120
+  tapir_sync within %syncreg, label %sync.continue, !dbg !120
 
 for.body:                                         ; preds = %for.inc, %for.body.lr.ph
   %indvars.iv64 = phi i64 [ 0, %for.body.lr.ph ], [ %indvars.iv.next65, %for.inc ]

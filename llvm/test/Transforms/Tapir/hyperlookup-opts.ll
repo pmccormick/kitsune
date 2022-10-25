@@ -122,7 +122,7 @@ pfor.inc:                                         ; preds = %invoke.cont7, %pfor
   br i1 %exitcond, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !28
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 lpad10:                                           ; preds = %sync.continue
   %20 = landingpad { i8*, i32 }
@@ -208,7 +208,7 @@ _ZN4cilk7reducerINS_6op_addIxLb1EEEED2Ev.exit:    ; preds = %cond.end.i.i
 ; CHECK: store i64 %[[RESULT]], i64* %[[VIEW]]
 ; CHECK: reattach within %syncreg
 
-; CHECK: sync within %syncreg
+; CHECK: tapir_sync within %syncreg
 
 ; CHECK: %[[CALL2:.+]] = call strand_noalias i8* @__cilkrts_hyper_lookup(
 ; CHECK-NEXT: %[[VIEW2:.+]] = bitcast i8* %[[CALL2]] to i64*

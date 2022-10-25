@@ -1518,7 +1518,7 @@ pfor.inc.i.i.3.i.i.i:                             ; preds = %.noexc.3.i.i.i, %pf
   %512 = load i64, i64* @__csi_unit_sync_base_id, align 8, !invariant.load !2
   %513 = add i64 %512, 57
   call void @__csan_sync(i64 %513, i8 0)
-  sync within %syncreg19.i.i.i.i.i, label %sync.continue.i.i.i.i.i
+  tapir_sync within %syncreg19.i.i.i.i.i, label %sync.continue.i.i.i.i.i
 
 invoke.cont.i.i:                                  ; preds = %_ZN6parlay14_sequence_baseIcNS_9allocatorIcEEED2Ev.exit.3.i.i.i
   call void @__csan_after_call(i64 %432, i64 %430, i8 2, i64 0)
@@ -1644,7 +1644,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.inc
   %553 = load i64, i64* @__csi_unit_sync_base_id, align 8, !invariant.load !2
   %554 = add i64 %553, 58
   call void @__csan_sync(i64 %554, i8 0)
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   invoke void @llvm.sync.unwind(token %syncreg)

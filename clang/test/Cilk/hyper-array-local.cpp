@@ -5,7 +5,7 @@ extern void reduce_long(void *, void *);
 
 typedef long _Hyperobject(identity_long, reduce_long) rlong __attribute__((aligned(16)));
 
-// CHECK_LABEL: local_array_of_hyper
+// CHECK-LABEL: local_array_of_hyper
 long local_array_of_hyper(unsigned int x)
 {
   // CHECK: %x.addr = alloca
@@ -24,7 +24,7 @@ long local_array_of_hyper(unsigned int x)
   // CHECK ret i64 [[VAL]]
 }
 
-// CHECK_LABEL: local_hyper_of_array
+// CHECK-LABEL: local_hyper_of_array
 long local_hyper_of_array(unsigned int x)
 {
   // CHECK: %x.addr = alloca

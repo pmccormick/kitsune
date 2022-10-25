@@ -715,12 +715,6 @@ def warn_drv_sarif_format_unstable : Warning<
 
 def err_drv_riscv_unsupported_with_linker_relaxation : Error<
   "%0 is unsupported with RISC-V linker relaxation (-mrelax)">;
-def note_cc1_round_trip_original : Note<"Original arguments in round-trip: %0">;
-def note_cc1_round_trip_generated : Note<"Generated arguments #%0 in round-trip: %1">;
-def remark_cc1_round_trip_generated : Remark<"Generated arguments #%0 in round-trip: %1">, InGroup<RoundTripCC1Args>;
-def err_cc1_round_trip_fail_then_ok : Error<"Original arguments parse failed, then succeeded in round-trip">;
-def err_cc1_round_trip_ok_then_fail : Error<"Generated arguments parse failed in round-trip">;
-def err_cc1_round_trip_mismatch : Error<"Generated arguments do not match in round-trip">;
 
 // +----- kitsune  FIXME: should probably use kitsune-centric naming here.
 // deprecate cilkrts (opencilk should no be default)
@@ -785,7 +779,8 @@ def warn_missing_kitsune_kokkos_opts : Warning<
 // -----+
 
 def warn_drv_missing_cfg_file : Warning<
-  "cannot find clang configuration file, %0, in support of option: %1.">;
+  "cannot find clang configuration file, %0, in support of option: %1.">,
+  InGroup<KitsuneConfiguration>;
 def err_drv_cannot_read_kitsune_cfg_file : Error<
   "cannot read clang configuration file, %0, in support of option: %1.">;
 
@@ -793,19 +788,27 @@ def err_drv_cannot_read_kitsune_cfg_file : Error<
 // litter.  we instead opt to warning users in cases where the options are
 // used but were not enabled at build time.
 def warn_drv_kitsune_kokkos_disabled : Warning<
-  "kokkos support was not enabled when clang was built.">;
+  "kokkos support was not enabled when clang was built.">,
+  InGroup<KitsuneConfiguration>;
 def warn_drv_tapir_openmp_target_disabled : Warning<
-  "the openmp runtime ABI transform target was not enabled when clang was built.">;
+  "the openmp runtime ABI transform target was not enabled when clang was "
+  "built.">, InGroup<DisabledTarget>;
 def warn_drv_tapir_qthreads_target_disabled: Warning<
-  "the qthreads runtime ABI transform target was not enabled when clang was built.">;
+  "the qthreads runtime ABI transform target was not enabled when clang was "
+  "built.">, InGroup<DisabledTarget>;
 def warn_drv_tapir_realm_target_disabled: Warning<
-  "the realm runtime ABI transform target was not enabled when clang was built.">;
+  "the realm runtime ABI transform target was not enabled when clang was "
+  "built.">, InGroup<DisabledTarget>;
 def warn_drv_tapir_cuda_target_disabled: Warning<
-  "the cuda toolkit runtime ABI transform target was not enabled when clang was built.">;
+  "the cuda toolkit runtime ABI transform target was not enabled when clang "
+  "was built.">, InGroup<DisabledTarget>;
 def warn_drv_tapir_hip_target_disabled: Warning<
-  "the hip runtime ABI transform target was not enabled when clang was built.">;
+  "the hip runtime ABI transform target was not enabled when clang was "
+  "built.">, InGroup<DisabledTarget>;
 def warn_drv_tapir_opencl_target_disabled: Warning<
-  "the opencl toolkit runtime ABI transform target was not enabled when clang was built.">;
+  "the opencl toolkit runtime ABI transform target was not enabled when clang "
+  "was built.">, InGroup<DisabledTarget>;
 def warn_drv_tapir_gpu_target_disabled: Warning<
-  "the gpu runtime ABI transform target was not enabled when clang was built.">;
+  "the gpu runtime ABI transform target was not enabled when clang was "
+  "built.">, InGroup<DisabledTarget>;
 }

@@ -219,7 +219,7 @@ cleanup.cont:                                     ; preds = %cleanup, %entry
   %7 = bitcast %struct.__cilkrts_pedigree** %parent7.i to i64*
   store i64 %4, i64* %7, align 8, !tbaa !26
   call void @llvm.lifetime.end.p0i8(i64 16, i8* nonnull %5) #3
-  sync within %syncreg, label %preSyncL
+  tapir_sync within %syncreg, label %preSyncL
 
 preSyncL:                                         ; preds = %cleanup.cont
   ret void
@@ -286,7 +286,7 @@ cleanup.cont:                                     ; preds = %cleanup, %entry
   %7 = bitcast %struct.__cilkrts_pedigree** %parent7.i to i64*
   store i64 %4, i64* %7, align 8, !tbaa !26
   call void @llvm.lifetime.end.p0i8(i64 16, i8* nonnull %5) #3
-  sync within %syncreg, label %preSyncL
+  tapir_sync within %syncreg, label %preSyncL
 
 preSyncL:                                         ; preds = %cleanup.cont
   ret void

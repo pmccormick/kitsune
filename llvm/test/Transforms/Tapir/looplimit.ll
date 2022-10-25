@@ -25,7 +25,7 @@ entry:
 ; CHECK: i32 %limit
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %entry
-  sync within %syncreg, label %pfor.end.continue
+  tapir_sync within %syncreg, label %pfor.end.continue
 
 pfor.end.continue:                                ; preds = %pfor.cond.cleanup
   ret void

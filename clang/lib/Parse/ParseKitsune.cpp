@@ -25,8 +25,8 @@ StmtResult Parser::ParseSyncStatement() {
   SourceLocation SyncLoc = ConsumeToken(); // eat the '_kitsune_sync'
   assert(Tok.is(tok::identifier) && Tok.getIdentifierInfo() &&
          "Not an identifier!");
-  Token IdentTok = Tok; 
-  ConsumeToken(); 
+  Token IdentTok = Tok;
+  ConsumeToken();
   return Actions.ActOnSyncStmt(SyncLoc, IdentTok.getIdentifierInfo()->getName());
 }
 
@@ -39,7 +39,7 @@ StmtResult Parser::ParseSpawnStatement() {
 
   assert(Tok.is(tok::identifier) && Tok.getIdentifierInfo() &&
          "Not an identifier!");
-  Token IdentTok = Tok; 
+  Token IdentTok = Tok;
   ConsumeToken();
 
   // Parse statement of spawned child
@@ -114,7 +114,7 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
     return StmtError();
   }
 
-  ParsedAttributesWithRange attrs(AttrFactory);
+  ParsedAttributes attrs(AttrFactory);
   MaybeParseCXX11Attributes(attrs);
 
   SourceLocation EmptyInitStmtSemiLoc;
@@ -146,7 +146,7 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
               : FixItHint());
 
     ForRangeInfo.LoopVar = Actions.ActOnCXXForRangeIdentifier(
-        getCurScope(), Loc, Name, attrs, attrs.Range.getEnd());
+        getCurScope(), Loc, Name, attrs);
   } else if (isForInitDeclaration()) {  // for (int X = 4;
     ParenBraceBracketBalancer BalancerRAIIObj(*this);
 
@@ -161,8 +161,9 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
     ColonProtectionRAIIObject ColonProtection(*this, MightBeForRangeStmt);
 
     SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
+    ParsedAttributes DeclSpecAttrs(AttrFactory);
     DeclGroupPtrTy DG = ParseSimpleDeclaration(
-        DeclaratorContext::ForInit, DeclEnd, attrs, false,
+        DeclaratorContext::ForInit, DeclEnd, attrs, DeclSpecAttrs, false,
         MightBeForRangeStmt ? &ForRangeInfo : nullptr);
     FirstPart = Actions.ActOnDeclStmt(DG, DeclStart, Tok.getLocation());
     if (ForRangeInfo.ParsedForRangeDecl()) {

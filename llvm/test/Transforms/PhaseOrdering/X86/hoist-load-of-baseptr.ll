@@ -65,10 +65,8 @@ define dso_local void @_Z7computeRSt6vectorIiSaIiEEy(%"class.std::vector"* nound
 ; O2-NEXT:    [[WIDE_LOAD10:%.*]] = load <4 x i32>, <4 x i32>* [[TMP4]], align 4, !tbaa [[TBAA0]]
 ; O2-NEXT:    [[TMP5:%.*]] = add nsw <4 x i32> [[WIDE_LOAD]], <i32 1, i32 1, i32 1, i32 1>
 ; O2-NEXT:    [[TMP6:%.*]] = add nsw <4 x i32> [[WIDE_LOAD10]], <i32 1, i32 1, i32 1, i32 1>
-; O2-NEXT:    [[TMP7:%.*]] = bitcast i32* [[TMP1]] to <4 x i32>*
-; O2-NEXT:    store <4 x i32> [[TMP5]], <4 x i32>* [[TMP7]], align 4, !tbaa [[TBAA0]]
-; O2-NEXT:    [[TMP8:%.*]] = bitcast i32* [[TMP3]] to <4 x i32>*
-; O2-NEXT:    store <4 x i32> [[TMP6]], <4 x i32>* [[TMP8]], align 4, !tbaa [[TBAA0]]
+; O2-NEXT:    store <4 x i32> [[TMP5]], <4 x i32>* [[TMP2]], align 4, !tbaa [[TBAA0]]
+; O2-NEXT:    store <4 x i32> [[TMP6]], <4 x i32>* [[TMP4]], align 4, !tbaa [[TBAA0]]
 ; O2-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; O2-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; O2-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]
@@ -118,10 +116,8 @@ define dso_local void @_Z7computeRSt6vectorIiSaIiEEy(%"class.std::vector"* nound
 ; O3-NEXT:    [[WIDE_LOAD11:%.*]] = load <4 x i32>, <4 x i32>* [[TMP4]], align 4, !tbaa [[TBAA0]]
 ; O3-NEXT:    [[TMP5:%.*]] = add nsw <4 x i32> [[WIDE_LOAD]], <i32 1, i32 1, i32 1, i32 1>
 ; O3-NEXT:    [[TMP6:%.*]] = add nsw <4 x i32> [[WIDE_LOAD11]], <i32 1, i32 1, i32 1, i32 1>
-; O3-NEXT:    [[TMP7:%.*]] = bitcast i32* [[TMP1]] to <4 x i32>*
-; O3-NEXT:    store <4 x i32> [[TMP5]], <4 x i32>* [[TMP7]], align 4, !tbaa [[TBAA0]]
-; O3-NEXT:    [[TMP8:%.*]] = bitcast i32* [[TMP3]] to <4 x i32>*
-; O3-NEXT:    store <4 x i32> [[TMP6]], <4 x i32>* [[TMP8]], align 4, !tbaa [[TBAA0]]
+; O3-NEXT:    store <4 x i32> [[TMP5]], <4 x i32>* [[TMP2]], align 4, !tbaa [[TBAA0]]
+; O3-NEXT:    store <4 x i32> [[TMP6]], <4 x i32>* [[TMP4]], align 4, !tbaa [[TBAA0]]
 ; O3-NEXT:    [[INDEX_NEXT]] = add nuw i64 [[INDEX]], 8
 ; O3-NEXT:    [[TMP9:%.*]] = icmp eq i64 [[INDEX_NEXT]], [[N_VEC]]
 ; O3-NEXT:    br i1 [[TMP9]], label [[MIDDLE_BLOCK:%.*]], label [[VECTOR_BODY]], !llvm.loop [[LOOP4:![0-9]+]]

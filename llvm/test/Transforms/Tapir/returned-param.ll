@@ -70,7 +70,7 @@ det.cont:                                         ; preds = %det.achd, %if.end7
   %add14 = add nsw i64 %add9, %div
   %add.ptr15 = getelementptr inbounds i64, i64* %target, i64 %add14
   %call16 = tail call i64* @cilk_merge(i64* %add.ptr, i64 %sub11, i64* %add.ptr12, i64 %sub13, i64* %add.ptr15)
-  sync within %syncreg, label %det.cont.split
+  tapir_sync within %syncreg, label %det.cont.split
 
 det.cont.split:                                   ; preds = %if.then, %if.then6, %det.cont
   ret i64* %target

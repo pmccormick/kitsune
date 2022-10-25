@@ -244,7 +244,7 @@ pfor.cond.cleanup.loopexit:                       ; preds = %pfor.preattach.epil
   br label %pfor.cond.cleanup
 
 pfor.cond.cleanup:                                ; preds = %pfor.cond.cleanup.loopexit, %pfor.cond.epil.prol.loopexit, %pfor.cond.cleanup.strpm-lcssa
-  sync within %syncreg.i, label %sync.continue
+  tapir_sync within %syncreg.i, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   tail call void @llvm.sync.unwind(token %syncreg.i)
@@ -494,7 +494,7 @@ pfor.cond.cleanup56.loopexit:                     ; preds = %pfor.cond38.epil
   br label %pfor.cond.cleanup56
 
 pfor.cond.cleanup56:                              ; preds = %pfor.cond.cleanup56.loopexit, %middle.block1208, %pfor.cond.cleanup56.strpm-lcssa
-  sync within %syncreg.i, label %sync.continue58
+  tapir_sync within %syncreg.i, label %sync.continue58
 
 sync.continue58:                                  ; preds = %pfor.cond.cleanup56
   tail call void @llvm.sync.unwind(token %syncreg.i)
@@ -1091,7 +1091,7 @@ pfor.cond.cleanup134.loopexit2:                   ; preds = %pfor.cond100.epil
   br label %pfor.cond.cleanup134
 
 pfor.cond.cleanup134:                             ; preds = %pfor.cond.cleanup134.loopexit2, %pfor.cond.cleanup134.loopexit, %pfor.cond100.epil.prol.loopexit, %pfor.cond.cleanup134.loopexit1143.strpm-lcssa
-  sync within %syncreg.i, label %sync.continue136
+  tapir_sync within %syncreg.i, label %sync.continue136
 
 sync.continue136:                                 ; preds = %pfor.cond.cleanup134
   tail call void @llvm.sync.unwind(token %syncreg.i)
@@ -1573,7 +1573,7 @@ pfor.cond.cleanup.i.loopexit:                     ; preds = %pfor.cond.i.epil
   br label %pfor.cond.cleanup.i
 
 pfor.cond.cleanup.i:                              ; preds = %pfor.cond.cleanup.i.loopexit, %middle.block1382, %pfor.cond.cleanup.i.strpm-lcssa
-  sync within %syncreg.i, label %sync.continue.i
+  tapir_sync within %syncreg.i, label %sync.continue.i
 
 sync.continue.i:                                  ; preds = %pfor.cond.cleanup.i
   call void @llvm.sync.unwind(token %syncreg.i)
@@ -2004,7 +2004,7 @@ pfor.cond.cleanup220.loopexit:                    ; preds = %pfor.cond205.epil
   br label %pfor.cond.cleanup220
 
 pfor.cond.cleanup220:                             ; preds = %pfor.cond.cleanup220.loopexit, %pfor.cond.cleanup220.strpm-lcssa
-  sync within %syncreg.i, label %sync.continue222
+  tapir_sync within %syncreg.i, label %sync.continue222
 
 sync.continue222:                                 ; preds = %pfor.cond.cleanup220
   call void @llvm.sync.unwind(token %syncreg.i)
@@ -2261,7 +2261,7 @@ pfor.inc301.strpm.outer:                          ; preds = %cond.end.7, %pfor.c
   br i1 %niter1168.ncmp, label %pfor.cond284.strpm.detachloop.sync, label %pfor.cond284.strpm.outer, !llvm.loop !73
 
 pfor.cond284.strpm.detachloop.sync:               ; preds = %pfor.inc301.strpm.outer
-  sync within %syncreg271.strpm.detachloop, label %pfor.cond284.strpm.detachloop.reattach.split
+  tapir_sync within %syncreg271.strpm.detachloop, label %pfor.cond284.strpm.detachloop.reattach.split
 
 pfor.cond284.strpm.detachloop.reattach.split:     ; preds = %pfor.cond284.strpm.detachloop.sync
   reattach within %syncreg271, label %pfor.cond.cleanup304.strpm-lcssa
@@ -2345,7 +2345,7 @@ pfor.cond.cleanup304.loopexit:                    ; preds = %cond.end.epil
   br label %pfor.cond.cleanup304
 
 pfor.cond.cleanup304:                             ; preds = %pfor.cond.cleanup304.loopexit, %pfor.cond.cleanup304.strpm-lcssa
-  sync within %syncreg271, label %sync.continue306
+  tapir_sync within %syncreg271, label %sync.continue306
 
 sync.continue306:                                 ; preds = %pfor.cond.cleanup304
   call void @llvm.sync.unwind(token %syncreg271)
@@ -2372,7 +2372,7 @@ pfor.inc320:                                      ; preds = %if.end318, %pfor.co
   br i1 %exitcond1104, label %pfor.cond.cleanup323, label %pfor.cond258, !llvm.loop !76
 
 pfor.cond.cleanup323:                             ; preds = %pfor.inc320
-  sync within %syncreg.i, label %sync.continue325
+  tapir_sync within %syncreg.i, label %sync.continue325
 
 sync.continue325:                                 ; preds = %pfor.cond.cleanup323
   call void @llvm.sync.unwind(token %syncreg.i)
@@ -2464,7 +2464,7 @@ pfor.inc373:                                      ; preds = %pfor.body358, %pfor
   br i1 %exitcond1109, label %pfor.cond.cleanup376, label %pfor.cond352, !llvm.loop !77
 
 pfor.cond.cleanup376:                             ; preds = %pfor.inc373
-  sync within %syncreg.i, label %sync.continue378
+  tapir_sync within %syncreg.i, label %sync.continue378
 
 sync.continue378:                                 ; preds = %pfor.cond.cleanup376
   call void @llvm.sync.unwind(token %syncreg.i)
@@ -2845,7 +2845,7 @@ pfor.cond.cleanup425.loopexit:                    ; preds = %pfor.cond409.epil
   br label %pfor.cond.cleanup425
 
 pfor.cond.cleanup425:                             ; preds = %pfor.cond.cleanup425.loopexit, %pfor.cond.cleanup425.strpm-lcssa
-  sync within %syncreg.i, label %sync.continue427
+  tapir_sync within %syncreg.i, label %sync.continue427
 
 sync.continue427:                                 ; preds = %pfor.cond.cleanup425
   call void @llvm.sync.unwind(token %syncreg.i)

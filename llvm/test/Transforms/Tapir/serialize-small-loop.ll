@@ -11,7 +11,7 @@ entry:
   br label %pfor.detach, !dbg !8
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %sync.continue, !dbg !8
+  tapir_sync within %syncreg, label %sync.continue, !dbg !8
 
 pfor.detach:                                      ; preds = %pfor.inc, %entry
   %indvars.iv = phi i64 [ 0, %entry ], [ %indvars.iv.next, %pfor.inc ]

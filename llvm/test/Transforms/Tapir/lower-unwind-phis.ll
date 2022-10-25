@@ -1304,7 +1304,7 @@ pfor.inc104:                                      ; preds = %do.body.i, %pfor.co
   br i1 %exitcond873.not, label %pfor.cond.cleanup107, label %pfor.cond84, !llvm.loop !26
 
 pfor.cond.cleanup107:                             ; preds = %pfor.inc104
-  sync within %syncreg, label %sync.continue109
+  tapir_sync within %syncreg, label %sync.continue109
 
 lpad103:                                          ; preds = %sync.continue109
   %curr.sroa.0.0743.lcssa = phi i64* [ %curr.sroa.0.0743, %sync.continue109 ]
@@ -1496,14 +1496,14 @@ lpad308:                                          ; preds = %pfor.cond298
 pfor.inc326.strpm.outer:                          ; preds = %invoke.cont311, %pfor.cond298.strpm.outer
   %niter1101.nadd = add nuw nsw i64 0, 1
   %niter1101.ncmp = icmp eq i64 %niter1101.nadd, %stripiter1100.zext
-  sync within %syncreg.strpm.detachloop1098, label %pfor.cond298.strpm.detachloop.reattach.split
+  tapir_sync within %syncreg.strpm.detachloop1098, label %pfor.cond298.strpm.detachloop.reattach.split
 
 pfor.cond298.strpm.detachloop.reattach.split:     ; preds = %pfor.inc326.strpm.outer
   reattach within %syncreg, label %pfor.cond.cleanup329.strpm-lcssa
 
 pfor.cond.cleanup329.strpm-lcssa:                 ; preds = %pfor.cond298.strpm.detachloop.reattach.split, %invoke.cont286
   %lcmp.mod1103.not = icmp eq i64 %xtraiter1096, 0
-  sync within %syncreg, label %sync.continue331
+  tapir_sync within %syncreg, label %sync.continue331
 
 lpad325.loopexit.strpm:                           ; preds = %lpad308, %pfor.cond298.strpm.outer
   %front.sroa.0.117 = phi i64* [ %front.sroa.0.1.lcssa15, %lpad308 ], [ %front.sroa.0.1.lcssa15, %pfor.cond298.strpm.outer ]
@@ -1540,7 +1540,7 @@ sync.continue331:                                 ; preds = %pfor.cond.cleanup32
           to label %cleanup337 unwind label %lpad325.loopexit.split-lp
 
 cleanup337:                                       ; preds = %sync.continue331
-  sync within %syncreg, label %sync.continue384
+  tapir_sync within %syncreg, label %sync.continue384
 
 lpad378:                                          ; preds = %sync.continue384
   %front.sroa.0.1.lcssa15.lcssa21 = phi i64* [ %front.sroa.0.1.lcssa15, %sync.continue384 ]

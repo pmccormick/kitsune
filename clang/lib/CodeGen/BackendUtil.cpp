@@ -247,194 +247,6 @@ static bool asanUseGlobalsGC(const Triple &T, const CodeGenOptions &CGOpts) {
   return false;
 }
 
-static void addMemProfilerPasses(const PassManagerBuilder &Builder,
-                                 legacy::PassManagerBase &PM) {
-  PM.add(createMemProfilerFunctionPass());
-  PM.add(createModuleMemProfilerLegacyPassPass());
-}
-
-static void addAddressSanitizerPasses(const PassManagerBuilder &Builder,
-                                      legacy::PassManagerBase &PM) {
-  const PassManagerBuilderWrapper &BuilderWrapper =
-      static_cast<const PassManagerBuilderWrapper&>(Builder);
-  const Triple &T = BuilderWrapper.getTargetTriple();
-  const CodeGenOptions &CGOpts = BuilderWrapper.getCGOpts();
-  bool Recover = CGOpts.SanitizeRecover.has(SanitizerKind::Address);
-  bool UseAfterScope = CGOpts.SanitizeAddressUseAfterScope;
-  bool UseOdrIndicator = CGOpts.SanitizeAddressUseOdrIndicator;
-  bool UseGlobalsGC = asanUseGlobalsGC(T, CGOpts);
-  llvm::AsanDtorKind DestructorKind = CGOpts.getSanitizeAddressDtor();
-  llvm::AsanDetectStackUseAfterReturnMode UseAfterReturn =
-      CGOpts.getSanitizeAddressUseAfterReturn();
-  PM.add(createAddressSanitizerFunctionPass(/*CompileKernel*/ false, Recover,
-                                            UseAfterScope, UseAfterReturn));
-  PM.add(createModuleAddressSanitizerLegacyPassPass(
-      /*CompileKernel*/ false, Recover, UseGlobalsGC, UseOdrIndicator,
-      DestructorKind));
-}
-
-static void addKernelAddressSanitizerPasses(const PassManagerBuilder &Builder,
-                                            legacy::PassManagerBase &PM) {
-  PM.add(createAddressSanitizerFunctionPass(
-      /*CompileKernel*/ true, /*Recover*/ true, /*UseAfterScope*/ false,
-      /*UseAfterReturn*/ llvm::AsanDetectStackUseAfterReturnMode::Never));
-  PM.add(createModuleAddressSanitizerLegacyPassPass(
-      /*CompileKernel*/ true, /*Recover*/ true, /*UseGlobalsGC*/ true,
-      /*UseOdrIndicator*/ false));
-}
-
-static void addHWAddressSanitizerPasses(const PassManagerBuilder &Builder,
-                                            legacy::PassManagerBase &PM) {
-  const PassManagerBuilderWrapper &BuilderWrapper =
-      static_cast<const PassManagerBuilderWrapper &>(Builder);
-  const CodeGenOptions &CGOpts = BuilderWrapper.getCGOpts();
-  bool Recover = CGOpts.SanitizeRecover.has(SanitizerKind::HWAddress);
-  PM.add(createHWAddressSanitizerLegacyPassPass(
-      /*CompileKernel*/ false, Recover,
-      /*DisableOptimization*/ CGOpts.OptimizationLevel == 0));
-}
-
-static void addKernelHWAddressSanitizerPasses(const PassManagerBuilder &Builder,
-                                              legacy::PassManagerBase &PM) {
-  const PassManagerBuilderWrapper &BuilderWrapper =
-      static_cast<const PassManagerBuilderWrapper &>(Builder);
-  const CodeGenOptions &CGOpts = BuilderWrapper.getCGOpts();
-  PM.add(createHWAddressSanitizerLegacyPassPass(
-      /*CompileKernel*/ true, /*Recover*/ true,
-      /*DisableOptimization*/ CGOpts.OptimizationLevel == 0));
-}
-
-static void addGeneralOptsForMemorySanitizer(const PassManagerBuilder &Builder,
-                                             legacy::PassManagerBase &PM,
-                                             bool CompileKernel) {
-  const PassManagerBuilderWrapper &BuilderWrapper =
-      static_cast<const PassManagerBuilderWrapper&>(Builder);
-  const CodeGenOptions &CGOpts = BuilderWrapper.getCGOpts();
-  int TrackOrigins = CGOpts.SanitizeMemoryTrackOrigins;
-  bool Recover = CGOpts.SanitizeRecover.has(SanitizerKind::Memory);
-  PM.add(createMemorySanitizerLegacyPassPass(
-      MemorySanitizerOptions{TrackOrigins, Recover, CompileKernel,
-                             CGOpts.SanitizeMemoryParamRetval != 0}));
-
-  // MemorySanitizer inserts complex instrumentation that mostly follows
-  // the logic of the original code, but operates on "shadow" values.
-  // It can benefit from re-running some general purpose optimization passes.
-  if (Builder.OptLevel > 0) {
-    PM.add(createEarlyCSEPass());
-    PM.add(createReassociatePass());
-    PM.add(createLICMPass());
-    PM.add(createGVNPass());
-    PM.add(createInstructionCombiningPass());
-    PM.add(createDeadStoreEliminationPass());
-  }
-}
-
-static void addMemorySanitizerPass(const PassManagerBuilder &Builder,
-                                   legacy::PassManagerBase &PM) {
-  addGeneralOptsForMemorySanitizer(Builder, PM, /*CompileKernel*/ false);
-}
-
-static void addKernelMemorySanitizerPass(const PassManagerBuilder &Builder,
-                                         legacy::PassManagerBase &PM) {
-  addGeneralOptsForMemorySanitizer(Builder, PM, /*CompileKernel*/ true);
-}
-
-static void addThreadSanitizerPass(const PassManagerBuilder &Builder,
-                                   legacy::PassManagerBase &PM) {
-  PM.add(createThreadSanitizerLegacyPassPass());
-}
-
-static void addDataFlowSanitizerPass(const PassManagerBuilder &Builder,
-                                     legacy::PassManagerBase &PM) {
-  const PassManagerBuilderWrapper &BuilderWrapper =
-      static_cast<const PassManagerBuilderWrapper&>(Builder);
-  const LangOptions &LangOpts = BuilderWrapper.getLangOpts();
-  PM.add(createDataFlowSanitizerLegacyPassPass(LangOpts.NoSanitizeFiles));
-}
-
-static void addEntryExitInstrumentationPass(const PassManagerBuilder &Builder,
-                                            legacy::PassManagerBase &PM) {
-  PM.add(createEntryExitInstrumenterPass());
-}
-
-static void
-addPostInlineEntryExitInstrumentationPass(const PassManagerBuilder &Builder,
-                                          legacy::PassManagerBase &PM) {
-  PM.add(createPostInlineEntryExitInstrumenterPass());
-}
-
-static void addCilkSanitizerPass(const PassManagerBuilder &Builder,
-                                 legacy::PassManagerBase &PM) {
-  PM.add(createCilkSanitizerLegacyPass());
-
-  // CilkSanitizer inserts complex instrumentation that mostly follows the logic
-  // of the original code, but operates on "shadow" values.  It can benefit from
-  // re-running some general purpose optimization passes.
-  if (Builder.OptLevel > 0) {
-    PM.add(createSROAPass());
-    PM.add(createEarlyCSEPass(true));
-    PM.add(createJumpThreadingPass());
-    PM.add(createCorrelatedValuePropagationPass());
-    PM.add(createCFGSimplificationPass());
-    PM.add(createReassociatePass());
-    PM.add(createLICMPass());
-    PM.add(createCFGSimplificationPass());
-    PM.add(createInstructionCombiningPass());
-    PM.add(createSCCPPass());
-    PM.add(createBitTrackingDCEPass());
-    PM.add(createInstructionCombiningPass());
-    PM.add(createDeadStoreEliminationPass());
-    PM.add(createCFGSimplificationPass());
-    PM.add(createInstructionCombiningPass());
-    if (Builder.OptLevel > 1) {
-      PM.add(createFunctionInliningPass(
-                 Builder.OptLevel, Builder.SizeLevel, false));
-      PM.add(createGlobalOptimizerPass());
-      PM.add(createGlobalDCEPass());
-      PM.add(createSROAPass());
-      PM.add(createEarlyCSEPass(true));
-      PM.add(createJumpThreadingPass());
-      PM.add(createCorrelatedValuePropagationPass());
-      PM.add(createCFGSimplificationPass());
-      PM.add(createReassociatePass());
-      PM.add(createLICMPass());
-      PM.add(createCFGSimplificationPass());
-      PM.add(createInstructionCombiningPass());
-      PM.add(createSCCPPass());
-      PM.add(createBitTrackingDCEPass());
-      PM.add(createInstructionCombiningPass());
-      PM.add(createDeadStoreEliminationPass());
-      PM.add(createCFGSimplificationPass());
-      PM.add(createInstructionCombiningPass());
-    }
-  }
-}
-
-static void
-addComprehensiveStaticInstrumentationPass(const PassManagerBuilder &Builder,
-                                          legacy::PassManagerBase &PM) {
-  PM.add(createComprehensiveStaticInstrumentationLegacyPass());
-
-  // CSI inserts complex instrumentation that mostly follows the logic of the
-  // original code, but operates on "shadow" values.  It can benefit from
-  // re-running some general purpose optimization passes.
-  if (Builder.OptLevel > 0) {
-    PM.add(createInstructionCombiningPass());
-    PM.add(createEarlyCSEPass());
-    PM.add(createJumpThreadingPass());
-    PM.add(createCorrelatedValuePropagationPass());
-    PM.add(createCFGSimplificationPass());
-    PM.add(createReassociatePass());
-    PM.add(createLICMPass());
-    PM.add(createGVNPass());
-    PM.add(createSCCPPass());
-    PM.add(createBitTrackingDCEPass());
-    PM.add(createInstructionCombiningPass());
-    PM.add(createDeadStoreEliminationPass());
-    PM.add(createCFGSimplificationPass());
-  }
-}
-
 static CSIOptions getCSIOptionsForCilkscale(bool InstrumentBasicBlocks) {
   CSIOptions Options;
   // Disable CSI hooks that Cilkscale doesn't need.
@@ -465,87 +277,6 @@ static CSIOptions getCSIOptionsForCilkscaleBenchmark() {
   Options.CallsMayThrow = false;
   Options.CallsTerminateBlocks = false;
   return Options;
-}
-
-static void
-addCilkscaleInstrumentation(const PassManagerBuilder &Builder,
-                            legacy::PassManagerBase &PM) {
-  PM.add(createComprehensiveStaticInstrumentationLegacyPass(
-             getCSIOptionsForCilkscale(/*InstrumentBasicBlocks*/ false)));
-
-  // CSI inserts complex instrumentation that mostly follows the logic of the
-  // original code, but operates on "shadow" values.  It can benefit from
-  // re-running some general purpose optimization passes.
-  if (Builder.OptLevel > 0) {
-    PM.add(createInstructionCombiningPass());
-    PM.add(createEarlyCSEPass());
-    PM.add(createJumpThreadingPass());
-    PM.add(createCorrelatedValuePropagationPass());
-    PM.add(createCFGSimplificationPass());
-    PM.add(createReassociatePass());
-    PM.add(createLICMPass());
-    PM.add(createGVNPass());
-    PM.add(createSCCPPass());
-    PM.add(createBitTrackingDCEPass());
-    PM.add(createInstructionCombiningPass());
-    PM.add(createDeadStoreEliminationPass());
-    PM.add(createCFGSimplificationPass());
-  }
-}
-
-static void
-addCilkscaleInstructionCountInstrumentation(const PassManagerBuilder &Builder,
-                                            legacy::PassManagerBase &PM) {
-  PM.add(createComprehensiveStaticInstrumentationLegacyPass(
-             getCSIOptionsForCilkscale(/*InstrumentBasicBlocks*/ true)));
-
-  // CSI inserts complex instrumentation that mostly follows the logic of the
-  // original code, but operates on "shadow" values.  It can benefit from
-  // re-running some general purpose optimization passes.
-  if (Builder.OptLevel > 0) {
-    PM.add(createInstructionCombiningPass());
-    PM.add(createEarlyCSEPass());
-    PM.add(createJumpThreadingPass());
-    PM.add(createCorrelatedValuePropagationPass());
-    PM.add(createCFGSimplificationPass());
-    PM.add(createReassociatePass());
-    PM.add(createLICMPass());
-    PM.add(createGVNPass());
-    PM.add(createSCCPPass());
-    PM.add(createBitTrackingDCEPass());
-    PM.add(createInstructionCombiningPass());
-    PM.add(createDeadStoreEliminationPass());
-    PM.add(createCFGSimplificationPass());
-  }
-}
-
-static void
-addCilkscaleBenchmarkInstrumentation(const PassManagerBuilder &Builder,
-                                     legacy::PassManagerBase &PM) {
-  PM.add(createComprehensiveStaticInstrumentationLegacyPass(
-             getCSIOptionsForCilkscaleBenchmark()));
-
-  // CSI inserts complex instrumentation that mostly follows the logic of the
-  // original code, but operates on "shadow" values.  It can benefit from
-  // re-running some general purpose optimization passes.  Even though the
-  // cilkscale-benchmark tool disables most CSI instrumentation, we still
-  // perform these optimizations to maintain consistency with other cilkscale
-  // tools.
-  if (Builder.OptLevel > 0) {
-    PM.add(createInstructionCombiningPass());
-    PM.add(createEarlyCSEPass());
-    PM.add(createJumpThreadingPass());
-    PM.add(createCorrelatedValuePropagationPass());
-    PM.add(createCFGSimplificationPass());
-    PM.add(createReassociatePass());
-    PM.add(createLICMPass());
-    PM.add(createGVNPass());
-    PM.add(createSCCPPass());
-    PM.add(createBitTrackingDCEPass());
-    PM.add(createInstructionCombiningPass());
-    PM.add(createDeadStoreEliminationPass());
-    PM.add(createCFGSimplificationPass());
-  }
 }
 
 static TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
@@ -820,295 +551,6 @@ getInstrProfOptions(const CodeGenOptions &CodeGenOpts,
   Options.InstrProfileOutput = CodeGenOpts.InstrProfileOutput;
   Options.Atomic = CodeGenOpts.AtomicProfileUpdate;
   return Options;
-}
-
-void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
-                                      legacy::FunctionPassManager &FPM) {
-  // Handle disabling of all LLVM passes, where we want to preserve the
-  // internal module before any optimization.
-  if (CodeGenOpts.DisableLLVMPasses)
-    return;
-
-  // Figure out TargetLibraryInfo.  This needs to be added to MPM and FPM
-  // manually (and not via PMBuilder), since some passes (eg. InstrProfiling)
-  // are inserted before PMBuilder ones - they'd get the default-constructed
-  // TLI with an unknown target otherwise.
-  Triple TargetTriple(TheModule->getTargetTriple());
-  std::unique_ptr<TargetLibraryInfoImpl> TLII(
-      createTLII(TargetTriple, CodeGenOpts));
-
-  // If we reached here with a non-empty index file name, then the index file
-  // was empty and we are not performing ThinLTO backend compilation (used in
-  // testing in a distributed build environment). Drop any the type test
-  // assume sequences inserted for whole program vtables so that codegen doesn't
-  // complain.
-  if (!CodeGenOpts.ThinLTOIndexFile.empty())
-    MPM.add(createLowerTypeTestsPass(/*ExportSummary=*/nullptr,
-                                     /*ImportSummary=*/nullptr,
-                                     /*DropTypeTests=*/true));
-
-  PassManagerBuilderWrapper PMBuilder(TargetTriple, CodeGenOpts, LangOpts);
-
-  // At O0 and O1 we only run the always inliner which is more efficient. At
-  // higher optimization levels we run the normal inliner.
-  if (CodeGenOpts.OptimizationLevel <= 1) {
-    bool InsertLifetimeIntrinsics = ((CodeGenOpts.OptimizationLevel != 0 &&
-                                      !CodeGenOpts.DisableLifetimeMarkers) ||
-                                     LangOpts.Coroutines);
-    PMBuilder.Inliner = createAlwaysInlinerLegacyPass(InsertLifetimeIntrinsics);
-  } else {
-    // We do not want to inline hot callsites for SamplePGO module-summary build
-    // because profile annotation will happen again in ThinLTO backend, and we
-    // want the IR of the hot path to match the profile.
-    PMBuilder.Inliner = createFunctionInliningPass(
-        CodeGenOpts.OptimizationLevel, CodeGenOpts.OptimizeSize,
-        (!CodeGenOpts.SampleProfileFile.empty() &&
-         CodeGenOpts.PrepareForThinLTO));
-  }
-
-  PMBuilder.OptLevel = CodeGenOpts.OptimizationLevel;
-
-  if (TLII->hasTapirTarget())
-    PMBuilder.TapirTarget = TLII->getTapirTarget();
-
-
-  PMBuilder.SizeLevel = CodeGenOpts.OptimizeSize;
-  PMBuilder.SLPVectorize = CodeGenOpts.VectorizeSLP;
-  PMBuilder.LoopVectorize = CodeGenOpts.VectorizeLoop;
-  PMBuilder.LoopStripmine = CodeGenOpts.StripmineLoop;
-  // Only enable CGProfilePass when using integrated assembler, since
-  // non-integrated assemblers don't recognize .cgprofile section.
-  PMBuilder.CallGraphProfile = !CodeGenOpts.DisableIntegratedAS;
-
-
-  PMBuilder.DisableUnrollLoops = !CodeGenOpts.UnrollLoops;
-  // Loop interleaving in the loop vectorizer has historically been set to be
-  // enabled when loop unrolling is enabled.
-  PMBuilder.LoopsInterleaved = CodeGenOpts.UnrollLoops;
-  PMBuilder.MergeFunctions = CodeGenOpts.MergeFunctions;
-  PMBuilder.PrepareForThinLTO = CodeGenOpts.PrepareForThinLTO;
-  PMBuilder.PrepareForLTO = CodeGenOpts.PrepareForLTO;
-  PMBuilder.RerollLoops = CodeGenOpts.RerollLoops;
-
-  MPM.add(new TargetLibraryInfoWrapperPass(*TLII));
-
-  if (TM)
-    TM->adjustPassManager(PMBuilder);
-
-  if (CodeGenOpts.DebugInfoForProfiling ||
-      !CodeGenOpts.SampleProfileFile.empty())
-    PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
-                           addAddDiscriminatorsPass);
-
-  // In ObjC ARC mode, add the main ARC optimization passes.
-  if (LangOpts.ObjCAutoRefCount) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
-                           addObjCARCExpandPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_ModuleOptimizerEarly,
-                           addObjCARCAPElimPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
-                           addObjCARCOptPass);
-  }
-
-  if (LangOpts.Coroutines)
-    addCoroutinePassesToExtensionPoints(PMBuilder);
-
-  if (!CodeGenOpts.MemoryProfileOutput.empty()) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addMemProfilerPasses);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addMemProfilerPasses);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::LocalBounds)) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
-                           addBoundsCheckingPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addBoundsCheckingPass);
-  }
-
-  if (CodeGenOpts.hasSanitizeCoverage()) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addSanitizerCoveragePass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addSanitizerCoveragePass);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::Address)) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addAddressSanitizerPasses);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addAddressSanitizerPasses);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::KernelAddress)) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addKernelAddressSanitizerPasses);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addKernelAddressSanitizerPasses);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::HWAddress)) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addHWAddressSanitizerPasses);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addHWAddressSanitizerPasses);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::KernelHWAddress)) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addKernelHWAddressSanitizerPasses);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addKernelHWAddressSanitizerPasses);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::Memory)) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addMemorySanitizerPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addMemorySanitizerPass);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::KernelMemory)) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addKernelMemorySanitizerPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addKernelMemorySanitizerPass);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::Thread)) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addThreadSanitizerPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addThreadSanitizerPass);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::DataFlow)) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addDataFlowSanitizerPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addDataFlowSanitizerPass);
-  }
-
-  if (CodeGenOpts.InstrumentFunctions ||
-      CodeGenOpts.InstrumentFunctionEntryBare ||
-      CodeGenOpts.InstrumentFunctionsAfterInlining ||
-      CodeGenOpts.InstrumentForProfiling) {
-    PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
-                           addEntryExitInstrumentationPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addEntryExitInstrumentationPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addPostInlineEntryExitInstrumentationPass);
-    PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                           addPostInlineEntryExitInstrumentationPass);
-  }
-
-  if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
-    PMBuilder.addExtension(PassManagerBuilder::EP_TapirLate,
-                           addCilkSanitizerPass);
-
-  if (LangOpts.getCilktool() != LangOptions::CilktoolKind::Cilktool_None) {
-    switch (LangOpts.getCilktool()) {
-    default: break;
-    case LangOptions::CilktoolKind::Cilktool_Cilkscale:
-      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLoopEnd,
-                             addCilkscaleInstrumentation);
-      break;
-    case LangOptions::CilktoolKind::Cilktool_Cilkscale_InstructionCount:
-      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLoopEnd,
-                             addCilkscaleInstructionCountInstrumentation);
-      break;
-    case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
-      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLoopEnd,
-                             addCilkscaleBenchmarkInstrumentation);
-      break;
-    }
-  }
-
-  if (LangOpts.getComprehensiveStaticInstrumentation()) {
-    switch (LangOpts.getComprehensiveStaticInstrumentation()) {
-    case LangOptions::CSI_EarlyAsPossible:
-      PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
-                             addComprehensiveStaticInstrumentationPass);
-      PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                             addComprehensiveStaticInstrumentationPass);
-      break;
-    case LangOptions::CSI_ModuleOptimizerEarly:
-      PMBuilder.addExtension(PassManagerBuilder::EP_ModuleOptimizerEarly,
-                             addComprehensiveStaticInstrumentationPass);
-      PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                             addComprehensiveStaticInstrumentationPass);
-      break;
-    case LangOptions::CSI_OptimizerLast:
-      PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                             addComprehensiveStaticInstrumentationPass);
-      PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
-                             addComprehensiveStaticInstrumentationPass);
-      break;
-    case LangOptions::CSI_TapirLate:
-      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLate,
-                             addComprehensiveStaticInstrumentationPass);
-      break;
-    case LangOptions::CSI_TapirLoopEnd:
-      PMBuilder.addExtension(PassManagerBuilder::EP_TapirLoopEnd,
-                             addComprehensiveStaticInstrumentationPass);
-      break;
-    case LangOptions::CSI_None:
-      break;
-    }
-  }
-
-  // Set up the per-function pass manager.
-  FPM.add(new TargetLibraryInfoWrapperPass(*TLII));
-  if (CodeGenOpts.VerifyModule)
-    FPM.add(createVerifierPass());
-
-  // Set up the per-module pass manager.
-  if (!CodeGenOpts.RewriteMapFiles.empty())
-    addSymbolRewriterPass(CodeGenOpts, &MPM);
-
-  if (Optional<GCOVOptions> Options = getGCOVOptions(CodeGenOpts, LangOpts)) {
-    MPM.add(createGCOVProfilerPass(*Options));
-    if (CodeGenOpts.getDebugInfo() == codegenoptions::NoDebugInfo)
-      MPM.add(createStripSymbolsPass(true));
-  }
-
-  if (Optional<InstrProfOptions> Options =
-          getInstrProfOptions(CodeGenOpts, LangOpts))
-    MPM.add(createInstrProfilingLegacyPass(*Options, false));
-
-  bool hasIRInstr = false;
-  if (CodeGenOpts.hasProfileIRInstr()) {
-    PMBuilder.EnablePGOInstrGen = true;
-    hasIRInstr = true;
-  }
-  if (CodeGenOpts.hasProfileCSIRInstr()) {
-    assert(!CodeGenOpts.hasProfileCSIRUse() &&
-           "Cannot have both CSProfileUse pass and CSProfileGen pass at the "
-           "same time");
-    assert(!hasIRInstr &&
-           "Cannot have both ProfileGen pass and CSProfileGen pass at the "
-           "same time");
-    PMBuilder.EnablePGOCSInstrGen = true;
-    hasIRInstr = true;
-  }
-  if (hasIRInstr) {
-    if (!CodeGenOpts.InstrProfileOutput.empty())
-      PMBuilder.PGOInstrGen = CodeGenOpts.InstrProfileOutput;
-    else
-      PMBuilder.PGOInstrGen = getDefaultProfileGenName();
-  }
-  if (CodeGenOpts.hasProfileIRUse()) {
-    PMBuilder.PGOInstrUse = CodeGenOpts.ProfileInstrumentUsePath;
-    PMBuilder.EnablePGOCSInstrUse = CodeGenOpts.hasProfileCSIRUse();
-  }
-
-  if (!CodeGenOpts.SampleProfileFile.empty())
-    PMBuilder.PGOSampleUse = CodeGenOpts.SampleProfileFile;
-
-  PMBuilder.populateFunctionPassManager(FPM);
-  PMBuilder.populateModulePassManager(MPM);
 }
 
 static void setCommandLineOpts(const CodeGenOptions &CodeGenOpts) {
@@ -1514,10 +956,10 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
     // Register the Cilksan pass.
     if (LangOpts.Sanitize.has(SanitizerKind::Cilk))
       PB.registerTapirLateEPCallback(
-          [](ModulePassManager &MPM, OptimizationLevel Level) {
+          [&](ModulePassManager &MPM, OptimizationLevel Level) {
             MPM.addPass(CSISetupPass());
             MPM.addPass(CilkSanitizerPass());
-            PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+            PB.addPostCilkInstrumentationPipeline(MPM, Level);
           });
     // Register CSI instrumentation for Cilkscale
     if (LangOpts.getCilktool() != LangOptions::CilktoolKind::Cilktool_None) {
@@ -1526,29 +968,29 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale:
         PB.registerTapirLoopEndEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass(getCSIOptionsForCilkscale(false)));
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscale(false)));
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              PB.addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale_InstructionCount:
         PB.registerTapirLoopEndEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass(getCSIOptionsForCilkscale(true)));
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscale(true)));
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              PB.addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CilktoolKind::Cilktool_Cilkscale_Benchmark:
           PB.registerTapirLoopEndEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass(getCSIOptionsForCilkscaleBenchmark()));
               MPM.addPass(ComprehensiveStaticInstrumentationPass(
                   getCSIOptionsForCilkscaleBenchmark()));
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              PB.addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       }
@@ -1559,34 +1001,34 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
       case LangOptions::CSI_EarlyAsPossible:
       case LangOptions::CSI_ModuleOptimizerEarly:
         PB.registerPipelineStartEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              PB.addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_TapirLate:
         PB.registerTapirLateEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              PB.addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_TapirLoopEnd:
         PB.registerTapirLoopEndEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              PB.addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_OptimizerLast:
         PB.registerOptimizerLastEPCallback(
-            [](ModulePassManager &MPM, OptimizationLevel Level) {
+            [&](ModulePassManager &MPM, OptimizationLevel Level) {
               MPM.addPass(CSISetupPass());
               MPM.addPass(ComprehensiveStaticInstrumentationPass());
-              PassBuilder::addPostCilkInstrumentationPipeline(MPM, Level);
+              PB.addPostCilkInstrumentationPipeline(MPM, Level);
             });
         break;
       case LangOptions::CSI_None:

@@ -30,17 +30,17 @@ det.cont:                                         ; preds = %det.achd, %if.end
   %3 = load i64, i64* %n.addr, align 8
   %sub = sub nsw i64 %3, 1
   call void @_Z3fool(i64 %sub)
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 ; CHECK: det.cont:
-; CHECK: sync within %syncreg, label %sync.continue1
+; CHECK: tapir_sync within %syncreg, label %sync.continue1
 
 sync.continue:                                    ; preds = %det.cont
   call void @llvm.sync.unwind(token %syncreg)
-  sync within %syncreg, label %sync.continue1
+  tapir_sync within %syncreg, label %sync.continue1
 ; CHECK: sync.continue1:
 ; CHECK-NEXT: call void @llvm.sync.unwind(token %syncreg)
 ; CHECK-NEXT: br label %[[RETURN:.+]]
-; CHECK-NOT: sync within %syncreg
+; CHECK-NOT: tapir_sync within %syncreg
 ; CHECK-NOT: @llvm.sync.unwind
 sync.continue1:                                   ; preds = %sync.continue
   call void @llvm.sync.unwind(token %syncreg)

@@ -1,6 +1,5 @@
 ; Check that the CSI pass properly splits the predecessors of a detach-continuation block.
 ;
-; RUN: opt < %s -csi -S -o - | FileCheck %s
 ; RUN: opt < %s -passes='csi' -S -o - | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -42,10 +41,10 @@ det.achd1.tf.tf.tf.tf:                            ; preds = %det.achd1.tf.tf.tf
 ; CHECK: reattach within %syncreg.i28, label %[[CONTINUE]]
 
 if.else:                                          ; preds = %entry
-  sync within %syncreg.i28, label %if.end
+  tapir_sync within %syncreg.i28, label %if.end
 
 ; CHECK: if.else:
-; CHECK: sync within %syncreg.i28, label %[[SYNC_SPLIT:.+]]
+; CHECK: tapir_sync within %syncreg.i28, label %[[SYNC_SPLIT:.+]]
 
 ; CHECK: [[SYNC_SPLIT]]:
 ; CHECK: call void @__csi_after_sync(

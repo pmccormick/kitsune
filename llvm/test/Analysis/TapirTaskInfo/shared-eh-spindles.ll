@@ -1,4 +1,4 @@
-; RUN: opt < %s -analyze -tasks -enable-new-pm=0 2>&1 | FileCheck %s
+; RUN: opt < %s -passes='print<tasks>' -enable-new-pm=0 2>&1 | FileCheck %s
 ; RUN: opt < %s -passes='print<tasks>' -disable-output 2>&1 | FileCheck %s
 
 %struct.vertex = type { %class._point2d, %struct.tri*, %struct.tri*, i32, i32 }
@@ -93,7 +93,7 @@ lpad29:                                           ; preds = %lpad29.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad29.loopexit ]
   %14 = extractvalue { i8*, i32 } %lpad.phi, 0
   %15 = extractvalue { i8*, i32 } %lpad.phi, 1
-  sync within %syncreg, label %eh.resume
+  tapir_sync within %syncreg, label %eh.resume
 
 if.else:                                          ; preds = %entry
   %idx.ext51 = sext i32 %shl7 to i64
@@ -179,10 +179,10 @@ lpad81:                                           ; preds = %lpad81.loopexit
   %lpad.phi219 = phi { i8*, i32 } [ %lpad.loopexit217, %lpad81.loopexit ]
   %29 = extractvalue { i8*, i32 } %lpad.phi219, 0
   %30 = extractvalue { i8*, i32 } %lpad.phi219, 1
-  sync within %syncreg, label %eh.resume
+  tapir_sync within %syncreg, label %eh.resume
 
 if.end:                                           ; preds = %det.cont80.2, %invoke.cont79.3, %cond.end.3, %invoke.cont.3
-  sync within %syncreg, label %sync.continue92
+  tapir_sync within %syncreg, label %sync.continue92
 
 sync.continue92:                                  ; preds = %if.end
   %cnt.i = getelementptr inbounds %class.gTreeNode, %class.gTreeNode* %parent, i64 0, i32 2, i32 0

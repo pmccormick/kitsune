@@ -221,7 +221,7 @@ pfor.cond.cleanup.epilog-lcssa:                   ; preds = %pfor.inc.epil
   br label %pfor.cond.cleanup
 
 pfor.cond.cleanup:                                ; preds = %pfor.cond.cleanup.strpm-lcssa, %pfor.cond.cleanup.epilog-lcssa
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 lpad:                                             ; No predecessors!
   %32 = landingpad { i8*, i32 }

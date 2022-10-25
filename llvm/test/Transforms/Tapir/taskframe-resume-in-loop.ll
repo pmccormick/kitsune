@@ -1252,7 +1252,7 @@ pfor.inc:                                         ; preds = %pfor.body, %pfor.co
   br i1 %exitcond174, label %pfor.cond.cleanup, label %pfor.cond, !dbg !4898, !llvm.loop !4899
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg47, label %pfor.cond22.preheader, !dbg !4898
+  tapir_sync within %syncreg47, label %pfor.cond22.preheader, !dbg !4898
 
 pfor.cond22.preheader:                            ; preds = %pfor.cond.cleanup
   invoke void @llvm.sync.unwind(token %syncreg47)
@@ -1432,7 +1432,7 @@ pfor.inc.i.i157:                                  ; preds = %if.end.i.i154, %pfo
 pfor.cond.cleanup.i.i158:                         ; preds = %pfor.inc.i.i157
   call void @__csan_after_loop(i64 %48, i8 0, i64 3), !dbg !5251
   call void @__csan_sync(i64 %54, i8 0), !dbg !5251
-  sync within %syncreg.i.i140, label %sync.continue.i.i159, !dbg !5251
+  tapir_sync within %syncreg.i.i140, label %sync.continue.i.i159, !dbg !5251
 
 sync.continue.i.i159:                             ; preds = %pfor.cond.cleanup.i.i158
   invoke void @llvm.sync.unwind(token %syncreg.i.i140)
@@ -1515,7 +1515,7 @@ pfor.cond.cleanup36:                              ; preds = %pfor.inc33
   call void @__csan_after_loop(i64 %33, i8 0, i64 1), !dbg !5279
   %87 = add i64 %53, 121, !dbg !5279
   call void @__csan_sync(i64 %87, i8 0), !dbg !5279
-  sync within %syncreg47, label %sync.continue38, !dbg !5279
+  tapir_sync within %syncreg47, label %sync.continue38, !dbg !5279
 
 sync.continue38:                                  ; preds = %pfor.cond.cleanup36
   invoke void @llvm.sync.unwind(token %syncreg47)
@@ -1741,7 +1741,7 @@ pfor.inc.i.i:                                     ; preds = %if.end.i.i, %pfor.c
 pfor.cond.cleanup.i.i:                            ; preds = %pfor.inc.i.i
   call void @__csan_after_loop(i64 %119, i8 0, i64 3), !dbg !5439
   call void @__csan_sync(i64 %125, i8 0), !dbg !5439
-  sync within %syncreg.i.i, label %sync.continue.i.i, !dbg !5439
+  tapir_sync within %syncreg.i.i, label %sync.continue.i.i, !dbg !5439
 
 sync.continue.i.i:                                ; preds = %pfor.cond.cleanup.i.i
   invoke void @llvm.sync.unwind(token %syncreg.i.i)
@@ -1807,7 +1807,7 @@ pfor.cond.cleanup76:                              ; preds = %pfor.inc73
   call void @__csan_after_loop(i64 %104, i8 0, i64 1), !dbg !5456
   %154 = add i64 %124, 123, !dbg !5456
   call void @__csan_sync(i64 %154, i8 0), !dbg !5456
-  sync within %syncreg47, label %sync.continue78, !dbg !5456
+  tapir_sync within %syncreg47, label %sync.continue78, !dbg !5456
 
 sync.continue78:                                  ; preds = %pfor.cond.cleanup76
   invoke void @llvm.sync.unwind(token %syncreg47)

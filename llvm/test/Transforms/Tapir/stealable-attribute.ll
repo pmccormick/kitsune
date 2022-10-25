@@ -199,7 +199,7 @@ _Z11ptFindBlock8_point3dIdEdiS0_.exit.loopexit.us: ; preds = %for.body.i.us, %mi
   reattach within %syncreg, label %pfor.inc.us
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %pfor.inc.us, %entry
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.detach.preheader, %pfor.inc
   %indvars.iv101 = phi i64 [ %indvars.iv.next102, %pfor.inc ], [ 0, %pfor.detach.preheader ]
@@ -242,7 +242,7 @@ pfor.detach29.lr.ph:                              ; preds = %sync.continue
   br label %pfor.detach29
 
 pfor.cond.cleanup28:                              ; preds = %pfor.inc40, %sync.continue
-  sync within %syncreg18, label %sync.continue42
+  tapir_sync within %syncreg18, label %sync.continue42
 
 pfor.detach29:                                    ; preds = %pfor.inc40, %pfor.detach29.lr.ph
   %indvars.iv = phi i64 [ 0, %pfor.detach29.lr.ph ], [ %indvars.iv.next, %pfor.inc40 ]

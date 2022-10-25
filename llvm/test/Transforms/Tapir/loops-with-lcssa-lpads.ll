@@ -51,7 +51,7 @@ pfor.detach.lr.ph:                                ; preds = %if.else
   br label %pfor.detach
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %if.else
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.inc, %pfor.detach.lr.ph
   %__begin.0387 = phi i64 [ 0, %pfor.detach.lr.ph ], [ %inc, %pfor.inc ]
@@ -77,7 +77,7 @@ lpad20:                                           ; preds = %pfor.detach
           cleanup
   %6 = extractvalue { i8*, i32 } %5, 0
   %7 = extractvalue { i8*, i32 } %5, 1
-  sync within %syncreg, label %ehcleanup202
+  tapir_sync within %syncreg, label %ehcleanup202
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   tail call void @_Z9quickSortIiSt4lessIiElEvPT_T1_T0_(i32* %2, i64 %conv7)
@@ -96,7 +96,7 @@ pfor.detach44.lr.ph:                              ; preds = %sync.continue
   br label %pfor.detach44
 
 pfor.cond.cleanup43:                              ; preds = %pfor.inc53, %sync.continue
-  sync within %syncreg31, label %sync.continue55
+  tapir_sync within %syncreg31, label %sync.continue55
 
 pfor.detach44:                                    ; preds = %pfor.inc53, %pfor.detach44.lr.ph
   %__begin33.0385 = phi i64 [ 0, %pfor.detach44.lr.ph ], [ %inc54, %pfor.inc53 ]
@@ -172,7 +172,7 @@ lpad84.us-lcssa.us:                               ; preds = %pfor.body77.us
           to label %det.rethrow.unreachable105 unwind label %lpad99.loopexit.us-lcssa.us
 
 pfor.cond.cleanup71:                              ; preds = %pfor.inc97, %pfor.inc97.us, %sync.continue55
-  sync within %syncreg61, label %sync.continue106
+  tapir_sync within %syncreg61, label %sync.continue106
 
 pfor.detach73:                                    ; preds = %pfor.detach73.preheader, %pfor.inc97
   %__begin63.0382 = phi i64 [ %inc98, %pfor.inc97 ], [ 0, %pfor.detach73.preheader ]
@@ -320,7 +320,7 @@ lpad99:                                           ; preds = %lpad99.loopexit.us-
   %lpad.phi372 = phi { i8*, i32 } [ %lpad.us-lcssa.us, %lpad99.loopexit.us-lcssa.us ], [ %lpad.us-lcssa, %lpad99.loopexit.us-lcssa ]
   %24 = extractvalue { i8*, i32 } %lpad.phi372, 0
   %25 = extractvalue { i8*, i32 } %lpad.phi372, 1
-  sync within %syncreg61, label %ehcleanup202
+  tapir_sync within %syncreg61, label %ehcleanup202
 
 sync.continue106:                                 ; preds = %pfor.cond.cleanup71
   %mul110 = shl i64 %add, 2
@@ -371,7 +371,7 @@ pfor.detach144.lr.ph:                             ; preds = %sync.continue106
   br label %pfor.detach144
 
 pfor.cond.cleanup143:                             ; preds = %pfor.inc189, %sync.continue106
-  sync within %syncreg132, label %sync.continue198
+  tapir_sync within %syncreg132, label %sync.continue198
 
 pfor.detach144:                                   ; preds = %pfor.inc189, %pfor.detach144.lr.ph
   %__begin134.0379 = phi i64 [ 0, %pfor.detach144.lr.ph ], [ %inc190, %pfor.inc189 ]
@@ -455,7 +455,7 @@ lpad191:                                          ; preds = %lpad191.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad191.loopexit ]
   %46 = extractvalue { i8*, i32 } %lpad.phi, 0
   %47 = extractvalue { i8*, i32 } %lpad.phi, 1
-  sync within %syncreg132, label %ehcleanup202
+  tapir_sync within %syncreg132, label %ehcleanup202
 
 sync.continue198:                                 ; preds = %pfor.cond.cleanup143
   call void @free(i8* %call30) #2

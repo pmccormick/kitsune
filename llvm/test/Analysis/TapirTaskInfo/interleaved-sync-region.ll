@@ -2,7 +2,7 @@
 ; discriminating syncs interleave the set of parallel tasks.  Thanks
 ; to George Stelle for the inspiration for this test.
 
-; RUN: opt -enable-new-pm=0 -analyze -tasks -print-may-happen-in-parallel < %s 2>&1 | FileCheck %s
+; RUN: opt -enable-new-pm=0 -passes="print<tasks>" -print-may-happen-in-parallel < %s 2>&1 | FileCheck %s
 ; RUN: opt -passes="print<tasks>" -print-may-happen-in-parallel -disable-output < %s 2>&1 | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -17,7 +17,7 @@ entry:
   br label %while.body
 
 while.body:                                       ; preds = %entry, %det.cont4
-  sync within %syncrega, label %sync.continue
+  tapir_sync within %syncrega, label %sync.continue
 
 sync.continue:                                    ; preds = %while.body
   detach within %syncrega, label %det.achd, label %det.cont
@@ -27,7 +27,7 @@ det.achd:                                         ; preds = %sync.continue
   reattach within %syncrega, label %det.cont
 
 det.cont:                                         ; preds = %det.achd, %sync.continue
-  sync within %syncregb, label %sync.continue1
+  tapir_sync within %syncregb, label %sync.continue1
 
 sync.continue1:                                   ; preds = %det.cont
   detach within %syncregb, label %det.achd2, label %det.cont4

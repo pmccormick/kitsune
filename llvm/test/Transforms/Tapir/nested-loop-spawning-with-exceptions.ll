@@ -148,7 +148,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.cond.cleanup.l
   %cond.i.i.i.i339453 = phi %"class.std::vector.0"* [ %cond.i.i.i.i339, %invoke.cont4 ], [ null, %if.end.i ], [ %cond.i.i.i.i339, %pfor.cond.cleanup.loopexit ]
   %18 = phi i8* [ %14, %invoke.cont4 ], [ null, %if.end.i ], [ %14, %pfor.cond.cleanup.loopexit ]
   %19 = phi i64 [ %13, %invoke.cont4 ], [ 0, %if.end.i ], [ %13, %pfor.cond.cleanup.loopexit ]
-  sync within %syncreg, label %sync.continue87
+  tapir_sync within %syncreg, label %sync.continue87
 
 lpad:                                             ; preds = %_ZNSt12_Vector_baseISt5tupleIJidiEESaIS1_EE11_M_allocateEm.exit.i.i, %if.then.i
   %20 = landingpad { i8*, i32 }
@@ -230,7 +230,7 @@ pfor.cond.cleanup28.loopexit:                     ; preds = %pfor.inc
   br label %pfor.cond.cleanup28
 
 pfor.cond.cleanup28:                              ; preds = %pfor.cond.cleanup28.loopexit, %invoke.cont17
-  sync within %syncreg18, label %sync.continue
+  tapir_sync within %syncreg18, label %sync.continue
 
 lpad10.loopexit:                                  ; preds = %_ZNSt16allocator_traitsISaIiEE8allocateERS0_m.exit.i.i.i.i
   %lpad.loopexit370 = landingpad { i8*, i32 }
@@ -317,7 +317,7 @@ lpad45:                                           ; preds = %lpad45.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad45.loopexit ]
   %42 = extractvalue { i8*, i32 } %lpad.phi, 0
   %43 = extractvalue { i8*, i32 } %lpad.phi, 1
-  sync within %syncreg18, label %ehcleanup
+  tapir_sync within %syncreg18, label %ehcleanup
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup28
   %sub.ptr.sub.i275 = sub i64 %32, %29
@@ -601,7 +601,7 @@ lpad80:                                           ; preds = %lpad80.loopexit
   %lpad.phi369 = phi { i8*, i32 } [ %lpad.loopexit367, %lpad80.loopexit ]
   %104 = extractvalue { i8*, i32 } %lpad.phi369, 0
   %105 = extractvalue { i8*, i32 } %lpad.phi369, 1
-  sync within %syncreg, label %ehcleanup123
+  tapir_sync within %syncreg, label %ehcleanup123
 
 sync.continue87:                                  ; preds = %pfor.cond.cleanup
   %sub.ptr.sub.i254 = sub i64 %17, %19
@@ -1088,7 +1088,7 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 ; CHECK: {{^.split}}:
 ; CHECK-NEXT: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach29.ls2(i64
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LSUNWIND:.+]]
-; CHECK: sync within %[[SYNCREG]]
+; CHECK: tapir_sync within %[[SYNCREG]]
 ; CHECK: ret void
 ; CHECK: [[DUNWIND]]:
 ; CHECK: resume
@@ -1107,7 +1107,7 @@ declare void @llvm.memset.p0i8.i64(i8* nocapture writeonly, i8, i64, i32, i1) #1
 ; CHECK-NEXT: to label %[[INVOKECONT:.+]] unwind label %[[LSUNWIND:.+]]
 ; CHECK: {{^pfor.detach29.preheader.ls1:}}
 ; CHECK: invoke fastcc void @_Z14func_with_sretidRSt6vectorI6paramsSaIS0_EE.outline_pfor.detach29.ls2(i64 0,
-; CHECK: sync within %[[SYNCREG]]
+; CHECK: tapir_sync within %[[SYNCREG]]
 ; CHECK: ret void
 ; CHECK: [[DUNWIND]]:
 ; CHECK resume

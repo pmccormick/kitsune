@@ -121,7 +121,7 @@ entry:
   %xtraiter406 = and i64 %wide.trip.count.i, 2047
   %3 = icmp ult i64 %2, 2047
   %lcmp.mod412 = icmp eq i64 %xtraiter406, 0
-  sync within %syncreg143, label %_Z10initializePdS_S_S_S_mm.exit
+  tapir_sync within %syncreg143, label %_Z10initializePdS_S_S_S_mm.exit
 
 _Z10initializePdS_S_S_S_mm.exit:                  ; preds = %entry
   %4 = load i32, i32* @lastcol, align 4, !tbaa !4

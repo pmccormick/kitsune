@@ -361,7 +361,7 @@ const char *Instruction::getOpcodeName(unsigned OpCode) {
   case CallBr: return "callbr";
   case Detach: return "detach";
   case Reattach: return "reattach";
-  case Sync:   return "sync";
+  case Sync:   return "tapir_sync";
 
   // Standard unary operators...
   case FNeg: return "fneg";

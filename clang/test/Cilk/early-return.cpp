@@ -28,7 +28,7 @@ void foo(int p) {
 // CHECK: br i1 %{{.+}}, label %[[THEN:.+]], label %[[END:.+]]
 
 // CHECK: [[THEN]]:
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -46,7 +46,7 @@ void foo(int p) {
 // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label
 
 // CHECK: [[INVOKECONT2]]:
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 
 // CHECK: [[SYNCCONT2]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])

@@ -86,7 +86,7 @@ void parallelfor_noexcept(int n) {
 // CHECK: [[INVOKECONT2]]:
 // CHECK: call {{.*}}i32 @_Z3barP3Foo(
 // CHECK: reattach within %[[SYNCREG]]
-// CHECK-DAG: sync within %[[SYNCREG]]
+// CHECK-DAG: tapir_sync within %[[SYNCREG]]
 // CHECK: [[TASKLPAD]]:
 // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
 // CHECK-NEXT: cleanup
@@ -131,7 +131,7 @@ void parallelfor_tryblock(int n) {
       // CHECK-NEXT: to label %[[INVOKECONT3:.+]] unwind label %[[TASKLPAD:.+]]
       // CHECK: [[INVOKECONT3]]
       // CHECK: reattach within %[[SYNCREG2]]
-      // CHECK-DAG: sync within %[[SYNCREG2]]
+      // CHECK-DAG: tapir_sync within %[[SYNCREG2]]
       // CHECK: [[TASKLPAD]]:
       // CHECK-NEXT: landingpad [[LPADTYPE:.+]]
       // CHECK-NEXT: cleanup
@@ -482,7 +482,7 @@ void spawn_tryblock(int n) {
       // CHECK-NEXT: to label %[[INVOKECONT2:.+]] unwind label %[[CONT3UNWIND:.+]]
       bar(new Foo());
       // CHECK: [[INVOKECONT2]]:
-      // CHECK-NEXT: sync within %[[SYNCREG]]
+      // CHECK-NEXT: tapir_sync within %[[SYNCREG]]
       _Cilk_sync;
     }
   // CHECK: [[DUNWIND]]:

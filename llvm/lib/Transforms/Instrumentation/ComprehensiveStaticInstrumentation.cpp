@@ -2481,13 +2481,13 @@ void CSIImpl::instrumentFunction(Function &F) {
           SyncsWithUnwinds.insert(SI);
           BBsToIgnore.insert(SI->getSuccessor(0));
         }
-      } else if (isa<CallBase>(I)) {
+      } else if (CallBase* CB = dyn_cast<CallBase>(&I)) {
         // Record this function call as either an allocation function, a call to
         // free (or delete), a memory intrinsic, or an ordinary real function
         // call.
         if (isAllocationFn(&I, TLI))
           AllocationFnCalls.push_back(&I);
-        else if (isFreeCall(&I, TLI))
+        else if (getFreedOperand(CB, TLI))
           FreeCalls.push_back(&I);
         else if (isa<MemIntrinsic>(I))
           MemIntrinsics.push_back(&I);

@@ -1,4 +1,4 @@
-; RUN: opt < %s -enable-new-pm=0 -analyze -tasks | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -passes='print<tasks>' 2>&1 | FileCheck %s
 ; RUN: opt < %s -passes='print<tasks>' -disable-output 2>&1 | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -22,7 +22,7 @@ det.achd:                                         ; preds = %entry
 det.cont:                                         ; preds = %det.achd, %entry
   %arraydecay3 = getelementptr inbounds [16 x i32], [16 x i32]* %x, i32 0, i32 0
   call void @bar(i32* %arraydecay3)
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %det.cont
   ret void

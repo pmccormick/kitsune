@@ -360,7 +360,7 @@ if.then.i.i.i81:                                  ; preds = %invoke.cont.i80
   br label %_ZNSt6vectorIS_IlSaIlEESaIS1_EED2Ev.exit82
 
 _ZNSt6vectorIS_IlSaIlEESaIS1_EED2Ev.exit82:       ; preds = %invoke.cont.i80, %if.then.i.i.i81
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %_ZNSt6vectorIS_IlSaIlEESaIS1_EED2Ev.exit82
   invoke void @llvm.sync.unwind(token %syncreg)

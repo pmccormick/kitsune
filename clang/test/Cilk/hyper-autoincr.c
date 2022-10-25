@@ -8,7 +8,7 @@ extern void reduce(void* left, void* right);
 typedef long _Hyperobject *long_hp;
 typedef long _Hyperobject long_h;
 extern int _Hyperobject x, _Hyperobject y;
-// CHECK_LABEL: extern1
+// CHECK-LABEL: extern1
 void extern1()
 {
   // CHECK: call i8* @llvm.hyper.lookup
@@ -20,7 +20,7 @@ void extern1()
   ++x;
 }
 
-// CHECK_LABEL: extern2
+// CHECK-LABEL: extern2
 int extern2()
 {
   // CHECK: call i8* @llvm.hyper.lookup
@@ -32,7 +32,7 @@ int extern2()
   return 1 + --x;
 }
 
-// CHECK_LABEL: ptr_with_direct_typedef
+// CHECK-LABEL: ptr_with_direct_typedef
 long ptr_with_direct_typedef(long_hp ptr)
 {
   // CHECK-NOT: ret i64
@@ -41,7 +41,7 @@ long ptr_with_direct_typedef(long_hp ptr)
   return ++*ptr;
 }
 
-// CHECK_LABEL: ptr_with_indirect_typedef_1
+// CHECK-LABEL: ptr_with_indirect_typedef_1
 long ptr_with_indirect_typedef_1(long_h *ptr)
 {
   // CHECK-NOT: ret i64
@@ -51,7 +51,7 @@ long ptr_with_indirect_typedef_1(long_h *ptr)
   return *ptr++; // this increments the pointer, a dead store
 }
 
-// CHECK_LABEL: ptr_with_indirect_typedef_2
+// CHECK-LABEL: ptr_with_indirect_typedef_2
 long ptr_with_indirect_typedef_2(long_h *ptr)
 {
   // CHECK-NOT: ret i64
@@ -61,7 +61,7 @@ long ptr_with_indirect_typedef_2(long_h *ptr)
   return *++ptr; // again, the increment is dead
 }
 
-// CHECK_LABEL: ptr_with_indirect_typedef_3
+// CHECK-LABEL: ptr_with_indirect_typedef_3
 long ptr_with_indirect_typedef_3(long_h *ptr)
 {
   // CHECK-NOT: ret i64
@@ -73,7 +73,7 @@ long ptr_with_indirect_typedef_3(long_h *ptr)
   return ptr[0]++;
 }
 
-// CHECK_LABEL: direct_typedef_1
+// CHECK-LABEL: direct_typedef_1
 long direct_typedef_1()
 {
   extern long_h z;
@@ -84,7 +84,7 @@ long direct_typedef_1()
   return ++z;
 }
 
-// CHECK_LABEL: local_reducer_1
+// CHECK-LABEL: local_reducer_1
 double local_reducer_1()
 {
   // Initialization precedes registration
@@ -103,7 +103,7 @@ double local_reducer_1()
   return x;
 }
 
-// CHECK_LABEL: two_increments
+// CHECK-LABEL: two_increments
 long two_increments()
 {
   // It would also be correct for evaluation of operands of + to be interleaved.

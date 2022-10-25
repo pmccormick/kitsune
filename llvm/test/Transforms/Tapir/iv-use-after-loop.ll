@@ -70,7 +70,7 @@ pfor.detach.lr.ph:                                ; preds = %entry
   br label %pfor.detach
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.inc, %pfor.detach.lr.ph
   %indvars.iv306 = phi i64 [ 0, %pfor.detach.lr.ph ], [ %indvars.iv.next307, %pfor.inc ]
@@ -118,7 +118,7 @@ lpad27:                                           ; preds = %pfor.detach
           cleanup
   %12 = extractvalue { i8*, i32 } %11, 0
   %13 = extractvalue { i8*, i32 } %11, 1
-  sync within %syncreg, label %ehcleanup
+  tapir_sync within %syncreg, label %ehcleanup
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   %div32 = sdiv i32 %n, 100
@@ -143,7 +143,7 @@ while.body:                                       ; preds = %while.body.preheade
   br label %pfor.detach56
 
 pfor.cond.cleanup55:                              ; preds = %pfor.inc75
-  sync within %syncreg45, label %pfor.cond.cleanup55.split
+  tapir_sync within %syncreg45, label %pfor.cond.cleanup55.split
 
 ; CHECK: indvars.iv.next299.lcssa.escape = zext i32 %add43 to i64
 
@@ -194,10 +194,10 @@ lpad77:                                           ; preds = %pfor.detach56
           cleanup
   %21 = extractvalue { i8*, i32 } %20, 0
   %22 = extractvalue { i8*, i32 } %20, 1
-  sync within %syncreg45, label %ehcleanup
+  tapir_sync within %syncreg45, label %ehcleanup
 
 pfor.cond.cleanup97:                              ; preds = %pfor.inc134
-  sync within %syncreg87, label %sync.continue136
+  tapir_sync within %syncreg87, label %sync.continue136
 
 pfor.detach98:                                    ; preds = %pfor.cond.cleanup55.split, %pfor.inc134
   %indvars.iv301 = phi i64 [ %indvars.iv.next302, %pfor.inc134 ], [ 0, %pfor.cond.cleanup55.split ]

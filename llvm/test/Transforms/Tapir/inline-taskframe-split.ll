@@ -59,7 +59,7 @@ define internal fastcc void @_Z12timeMatching9edgeArrayIiEiPc(%struct.edgeArray*
   br label %18
 
 18:                                               ; preds = %17
-  sync within none, label %19
+  tapir_sync within none, label %19
 
 19:                                               ; preds = %18
   br label %20
@@ -88,7 +88,7 @@ define internal fastcc void @_Z12timeMatching9edgeArrayIiEiPc(%struct.edgeArray*
   br label %28
 
 28:                                               ; preds = %27
-  sync within none, label %29
+  tapir_sync within none, label %29
 
 29:                                               ; preds = %28
   br label %30

@@ -38,6 +38,6 @@ void foo(int p) {
 // CHECK-NEXT: br label %[[RETURN]]
 
 // CHECK: [[RETURN]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 // CHECK: ret void

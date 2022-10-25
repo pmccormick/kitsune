@@ -59,15 +59,15 @@ pfor.inc:                                         ; preds = %pfor.body, %pfor.co
   br i1 %exitcond, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !6
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg1, label %cleanup
+  tapir_sync within %syncreg1, label %cleanup
 ; CHECK: pfor.cond.cleanup:
-; CHECK: sync within %syncreg1
+; CHECK: tapir_sync within %syncreg1
 
 cleanup:                                          ; preds = %pfor.cond.cleanup, %det.cont
   tail call void @bar()
-  sync within %syncreg, label %sync.continue7
+  tapir_sync within %syncreg, label %sync.continue7
 ; CHECK: cleanup:
-; CHECK: sync within %syncreg
+; CHECK: tapir_sync within %syncreg
 
 sync.continue7:                                   ; preds = %cleanup
   call void @llvm.lifetime.end.p0i8(i64 4, i8* nonnull %sum.0.sum.0..sroa_cast)

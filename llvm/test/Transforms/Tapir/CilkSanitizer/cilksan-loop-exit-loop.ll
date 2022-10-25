@@ -1,7 +1,6 @@
 ; Check that Cilksan properly instruments programs with loops in the
 ; exits of Tapir loops.
 ;
-; RUN: opt < %s -enable-new-pm=0 -csan -S -o - | FileCheck %s
 ; RUN: opt < %s -passes='cilksan' -S -o - | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -701,7 +700,7 @@ pfor.body.i.i.3.i.i.i:                            ; preds = %pfor.inc.i.i.2.i.i.
   reattach within %syncreg19.i.i.i.i.i, label %pfor.inc.i.i.3.i.i.i
 
 pfor.inc.i.i.3.i.i.i:                             ; preds = %.noexc.3.i.i.i, %pfor.inc.i.i.2.i.i.i
-  sync within %syncreg19.i.i.i.i.i, label %sync.continue.i.i.i.i.i
+  tapir_sync within %syncreg19.i.i.i.i.i, label %sync.continue.i.i.i.i.i
 
 invoke.cont.i.i:                                  ; preds = %_ZN6parlay14_sequence_baseIcNS_9allocatorIcEEED2Ev.exit.3.i.i.i
   %impl.i20.i.i.i = getelementptr inbounds %"class.parlay::sequence.2", %"class.parlay::sequence.2"* %s.i.i.i, i64 0, i32 0, i32 0
@@ -769,7 +768,7 @@ pfor.inc:                                         ; preds = %"_ZZN6parlay8sequen
   br i1 %exitcond, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !36
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   call void @llvm.sync.unwind(token %syncreg)

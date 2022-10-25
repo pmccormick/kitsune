@@ -95,7 +95,7 @@ pfor.inc.i:                                       ; preds = %pfor.body.i, %pfor.
   br i1 %exitcond.not.i, label %pfor.cond.cleanup.i, label %pfor.cond.i, !llvm.loop !41
 
 pfor.cond.cleanup.i:                              ; preds = %pfor.inc.i
-  sync within %syncreg.i, label %QuadNode_addDescendantIntersections.exit
+  tapir_sync within %syncreg.i, label %QuadNode_addDescendantIntersections.exit
 
 QuadNode_addDescendantIntersections.exit:         ; preds = %det.achd1.tf, %if.end.i, %pfor.cond.cleanup.i
   call void @llvm.taskframe.end(token %tf.i)
@@ -149,7 +149,7 @@ pfor.inc.i19:                                     ; preds = %pfor.body.i17, %pfo
   br i1 %exitcond.not.i18, label %pfor.cond.cleanup.i20, label %pfor.cond.i15, !llvm.loop !41
 
 pfor.cond.cleanup.i20:                            ; preds = %pfor.inc.i19
-  sync within %syncreg.i1, label %QuadNode_addDescendantIntersections.exit21
+  tapir_sync within %syncreg.i1, label %QuadNode_addDescendantIntersections.exit21
 
 QuadNode_addDescendantIntersections.exit21:       ; preds = %if.else, %if.end.i6, %pfor.cond.cleanup.i20
   br label %if.end
@@ -193,7 +193,7 @@ det.cont15:                                       ; preds = %det.achd14, %det.co
   %seChild = getelementptr inbounds %struct.QuadNode, %struct.QuadNode* %quadnode, i64 0, i32 6
   %19 = load %struct.QuadNode*, %struct.QuadNode** %seChild, align 8, !tbaa !26
   call void @QuadNode_addIntersections(%struct.QuadNode* %19, %struct.IntersectionEventListReducer* %intersectionEventList, i32 %add)
-  sync within %syncreg, label %if.end27
+  tapir_sync within %syncreg, label %if.end27
 
 if.else17:                                        ; preds = %if.then4
   call void @QuadNode_addIntersections(%struct.QuadNode* nonnull %16, %struct.IntersectionEventListReducer* %intersectionEventList, i32 %add)
@@ -209,14 +209,14 @@ if.else17:                                        ; preds = %if.then4
   br label %if.end27
 
 if.end27:                                         ; preds = %if.else17, %det.cont15, %if.end
-  sync within %syncreg, label %sync.continue28
+  tapir_sync within %syncreg, label %sync.continue28
 
 sync.continue28:                                  ; preds = %if.end27
   ret void
 }
 
 ; CHECK: if.end27:
-; CHECK-NEXT: sync within %syncreg, label %[[SYNC_CONT:.+]]
+; CHECK-NEXT: tapir_sync within %syncreg, label %[[SYNC_CONT:.+]]
 ; CHECK: [[SYNC_CONT]]:
 ; CHECK: ret void
 

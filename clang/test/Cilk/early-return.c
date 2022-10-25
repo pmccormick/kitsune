@@ -21,12 +21,12 @@ void foo(int p) {
 // CHECK: br i1 %{{.+}}, label %[[THEN:.+]], label %[[END:.+]]
 
 // CHECK: [[THEN]]:
-// CHECK-NEXT: sync within %[[SYNCREG]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]]
 
 // CHECK: [[END]]:
 // CHECK-NEXT: call void {{.*}}@bar()
 
-// CHECK: sync within %[[SYNCREG]]
+// CHECK: tapir_sync within %[[SYNCREG]]
 
 // CHECK: ret void
 

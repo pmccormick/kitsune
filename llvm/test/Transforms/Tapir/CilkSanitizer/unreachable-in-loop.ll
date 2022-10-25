@@ -1,6 +1,5 @@
 ; Thanks to Brian Wheatman for the source code behind this test.
 ;
-; RUN: opt %s -enable-new-pm=0 -csan -S | FileCheck %s
 ; RUN: opt %s -aa-pipeline=default -passes='cilksan' -S | FileCheck %s
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -335,7 +334,7 @@ lpad31:                                           ; preds = %while.end
   br label %ehcleanup567, !dbg !2649
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %sync.continue, !dbg !2648
+  tapir_sync within %syncreg, label %sync.continue, !dbg !2648
 
 pfor.detach:                                      ; preds = %pfor.detach.preheader, %pfor.inc
   %indvars.iv1321 = phi i64 [ %indvars.iv.next1322, %pfor.inc ], [ 0, %pfor.detach.preheader ]
@@ -424,7 +423,7 @@ lpad84:                                           ; preds = %lpad84.loopexit
   %lpad.phi1024 = phi { i8*, i32 } [ %lpad.loopexit1022, %lpad84.loopexit ]
   %50 = extractvalue { i8*, i32 } %lpad.phi1024, 0, !dbg !2680
   %51 = extractvalue { i8*, i32 } %lpad.phi1024, 1, !dbg !2680
-  sync within %syncreg, label %ehcleanup567, !dbg !2648
+  tapir_sync within %syncreg, label %ehcleanup567, !dbg !2648
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   %inc92 = add nuw nsw i32 %i.01253, 1, !dbg !2681
@@ -535,7 +534,7 @@ lpad143:                                          ; preds = %while.end141
   br label %ehcleanup567, !dbg !2736
 
 pfor.cond.cleanup167:                             ; preds = %pfor.inc216
-  sync within %syncreg, label %sync.continue225, !dbg !2735
+  tapir_sync within %syncreg, label %sync.continue225, !dbg !2735
 
 pfor.detach168:                                   ; preds = %pfor.detach168.preheader, %pfor.inc216
   %indvars.iv1325 = phi i64 [ %indvars.iv.next1326, %pfor.inc216 ], [ 0, %pfor.detach168.preheader ]
@@ -624,7 +623,7 @@ lpad218:                                          ; preds = %lpad218.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad218.loopexit ]
   %69 = extractvalue { i8*, i32 } %lpad.phi, 0, !dbg !2764
   %70 = extractvalue { i8*, i32 } %lpad.phi, 1, !dbg !2764
-  sync within %syncreg, label %ehcleanup567, !dbg !2735
+  tapir_sync within %syncreg, label %ehcleanup567, !dbg !2735
 
 sync.continue225:                                 ; preds = %pfor.cond.cleanup167
   %inc233 = add nuw nsw i32 %i113.01256, 1, !dbg !2765

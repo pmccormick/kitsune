@@ -168,7 +168,7 @@ pfor.inc:                                         ; preds = %pfor.cond, %if.end3
   br i1 %exitcond, label %pfor.cond.cleanup, label %pfor.cond, !dbg !3288, !llvm.loop !3289
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %if.end44, !dbg !3288
+  tapir_sync within %syncreg, label %if.end44, !dbg !3288
 
 lpad37.loopexit:                                  ; preds = %pfor.cond, %lpad
   %lpad.loopexit = landingpad { i8*, i32 }
@@ -195,11 +195,11 @@ lpad37.loopexit:                                  ; preds = %pfor.cond, %lpad
 
 lpad37:                                           ; preds = %lpad37.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad37.loopexit ]
-  sync within %syncreg, label %sync.continue42, !dbg !3288
+  tapir_sync within %syncreg, label %sync.continue42, !dbg !3288
 
 ; CHECK: lpad37:
 ; CHECK-NEXT: %lpad.phi = phi { i8*, i32 } [ %[[EPILPHI]], %lpad37.loopexit.body ]
-; CHECK-NEXT: sync within %syncreg, label %sync.continue42
+; CHECK-NEXT: tapir_sync within %syncreg, label %sync.continue42
 
 sync.continue42:                                  ; preds = %lpad37
   resume { i8*, i32 } %lpad.phi, !dbg !3245

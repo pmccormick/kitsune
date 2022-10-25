@@ -1071,7 +1071,7 @@ let test_builder () =
     (* CHECK: %sync_region = tail call token @llvm.syncregion.start()
      * CHECK: detach within %sync_region, label %Bb02, label %Bb03
      * CHECK: reattach within %sync_region, label %Bb03
-     * CHECK: sync within %sync_region, label %Bb04
+     * CHECK: tapir_sync within %sync_region, label %Bb04
      *)
 
     (* Sync region faux function. *)

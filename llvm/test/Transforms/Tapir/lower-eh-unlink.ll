@@ -36,7 +36,7 @@ pfor.detach.lr.ph:                                ; preds = %entry
   br label %pfor.detach
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.inc, %pfor.detach.lr.ph
   %indvars.iv221 = phi i64 [ %indvars.iv.next222, %pfor.inc ], [ 0, %pfor.detach.lr.ph ]
@@ -376,7 +376,7 @@ lpad27:                                           ; preds = %pfor.detach
           cleanup
   %148 = extractvalue { i8*, i32 } %147, 0
   %149 = extractvalue { i8*, i32 } %147, 1
-  sync within %syncreg, label %ehcleanup119
+  tapir_sync within %syncreg, label %ehcleanup119
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   %call.i = tail call i32 @_ZN8sequence4scanIiiN5utils4addFIiEENS_4getAIiiEEEET_PS6_T0_S8_T1_T2_S6_bb(i32* %2, i32 0, i32 %add, i32* %2, i32 0, i1 zeroext false, i1 zeroext false)
@@ -402,7 +402,7 @@ pfor.detach66.lr.ph:                              ; preds = %if.end46
   br label %pfor.detach66
 
 pfor.cond.cleanup65:                              ; preds = %pfor.inc97, %if.end46
-  sync within %syncreg55, label %sync.continue106
+  tapir_sync within %syncreg55, label %sync.continue106
 
 pfor.detach66:                                    ; preds = %pfor.inc97, %pfor.detach66.lr.ph
   %indvars.iv = phi i64 [ %indvars.iv.next, %pfor.inc97 ], [ 0, %pfor.detach66.lr.ph ]
@@ -449,7 +449,7 @@ lpad99:                                           ; preds = %lpad99.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad99.loopexit ]
   %161 = extractvalue { i8*, i32 } %lpad.phi, 0
   %162 = extractvalue { i8*, i32 } %lpad.phi, 1
-  sync within %syncreg55, label %ehcleanup119
+  tapir_sync within %syncreg55, label %ehcleanup119
 
 sync.continue106:                                 ; preds = %pfor.cond.cleanup65
   tail call void @free(i8* %call3) #2

@@ -29,7 +29,7 @@ loop_latch:                                       ; preds = %synced21, %loop_bod
   br i1 %exitcond10, label %loop_exit, label %loop_body
 
 loop_exit:                                        ; preds = %loop_latch
-  sync within %syncreg, label %synced22
+  tapir_sync within %syncreg, label %synced22
 
 det.achd:                                         ; preds = %loop_body
   %syncreg5 = tail call token @llvm.syncregion.start()
@@ -45,7 +45,7 @@ loop_latch3:                                      ; preds = %block_exit20, %loop
   br i1 %exitcond9, label %loop_exit4, label %loop_body2
 
 loop_exit4:                                       ; preds = %loop_latch3
-  sync within %syncreg5, label %synced21
+  tapir_sync within %syncreg5, label %synced21
 
 block_exit:                                       ; preds = %loop_body2
   %2 = getelementptr inbounds [24 x float], [24 x float]* %O1, i64 %c06, i64 %c14
@@ -65,7 +65,7 @@ loop_latch9:                                      ; preds = %synced, %loop_body8
   br i1 %exitcond8, label %loop_exit10, label %loop_body8
 
 loop_exit10:                                      ; preds = %loop_latch9
-  sync within %syncreg11, label %block_exit20
+  tapir_sync within %syncreg11, label %block_exit20
 
 det.achd12:                                       ; preds = %loop_body8
   %syncreg17 = tail call token @llvm.syncregion.start()
@@ -81,7 +81,7 @@ loop_latch15:                                     ; preds = %det.achd18, %loop_b
   br i1 %exitcond, label %loop_exit16, label %loop_body14
 
 loop_exit16:                                      ; preds = %loop_latch15
-  sync within %syncreg17, label %synced
+  tapir_sync within %syncreg17, label %synced
 
 det.achd18:                                       ; preds = %loop_body14
   %7 = getelementptr inbounds [24 x [21 x [33 x float]]], [24 x [21 x [33 x float]]]* %A, i64 %c06, i64 %c14, i64 %c22, i64 %c31

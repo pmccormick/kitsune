@@ -5,7 +5,7 @@
 extern int _Hyperobject x[10];
 
 // One array with 10 hyperobject elements
-// CHECK_LABEL: read_array_hyper
+// CHECK-LABEL: read_array_hyper
 int read_array_hyper(unsigned i)
 {
   return x[i];

@@ -130,7 +130,7 @@ invoke.cont:                                      ; preds = %det.achd5
 
 det.cont10:                                       ; preds = %pfor.body, %invoke.cont
   tail call void @_Z9nothrowfni(i32 3) #6
-  sync within %syncreg4, label %pfor.preattach
+  tapir_sync within %syncreg4, label %pfor.preattach
 
 lpad:                                             ; preds = %det.achd5
   %2 = landingpad { i8*, i32 }
@@ -169,7 +169,7 @@ pfor.inc:                                         ; preds = %pfor.cond, %pfor.pr
   br i1 %exitcond158, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !10
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg1, label %cleanup
+  tapir_sync within %syncreg1, label %cleanup
 
 cleanup:                                          ; preds = %pfor.cond.cleanup
   br i1 %cmp, label %pfor.cond48, label %cleanup104
@@ -200,7 +200,7 @@ invoke.cont60:                                    ; preds = %det.achd56
 
 det.cont69:                                       ; preds = %pfor.body54, %invoke.cont60
   tail call void @_Z9nothrowfni(i32 5) #6
-  sync within %syncreg55, label %pfor.preattach86
+  tapir_sync within %syncreg55, label %pfor.preattach86
 
 lpad57:                                           ; preds = %det.achd56
   %12 = landingpad { i8*, i32 }
@@ -239,7 +239,7 @@ pfor.inc94:                                       ; preds = %pfor.cond48, %pfor.
   br i1 %exitcond, label %pfor.cond.cleanup97, label %pfor.cond48, !llvm.loop !11
 
 pfor.cond.cleanup97:                              ; preds = %pfor.inc94
-  sync within %syncreg36, label %cleanup104
+  tapir_sync within %syncreg36, label %cleanup104
 
 cleanup104:                                       ; preds = %det.cont, %pfor.cond.cleanup97, %cleanup
   %21 = tail call token @llvm.taskframe.create()
@@ -252,7 +252,7 @@ det.achd109:                                      ; preds = %cleanup104
 
 det.cont110:                                      ; preds = %det.achd109, %cleanup104
   tail call void @_Z9nothrowfni(i32 7) #6
-  sync within %syncreg, label %sync.continue111
+  tapir_sync within %syncreg, label %sync.continue111
 
 sync.continue111:                                 ; preds = %det.cont110
   ret i32 0
@@ -340,7 +340,7 @@ invoke.cont24:                                    ; preds = %det.achd20
 
 det.cont33:                                       ; preds = %invoke.cont18, %invoke.cont24
   call void @_Z9nothrowfni(i32 3) #6
-  sync within %syncreg19, label %sync.continue
+  tapir_sync within %syncreg19, label %sync.continue
 
 sync.continue:                                    ; preds = %det.cont33
   call void @_ZN3BarD1Ev(%class.Bar* nonnull %b2) #6
@@ -401,7 +401,7 @@ pfor.inc:                                         ; preds = %pfor.cond, %pfor.pr
   br i1 %exitcond210, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !12
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg12, label %cleanup
+  tapir_sync within %syncreg12, label %cleanup
 
 ehcleanup44:                                      ; preds = %ehcleanup41
   %lpad.val48 = insertvalue { i8*, i32 } undef, i8* %exn.slot16.0, 0
@@ -456,7 +456,7 @@ invoke.cont86:                                    ; preds = %det.achd82
 
 det.cont95:                                       ; preds = %invoke.cont80, %invoke.cont86
   call void @_Z9nothrowfni(i32 5) #6
-  sync within %syncreg81, label %sync.continue102
+  tapir_sync within %syncreg81, label %sync.continue102
 
 sync.continue102:                                 ; preds = %det.cont95
   call void @_ZN3BarD1Ev(%class.Bar* nonnull %b3) #6
@@ -517,7 +517,7 @@ pfor.inc120:                                      ; preds = %pfor.cond70, %pfor.
   br i1 %exitcond, label %pfor.cond.cleanup123, label %pfor.cond70, !llvm.loop !13
 
 pfor.cond.cleanup123:                             ; preds = %pfor.inc120
-  sync within %syncreg58, label %cleanup130
+  tapir_sync within %syncreg58, label %cleanup130
 
 ehcleanup113:                                     ; preds = %ehcleanup104
   %lpad.val117 = insertvalue { i8*, i32 } undef, i8* %exn.slot78.0, 0
@@ -556,7 +556,7 @@ invoke.cont141:                                   ; preds = %det.achd137
 
 det.cont150:                                      ; preds = %invoke.cont136, %invoke.cont141
   call void @_Z9nothrowfni(i32 7) #6
-  sync within %syncreg, label %sync.continue158
+  tapir_sync within %syncreg, label %sync.continue158
 
 lpad135:                                          ; preds = %cleanup130
   %41 = landingpad { i8*, i32 }
@@ -738,7 +738,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 
 ; CHECK: det.cont95.ls1:
 ; CHECK-NEXT: call void @_Z9nothrowfni(i32 5)
-; CHECK-NEXT: sync within %[[SYNCREG]], label %sync.continue102.ls1
+; CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %sync.continue102.ls1
 
 ; CHECK: sync.continue102.ls1:
 ; CHECK-NEXT: call void @_ZN3BarD1Ev(%class.Bar* nonnull %[[B3]])
@@ -817,7 +817,7 @@ declare i32 @llvm.tapir.loop.grainsize.i32(i32) #7
 
 ; CHECK: det.cont33.ls1:
 ; CHECK-NEXT: call void @_Z9nothrowfni(i32 3)
-; CHECK-NEXT: sync within %[[SYNCREG]], label %sync.continue.ls1
+; CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %sync.continue.ls1
 
 ; CHECK: sync.continue.ls1:
 ; CHECK-NEXT: call void @_ZN3BarD1Ev(%class.Bar* nonnull %[[B2]])

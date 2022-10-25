@@ -1,4 +1,3 @@
-; RUN: opt < %s -enable-new-pm=0 -loop-spawning-ti -simplifycfg -function-attrs -csi -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK
 ; RUN: opt < %s -passes='loop-spawning,function(simplifycfg),cgscc(function-attrs),csi-setup,csi' -csi-instrument-basic-blocks=false -csi-instrument-memory-accesses=false -csi-instrument-atomics=false -csi-instrument-memintrinsics=false -csi-instrument-allocfn=false -csi-instrument-alloca=false -csi-instrument-function-calls=false -S -o - | FileCheck %s --check-prefixes=CHECK
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
@@ -746,7 +745,7 @@ for.cond34.for.cond.cleanup37_crit_edge.us:       ; preds = %for.body39.us.epil,
   reattach within %syncreg203, label %pfor.inc.us
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc.us, %pfor.detach.lr.ph, %invoke.cont29
-  sync within %syncreg203, label %sync.continue
+  tapir_sync within %syncreg203, label %sync.continue
 
 lpad25:                                           ; preds = %if.else.i1184, %if.then.i.i1153, %if.else.i, %if.then.i.i1123, %if.end.i694, %invoke.cont24
   %126 = landingpad { i8*, i32 }
@@ -766,7 +765,7 @@ pfor.detach64.lr.ph:                              ; preds = %sync.continue
   br label %pfor.detach64
 
 pfor.cond.cleanup63:                              ; preds = %pfor.inc187, %sync.continue
-  sync within %syncreg203, label %sync.continue196
+  tapir_sync within %syncreg203, label %sync.continue196
 
 pfor.detach64:                                    ; preds = %pfor.inc187, %pfor.detach64.lr.ph
   %indvars.iv1869 = phi i64 [ 0, %pfor.detach64.lr.ph ], [ %indvars.iv.next1870, %pfor.inc187 ]
@@ -1053,7 +1052,7 @@ pfor.detach216.lr.ph:                             ; preds = %sync.continue196
   br label %pfor.detach216
 
 pfor.cond.cleanup215:                             ; preds = %pfor.inc284, %sync.continue196
-  sync within %syncreg203, label %sync.continue293
+  tapir_sync within %syncreg203, label %sync.continue293
 
 pfor.detach216:                                   ; preds = %pfor.inc284, %pfor.detach216.lr.ph
   %indvars.iv1879 = phi i64 [ 0, %pfor.detach216.lr.ph ], [ %indvars.iv.next1880, %pfor.inc284 ]
@@ -1072,7 +1071,7 @@ pfor.detach236.lr.ph:                             ; preds = %pfor.body221
   br label %pfor.detach236
 
 pfor.cond.cleanup234:                             ; preds = %pfor.inc263, %pfor.body221
-  sync within %syncreg222, label %sync.continue274
+  tapir_sync within %syncreg222, label %sync.continue274
 
 pfor.detach236:                                   ; preds = %pfor.inc263, %pfor.detach236.lr.ph
   %indvars.iv1874 = phi i64 [ 0, %pfor.detach236.lr.ph ], [ %indvars.iv.next1875, %pfor.inc263 ]

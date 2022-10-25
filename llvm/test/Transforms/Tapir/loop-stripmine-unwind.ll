@@ -98,7 +98,7 @@ pfor.body89:                                      ; preds = %while.body
   unreachable
 
 pfor.inc104:                                      ; preds = %while.body
-  sync within %syncreg, label %sync.continue109
+  tapir_sync within %syncreg, label %sync.continue109
 
 lpad103:                                          ; preds = %sync.continue109
   %5 = landingpad { i8*, i32 }
@@ -167,7 +167,7 @@ pfor.inc326:                                      ; preds = %pfor.preattach318, 
   br i1 %exitcond883.not, label %pfor.cond.cleanup329, label %pfor.cond298
 
 pfor.cond.cleanup329:                             ; preds = %pfor.inc326
-  sync within %syncreg, label %sync.continue331
+  tapir_sync within %syncreg, label %sync.continue331
 
 lpad325.loopexit:                                 ; preds = %pfor.cond298
   %lpad.loopexit596 = landingpad { i8*, i32 }
@@ -216,7 +216,7 @@ cleanup337:                                       ; preds = %sync.continue331
 
 ; CHECK: pfor.inc326.epil:
 
-; CHECK: sync within
+; CHECK: tapir_sync within
 
 ; CHECK: lpad325.loopexit:
 ; CHECK-NEXT: landingpad

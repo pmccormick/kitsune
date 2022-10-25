@@ -181,7 +181,7 @@ pfor.cond:                                        ; preds = %pfor.inc80, %for.en
 
 pfor.cond.cleanup:                                ; preds = %pfor.cond
   store i32 8, i32* %cleanup.dest.slot, align 4
-  sync within %syncreg, label %sync.continue92, !dbg !8524
+  tapir_sync within %syncreg, label %sync.continue92, !dbg !8524
 
 pfor.detach:                                      ; preds = %pfor.cond
   %26 = load i32, i32* %__init, align 4, !dbg !8524
@@ -226,7 +226,7 @@ pfor.cond55:                                      ; preds = %pfor.inc, %pfor.bod
 
 pfor.cond.cleanup57:                              ; preds = %pfor.cond55
   store i32 12, i32* %cleanup.dest.slot58, align 4
-  sync within %syncreg47, label %sync.continue, !dbg !8536
+  tapir_sync within %syncreg47, label %sync.continue, !dbg !8536
 
 pfor.detach59:                                    ; preds = %pfor.cond55
   %31 = load i32, i32* %__init48, align 4, !dbg !8536
@@ -315,7 +315,7 @@ lpad73:                                           ; preds = %pfor.detach59, %det
   store i8* %49, i8** %exn.slot74, align 8, !dbg !8562
   %50 = extractvalue { i8*, i32 } %48, 1, !dbg !8562
   store i32 %50, i32* %ehselector.slot75, align 4, !dbg !8562
-  sync within %syncreg47, label %sync.continue78, !dbg !8536
+  tapir_sync within %syncreg47, label %sync.continue78, !dbg !8536
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup57
   br label %pfor.end
@@ -353,7 +353,7 @@ lpad82:                                           ; preds = %pfor.detach, %det.r
   store i8* %53, i8** %exn.slot83, align 8, !dbg !8566
   %54 = extractvalue { i8*, i32 } %52, 1, !dbg !8566
   store i32 %54, i32* %ehselector.slot84, align 4, !dbg !8566
-  sync within %syncreg, label %sync.continue93, !dbg !8524
+  tapir_sync within %syncreg, label %sync.continue93, !dbg !8524
 
 sync.continue92:                                  ; preds = %pfor.cond.cleanup
   br label %pfor.end94

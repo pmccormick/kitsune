@@ -969,6 +969,10 @@ def CilkPlusLoopControlVarModification : DiagGroup<"cilk-loop-control-var-modifi
 def ReturnCilkSpawn : DiagGroup<"return-cilk-spawn">;
 def CilkIgnored : DiagGroup<"cilk-ignored">;
 
+// Kitsune/Tapir warnings.
+def KitsuneConfiguration : DiagGroup<"kitsune-configuration">;
+def DisabledTarget : DiagGroup<"disabled-target">;
+
 def Extra : DiagGroup<"extra", [
     DeprecatedCopy,
     MissingFieldInitializers,

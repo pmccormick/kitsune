@@ -61,7 +61,7 @@ pfor.inc:                                         ; preds = %pfor.preattach, %pf
   br i1 %exitcond, label %pfor.cond, label %pfor.cond.cleanup, !llvm.loop !7
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg, label %cleanup
+  tapir_sync within %syncreg, label %cleanup
 
 cleanup:                                          ; preds = %pfor.cond.cleanup, %entry
   ret void

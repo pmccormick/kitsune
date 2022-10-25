@@ -2065,7 +2065,7 @@ pfor.inc:                                         ; preds = %cond.end, %pfor.con
   br i1 %cmp91, label %pfor.cond, label %pfor.cond.cleanup, !dbg !5027, !llvm.loop !5028
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg284, label %sync.continue, !dbg !5027
+  tapir_sync within %syncreg284, label %sync.continue, !dbg !5027
 
 lpad90:                                           ; preds = %sync.continue
   %69 = landingpad { i8*, i32 }
@@ -2118,7 +2118,7 @@ pfor.inc121:                                      ; preds = %pfor.body118, %pfor
   br i1 %cmp123, label %pfor.cond112, label %pfor.cond.cleanup124, !dbg !5054, !llvm.loop !5055
 
 pfor.cond.cleanup124:                             ; preds = %pfor.inc121
-  sync within %syncreg284, label %sync.continue126, !dbg !5054
+  tapir_sync within %syncreg284, label %sync.continue126, !dbg !5054
 
 sync.continue126:                                 ; preds = %pfor.cond.cleanup124
   invoke void @llvm.sync.unwind(token %syncreg284)
@@ -2254,7 +2254,7 @@ pfor.inc199:                                      ; preds = %for.cond.cleanup, %
   br i1 %cmp201, label %pfor.cond153, label %pfor.cond.cleanup202, !dbg !5100, !llvm.loop !5101
 
 pfor.cond.cleanup202:                             ; preds = %pfor.inc199
-  sync within %syncreg284, label %sync.continue204, !dbg !5100
+  tapir_sync within %syncreg284, label %sync.continue204, !dbg !5100
 
 lpad198.loopexit:                                 ; preds = %lpad175, %pfor.cond153
   %lpad.loopexit = landingpad { i8*, i32 }
@@ -2354,7 +2354,7 @@ pfor.inc262:                                      ; preds = %pfor.preattach261, 
   br i1 %cmp264, label %pfor.cond238, label %pfor.cond.cleanup265, !dbg !5149, !llvm.loop !5150
 
 pfor.cond.cleanup265:                             ; preds = %pfor.inc262
-  sync within %syncreg284, label %sync.continue267, !dbg !5149
+  tapir_sync within %syncreg284, label %sync.continue267, !dbg !5149
 
 sync.continue267:                                 ; preds = %pfor.cond.cleanup265
   invoke void @llvm.sync.unwind(token %syncreg284)
@@ -2438,7 +2438,7 @@ pfor.inc338:                                      ; preds = %cond.end313, %pfor.
   br i1 %cmp340, label %pfor.cond296, label %pfor.cond.cleanup341, !dbg !5188, !llvm.loop !5189
 
 pfor.cond.cleanup341:                             ; preds = %pfor.inc338
-  sync within %syncreg284, label %sync.continue343, !dbg !5188
+  tapir_sync within %syncreg284, label %sync.continue343, !dbg !5188
 
 lpad337:                                          ; preds = %sync.continue343
   %111 = landingpad { i8*, i32 }

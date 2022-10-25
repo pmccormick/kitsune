@@ -48,7 +48,7 @@ pfor.inc:                                         ; preds = %for.cond.cleanup, %
   br i1 %exitcond83.not, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !6
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg17, label %if.end30
+  tapir_sync within %syncreg17, label %if.end30
 
 if.else:                                          ; preds = %entry
   %cmp12 = icmp ugt i64 %cCount, %rCount
@@ -66,7 +66,7 @@ det.achd:                                         ; preds = %if.then13
 det.cont:                                         ; preds = %det.achd, %if.then13
   %add18 = add i64 %div14, %cStart
   call void @_Z14transR_nothrowmmmmmm(i64 noundef %rStart, i64 noundef %rCount, i64 noundef %rLength, i64 noundef %add18, i64 noundef %sub16, i64 noundef %cLength) #7
-  sync within %syncreg17, label %if.end30
+  tapir_sync within %syncreg17, label %if.end30
 
 if.else20:                                        ; preds = %if.else
   %div22 = lshr i64 %rCount, 1
@@ -80,7 +80,7 @@ det.achd26:                                       ; preds = %if.else20
 det.cont27:                                       ; preds = %det.achd26, %if.else20
   %add28 = add i64 %div22, %rStart
   call void @_Z14transR_nothrowmmmmmm(i64 noundef %add28, i64 noundef %sub25, i64 noundef %rLength, i64 noundef %cStart, i64 noundef %cCount, i64 noundef %cLength) #7
-  sync within %syncreg17, label %if.end30
+  tapir_sync within %syncreg17, label %if.end30
 
 if.end30:                                         ; preds = %det.cont27, %det.cont, %if.then, %pfor.cond.cleanup
   ret void
@@ -90,16 +90,16 @@ if.end30:                                         ; preds = %det.cont27, %det.co
 
 ; CHECK: det.cont:
 ; CHECK-NOT: call void @_Z14transR_nothrowmmmmmm(
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK: br label %tailrecurse
 
 ; CHECK: det.cont27:
 ; CHECK-NOT: call void @_Z14transR_nothrowmmmmmm(
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK: br label %tailrecurse
 
 ; CHECK: if.end30:
-; CHECK-NEXT: sync within %syncreg17, label %[[RETBLK:.+]]
+; CHECK-NEXT: tapir_sync within %syncreg17, label %[[RETBLK:.+]]
 
 ; CHECK: [[RETBLK]]:
 ; CHECK-NEXT: ret void
@@ -153,7 +153,7 @@ pfor.inc:                                         ; preds = %for.cond.cleanup, %
   br i1 %exitcond83.not, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !9
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg17, label %sync.continue
+  tapir_sync within %syncreg17, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   call void @llvm.sync.unwind(token %syncreg17)
@@ -175,7 +175,7 @@ det.achd:                                         ; preds = %if.then13
 det.cont:                                         ; preds = %det.achd, %if.then13
   %add18 = add i64 %div14, %cStart
   call void @_Z6transRmmmmmm(i64 noundef %rStart, i64 noundef %rCount, i64 noundef %rLength, i64 noundef %add18, i64 noundef %sub16, i64 noundef %cLength)
-  sync within %syncreg17, label %sync.continue19
+  tapir_sync within %syncreg17, label %sync.continue19
 
 sync.continue19:                                  ; preds = %det.cont
   call void @llvm.sync.unwind(token %syncreg17)
@@ -193,7 +193,7 @@ det.achd26:                                       ; preds = %if.else20
 det.cont27:                                       ; preds = %det.achd26, %if.else20
   %add28 = add i64 %div22, %rStart
   call void @_Z6transRmmmmmm(i64 noundef %add28, i64 noundef %sub25, i64 noundef %rLength, i64 noundef %cStart, i64 noundef %cCount, i64 noundef %cLength)
-  sync within %syncreg17, label %sync.continue29
+  tapir_sync within %syncreg17, label %sync.continue29
 
 sync.continue29:                                  ; preds = %det.cont27
   call void @llvm.sync.unwind(token %syncreg17)
@@ -207,18 +207,18 @@ if.end30:                                         ; preds = %sync.continue, %if.
 
 ; CHECK: det.cont:
 ; CHECK-NOT: call void @_Z6transRmmmmmm(
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK-NOT: call void @llvm.sync.unwind(
 ; CHECK: br label %tailrecurse
 
 ; CHECK: det.cont27:
 ; CHECK-NOT: call void @_Z6transRmmmmmm(
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK-NOT: call void @llvm.sync.unwind(
 ; CHECK: br label %tailrecurse
 
 ; CHECK: if.end30:
-; CHECK-NEXT: sync within %syncreg17, label %[[RETBLK:.+]]
+; CHECK-NEXT: tapir_sync within %syncreg17, label %[[RETBLK:.+]]
 
 ; CHECK: [[RETBLK]]:
 ; CHECK-NEXT: call void @llvm.sync.unwind(token %syncreg17)

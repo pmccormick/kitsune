@@ -3,7 +3,6 @@
 ; destination, these calls are implicitly assumed not to throw when
 ; promoting calls to invokes.
 ;
-; RUN: opt < %s -csi -S -o - | FileCheck %s
 ; RUN: opt < %s -passes='csi' -S -o - | FileCheck %s
 
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
@@ -203,7 +202,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.inc
   %53 = load i64, i64* @__csi_unit_sync_base_id, align 8, !invariant.load !2
   %54 = add i64 %53, 6
   call void @__csan_sync(i64 %54, i8 0)
-  sync within %syncreg38, label %sync.continue
+  tapir_sync within %syncreg38, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   invoke void @llvm.sync.unwind(token %syncreg38)
@@ -292,7 +291,7 @@ pfor.cond.cleanup72:                              ; preds = %pfor.inc69
   call void @__csan_after_loop(i64 %61, i8 0, i64 1)
   %67 = add i64 %53, 7
   call void @__csan_sync(i64 %67, i8 0)
-  sync within %syncreg38, label %sync.continue74
+  tapir_sync within %syncreg38, label %sync.continue74
 
 sync.continue74:                                  ; preds = %pfor.cond.cleanup72
   invoke void @llvm.sync.unwind(token %syncreg38)

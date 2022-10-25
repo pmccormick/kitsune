@@ -55,7 +55,7 @@ det.cont:                                         ; preds = %det.achd, %if.then1
   %add.ptr5 = getelementptr inbounds i64, i64* %array, i64 %div1675
   %sub = sub nsw i64 %size, %div1675
   tail call fastcc void @cilk_sort_routine(i64* %add.ptr, i64* %add.ptr5, i64 %sub, i32 1, i32 %inc)
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %det.cont
   tail call fastcc void @parallel_merge(i64* %result, i64* %array, i64* %add.ptr5, i64 %div1675, i64 %sub)
@@ -73,7 +73,7 @@ det.cont21:                                       ; preds = %det.achd20, %if.els
   %add.ptr25 = getelementptr inbounds i64, i64* %array, i64 %div1675
   %sub27 = sub nsw i64 %size, %div1675
   tail call fastcc void @cilk_sort_routine(i64* %add.ptr23, i64* %add.ptr25, i64 %sub27, i32 0, i32 %inc)
-  sync within %syncreg, label %sync.continue31
+  tapir_sync within %syncreg, label %sync.continue31
 
 sync.continue31:                                  ; preds = %det.cont21
   tail call fastcc void @parallel_merge(i64* %array, i64* %result, i64* %add.ptr23, i64 %div1675, i64 %sub27)

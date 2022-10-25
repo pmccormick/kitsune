@@ -215,7 +215,7 @@ pfor.inc.us.i:                                    ; preds = %pfor.cond.us.i
   br i1 undef, label %pfor.cond.cleanup.i, label %pfor.cond.us.i
 
 pfor.cond.cleanup.i:                              ; preds = %pfor.inc.us.i
-  sync within %syncreg.i, label %for.body18
+  tapir_sync within %syncreg.i, label %for.body18
 
 for.body18:                                       ; preds = %for.body18, %pfor.cond.cleanup.i
   call void @__csan_sqrt(i64 undef, i64 undef, i8 0, i64 0, double undef, double undef)
@@ -225,7 +225,7 @@ for.body18:                                       ; preds = %for.body18, %pfor.c
   br i1 undef, label %for.end76, label %for.body18
 
 ; CHECK: pfor.cond.cleanup.i:
-; CHECK-NEXT: sync within %syncreg.i, label %[[BB_SPLIT:.+]]
+; CHECK-NEXT: tapir_sync within %syncreg.i, label %[[BB_SPLIT:.+]]
 
 ; CHECK: [[BB_SPLIT]]:
 ; CHECK-NEXT: br label %for.body18

@@ -18,7 +18,7 @@ pfor.body.i:                                      ; preds = %entry
   unreachable
 
 pfor.inc.i:                                       ; preds = %entry
-  sync within %syncreg143, label %_Z10initializePdS_S_S_S_mm.exit
+  tapir_sync within %syncreg143, label %_Z10initializePdS_S_S_S_mm.exit
 
 _Z10initializePdS_S_S_S_mm.exit:                  ; preds = %pfor.inc.i
   detach within %syncreg143, label %pfor.body, label %pfor.inc
@@ -27,7 +27,7 @@ pfor.body:                                        ; preds = %_Z10initializePdS_S
   unreachable
 
 pfor.inc:                                         ; preds = %_Z10initializePdS_S_S_S_mm.exit
-  sync within %syncreg143, label %sync.continue
+  tapir_sync within %syncreg143, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.inc
   detach within %syncreg143, label %pfor.body.i122, label %pfor.inc.i124
@@ -36,7 +36,7 @@ pfor.body.i122:                                   ; preds = %sync.continue
   unreachable
 
 pfor.inc.i124:                                    ; preds = %sync.continue
-  sync within %syncreg143, label %pfor.cond.i136
+  tapir_sync within %syncreg143, label %pfor.cond.i136
 
 pfor.cond.i136:                                   ; preds = %pfor.inc.i124
   detach within %syncreg143, label %pfor.body.i142, label %pfor.inc.i144
@@ -45,7 +45,7 @@ pfor.body.i142:                                   ; preds = %pfor.cond.i136
   unreachable
 
 pfor.inc.i144:                                    ; preds = %pfor.cond.i136
-  sync within %syncreg143, label %cleanup.tf.tfend
+  tapir_sync within %syncreg143, label %cleanup.tf.tfend
 
 cleanup.tf.tfend:                                 ; preds = %pfor.inc.i144
   detach within %syncreg143, label %pfor.body.i105, label %pfor.inc.i107
@@ -54,7 +54,7 @@ pfor.body.i105:                                   ; preds = %cleanup.tf.tfend
   unreachable
 
 pfor.inc.i107:                                    ; preds = %cleanup.tf.tfend
-  sync within %syncreg143, label %_Z11map_add_mulPdS_S_dmm.exit.tfend.tfend
+  tapir_sync within %syncreg143, label %_Z11map_add_mulPdS_S_dmm.exit.tfend.tfend
 
 _Z11map_add_mulPdS_S_dmm.exit.tfend.tfend:        ; preds = %pfor.inc.i107
   detach within %syncreg143, label %pfor.body73, label %pfor.inc101
@@ -63,7 +63,7 @@ pfor.body73:                                      ; preds = %_Z11map_add_mulPdS_
   unreachable
 
 pfor.inc101:                                      ; preds = %_Z11map_add_mulPdS_S_dmm.exit.tfend.tfend
-  sync within %syncreg143, label %sync.continue106
+  tapir_sync within %syncreg143, label %sync.continue106
 
 sync.continue106:                                 ; preds = %pfor.inc101
   br label %pfor.cond157

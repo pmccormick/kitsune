@@ -2569,8 +2569,10 @@ static bool MergeCompatibleInvokes(BasicBlock *BB, DomTreeUpdater *DTU) {
   // Record all the predecessors of this `landingpad`. As per verifier,
   // the only allowed predecessor is the unwind edge of an `invoke`.
   // We want to group "compatible" `invokes` into the same set to be merged.
-  for (BasicBlock *PredBB : predecessors(BB))
+  for (BasicBlock *PredBB : predecessors(BB)) {
+    llvm::errs() << *PredBB << "\n";
     Grouper.insert(cast<InvokeInst>(PredBB->getTerminator()));
+  }
 
   // And now, merge `invoke`s that were grouped togeter.
   for (ArrayRef<InvokeInst *> Invokes : Grouper.Sets) {
@@ -6965,10 +6967,9 @@ bool SimplifyCFGOpt::simplifyCondBranch(BranchInst *BI, IRBuilder<> &Builder) {
       // execute Successor #0 if it branches to Successor #1.
       Instruction *Succ0TI = BI->getSuccessor(0)->getTerminator();
       if (Succ0TI->getNumSuccessors() == 1 &&
-          Succ0TI->getSuccessor(0) == BI->getSuccessor(1)) {
+          Succ0TI->getSuccessor(0) == BI->getSuccessor(1))
         if (SpeculativelyExecuteBB(BI, BI->getSuccessor(0), TTI))
           return requestResimplify();
-      }
     }
   } else if (BI->getSuccessor(1)->getSinglePredecessor()) {
     // If Successor #0 has multiple preds, we may be able to conditionally

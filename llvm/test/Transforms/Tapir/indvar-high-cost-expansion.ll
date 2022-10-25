@@ -92,7 +92,7 @@ pfor.inc:                                         ; preds = %pfor.cond, %pfor.bo
   br i1 %exitcond, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !78
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg56, label %cleanup
+  tapir_sync within %syncreg56, label %cleanup
 
 cleanup:                                          ; preds = %pfor.cond.cleanup
   call void @llvm.lifetime.end.p0i8(i64 8, i8* nonnull %6) #23
@@ -153,7 +153,7 @@ pfor.inc97:                                       ; preds = %pfor.cond68, %invok
 ; CHECK-NEXT: br i1 %[[CMP]], label %pfor.cond68, label %pfor.cond.cleanup107
 
 pfor.cond.cleanup107:                             ; preds = %pfor.inc97
-  sync within %syncreg56, label %cleanup116
+  tapir_sync within %syncreg56, label %cleanup116
 
 lpad90:                                           ; preds = %pfor.body74
   %14 = landingpad { i8*, i32 }
@@ -171,7 +171,7 @@ lpad99.loopexit:                                  ; preds = %pfor.cond68, %lpad9
 
 lpad99:                                           ; preds = %lpad99.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad99.loopexit ]
-  sync within %syncreg56, label %sync.continue111
+  tapir_sync within %syncreg56, label %sync.continue111
 
 sync.continue111:                                 ; preds = %lpad99
   call void @llvm.lifetime.end.p0i8(i64 8, i8* nonnull %10) #23

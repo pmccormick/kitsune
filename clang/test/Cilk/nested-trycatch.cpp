@@ -41,7 +41,7 @@ void foo() {
 // CHECK: br i1 {{.+}}, label {{.+}}, label %[[EHCLEANUP:.+]]
 
 // CHECK: call void @llvm.taskframe.end(token %[[TF]])
-// CHECK: sync within %[[SYNCREG1]]
+// CHECK: tapir_sync within %[[SYNCREG1]]
 
 // CHECK: [[EHCLEANUP]]:
 // CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TF]],

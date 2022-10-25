@@ -23,7 +23,7 @@ pfor.detach.preheader:                            ; preds = %if.then
   br label %pfor.detach
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %if.then
-  sync within %syncreg, label %if.end
+  tapir_sync within %syncreg, label %if.end
 
 pfor.detach:                                      ; preds = %pfor.detach.preheader, %pfor.inc
   %i.016 = phi i64 [ %add2, %pfor.inc ], [ 0, %pfor.detach.preheader ]

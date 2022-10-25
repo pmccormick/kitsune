@@ -75,7 +75,7 @@ det.cont:                                         ; preds = %det.achd, %if.else
   %sub.ptr.sub6 = sub i64 %sub.ptr.lhs.cast4, %sub.ptr.rhs.cast5
   %sub.ptr.div7 = ashr exact i64 %sub.ptr.sub6, 3
   tail call void @_Z9quickSortIdSt4lessIdElEvPT_T1_T0_(double* %0, i64 %sub.ptr.div7)
-  sync within %syncreg, label %if.end
+  tapir_sync within %syncreg, label %if.end
 
 if.end:                                           ; preds = %det.cont, %if.then
   ret void
@@ -92,7 +92,7 @@ if.then:                                          ; preds = %det.cont, %entry
   %A.tr.lcssa = phi double* [ %A, %entry ], [ %0, %det.cont ]
   %n.tr.lcssa = phi i64 [ %n, %entry ], [ %sub.ptr.div7, %det.cont ]
   tail call void @_Z15quickSortSerialIdSt4lessIdElEvPT_T1_T0_(double* %A.tr.lcssa, i64 %n.tr.lcssa)
-  sync within %syncreg, label %if.end.split
+  tapir_sync within %syncreg, label %if.end.split
 
 if.else:                                          ; preds = %entry, %det.cont
   %n.tr22 = phi i64 [ %sub.ptr.div7, %det.cont ], [ %n, %entry ]
@@ -160,7 +160,7 @@ det.cont:                                         ; preds = %det.achd, %if.else
   %sub.ptr.sub6 = sub i64 %sub.ptr.lhs.cast4, %sub.ptr.rhs.cast5
   %sub.ptr.div7 = ashr exact i64 %sub.ptr.sub6, 3
   tail call void @_Z9quickSortIPc7strLesslEvPT_T1_T0_(i8** %0, i64 %sub.ptr.div7)
-  sync within %syncreg, label %if.end
+  tapir_sync within %syncreg, label %if.end
 
 if.end:                                           ; preds = %det.cont, %if.then
   ret void
@@ -177,7 +177,7 @@ if.then:                                          ; preds = %det.cont, %entry
   %A.tr.lcssa = phi i8** [ %A, %entry ], [ %0, %det.cont ]
   %n.tr.lcssa = phi i64 [ %n, %entry ], [ %sub.ptr.div7, %det.cont ]
   tail call void @_Z15quickSortSerialIPc7strLesslEvPT_T1_T0_(i8** %A.tr.lcssa, i64 %n.tr.lcssa)
-  sync within %syncreg, label %if.end.split
+  tapir_sync within %syncreg, label %if.end.split
 
 if.else:                                          ; preds = %entry, %det.cont
   %n.tr22 = phi i64 [ %sub.ptr.div7, %det.cont ], [ %n, %entry ]
@@ -375,7 +375,7 @@ if.then28:                                        ; preds = %if.end26
 ; CHECK-NEXT: to label %.noexc3 unwind label %lpad32
 
 ; CHECK: .noexc3:
-; CHECK-NEXT: sync within %syncreg.i, label %_Z9quickSortIdSt4lessIdEiEvPT_T1_T0_.exit
+; CHECK-NEXT: tapir_sync within %syncreg.i, label %_Z9quickSortIdSt4lessIdEiEvPT_T1_T0_.exit
 
 ; CHECK: [[TASKFRAMELPAD]]:
 ; CHECK: invoke void @llvm.taskframe.resume.sl_p0i8i32s(token %[[TASKFRAME]],

@@ -5,7 +5,7 @@
 // One hyperobject array with 10 integer elementso
 typedef int I10[10];
 extern I10 _Hyperobject y;
-// CHECK_LABEL: read_hyper_array
+// CHECK-LABEL: read_hyper_array
 int read_hyper_array(unsigned i)
 {
   return y[i];

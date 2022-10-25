@@ -364,7 +364,7 @@ if.then89:                                        ; preds = %land.lhs.true85
 
 if.end97:                                         ; preds = %if.end65, %land.lhs.true85, %if.then89
   %r11.1 = phi %struct.InternalNode* [ %call95, %if.then89 ], [ %r11.0, %land.lhs.true85 ], [ %r11.0, %if.end65 ]
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %if.end97
   %arrayidx99 = getelementptr inbounds %struct.InternalNode, %struct.InternalNode* %a, i64 0, i32 0, i64 1
@@ -445,7 +445,7 @@ if.then155:                                       ; preds = %land.lhs.true151
 
 if.end163:                                        ; preds = %if.end131, %land.lhs.true151, %if.then155
   %r11.2 = phi %struct.InternalNode* [ %call161, %if.then155 ], [ %r11.1, %land.lhs.true151 ], [ %r11.1, %if.end131 ]
-  sync within %syncreg, label %sync.continue164
+  tapir_sync within %syncreg, label %sync.continue164
 
 sync.continue164:                                 ; preds = %if.end163
   br i1 %cmp24, label %if.then166, label %if.else176

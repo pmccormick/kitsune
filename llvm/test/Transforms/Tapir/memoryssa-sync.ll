@@ -26,11 +26,11 @@ det.achd:                                         ; preds = %if.end
 det.cont:                                         ; preds = %det.achd, %if.end
   %sub1 = add nsw i32 %n, -2
   %call2 = tail call i32 @fib(i32 %sub1)
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 ; CHECK: det.cont:
 ; CHECK: [[DETCONTPHI:[0-9]+]] = MemoryPhi({if.end,{{[0-9]+}}},{det.achd,{{[0-9]+}}})
 ; CHECK: [[SYNCDEF:[0-9]+]] = MemoryDef([[DETCONTPHI]])
-; CHECK-NEXT: sync within %syncreg, label %sync.continue
+; CHECK-NEXT: tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %det.cont
   %x.0.load10 = load i32, i32* %x, align 4

@@ -409,7 +409,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.inc
   call void @__csan_after_loop(i64 %12, i8 0, i64 3) #20
   %25 = load i64, i64* @__csi_unit_sync_base_id, align 8, !invariant.load !2
   call void @__csan_sync(i64 %25, i8 0) #20
-  sync within %syncreg, label %cleanup
+  tapir_sync within %syncreg, label %cleanup
 
 cleanup:                                          ; preds = %pfor.cond.cleanup, %entry
   %sum.0.load21 = load i64, i64* %sum, align 8
@@ -429,7 +429,7 @@ cleanup:                                          ; preds = %pfor.cond.cleanup, 
 ; CHECK: pfor.inc.ls1:
 ; CHECK: call void @__csan_task_exit(
 ; CHECK: call void @__csan_detach_continue(
-; CHECK: sync within
+; CHECK: tapir_sync within
 
 ; CHECK: ret void
 
@@ -548,7 +548,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.inc
   %40 = load i64, i64* @__csi_unit_sync_base_id, align 8, !invariant.load !2
   %41 = add i64 %40, 1
   call void @__csan_sync(i64 %41, i8 0)
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 lpad:                                             ; preds = %32
   %42 = landingpad { i8*, i32 }
@@ -646,7 +646,7 @@ csi.cleanup:                                      ; preds = %entry
 ; CHECK: pfor.inc.ls1:
 ; CHECK: call void @__csan_task_exit(
 ; CHECK: call void @__csan_detach_continue(
-; CHECK: sync within
+; CHECK: tapir_sync within
 
 ; CHECK: ret void
 

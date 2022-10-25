@@ -66,7 +66,7 @@ void spawn(int a) {
 
 // CHECK: [[CONTINUE]]:
 // CHECK: call void @_Z9nothrowfni(
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONTINUE:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONTINUE:.+]]
 
 // CHECK: [[SYNCCONTINUE]]:
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -99,7 +99,7 @@ void spawn_destructor(int a) {
 
 // CHECK: [[CONTINUE]]:
 // CHECK: call void @_Z9nothrowfni(
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONTINUE:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONTINUE:.+]]
 
 // CHECK: [[SYNCCONTINUE]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -171,7 +171,7 @@ int trycatch(int a) {
 
 // CHECK: [[CONTINUE]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 2)
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -242,7 +242,7 @@ int trycatch_destructor(int a) {
 
 // CHECK: [[CONTINUE]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 2)
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -338,7 +338,7 @@ int mix_spawn_trycatch(int a) {
 
 // CHECK: [[CONTINUE2]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
-// CHECK-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK: [[TRYSYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG]])
@@ -380,7 +380,7 @@ int mix_spawn_trycatch(int a) {
 // CHECK-O0: [[TRYCONT]]:
 // CHECK-O1: [[TRYSUCONT]]:
 // CHECK-NEXT: call void @llvm.taskframe.end(token %[[TFTRY]])
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -445,7 +445,7 @@ int mix_spawn_trycatch_destructors(int a) {
 
 // CHECK: [[CONTINUE2]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
-// CHECK-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK: [[TRYSYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG]])
@@ -524,13 +524,13 @@ int mix_spawn_trycatch_destructors(int a) {
 
 // CHECK: [[TRYCONT]]:
 // CHECK-NEXT: call void @llvm.taskframe.end(token %[[TFTRY]])
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-O0-NEXT: to label %[[SUCONT:.+]] unwind label %[[OUTERCLEANUPLPAD]]
 // CHECK-O0: [[SUCONT]]:
-// CHECK-O0-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK-O0-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 // CHECK-O1-NEXT: to label %[[SUCONT2:.+]] unwind label %[[OUTERCLEANUPLPAD]]
 
 // CHECK: [[TFTRYCLEANUP]]:
@@ -611,7 +611,7 @@ int nested_trycatch(int a) {
 
 // CHECK: [[CONTINUE3]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 4)
-// CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG2]])
@@ -646,7 +646,7 @@ int nested_trycatch(int a) {
 
 // CHECK: [[TRYCONT1]]:
 // CHECK-NEXT: call void @llvm.taskframe.end(token %[[TFTRY1]])
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -687,7 +687,7 @@ int nested_trycatch(int a) {
 // CHECK-O0: [[TRYCONT2]]:
 // CHECK-O1: [[TRYSUCONT2]]:
 // CHECK-NEXT: call void @llvm.taskframe.end(token %[[TFTRY2]])
-// CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG1]])
@@ -787,7 +787,7 @@ int nested_trycatch_destructors(int a) {
 
 // CHECK: [[CONTINUE3]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 4)
-// CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG2]])
@@ -852,14 +852,14 @@ int nested_trycatch_destructors(int a) {
 
 // CHECK-O0: [[TRYCONT1]]:
 // CHECK-O0-NEXT: call void @llvm.taskframe.end(token %[[TFTRY1]])
-// CHECK-O0-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-O0-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK-O0: [[SYNCCONT]]:
 // CHECK-O0-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-O0-NEXT: to label %[[SUCONT:.+]] unwind label %[[B1CLEANUPLPAD]]
 
 // CHECK-O0: [[SUCONT]]:
-// CHECK-O0-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK-O0-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 
 // CHECK: [[B3CONSTRLPAD]]:
 // CHECK-NEXT: landingpad
@@ -905,7 +905,7 @@ int nested_trycatch_destructors(int a) {
 
 // CHECK: [[TRYCONT2]]:
 // CHECK-NEXT: call void @llvm.taskframe.end(token %[[TFTRY2]])
-// CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG1]])
@@ -931,7 +931,7 @@ int nested_trycatch_destructors(int a) {
 
 // CHECK-O1: [[TRYCONT1]]:
 // CHECK-O1-NEXT: call void @llvm.taskframe.end(token %[[TFTRY1]])
-// CHECK-O1-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-O1-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK-O1: [[SYNCCONT]]:
 // CHECK-O1-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -1034,7 +1034,7 @@ int mix_parfor_trycatch(int a) {
 // CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC:.+]], label %{{.+}}, !llvm.loop
 
 // CHECK: [[PFORSYNC]]:
-// CHECK: sync within %[[PFORSYNCREG]], label %[[PFORSYNCCONT:.+]]
+// CHECK: tapir_sync within %[[PFORSYNCREG]], label %[[PFORSYNCCONT:.+]]
 
 // CHECK-O0: [[LPAD]]:
 // CHECK-O0-NEXT: landingpad
@@ -1089,7 +1089,7 @@ int mix_parfor_trycatch(int a) {
 
 // CHECK: [[CONTINUE3]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 6)
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -1109,7 +1109,7 @@ int mix_parfor_trycatch(int a) {
 // CHECK-O0-NEXT: br label %[[PFOREND:.+]]
 // CHECK-O0: [[PFOREND]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 4)
-// CHECK-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK: [[TRYSYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG]])
@@ -1239,7 +1239,7 @@ int mix_parfor_trycatch_destructors(int a) {
 // CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC:.+]], label %{{.+}}, !llvm.loop
 
 // CHECK: [[PFORSYNC]]:
-// CHECK: sync within %[[PFORSYNCREG]], label %[[PFORSYNCCONT:.+]]
+// CHECK: tapir_sync within %[[PFORSYNCREG]], label %[[PFORSYNCCONT:.+]]
 
 // CHECK-O1: [[PFORLPAD]]:
 // CHECK-O1-NEXT: landingpad
@@ -1255,7 +1255,7 @@ int mix_parfor_trycatch_destructors(int a) {
 
 // CHECK-O1: [[PFORSYNCCONT]]:
 // CHECK-O1: call void @_Z9nothrowfni(i32 noundef 4)
-// CHECK-O1-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
+// CHECK-O1-NEXT: tapir_sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK-O1: [[TRYSYNCCONT]]:
 // CHECK-O1: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}%[[B2]])
@@ -1336,12 +1336,12 @@ int mix_parfor_trycatch_destructors(int a) {
 
 // CHECK: [[CONTINUE3]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 6)
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-NEXT: to label %[[SUCONT:.+]] unwind label %[[B3CLEANUPLPAD:.+]]
 // CHECK-O0: [[SUCONT]]:
-// CHECK-O0-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-O0-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK-O0: [[PFORLPAD]]:
 // CHECK-O0-NEXT: landingpad
@@ -1351,7 +1351,7 @@ int mix_parfor_trycatch_destructors(int a) {
 
 // CHECK-O0: [[PFORSYNCCONT]]:
 // CHECK-O0: call void @_Z9nothrowfni(i32 noundef 4)
-// CHECK-O0-NEXT: sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
+// CHECK-O0-NEXT: tapir_sync within %[[TRYSYNCREG]], label %[[TRYSYNCCONT:.+]]
 
 // CHECK-O0: [[TRYSYNCCONT]]:
 // CHECK-O0: call void @_ZN3BarD1Ev(%class.Bar* {{.*}}dereferenceable(1) %[[B2]])
@@ -1457,7 +1457,7 @@ int spawn_trycatch(int a) {
 
 // CHECK: [[TRYDETCONT1]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 2)
-// CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG1]])
@@ -1526,7 +1526,7 @@ int spawn_trycatch(int a) {
 
 // CHECK: [[TRYDETCONT2]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 4)
-// CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG2]])
@@ -1599,7 +1599,7 @@ int spawn_trycatch(int a) {
 
 // CHECK: [[CONTINUE2]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 6)
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 
 // CHECK: [[SYNCCONT2]]:
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -1695,7 +1695,7 @@ int spawn_trycatch_destructors(int a) {
 
 // CHECK: [[TRYDETCONT1]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
-// CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG1]])
@@ -1794,7 +1794,7 @@ int spawn_trycatch_destructors(int a) {
 
 // CHECK: [[TRYDETCONT2]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 5)
-// CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG2]])
@@ -1879,12 +1879,12 @@ int spawn_trycatch_destructors(int a) {
 
 // CHECK: [[CONTINUE4]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 7)
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 // CHECK: [[SYNCCONT]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-NEXT: to label %[[SUCONT:.+]] unwind label %[[B4CLEANUPLPAD:.+]]
 // CHECK-O0: [[SUCONT]]:
-// CHECK-O0-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
+// CHECK-O0-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT:.+]]
 
 // CHECK: [[TASKCLEANUP2]]:
 // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[SYNCREG]],
@@ -2003,7 +2003,7 @@ int parfor_trycatch(int a) {
 
 // CHECK: [[TRYDETCONT1]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
-// CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG1]])
@@ -2054,8 +2054,8 @@ int parfor_trycatch(int a) {
 // CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC1:.+]], label {{.+}}, !llvm.loop
 
 // CHECK: [[PFORSYNC1]]:
-// CHECK-O0: sync within %[[PFORSYNCREG1]], label %[[PFORSYNCCONT1:.+]]
-// CHECK-O1: sync within %[[PFORSYNCREG1]], label %[[PFOREND1:.+]]
+// CHECK-O0: tapir_sync within %[[PFORSYNCREG1]], label %[[PFORSYNCCONT1:.+]]
+// CHECK-O1: tapir_sync within %[[PFORSYNCREG1]], label %[[PFOREND1:.+]]
 
 // CHECK-O0: [[TASKCLEANUP1]]:
 // CHECK-O0: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[PFORSYNCREG1]],
@@ -2089,7 +2089,7 @@ int parfor_trycatch(int a) {
 
 // CHECK: [[TRYDETCONT2]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 5)
-// CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG2]])
@@ -2140,8 +2140,8 @@ int parfor_trycatch(int a) {
 // CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC2:.+]], label {{.+}}, !llvm.loop
 
 // CHECK: [[PFORSYNC2]]:
-// CHECK-O0: sync within %[[PFORSYNCREG2]], label %[[PFORSYNCCONT2:.+]]
-// CHECK-O1: sync within %[[PFORSYNCREG2]], label %[[PFOREND2:.+]]
+// CHECK-O0: tapir_sync within %[[PFORSYNCREG2]], label %[[PFORSYNCCONT2:.+]]
+// CHECK-O1: tapir_sync within %[[PFORSYNCREG2]], label %[[PFOREND2:.+]]
 
 // CHECK-O0: [[TASKCLEANUP2]]:
 // CHECK-O0: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[PFORSYNCREG2]],
@@ -2167,7 +2167,7 @@ int parfor_trycatch(int a) {
 
 // CHECK: [[CONTINUE2]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 7)
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 
 // CHECK: [[SYNCCONT2]]:
 // CHECK-NEXT: call void @llvm.sync.unwind(token %[[SYNCREG]])
@@ -2266,7 +2266,7 @@ int parfor_trycatch_destructors(int a) {
 
 // CHECK: [[TRYDETCONT1]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 3)
-// CHECK-NEXT: sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG1]], label %[[TRYSYNCCONT1:.+]]
 
 // CHECK: [[TRYSYNCCONT1]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG1]])
@@ -2343,8 +2343,8 @@ int parfor_trycatch_destructors(int a) {
 // CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC1:.+]], label {{.+}}, !llvm.loop
 
 // CHECK: [[PFORSYNC1]]:
-// CHECK-O0: sync within %[[PFORSYNCREG1]], label %[[PFORSYNCCONT1:.+]]
-// CHECK-O1: sync within %[[PFORSYNCREG1]], label %[[PFOREND1:.+]]
+// CHECK-O0: tapir_sync within %[[PFORSYNCREG1]], label %[[PFORSYNCCONT1:.+]]
+// CHECK-O1: tapir_sync within %[[PFORSYNCREG1]], label %[[PFOREND1:.+]]
 
 // CHECK: [[PFORCLEANUP1]]:
 // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[PFORSYNCREG1]],
@@ -2385,7 +2385,7 @@ int parfor_trycatch_destructors(int a) {
 
 // CHECK: [[TRYDETCONT2]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 5)
-// CHECK-NEXT: sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[TRYSYNCREG2]], label %[[TRYSYNCCONT2:.+]]
 
 // CHECK: [[TRYSYNCCONT2]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[TRYSYNCREG2]])
@@ -2445,8 +2445,8 @@ int parfor_trycatch_destructors(int a) {
 // CHECK-O1: br i1 {{.+}}, label %[[PFORSYNC2:.+]], label {{.+}}, !llvm.loop
 
 // CHECK: [[PFORSYNC2]]:
-// CHECK-O0: sync within %[[PFORSYNCREG2]], label %[[PFORSYNCCONT2:.+]]
-// CHECK-O1: sync within %[[PFORSYNCREG2]], label %[[PFOREND2:.+]]
+// CHECK-O0: tapir_sync within %[[PFORSYNCREG2]], label %[[PFORSYNCCONT2:.+]]
+// CHECK-O1: tapir_sync within %[[PFORSYNCREG2]], label %[[PFOREND2:.+]]
 
 // CHECK: [[PFORCLEANUP2]]:
 // CHECK: invoke void @llvm.detached.rethrow.sl_p0i8i32s(token %[[PFORSYNCREG2]],
@@ -2484,12 +2484,12 @@ int parfor_trycatch_destructors(int a) {
 
 // CHECK: [[CONTINUE2]]:
 // CHECK-NEXT: call void @_Z9nothrowfni(i32 noundef 7)
-// CHECK-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 // CHECK: [[SYNCCONT2]]:
 // CHECK-NEXT: invoke void @llvm.sync.unwind(token %[[SYNCREG]])
 // CHECK-NEXT: to label %[[SUCONT2:.+]] unwind label %[[B4CLEANUPLPAD:.+]]
 // CHECK-O0: [[SUCONT2]]:
-// CHECK-O0-NEXT: sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
+// CHECK-O0-NEXT: tapir_sync within %[[SYNCREG]], label %[[SYNCCONT2:.+]]
 
 // CHECK-O1: [[B4CONSTRLPAD]]:
 // CHECK-O1-NEXT: landingpad

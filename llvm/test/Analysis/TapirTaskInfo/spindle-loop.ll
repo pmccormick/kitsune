@@ -1,4 +1,4 @@
-; RUN: opt < %s -enable-new-pm=0 -analyze -tasks -verify-task-info 2>&1 | FileCheck %s
+; RUN: opt < %s -enable-new-pm=0 -passes='print<tasks>' -verify-task-info 2>&1 | FileCheck %s
 ; RUN: opt < %s -passes='print<tasks>' -verify-task-info 2>&1 | FileCheck %s
 
 %"class.std::ios_base::Init" = type { i8 }
@@ -245,7 +245,7 @@ pfor.detach.preheader:                            ; preds = %sw.bb56
   br label %pfor.detach
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %sw.bb56
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 pfor.detach:                                      ; preds = %pfor.detach.preheader, %pfor.inc
   %__begin.0288 = phi i32 [ %inc65, %pfor.inc ], [ 0, %pfor.detach.preheader ]
@@ -282,7 +282,7 @@ lpad66:                                           ; preds = %lpad66.loopexit
   %lpad.phi = phi { i8*, i32 } [ %lpad.loopexit, %lpad66.loopexit ]
   %16 = extractvalue { i8*, i32 } %lpad.phi, 0
   %17 = extractvalue { i8*, i32 } %lpad.phi, 1
-  sync within %syncreg, label %ehcleanup
+  tapir_sync within %syncreg, label %ehcleanup
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   call void @_ZN10CUtilTimer4stopEv(%class.CUtilTimer* nonnull %t)
@@ -296,7 +296,7 @@ pfor.detach84.preheader:                          ; preds = %sw.bb71
   br label %pfor.detach84
 
 pfor.cond.cleanup83:                              ; preds = %pfor.inc96, %sw.bb71
-  sync within %syncreg72, label %sync.continue105
+  tapir_sync within %syncreg72, label %sync.continue105
 
 pfor.detach84:                                    ; preds = %pfor.detach84.preheader, %pfor.inc96
   %__begin74.0286 = phi i32 [ %inc97, %pfor.inc96 ], [ 0, %pfor.detach84.preheader ]
@@ -333,7 +333,7 @@ lpad98:                                           ; preds = %lpad98.loopexit
   %lpad.phi280 = phi { i8*, i32 } [ %lpad.loopexit278, %lpad98.loopexit ]
   %19 = extractvalue { i8*, i32 } %lpad.phi280, 0
   %20 = extractvalue { i8*, i32 } %lpad.phi280, 1
-  sync within %syncreg72, label %ehcleanup
+  tapir_sync within %syncreg72, label %ehcleanup
 
 sync.continue105:                                 ; preds = %pfor.cond.cleanup83
   call void @_ZN10CUtilTimer4stopEv(%class.CUtilTimer* nonnull %t)

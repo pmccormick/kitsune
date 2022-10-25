@@ -136,7 +136,7 @@ pfor.cond.cleanup:                                ; preds = %pfor.cond.cleanup.l
   %cond.i.i.i.i212259 = phi %"class.std::vector.0"* [ %cond.i.i.i.i212, %_ZNSt6vectorIS_ISt5tupleIJidiEESaIS1_EESaIS3_EEC2EmRKS4_.exit ], [ null, %if.end.i ], [ %cond.i.i.i.i212, %pfor.cond.cleanup.loopexit ]
   %18 = phi i8* [ %14, %_ZNSt6vectorIS_ISt5tupleIJidiEESaIS1_EESaIS3_EEC2EmRKS4_.exit ], [ null, %if.end.i ], [ %14, %pfor.cond.cleanup.loopexit ]
   %19 = phi i64 [ %13, %_ZNSt6vectorIS_ISt5tupleIJidiEESaIS1_EESaIS3_EEC2EmRKS4_.exit ], [ 0, %if.end.i ], [ %13, %pfor.cond.cleanup.loopexit ]
-  sync within %syncreg, label %sync.continue53
+  tapir_sync within %syncreg, label %sync.continue53
 
 pfor.detach:                                      ; preds = %pfor.inc51, %pfor.detach.lr.ph
   %indvars.iv246 = phi i64 [ 0, %pfor.detach.lr.ph ], [ %indvars.iv.next247, %pfor.inc51 ]
@@ -194,7 +194,7 @@ pfor.cond.cleanup20.loopexit:                     ; preds = %pfor.inc
   br label %pfor.cond.cleanup20
 
 pfor.cond.cleanup20:                              ; preds = %pfor.cond.cleanup20.loopexit, %_ZNSt6vectorIiSaIiEEC2EmRKS0_.exit166
-  sync within %syncreg10, label %sync.continue
+  tapir_sync within %syncreg10, label %sync.continue
 
 pfor.detach21:                                    ; preds = %pfor.inc, %pfor.detach21.preheader
   %indvars.iv242 = phi i64 [ %indvars.iv.next243, %pfor.inc ], [ 0, %pfor.detach21.preheader ]

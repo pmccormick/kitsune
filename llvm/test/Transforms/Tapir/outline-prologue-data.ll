@@ -234,7 +234,7 @@ cont9:                                            ; preds = %handler.add_overflo
   br i1 %cmp10, label %pfor.cond, label %pfor.cond.cleanup, !llvm.loop !6
 
 pfor.cond.cleanup:                                ; preds = %cont9
-  sync within %syncreg, label %sync.continue
+  tapir_sync within %syncreg, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   call void @llvm.sync.unwind(token %syncreg)

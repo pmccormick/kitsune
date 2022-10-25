@@ -54,7 +54,7 @@ pfor.inc:                                         ; preds = %for.cond.cleanup, %
   br i1 %exitcond83.not, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !6
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg17, label %if.end30
+  tapir_sync within %syncreg17, label %if.end30
 
 if.else:                                          ; preds = %tailrecurse
   %cmp12 = icmp ugt i64 %cCount.tr, %rCount.tr
@@ -87,7 +87,7 @@ det.cont27:                                       ; preds = %det.achd26, %if.els
   br label %tailrecurse
 
 if.end30:                                         ; preds = %pfor.cond.cleanup, %if.then
-  sync within %syncreg17, label %if.end30.split
+  tapir_sync within %syncreg17, label %if.end30.split
 
 if.end30.split:                                   ; preds = %if.end30
   ret void
@@ -102,7 +102,7 @@ if.end30.split:                                   ; preds = %if.end30
 ; CHECK: br i1 {{.*}}, label %[[SYNC_BLOCK:.+]], label %pfor.cond
 
 ; CHECK-NOT: pfor.cond.cleanup:
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK-NOT: call void @llvm.sync.unwind(token %syncreg17)
 
 ; CHECK: if.then13:
@@ -110,7 +110,7 @@ if.end30.split:                                   ; preds = %if.end30
 
 ; CHECK: det.cont:
 ; CHECK-NOT: call void @_Z6transRmmmmmm(
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK-NOT: call void @llvm.sync.unwind(
 ; CHECK: br label %tailrecurse
 
@@ -119,12 +119,12 @@ if.end30.split:                                   ; preds = %if.end30
 
 ; CHECK: det.cont27:
 ; CHECK-NOT: call void @_Z6transRmmmmmm(
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK-NOT: call void @llvm.sync.unwind(
 ; CHECK: br label %tailrecurse
 
 ; CHECK: [[SYNC_BLOCK]]:
-; CHECK-NEXT: sync within %syncreg17, label %[[RETBLK:.+]]
+; CHECK-NEXT: tapir_sync within %syncreg17, label %[[RETBLK:.+]]
 
 ; CHECK: [[RETBLK]]:
 ; CHECK-NEXT: ret void
@@ -185,7 +185,7 @@ pfor.inc:                                         ; preds = %for.cond.cleanup, %
   br i1 %exitcond83.not, label %pfor.cond.cleanup, label %pfor.cond, !llvm.loop !9
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc
-  sync within %syncreg17, label %sync.continue
+  tapir_sync within %syncreg17, label %sync.continue
 
 sync.continue:                                    ; preds = %pfor.cond.cleanup
   tail call void @llvm.sync.unwind(token %syncreg17)
@@ -222,7 +222,7 @@ det.cont27:                                       ; preds = %det.achd26, %if.els
   br label %tailrecurse
 
 if.end30:                                         ; preds = %sync.continue, %if.then
-  sync within %syncreg17, label %if.end30.split
+  tapir_sync within %syncreg17, label %if.end30.split
 
 if.end30.split:                                   ; preds = %if.end30
   call void @llvm.sync.unwind(token %syncreg17)
@@ -238,7 +238,7 @@ if.end30.split:                                   ; preds = %if.end30
 ; CHECK: br i1 {{.*}}, label %[[SYNC_BLOCK:.+]], label %pfor.cond
 
 ; CHECK-NOT: pfor.cond.cleanup:
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK-NOT: call void @llvm.sync.unwind(token %syncreg17)
 
 ; CHECK: if.then13:
@@ -246,7 +246,7 @@ if.end30.split:                                   ; preds = %if.end30
 
 ; CHECK: det.cont:
 ; CHECK-NOT: call void @_Z6transRmmmmmm(
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK-NOT: call void @llvm.sync.unwind(
 ; CHECK: br label %tailrecurse
 
@@ -255,12 +255,12 @@ if.end30.split:                                   ; preds = %if.end30
 
 ; CHECK: det.cont27:
 ; CHECK-NOT: call void @_Z6transRmmmmmm(
-; CHECK-NOT: sync within %syncreg17
+; CHECK-NOT: tapir_sync within %syncreg17
 ; CHECK-NOT: call void @llvm.sync.unwind(
 ; CHECK: br label %tailrecurse
 
 ; CHECK: [[SYNC_BLOCK]]:
-; CHECK-NEXT: sync within %syncreg17, label %[[RETBLK:.+]]
+; CHECK-NEXT: tapir_sync within %syncreg17, label %[[RETBLK:.+]]
 
 ; CHECK: [[RETBLK]]:
 ; CHECK-NEXT: call void @llvm.sync.unwind(token %syncreg17)

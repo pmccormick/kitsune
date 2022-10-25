@@ -145,7 +145,7 @@ pfor.cond.epil:                                   ; preds = %pfor.cond.epil.preh
   br i1 %epil.iter.cmp, label %pfor.cond.cleanup, label %pfor.cond.epil, !llvm.loop !13
 
 pfor.cond.cleanup:                                ; preds = %pfor.cond.epil, %middle.block36, %pfor.cond.cleanup.strpm-lcssa
-  sync within %syncreg, label %cleanup
+  tapir_sync within %syncreg, label %cleanup
 
 cleanup:                                          ; preds = %pfor.cond.cleanup, %entry
   ret void

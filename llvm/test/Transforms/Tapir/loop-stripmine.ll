@@ -16,7 +16,7 @@ pfor.detach.preheader:                            ; preds = %entry
   br label %pfor.detach, !dbg !8
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %entry
-  sync within %syncreg, label %sync.continue, !dbg !8
+  tapir_sync within %syncreg, label %sync.continue, !dbg !8
 
 pfor.detach:                                      ; preds = %pfor.inc, %pfor.detach.preheader
   %indvars.iv = phi i64 [ 0, %pfor.detach.preheader ], [ %indvars.iv.next, %pfor.inc ]
@@ -94,7 +94,7 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 ; CHECK-NEXT: br i1 %[[EPILLATCHCMP]], label %[[EPILHEAD]], label
 
 ; CHECK: pfor.cond.cleanup:
-; CHECK-NEXT: sync within %syncreg
+; CHECK-NEXT: tapir_sync within %syncreg
 
 ; CHECK: [[STRPLOOPOUTERHEAD]]:
 ; CHECK-NEXT: %[[STRPLOOPITER]] = phi i64
@@ -145,7 +145,7 @@ pfor.detach.preheader:                            ; preds = %entry
   br label %pfor.detach, !dbg !22
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %entry
-  sync within %syncreg, label %sync.continue, !dbg !22
+  tapir_sync within %syncreg, label %sync.continue, !dbg !22
 
 pfor.detach:                                      ; preds = %pfor.inc, %pfor.detach.preheader
   %indvars.iv = phi i64 [ 0, %pfor.detach.preheader ], [ %indvars.iv.next, %pfor.inc ]
@@ -217,10 +217,10 @@ sync.continue:                                    ; preds = %pfor.cond.cleanup
 ; CHECK: br i1 {{.+}}, label %[[STRPLOOPSYNC:.+]], label %[[STRPLOOPOUTERHEAD]]
 
 ; CHECK: [[STRPLOOPSYNC]]:
-; CHECK-NEXT: sync within %[[NESTEDSYNCREG]], label %[[STRPLOOPREATTACH:.+]], !dbg !25
+; CHECK-NEXT: tapir_sync within %[[NESTEDSYNCREG]], label %[[STRPLOOPREATTACH:.+]], !dbg !25
 
 ; CHECK: [[STRPLOOPREATTACH]]:
-; CHECK-NOT: call void @llvm.sync.unwind(token %[[NESTEDSYNCREG]])
+; CHECK-NEXT: call void @llvm.sync.unwind(token %[[NESTEDSYNCREG]])
 ; CHECK-NEXT: reattach within %syncreg, label %[[STRPLOOPDETACHCONT]]
 
 ; Function Attrs: nounwind uwtable
@@ -231,7 +231,7 @@ entry:
   br i1 %cmp27, label %pfor.detach, label %pfor.cond.cleanup, !dbg !32
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %entry
-  sync within %syncreg, label %sync.continue, !dbg !32
+  tapir_sync within %syncreg, label %sync.continue, !dbg !32
 
 pfor.detach:                                      ; preds = %entry, %pfor.inc
   %indvars.iv = phi i32 [ %indvars.iv.next, %pfor.inc ], [ 0, %entry ]
@@ -305,7 +305,7 @@ pfor.detach.preheader:                            ; preds = %entry
   br label %pfor.detach, !dbg !48
 
 pfor.cond.cleanup:                                ; preds = %pfor.inc, %entry
-  sync within %syncreg, label %sync.continue, !dbg !48
+  tapir_sync within %syncreg, label %sync.continue, !dbg !48
 
 pfor.detach:                                      ; preds = %pfor.inc, %pfor.detach.preheader
   %indvars.iv = phi i64 [ 0, %pfor.detach.preheader ], [ %indvars.iv.next, %pfor.inc ]
