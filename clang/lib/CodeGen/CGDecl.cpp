@@ -2215,8 +2215,7 @@ void CodeGenFunction::EmitAutoVarCleanups(const AutoVarEmission &emission) {
 CodeGenFunction::Destroyer *
 CodeGenFunction::getDestroyer(QualType::DestructionKind kind) {
   switch (kind) {
-  case QualType::DK_none:
-    return nullptr;
+  case QualType::DK_none: llvm_unreachable("no destroyer for trivial dtor");
   case QualType::DK_hyperobject:
     return destroyHyperobject;
   case QualType::DK_cxx_destructor:

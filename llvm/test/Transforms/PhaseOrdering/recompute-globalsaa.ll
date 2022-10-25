@@ -13,7 +13,7 @@ define i32 @main() {
 ; COM: now, this is changed to bar.exit, but really, we ought to figure out what
 ; COM: is actually causing this. So TODO.
 ; CHECK-LABEL: @main(
-; CHECK-NEXT:  bar.exit:
+; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32*, i32** @e, align 8
 ; CHECK-NEXT:    store i32 0, i32* [[TMP0]], align 4
 ; CHECK-NEXT:    store i32* null, i32** @e, align 8

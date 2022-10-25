@@ -4,23 +4,21 @@
 
 extern __complex__ float _Hyperobject c;
 
-// CHECK-LABEL: get_real 
+// CHECK-LABEL: get_real
 float get_real()
 {
-  // CHECK: %[[RAW1:.+]] = call i8* @llvm.hyper.lookup(i8* bitcast ({ float, float }* @c to i8*))
-  // CHECK: %[[VIEW1:.+]] = bitcast i8* %[[RAW1]] to { float, float }*
-  // CHECK: %[[FIELD1:.+]] = getelementptr inbounds { float, float }, { float, float }* %[[VIEW1]], i32 0, i32 0
-  // CHECK: %[[RET1:.+]] = load float, float* %[[FIELD1]]
+  // CHECK: %[[VIEW1:.+]] = call ptr @llvm.hyper.lookup(ptr @c)
+  // CHECK: %[[FIELD1:.+]] = getelementptr inbounds { float, float }, ptr %[[VIEW1]], i32 0, i32 0
+  // CHECK: %[[RET1:.+]] = load float, ptr %[[FIELD1]]
   // CHECK: ret float %[[RET1]]
   return __real__(c);
 }
 // CHECK-LABEL: get_imag
 float get_imag()
 {
-  // CHECK: %[[RAW2:.+]] = call i8* @llvm.hyper.lookup(i8* bitcast ({ float, float }* @c to i8*))
-  // CHECK: %[[VIEW2:.+]] = bitcast i8* %[[RAW2]] to { float, float }*
-  // CHECK: %[[FIELD2:.+]] = getelementptr inbounds { float, float }, { float, float }* %[[VIEW2]], i32 0, i32 1
-  // CHECK: load float, float* %[[FIELD2]]
+  // CHECK: %[[VIEW2:.+]] = call ptr @llvm.hyper.lookup(ptr @c)
+  // CHECK: %[[FIELD2:.+]] = getelementptr inbounds { float, float }, ptr %[[VIEW2]], i32 0, i32 1
+  // CHECK: load float, ptr %[[FIELD2]]
   // CHECK: ret float
   return __imag__(c);
 }
@@ -29,7 +27,7 @@ float get_imag()
 float get_abs()
 {
   // Only one call to llvm.hyper.lookup.
-  // CHECK: @llvm.hyper.lookup(i8* bitcast ({ float, float }* @c to i8*))
+  // CHECK: @llvm.hyper.lookup(ptr @c)
   // CHECK-NOT: @llvm.hyper.lookup
   // CHECK: call float @cabsf
   // CHECK: ret float

@@ -505,10 +505,9 @@ CodeGenFunction::EmitCXXOperatorMemberCallExpr(const CXXOperatorCallExpr *E,
                                                ReturnValueSlot ReturnValue) {
   assert(MD->isInstance() &&
          "Trying to emit a member call expr on a static method!");
-  RValue Result = EmitCXXMemberOrOperatorMemberCallExpr(
+  return EmitCXXMemberOrOperatorMemberCallExpr(
       E, MD, ReturnValue, /*HasQualifier=*/false, /*Qualifier=*/nullptr,
       /*IsArrow=*/false, E->getArg(0));
-  return Result;
 }
 
 RValue CodeGenFunction::EmitCUDAKernelCallExpr(const CUDAKernelCallExpr *E,

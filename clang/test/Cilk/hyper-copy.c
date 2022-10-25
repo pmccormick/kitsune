@@ -9,10 +9,10 @@ extern struct S b __attribute__((aligned(8)));
 // CHECK-LABEL: scopy
 void scopy()
 {
-  // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (%struct.S* @a to i8*))
-  // CHECK: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 bitcast (%struct.S* @b to i8*)
-  // CHECK: call i8* @llvm.hyper.lookup(i8* bitcast (%struct.S* @a to i8*))
-  // CHECK: call void @llvm.memcpy.p0i8.p0i8.i64
+  // CHECK: call ptr @llvm.hyper.lookup(ptr @a)
+  // CHECK: call void @llvm.memcpy.p0.p0.i64(ptr align {{.*}} @b
+  // CHECK: call ptr @llvm.hyper.lookup(ptr @a)
+  // CHECK: call void @llvm.memcpy.p0.p0.i64
   // CHECK: ret void
   b = a;
   a = b;

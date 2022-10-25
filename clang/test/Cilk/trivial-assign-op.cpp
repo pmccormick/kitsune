@@ -4,7 +4,7 @@
 struct event {
   float v;
   long p;
-  event(float value, long index, bool type) 
+  event(float value, long index, bool type)
     : v(value), p((index << 1) + type) {}
   event() {}
 };
@@ -25,7 +25,7 @@ struct cutInfo {
   float cutOff;
   long numLeft;
   long numRight;
-cutInfo(float _cost, float _cutOff, long nl, long nr) 
+cutInfo(float _cost, float _cutOff, long nl, long nr)
 : cost(_cost), cutOff(_cutOff), numLeft(nl), numRight(nr) {}
   cutInfo() {}
 };
@@ -42,19 +42,19 @@ void generateNode(Boxes boxes, Events events, BoundingBox B,  long n,
 }
 
 // CHECK: define {{.*}}void @_Z12generateNodePP5rangePP5eventS0_li(
-// CHECK: getelementptr inbounds [3 x %struct.cutInfo], [3 x %struct.cutInfo]* %cuts, i64 0, i64 0
+// CHECK: getelementptr inbounds [3 x %struct.cutInfo], ptr %cuts, i64 0, i64 0
 // CHECK-NOT: call void @_Z7bestCutP5event5rangeS1_S1_l(
 // CHECK: detach
 // CHECK: call void @_Z7bestCutP5event5rangeS1_S1_l(
 // CHECK: call void @llvm.memcpy
 // CHECK: reattach
-// CHECK: getelementptr inbounds [3 x %struct.cutInfo], [3 x %struct.cutInfo]* %cuts, i64 0, i64 1
+// CHECK: getelementptr inbounds [3 x %struct.cutInfo], ptr %cuts, i64 0, i64 1
 // CHECK-NOT: call void @_Z7bestCutP5event5rangeS1_S1_l(
 // CHECK: detach
 // CHECK: call void @_Z7bestCutP5event5rangeS1_S1_l(
 // CHECK: call void @llvm.memcpy
 // CHECK: reattach
-// CHECK: getelementptr inbounds [3 x %struct.cutInfo], [3 x %struct.cutInfo]* %cuts, i64 0, i64 2
+// CHECK: getelementptr inbounds [3 x %struct.cutInfo], ptr %cuts, i64 0, i64 2
 // CHECK-NOT: call void @_Z7bestCutP5event5rangeS1_S1_l(
 // CHECK: detach
 // CHECK: call void @_Z7bestCutP5event5rangeS1_S1_l(

@@ -41,8 +41,6 @@ ADD(ld, long double)      ZERO(ld, long double)
 void define_int_reducer(long *out)
 {
   // CHECK: call void @llvm.reducer.register.i64
-  // CHECK: bitcast (void (i8*)* @zero_sl to i8*)
-  // CHECK: bitcast (void (i8*, i8*)* @add_sl to i8*
   ADD_REDUCER(long) sum;
   _Cilk_for (int i = 0; i < 3900; ++i)
     sum += i;
@@ -55,8 +53,6 @@ void define_int_reducer(long *out)
 void define_float_reducer(float *out)
 {
   // CHECK: call void @llvm.reducer.register.i64
-  // CHECK: bitcast (void (i8*)* @zero_f to i8*)
-  // CHECK: bitcast (void (i8*, i8*)* @add_f to i8*
   ADD_REDUCER(float) sum;
   _Cilk_for (int i = 0; i < 3900; ++i)
     sum += i;
