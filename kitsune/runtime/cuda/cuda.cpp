@@ -372,7 +372,7 @@ void *__kitrt_cuMemAllocManaged(size_t size) {
   // Register this allocation so the runtime can help track the
   // locality (and affinity) of data.
   __kitrt_registerMemAlloc((void *)devp, size);
-  
+
   return (void *)devp;
 }
 
@@ -419,10 +419,6 @@ void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   if (__kitrt_cuIsMemManaged(vp) && not __kitrt_isMemPrefetched(vp)) {
     size_t size = __kitrt_getMemAllocSize(vp);
     if (size > 0) {
-      if (stream != NULL)
-        CU_SAFE_CALL(cuStreamAttachMemAsync_p((CUstream)stream,
-                                              (CUdeviceptr)vp,
-                                              0, CU_MEM_ATTACH_HOST));
       CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size,
                                         _kitrtCUdevice,
                                         (CUstream)stream));
