@@ -5744,6 +5744,8 @@ void Parser::ParseTypeQualifierListOpt(
     case tok::kw___read_write:
       ParseOpenCLQualifiers(DS.getAttributes());
       break;
+
+	// Kitsune qualifiers
     case tok::kw__readonly:
     case tok::kw__writeonly:
     case tok::kw__readwrite:
@@ -6020,7 +6022,7 @@ void Parser::ParseDeclaratorInternal(Declarator &D,
           }
         }
       }
-        
+
       switch (Args.size()) {
       case 0:
         break;

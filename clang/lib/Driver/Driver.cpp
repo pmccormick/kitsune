@@ -1233,7 +1233,7 @@ bool Driver::readConfigFile(StringRef FileName) {
   // Read options from config file.
   llvm::SmallString<128> CfgFileName(FileName);
   llvm::sys::path::native(CfgFileName);
-  ConfigFile = std::string(CfgFileName);
+  ConfigFileList.push_back(std::string(CfgFileName));
 
   bool ContainsErrors;
   if (CfgOptions.get() == nullptr) {
@@ -1351,10 +1351,11 @@ bool Driver::loadConfigFile() {
     }
   }
 
-  // Prepare list of directories where config file is searched for.  Note that the directories
-  // appear in the order they will be searched -- the first matched file will be used and the
-  // search will stop from that point.
-  std::vector<StringRef> CfgFileSearchDirs = {Dir, UserConfigDir, KitsuneConfigDir, SystemConfigDir};
+  // Prepare list of directories where config file is searched for.  Note that
+  // the directories appear in the order they will be searched -- the first
+  // matched file will be used and the search will stop from that point.
+  std::vector<StringRef> CfgFileSearchDirs = {
+      Dir, UserConfigDir, KitsuneConfigDir, SystemConfigDir};
 
   // kitsune: check for a kokkos configuration file.
   if (CLOptions->hasArg(options::OPT_fkokkos)) {
@@ -1393,10 +1394,11 @@ bool Driver::loadConfigFile() {
               .Default(""));
       if (!TapirTargetCfgFile.empty()) {
         llvm::SmallString<128> TapirTargetCfgFilePath;
-        if (searchForFile(TapirTargetCfgFilePath, CfgFileSearchDirs, TapirTargetCfgFile)) {
+        if (searchForFile(TapirTargetCfgFilePath, CfgFileSearchDirs,
+                          TapirTargetCfgFile)) {
           if (readConfigFile(TapirTargetCfgFilePath))
             Diag(diag::err_drv_cannot_read_kitsune_cfg_file)
-              << TapirTargetCfgFilePath << A->getValue();
+                << TapirTargetCfgFilePath << A->getValue();
         } else {
           Diag(diag::warn_drv_missing_cfg_file)
               << TapirTargetCfgFile << A->getValue();
@@ -1407,7 +1409,6 @@ bool Driver::loadConfigFile() {
       }
     }
   }
-
 
   // If config file is not specified explicitly, try to deduce configuration
   // from executable name. For instance, an executable 'armv7l-clang' will
@@ -1452,12 +1453,6 @@ bool Driver::loadConfigFile() {
         FixedConfigFile += CfgFileName.substr(ArchPrefixLen);
     }
   }
-
-  // Prepare list of directories where config file is searched for.
-  CfgFileSearchDirs.push_back(UserConfigDir);
-  CfgFileSearchDirs.push_back(KitsuneConfigDir);
-  CfgFileSearchDirs.push_back(SystemConfigDir);
-  CfgFileSearchDirs.push_back(Dir);
 
   // Try to find config file. First try file with corrected architecture.
   llvm::SmallString<128> CfgFilePath;

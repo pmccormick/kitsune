@@ -2016,10 +2016,6 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
     return;
   }
 
-  emitStoresForConstant(CGM, D, Builder.CreateElementBitCast(Loc, CGM.Int8Ty),
-                        type.isVolatileQualified(), Builder, constant,
-                        /*IsAutoInit=*/false);
-
   llvm::Type *BP = CGM.Int8Ty->getPointerTo(Loc.getAddressSpace());
   emitStoresForConstant(
       CGM, D,
@@ -2215,7 +2211,8 @@ void CodeGenFunction::EmitAutoVarCleanups(const AutoVarEmission &emission) {
 CodeGenFunction::Destroyer *
 CodeGenFunction::getDestroyer(QualType::DestructionKind kind) {
   switch (kind) {
-  case QualType::DK_none: llvm_unreachable("no destroyer for trivial dtor");
+  case QualType::DK_none:
+    return nullptr;
   case QualType::DK_hyperobject:
     return destroyHyperobject;
   case QualType::DK_cxx_destructor:

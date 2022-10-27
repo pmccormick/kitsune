@@ -4500,14 +4500,14 @@ StmtResult Sema::ActOnForallStmt(SourceLocation ForLoc, SourceLocation LParenLoc
   // Without any initialization declaration there is no way to label the first
   // private induction variable as we don't use any form of metadata
   if (!First)
-    return StmtError(Diag(LParenLoc.getLocWithOffset(1), 
+    return StmtError(Diag(LParenLoc.getLocWithOffset(1),
       diag::err_forall_no_init));
 
   // A forall statement must have a condition. Without a condition, it would be
   // up to the loop body to break in order not to have an infinite loop. As
   // mentioned below, breaking loops doesn't make sense in a parallel for.
   if (!Second.get().first && !Second.get().second) // neither condition declaration nor expression
-    return StmtError(Diag(First->getEndLoc().getLocWithOffset(1), 
+    return StmtError(Diag(First->getEndLoc().getLocWithOffset(1),
       diag::err_forall_no_cond));
 
   // A forall statement must have an increment expression. If it didn't, we
@@ -4517,7 +4517,7 @@ StmtResult Sema::ActOnForallStmt(SourceLocation ForLoc, SourceLocation LParenLoc
   // semicolon, but this would require an api change to the function arguments
   // since this isn't passed at the moment.
   if (!Third)
-    return StmtError(Diag(RParenLoc.getLocWithOffset(-1), 
+    return StmtError(Diag(RParenLoc.getLocWithOffset(-1),
       diag::err_forall_no_inc));
 
   // We can't allow break statements in a forall statement. Breaking a serial
@@ -4527,10 +4527,10 @@ StmtResult Sema::ActOnForallStmt(SourceLocation ForLoc, SourceLocation LParenLoc
   // for. In practice, there is no guarantee on the execution order of loop
   // iterations or that subsequent iterations haven't already completed. In the
   // codegen we point break to continue so the codegen is correct, but this
-  // check explicitly disallows breaking. 
+  // check explicitly disallows breaking.
   auto BCF=BreakContinueFinder(*this, Body);
   if (BCF.BreakFound())
-    return StmtError(Diag(BCF.GetBreakLoc(), 
+    return StmtError(Diag(BCF.GetBreakLoc(),
       diag::err_forall_has_break));
 
   if (isa<NullStmt>(Body))

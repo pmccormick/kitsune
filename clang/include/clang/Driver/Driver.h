@@ -294,8 +294,7 @@ private:
   /// Name to use when invoking gcc/g++.
   std::string CCCGenericGCCName;
 
-  /// Name of configuration file if used.
-  std::string ConfigFile;
+  /// Name of configuration files if used.
   llvm::SmallVector<std::string, 8> ConfigFileList;
 
   /// Allocator for string saver.
@@ -393,7 +392,7 @@ public:
   /// Name to use when invoking gcc/g++.
   const std::string &getCCCGenericGCCName() const { return CCCGenericGCCName; }
 
-  const std::string &getConfigFile() const { return ConfigFile; }
+  const llvm::SmallVectorImpl<std::string> &getConfigFile() const { return ConfigFileList; }
 
   const llvm::opt::OptTable &getOpts() const { return getDriverOptTable(); }
 

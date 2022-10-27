@@ -2377,7 +2377,7 @@ Expr *Sema::ValidateReducerCallback(Expr *E, unsigned NumArgs,
     return E;
 
   if (T->isNullPtrType())
-    return ImplicitCastExpr::Create(Context, Context.VoidPtrTy, 
+    return ImplicitCastExpr::Create(Context, Context.VoidPtrTy,
                                     CK_NullToPointer, E, nullptr,
                                     VK_PRValue, FPOptionsOverride());
 
@@ -5783,7 +5783,7 @@ static TypeSourceInfo *GetFullTypeForDeclarator(TypeProcessingState &state,
     }
 
     case DeclaratorChunk::Hyperobject: {
-      T = S.BuildHyperobjectType(T, DeclType.Hyper.Arg[0], 
+      T = S.BuildHyperobjectType(T, DeclType.Hyper.Arg[0],
                                  DeclType.Hyper.Arg[1], DeclType.Loc);
       break;
     }
@@ -8393,7 +8393,6 @@ static void HandleKitsuneMemAccessAttr(QualType &CurType, const ParsedAttr &Attr
                                    Sema &S) {
 
   if (const TypedefType* TypedefTy = CurType->getAs<TypedefType>()) {
-
     std::string PrevAccessQual;
     if (TypedefTy->getDecl()->hasAttr<KitsuneMemAccessAttr>()) {
       KitsuneMemAccessAttr *Attr =
@@ -8410,11 +8409,11 @@ static void HandleKitsuneMemAccessAttr(QualType &CurType, const ParsedAttr &Attr
          << AttrName << Attr.getRange();
     } else {
       // Contradicting qualifiers
-      S.Diag(Attr.getLoc(), diag::err_kitsune_multiple_access_qualifiers); 
+      S.Diag(Attr.getLoc(), diag::err_kitsune_multiple_access_qualifiers);
     }
 
     S.Diag(TypedefTy->getDecl()->getBeginLoc(),
-	   diag::note_kitsune_typedef_access_qualifier) << PrevAccessQual; 
+	   diag::note_kitsune_typedef_access_qualifier) << PrevAccessQual;
   }
 }
 

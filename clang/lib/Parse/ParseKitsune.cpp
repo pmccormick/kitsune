@@ -155,37 +155,43 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
       Diag(Tok, diag::ext_c99_variable_decl_in_for_loop);
       Diag(Tok, diag::warn_gcc_variable_decl_in_for_loop);
     }
-
-    // In C++0x, "for (T NS:a" might not be a typo for ::
-    bool MightBeForRangeStmt = getLangOpts().CPlusPlus;
-    ColonProtectionRAIIObject ColonProtection(*this, MightBeForRangeStmt);
-
-    SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
-    ParsedAttributes DeclSpecAttrs(AttrFactory);
-    DeclGroupPtrTy DG = ParseSimpleDeclaration(
-        DeclaratorContext::ForInit, DeclEnd, attrs, DeclSpecAttrs, false,
-        MightBeForRangeStmt ? &ForRangeInfo : nullptr);
-    FirstPart = Actions.ActOnDeclStmt(DG, DeclStart, Tok.getLocation());
-    if (ForRangeInfo.ParsedForRangeDecl()) {
-      Diag(ForRangeInfo.ColonLoc, getLangOpts().CPlusPlus11 ?
-           diag::warn_cxx98_compat_for_range : diag::ext_for_range);
-      ForRangeInfo.LoopVar = FirstPart;
-      FirstPart = StmtResult();
-    } else if (Tok.is(tok::semi)) {  // for (int x = 4;
-      ConsumeToken();
-    } else if ((ForEach = isTokIdentifier_in())) {
-      Actions.ActOnForEachDeclStmt(DG);
-      // ObjC: for (id x in expr)
-      ConsumeToken(); // consume 'in'
-
-      if (Tok.is(tok::code_completion)) {
-        Actions.CodeCompleteObjCForCollection(getCurScope(), DG);
-        cutOffParsing();
-        return StmtError();
-      }
-      Collection = ParseExpression();
+    DeclGroupPtrTy DG;
+    if (Tok.is(tok::kw_using)) {
+      DG = ParseAliasDeclarationInInitStatement(DeclaratorContext::ForInit,
+                                                attrs);
     } else {
-      Diag(Tok, diag::err_expected_semi_for);
+      // In C++0x, "for (T NS:a" might not be a typo for ::
+      bool MightBeForRangeStmt = getLangOpts().CPlusPlus;
+      ColonProtectionRAIIObject ColonProtection(*this, MightBeForRangeStmt);
+
+      SourceLocation DeclStart = Tok.getLocation(), DeclEnd;
+      ParsedAttributes DeclSpecAttrs(AttrFactory);
+      DG = ParseSimpleDeclaration(
+          DeclaratorContext::ForInit, DeclEnd, attrs, DeclSpecAttrs, false,
+          MightBeForRangeStmt ? &ForRangeInfo : nullptr);
+      FirstPart = Actions.ActOnDeclStmt(DG, DeclStart, Tok.getLocation());
+      if (ForRangeInfo.ParsedForRangeDecl()) {
+        Diag(ForRangeInfo.ColonLoc, getLangOpts().CPlusPlus11
+                                        ? diag::warn_cxx98_compat_for_range
+                                        : diag::ext_for_range);
+        ForRangeInfo.LoopVar = FirstPart;
+        FirstPart = StmtResult();
+      } else if (Tok.is(tok::semi)) { // for (int x = 4;
+        ConsumeToken();
+      } else if ((ForEach = isTokIdentifier_in())) {
+        Actions.ActOnForEachDeclStmt(DG);
+        // ObjC: for (id x in expr)
+        ConsumeToken(); // consume 'in'
+
+        if (Tok.is(tok::code_completion)) {
+          Actions.CodeCompleteObjCForCollection(getCurScope(), DG);
+          cutOffParsing();
+          return StmtError();
+        }
+        Collection = ParseExpression();
+      } else {
+        Diag(Tok, diag::err_expected_semi_for);
+      }
     }
   } else {
     ProhibitAttributes(attrs);
@@ -240,7 +246,6 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
   }
 
   // Parse the second part of the for specifier.
-  getCurScope()->AddFlags(Scope::BreakScope | Scope::ContinueScope);
   if (!ForEach && !ForRangeInfo.ParsedForRangeDecl() &&
       !SecondPart.isInvalid()) {
     // Parse the second part of the for specifier.
@@ -254,9 +259,11 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
         // for-range-declaration next.
         bool MightBeForRangeStmt = !ForRangeInfo.ParsedForRangeDecl();
         ColonProtectionRAIIObject ColonProtection(*this, MightBeForRangeStmt);
-        SecondPart =
-            ParseCXXCondition(nullptr, ForLoc, Sema::ConditionKind::Boolean,
-                              MightBeForRangeStmt ? &ForRangeInfo : nullptr);
+        SecondPart = ParseCXXCondition(
+            nullptr, ForLoc, Sema::ConditionKind::Boolean,
+            // FIXME: recovery if we don't see another semi!
+            /*MissingOK=*/true, MightBeForRangeStmt ? &ForRangeInfo : nullptr,
+            /*EnterForConditionScope*/ true);
 
         if (ForRangeInfo.ParsedForRangeDecl()) {
           Diag(FirstPart.get() ? FirstPart.get()->getBeginLoc()
@@ -273,23 +280,31 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
           }
         }
       } else {
+        // We permit 'continue' and 'break' in the condition of a for loop.
+        getCurScope()->AddFlags(Scope::BreakScope | Scope::ContinueScope);
+
         ExprResult SecondExpr = ParseExpression();
         if (SecondExpr.isInvalid())
           SecondPart = Sema::ConditionError();
         else
-          SecondPart =
-              Actions.ActOnCondition(getCurScope(), ForLoc, SecondExpr.get(),
-                                     Sema::ConditionKind::Boolean);
+          SecondPart = Actions.ActOnCondition(
+              getCurScope(), ForLoc, SecondExpr.get(),
+              Sema::ConditionKind::Boolean, /*MissingOK=*/true);
       }
     }
   }
 
+  // Enter a break / continue scope, if we didn't already enter one while
+  // parsing the second part.
+  if (!getCurScope()->isContinueScope())
+    getCurScope()->AddFlags(Scope::BreakScope | Scope::ContinueScope);
+
   // Parse the third part of the for statement.
   if (!ForEach && !ForRangeInfo.ParsedForRangeDecl()) {
     if (Tok.isNot(tok::semi)) {
-      if (!SecondPart.isInvalid())
+      if (!SecondPart.isInvalid()) {
         Diag(Tok, diag::err_expected_semi_for);
-      else
+      } else
         // Skip until semicolon or rparen, don't consume it.
         SkipUntil(tok::r_paren, StopAtSemi | StopBeforeMatch);
     }
@@ -314,6 +329,9 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
     Diag(CoawaitLoc, diag::err_for_co_await_not_range_for);
     CoawaitLoc = SourceLocation();
   }
+
+  if (CoawaitLoc.isValid() && getLangOpts().CPlusPlus20)
+    Diag(CoawaitLoc, diag::warn_deprecated_for_co_await);
 
   // We need to perform most of the semantic analysis for a C++0x for-range
   // statememt before parsing the body, in order to be able to deduce the type

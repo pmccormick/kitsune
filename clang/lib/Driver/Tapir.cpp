@@ -39,14 +39,13 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
       .Case("none", TapirTargetID::None)
       .Case("serial", TapirTargetID::Serial)
       .Case("cilk", TapirTargetID::Cilk)
-      .Case("cuda", TapirTargetID::Cuda)
-      .Case("opencilk", TapirTargetID::OpenCilk)      
+      .Case("cilkplus", TapirTargetID::Cilk)
+      .Case("opencilk", TapirTargetID::OpenCilk)
       .Case("cuda", TapirTargetID::Cuda)
       .Case("openmp", TapirTargetID::OpenMP)
       .Case("qthreads", TapirTargetID::Qthreads)
       .Case("realm", TapirTargetID::Realm)
       .Case("opencl", TapirTargetID::OpenCL)
-      .Case("cilk", TapirTargetID::Cilk)
       .Case("gpu", TapirTargetID::GPU)
       .Default(TapirTargetID::Last_TapirTargetID);
 
@@ -55,7 +54,7 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
 
 TapirNVArchTargetID clang::parseTapirNVArchTarget(const ArgList &Args) {
   TapirNVArchTargetID NVArch = TapirNVArchTargetID::Off;
-  if (const Arg *A = Args.getLastArg(options::OPT_ftapir_nvarch_EQ)) 
+  if (const Arg *A = Args.getLastArg(options::OPT_ftapir_nvarch_EQ))
     NVArch = llvm::StringSwitch<TapirNVArchTargetID>(A->getValue())
       .Case("sm_50", TapirNVArchTargetID::SM_50)
       .Case("sm_52", TapirNVArchTargetID::SM_52)

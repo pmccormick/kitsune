@@ -4218,14 +4218,17 @@ def note_called_once_gets_called_twice : Note<
 // +===== kitsune/tapir: errors related to custom codegen attributes. 
 def warn_tapir_attr_not_enabled: Warning<
     "tapir attribute encountered but tapir is not enabled (via -ftapir).  "
-    "Attribute ignored.">;
+    "Attribute ignored.">,
+    InGroup<Tapir>;
 
 def warn_tapir_target_attr_bad_stmt_class: Warning<
     "tapir target runtime attribute applied to an unsupported statement.  "
-    "Attribute ignored.">;
+    "Attribute ignored.">,
+    InGroup<Tapir>;
 
 def warn_kitsune_not_enabled: Warning<
-    "kitsune not enabled (-fkitsune) tapir attribute will be ignored.">;
+    "kitsune not enabled (-fkitsune) tapir attribute will be ignored.">,
+    InGroup<Kitsune>;
 
 // rutnime target-centric errors/warnings. 
 def err_tapir_target_attr_unsupported_stmt: Error<
@@ -4246,7 +4249,8 @@ def err_tapir_strategy_unknown: Error<
 // spawn+sync errors/warnings.
 // 
 def warn_spawn_as_loop_body: Warning<
-    "%0 loop with spawn statement body has undefined behavior.">;
+    "%0 loop with spawn statement body has undefined behavior.">,
+    InGroup<Kitsune>;
 
 // Forall errors/warnings
 def err_forall_no_init: Error<

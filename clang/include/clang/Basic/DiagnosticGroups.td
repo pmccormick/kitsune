@@ -970,8 +970,9 @@ def ReturnCilkSpawn : DiagGroup<"return-cilk-spawn">;
 def CilkIgnored : DiagGroup<"cilk-ignored">;
 
 // Kitsune/Tapir warnings.
-def KitsuneConfiguration : DiagGroup<"kitsune-configuration">;
-def DisabledTarget : DiagGroup<"disabled-target">;
+def Kitsune : DiagGroup<"kitsune">;
+def Tapir : DiagGroup<"tapir">;
+def TapirTarget : DiagGroup<"disabled-target">;
 
 def Extra : DiagGroup<"extra", [
     DeprecatedCopy,

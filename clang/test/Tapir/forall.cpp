@@ -17,5 +17,7 @@ void f1() {
 
   forall (n = 0 n < 10 n++); // expected-error 2{{expected ';' in 'for'}}
 
-  forall (;); // expected-error {{expected ';' in 'for'}}
+  forall (;);
+  // expected-error@20 {{expected ';' in 'for'}}
+  // expected-error@20 {{forall statement must have an initialization expression}}
 }
