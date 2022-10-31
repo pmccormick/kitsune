@@ -7,13 +7,14 @@
 @d = internal global i32 0, align 4
 
 define i32 @main() {
-; COM: The label of the block in the comment below is entry: in LLVM upstream
-; COM: (as it perhaps ought to be). But for some reason, we end up with
-; COM: bar.exit. This is perhaps a bug in one of our (or Tapir's) passes. For
-; COM: now, this is changed to bar.exit, but really, we ought to figure out what
-; COM: is actually causing this. So TODO.
+; This is different from LLVM upstream. During the course of optimizing, a
+; conditional branch ends up with a constant value. In our case, jump-threading
+; gets run on this code, while in vanilla LLVM, instcombine is run on it.
+; Apparently the two passes deal with the constant conditionals slightly
+; differently. The result is that in our case, the basic block get the name of
+; the destination of the branch whereas in vanilla LLVM, it retains its name.
 ; CHECK-LABEL: @main(
-; CHECK-NEXT:  entry:
+; CHECK-NEXT:  bar.exit:
 ; CHECK-NEXT:    [[TMP0:%.*]] = load i32*, i32** @e, align 8
 ; CHECK-NEXT:    store i32 0, i32* [[TMP0]], align 4
 ; CHECK-NEXT:    store i32* null, i32** @e, align 8
