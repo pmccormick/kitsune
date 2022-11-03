@@ -53,13 +53,14 @@
 
 #include <cstdio>
 #include <cassert>
+#include <unordered_map>
 #include <map>
 #include "memory_map.h"
 
 //#define _KITRT_VERBOSE_
 
 
-typedef std::map<void *, KitRTAllocMapEntry> KitRTAllocMap;
+typedef std::unordered_map<void *, KitRTAllocMapEntry> KitRTAllocMap;
 static KitRTAllocMap _kitrtAllocMap;
 
 void __kitrt_registerMemAlloc(void *addr, size_t size, bool prefetched) {

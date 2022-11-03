@@ -66,6 +66,7 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <unordered_map>
 #include <sstream>
 #include <stdbool.h>
 
@@ -178,7 +179,7 @@ DECLARE_DLSYM(cuOccupancyMaxPotentialBlockSize);
 //
 // TODO: Is there a faster path here for lookup?  Is a map more
 // complicated than necessary?
-typedef std::map<const void*, CUmodule>  KitRTModuleMap;
+typedef std::unordered_map<const void*, CUmodule>  KitRTModuleMap;
 static KitRTModuleMap _kitrtModuleMap;
 
 // Alongside the module map the runtime also maintains a map from
@@ -187,7 +188,7 @@ static KitRTModuleMap _kitrtModuleMap;
 //
 // TODO: Ditto from above.  Is there a faster path here for lookup?
 // Is a map more complicated than necessary?
-typedef std::map<const char *, CUfunction>  KitRTKernelMap;
+typedef std::unordered_map<const char *, CUfunction>  KitRTKernelMap;
 static KitRTKernelMap _kitrtKernelMap;
 
 

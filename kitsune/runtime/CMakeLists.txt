@@ -16,8 +16,8 @@ set(KITRT_INCLUDE_DIR ${KITSUNE_RUNTIME_DIR})
 # second option (KITRT_ENABLE_VERBOSE) will report runtime details and
 # give a general feel for what is going on (memory allocations, kernel
 # launches, etc.).
-option(KITRT_ENABLE_DEBUG "Enable debug mode features for the runtime." ON)
-option(KITRT_ENABLE_VERBOSE "Enable verbose execution mode for debuggin." ON)
+option(KITRT_ENABLE_DEBUG "Enable debug mode features for the runtime." OFF)
+option(KITRT_ENABLE_VERBOSE "Enable verbose execution mode for debuggin." OFF)
 
 include_directories(${KITSUNE_SOURCE_DIR}/include)
 include_directories(${KITSUNE_RUNTIME_INCLUDE_DIR})
