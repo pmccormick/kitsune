@@ -16,6 +16,6 @@ nvcc=${CUDA_HOME}/bin/nvcc
 ptxas=${CUDA_HOME}/bin/ptxas
 fatbinary=${CUDA_HOME}/bin/fatbinary
 
-nvcc_cxx_flags=-std=c++17 --no-exceptions --expt-extended-lambda -expt-relaxed-constexpr
+nvcc_cxx_flags=-std c++17 --no-exceptions --expt-extended-lambda -expt-relaxed-constexpr
 nvcc_target_flags=-arch=${NVARCH}
 clang_cu_flags=-xcuda --cuda-gpu_arch=${NVARCH}

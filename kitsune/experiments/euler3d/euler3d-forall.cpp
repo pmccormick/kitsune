@@ -61,14 +61,14 @@ void dealloc(T* array) {
   __kitrt_cuMemFree((void*)array);
 }
 
+
+
 template <typename T>
-void cpy(T* dst, const T* src, int N) {
-  //__kitrt_memNeedsPrefetch((void *)dst);
-  //__kitrt_memNeedsPrefetch((void *)src);
-  forall(int i = 0; i < N; i++)
+inline __attribute__((always_inline))
+void cpy(T* dst, T* src, int N) {
+  forall(unsigned int i = 0; i < N; i++)
     dst[i] = src[i];
 }
-
 
 void dump(float* variables, int nel, int nelr)
 {
@@ -101,10 +101,8 @@ void dump(float* variables, int nel, int nelr)
 
 void initialize_variables(int nelr,
                           float* variables,
-                          const float* ff_variable)
+                          float* ff_variable)
 {
-  //__kitrt_memNeedsPrefetch((void *)variables);
-  //__kitrt_memNeedsPrefetch((void *)ff_variable);
   forall(int i = 0; i < nelr; i++) {
     for(int j = 0; j < NVAR; j++)
       variables[i + j*nelr] = ff_variable[j];
@@ -523,24 +521,25 @@ int main(int argc, char** argv)
 
   // Create arrays and set initial conditions
   float* variables = alloc<float>(nelr*NVAR);
-  initialize_variables(nelr, variables, ff_variable);
 
+  auto start = chrono::steady_clock::now();
+  initialize_variables(nelr, variables, ff_variable);
+  
   float* old_variables = alloc<float>(nelr*NVAR);
   float* fluxes = alloc<float>(nelr*NVAR);
   float* step_factors = alloc<float>(nelr);
 
-  cout << iterations << " ";
-  auto start = chrono::steady_clock::now();
   double copy_total = 0.0;
   double sf_total = 0.0;
   double rk_total = 0.0;
   // Begin iterations
   for(int i = 0; i < iterations; i++) {
-
+    
     auto copy_start = chrono::steady_clock::now();
     cpy(old_variables, variables, nelr*NVAR);
     auto copy_end = chrono::steady_clock::now();
-    copy_total += chrono::duration<double>(copy_end-copy_start).count();
+    double time = chrono::duration<double>(copy_end-copy_start).count();
+    copy_total += time;
 
     // for the first iteration we compute the time step
     auto sf_start = chrono::steady_clock::now();
@@ -563,6 +562,7 @@ int main(int argc, char** argv)
   }
 
   auto end = chrono::steady_clock::now();
+  cout << iterations << " ";
   cout << copy_total << " "
        << sf_total << " "
        << rk_total << " "

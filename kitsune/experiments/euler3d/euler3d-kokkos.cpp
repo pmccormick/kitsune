@@ -92,13 +92,13 @@ void initialize_variables(int nelr,
 {
   variables.sync_device();
   ff_variable.sync_device();
-  variables.modify_device();
   Kokkos::parallel_for("initialize_variables", nelr,
         KOKKOS_LAMBDA(const int &i) {
     for(int j = 0; j < NVAR; j++)
       variables.d_view(i + j*nelr) = ff_variable.d_view(j);
   });
   Kokkos::fence();
+  variables.modify_device();
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
@@ -408,7 +408,7 @@ void time_step(int j, int nelr,
   fluxes.sync_device();
   variables.modify_device();
   Kokkos::parallel_for("time_step", nelr/block_length,
-      KOKKOS_LAMBDA(const int &blk) {
+    KOKKOS_LAMBDA(const int &blk) {
     int b_start = blk*block_length;
     int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
     for(int i = b_start; i < b_end; ++i) {
@@ -552,7 +552,9 @@ int main(int argc, char** argv)
 
     // Create arrays and set initial conditions
     View<float> variables = View<float>("variables", nelr * NVAR);
+    cout << iterations << " "; 
 
+    auto start = chrono::steady_clock::now();
     initialize_variables(nelr, variables, ff_variable);
 
     View<float> old_variables = View<float>("old_variables", nelr*NVAR);
@@ -560,18 +562,17 @@ int main(int argc, char** argv)
     View<float> step_factors = View<float>("step_factors", nelr);
 
     // Begin iterations
-    cout << iterations << " "; 
-    auto start = chrono::steady_clock::now();
     double copy_total = 0.0;
     double sf_total = 0.0;
     double rk_total = 0.0;
     for(int i = 0; i < iterations; i++) {
-
+      
       auto copy_start = chrono::steady_clock::now();
       cpy(old_variables, variables, nelr*NVAR);
       auto copy_end = chrono::steady_clock::now();
-      copy_total += chrono::duration<double>(copy_end-copy_start).count();
-
+      double time = chrono::duration<double>(copy_end-copy_start).count();      
+      copy_total += time;
+    
       // for the first iteration we compute the time step
       auto sf_start = chrono::steady_clock::now();
       compute_step_factor(nelr, variables, areas, step_factors);
