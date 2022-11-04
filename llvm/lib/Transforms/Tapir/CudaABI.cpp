@@ -872,14 +872,14 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   PHINode *PrimaryIV = cast<PHINode>(VMap[TLI.getPrimaryInduction().first]);
   Value *PrimaryIVInput = PrimaryIV->getIncomingValueForBlock(Entry);
 
-  /*Value *SyncR = T->getDetach()->getSyncRegion();
+  Value *SyncR = T->getDetach()->getSyncRegion();
   for(Use& U:SyncR->uses()) {
     if (auto *SyncI = dyn_cast<SyncInst>(U.getUser())) {
       LLVM_DEBUG(dbgs() << "saving sync instruction for post-processing...\n");
       TTarget->pushSync(SyncI);
     }
   }
-  */
+
 
   Instruction *ClonedSyncReg =
        cast<Instruction>(VMap[T->getDetach()->getSyncRegion()]);

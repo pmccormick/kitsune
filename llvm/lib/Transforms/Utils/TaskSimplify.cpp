@@ -189,10 +189,10 @@ bool llvm::simplifySyncs(Task *T, MaybeParallelTasks &MPTasks) {
   Changed |= removeRedundantSyncs(MPTasks, T);
 
   // Remove redundant sync regions.
-  Changed |= removeRedundantSyncRegions(MPTasks, T);
+  //Changed |= removeRedundantSyncRegions(MPTasks, T);
 
   return Changed;
-}  
+}
 
 static bool taskCanThrow(const Task *T) {
   for (const Spindle *S : T->spindles())
