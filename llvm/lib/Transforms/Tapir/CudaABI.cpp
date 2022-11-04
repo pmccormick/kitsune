@@ -872,8 +872,7 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   PHINode *PrimaryIV = cast<PHINode>(VMap[TLI.getPrimaryInduction().first]);
   Value *PrimaryIVInput = PrimaryIV->getIncomingValueForBlock(Entry);
 
-  Value *SyncR = T->getDetach()->getSyncRegion();
-  /*
+  /*Value *SyncR = T->getDetach()->getSyncRegion();
   for(Use& U:SyncR->uses()) {
     if (auto *SyncI = dyn_cast<SyncInst>(U.getUser())) {
       LLVM_DEBUG(dbgs() << "saving sync instruction for post-processing...\n");
@@ -1010,7 +1009,7 @@ static Function *getVprintfDeclaration(llvm::Module &M) {
 //   };
 //   char *VArgBuffer = alloca(sizeof(Vargs);
 //   *(Vargs*)VArgBuffer = {a1, a2, a3};
-//  vprintf("string %s is %d characters long.\n", VArgBuffer);
+//   vprintf("string %s is %d characters long.\n", VArgBuffer);
 //
 // The VArgBuffer should be aligned to the max of the arguments and each
 // argument should be aligned to its own preferred alignment.
@@ -1047,7 +1046,8 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn) {
   // Handle special cases where code generation can be a bit more
   // complex; e.g., printf().
   if (Fn->getName() == "printf" || Fn->getName() == "fprintf") {
-    report_fatal_error("cuabi: printf unsupported parallel loops... :-(\n");
+    report_fatal_error("cuabi: printf is currently unsupported "
+                       "parallel loops... :-(\n");
   }
 
   std::string FnName;
@@ -1057,19 +1057,22 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn) {
     LLVM_DEBUG(dbgs() << "\ttransforming llvm intrinsic ("
                       << Fn->getName() << ") to device-side...\n");
     Function *nvi = nullptr;
-    if (Fn->getName() == "llvm.sqrt") {
-      if (Fn->getReturnType()->isFloatTy())
-        FnName = "sqrtf";
-      else
+    if (Fn->getName() == "llvm.sqrt.f32") {
+      FnName = "sqrtf";
+    } else if (Fn->getName() == "llvm.sqrt.f64") {
         FnName = "sqrt";
     } else if (Fn->getName() == "llvm.cos.f32") {
-      FnName = "cosf";
+      FnName = "fast_cosf";
     } else if (Fn->getName() == "llvm.cos.f64") {
       FnName = "cos";
     } else if (Fn->getName() == "llvm.sin.f32") {
-      FnName = "sinf";
+      FnName = "fast_sinf";
     } else if (Fn->getName() == "llvm.sin.f64") {
       FnName = "sin";
+    } else if (Fn->getName() == "llvm.tan.f32") {
+      FnName = "fast_tanf";
+    } else if (Fn->getName() == "llvm.tan.f64") {
+      FnName = "tan";
     } else if (Fn->getName() == "llvm.nvvm.read.ptx.sreg.tid.x" ||
                Fn->getName() == "llvm.nvvm.read.ptx.sreg.ntid.x" ||
                Fn->getName() == "llvm.nvvm.read.ptx.sreg.ctaid.x") {
