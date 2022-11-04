@@ -822,18 +822,11 @@ void __kitrt_cuSynchronizeStreams() {
   // If the active stream is empty, our launch path went through the
   // default stream.  Otherwise, we need to sync on each of the active
   // streams.
-  if (_kitrtActiveStreams.empty()) {
-    CU_SAFE_CALL(cuStreamSynchronize_p(NULL));
-  } else {
-    // TODO: Revisit logic here relative to the use of internal
-    // event timing mode.
-    CU_SAFE_CALL(cuCtxSynchronize());
-    while(not _kitrtActiveStreams.empty()) {
-      CUstream stream = _kitrtActiveStreams.front();
-      //CU_SAFE_CALL(cuStreamSynchronize_p(stream));
-      CU_SAFE_CALL(cuStreamDestroy(stream));
-      _kitrtActiveStreams.pop_front();
-    }
+  CU_SAFE_CALL(cuCtxSynchronize());
+  while(not _kitrtActiveStreams.empty()) {
+    CUstream stream = _kitrtActiveStreams.front();
+    CU_SAFE_CALL(cuStreamDestroy(stream));
+    _kitrtActiveStreams.pop_front();
   }
 }
 
