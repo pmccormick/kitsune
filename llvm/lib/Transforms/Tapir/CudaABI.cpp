@@ -24,7 +24,6 @@
 // comments in the code.
 //
 //===----------------------------------------------------------------------===//
-#include "llvm/Transforms/Tapir/CudaABI.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Constants.h"
@@ -57,6 +56,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Tapir/CudaABI.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Tapir/TapirGPUUtils.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
@@ -780,9 +780,8 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
                         << NewG->getName() << "'.\n");
       TTarget->pushGlobalVariable(G);
 
-    } else if (dyn_cast<GlobalAlias>(V)) {
+    } else if (dyn_cast<GlobalAlias>(V))
       llvm_unreachable("kitsune: GlobalAlias not implemented.");
-    }
   }
 
   // Create declarations for all functions first. These may be needed in the
@@ -806,6 +805,7 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
                                      F->getName(), KernelModule);
         }
       }
+
       for (size_t i = 0; i < F->arg_size(); i++) {
         Argument *Arg = F->getArg(i);
         Argument *NewA = DeviceF->getArg(i);
@@ -872,25 +872,18 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   PHINode *PrimaryIV = cast<PHINode>(VMap[TLI.getPrimaryInduction().first]);
   Value *PrimaryIVInput = PrimaryIV->getIncomingValueForBlock(Entry);
 
-  Value *SyncR = T->getDetach()->getSyncRegion();
-  for(Use& U:SyncR->uses()) {
-    if (auto *SyncI = dyn_cast<SyncInst>(U.getUser())) {
-      LLVM_DEBUG(dbgs() << "saving sync instruction for post-processing...\n");
-      TTarget->pushSync(SyncI);
-    }
-  }
+  TTarget->pushSR(T->getDetach()->getSyncRegion());
 
-
-  Instruction *ClonedSyncReg =
-       cast<Instruction>(VMap[T->getDetach()->getSyncRegion()]);
   // We no longer need the cloned sync region.
+  Instruction *ClonedSyncReg = cast<Instruction>(
+              VMap[T->getDetach()->getSyncRegion()]);
   ClonedSyncReg->eraseFromParent();
 
   // Set the helper function to have external linkage.
   Function *Helper = Out.Outline;
   Helper->setName(KernelName);
-  //Helper->setLinkage(Function::ExternalLinkage);
 
+  //Helper->setLinkage(Function::ExternalLinkage);
   // Set the target features for the helper.
   AttrBuilder Attrs;
   Attrs.addAttribute("target-cpu", GPUArch);
@@ -1104,8 +1097,6 @@ void CudaLoop::transformForPTX(Function &F) {
   LLVM_DEBUG(dbgs() << "Transforming function '" << F.getName() << "' "
                     << "in preparation for PTX generation.\n");
 
-  LLVMContext &Ctx = KernelModule.getContext();
-
   // ThreadID.x
   auto tid = Intrinsic::getDeclaration(&KernelModule,
                                        Intrinsic::nvvm_read_ptx_sreg_tid_x);
@@ -1199,7 +1190,8 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
                                        DominatorTree &DT) {
 
   LLVM_DEBUG(dbgs() << "\tprocessing outlined loop call for kernel '"
-                    << KernelName << "' w/ " << OrderedInputs.size() << "arguments.\n");
+                    << KernelName << "' w/ " << OrderedInputs.size()
+                    << " arguments.\n");
 
   LLVMContext &Ctx = M.getContext();
   PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
@@ -1294,8 +1286,6 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
     B.CreateCall(KitCudaModuleLaunchFn,
                    {CuModule, KNameParam, argsPtr, TCCI, prefetchStream});
   }
-
-  //B.CreateCall(KitCudaSyncFn);
 }
 
 CudaABI::CudaABI(Module &M)
@@ -1303,8 +1293,8 @@ CudaABI::CudaABI(Module &M)
       KM(Twine(CUABI_PREFIX + sys::path::filename(M.getName())).str(),
       M.getContext()) {
 
-  LLVM_DEBUG(dbgs() << "cuabi: creating tapir target for module: "
-                    << M.getName() << "\n");
+  LLVM_DEBUG(dbgs() << "cuabi: creating tapir target for module '"
+                    << M.getName() << "'\n");
 
   // Create a module (KM) to hold all device side functions for
   // all parallel constructs in the module we are processing (M).
@@ -1332,9 +1322,10 @@ CudaABI::CudaABI(Module &M)
                        "Was LLVM built with the NVPTX target enabled?");
   }
 
-  PTXTargetMachine = PTXTarget->createTargetMachine(
-      TT.getTriple(), GPUArch, PTXVersionStr.c_str(), TargetOptions(),
-      Reloc::PIC_, CodeModel::Large, CodeGenOpt::Aggressive);
+  PTXTargetMachine = PTXTarget->createTargetMachine(TT.getTriple(), GPUArch,
+                                     PTXVersionStr.c_str(), TargetOptions(),
+                                     Reloc::PIC_, CodeModel::Large,
+                                     CodeGenOpt::Aggressive);
 
   KM.setTargetTriple(TT.str());
   KM.setDataLayout(PTXTargetMachine->createDataLayout());
@@ -1410,13 +1401,13 @@ void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
         M.getOrInsertFunction("__kitrt_cuSynchronizeStreams",
                               VoidTy); // no return & no parameters
 
-    // TODO: Really want to make certain we only have one successsor
-    // block here...  We could have multple edges?  Exceptions?
-    for(SyncInst *SI : SyncList) {
-      CallInst::Create(KitCudaSyncFn, "",
-                       &*SI->getSuccessor(0)->begin());
+    for(Value *SR : SyncRegList) {
+      for (Use &U : SR->uses()) {
+        if (auto *SyncI = dyn_cast<SyncInst>(U.getUser()))
+          CallInst::Create(KitCudaSyncFn, "",&*SyncI->getSuccessor(0)->begin());
+      }
     }
-    SyncList.clear();
+    SyncRegList.clear();
   }
 }
 

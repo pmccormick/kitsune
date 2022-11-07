@@ -79,9 +79,8 @@ public:
   int globalVarCount() const {
     return GlobalVars.size();
   }
-
-  void pushSync(SyncInst *SI) {
-    SyncList.push_back(SI);
+  void pushSR(Value *SR) {
+    SyncRegList.insert(SR);
   }
 
   private:
@@ -102,15 +101,15 @@ public:
     typedef std::list<GlobalVariable *> GlobalVarListTy;
     GlobalVarListTy GlobalVars;
 
-    typedef std::list<SyncInst*> SyncListTy;
-    SyncListTy SyncList;
+    typedef std::set<Value*> SyncRegionListTy;
+    SyncRegionListTy SyncRegList;
 
     Module   KM;
     TargetMachine *PTXTargetMachine;
 };
 
 /// The loop outline process for transforming a Tapir parallel loop
-/// represention into a Cuda runtime and PTX --> fat binary kernel
+/// representation into a Cuda runtime and PTX --> fat binary kernel
 /// execution.
 ///
 ///  * The loop processor requires a CUDA install and that the 'ptxas'
