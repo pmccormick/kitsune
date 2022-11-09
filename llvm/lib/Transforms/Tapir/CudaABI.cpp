@@ -7,23 +7,25 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the Kitsune+Tapir GPU ABI to convert Tapir
+// This file implements the Kitsune+Tapir CUDA ABI to convert Tapir
 // instructions to calls into the CUDA-centric portions of the Kitsune
-// runtime for GPUs and produce a fully compiled (not JIT) executable
-// that is suitable for a given architecture target.
+// runtime and produce a fully compiled (non-JIT) executable that is
+// suitable for a given architecture target.  Some of the key aspects
+// of this transform are discussed in the LLVM NVPTX target documentation.
 //
-// While portions of this transform mimic aspects of what Clang does
-// to provide CUDA support it uses the CUDA Driver API.  Given many
-// details about NVIDIA's fat binary structure are not 100% documented
-// many things are still a work in progress. This includes robust
-// behavior for portions of the CUDA tools (e.g., cuobjdump,
-// debugging, profiling).  Most tools appear to work but we have not
-// yet make a complete and thorough pass through the full feature set.
+//     https://llvm.org/docs/NVPTXUsage.html)
 //
-// More notes regarding these aspects are sprinkled throughout the
-// comments in the code.
+// In addition, looking at some of the details in how Clang handles
+// CUDA code generation can be helpful -- although the Kitsune runtime
+// also helps to simplify certain code generation details.
+//
+// TODO: Quick overview of key remaining work within current code base.
+//    1. Check updates for CUDA and PTX version matches.
+//    2. Flush out command line arguments and align with ptxas
+//       feature set.
 //
 //===----------------------------------------------------------------------===//
+//
 #include "llvm/ADT/Twine.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Constants.h"
@@ -49,7 +51,6 @@
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/Inliner.h"
@@ -78,7 +79,7 @@ static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 // additional control and functionality, debugging, etc.  As a reminder,
 // these can be used in the form:
 //
-//   -mllvm -cudabi-option[...]
+//   -mllvm -cuabi-option[...]
 //
 
 
@@ -90,8 +91,6 @@ static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 // of GPU architectures (e.g., we favor 64-bit and SM_60 or newer, which
 // follows the trends of longer term CUDA support.  Although exposed here, we
 // have not tested 32-bit host support.
-//
-// TODO: Might be nice to allow build-time setting of this default.
 //
 static cl::opt<std::string>
     GPUArch("cuabi-arch", cl::init("sm_75"), cl::NotHidden,
@@ -280,7 +279,7 @@ static cl::opt<unsigned>
 // Adapted from Transforms/Utils/ModuleUtils.cpp
 // TODO: Technically we only use this to add a global ctor for
 // dealing with the nuances of CUDA kernels so perhaps we'd be
-// off renaming this to match our specific use case...  ????
+// off renaming this to match our specific use case?
 static void appendToGlobalArray(const char *Array, Module &M, Constant *C,
                                 int Priority, Constant *Data) {
 
@@ -363,12 +362,10 @@ static std::string PTXVersionFromCudaVersion() {
   Twine CudaVersionStr = "unknown";
 #endif
 
-  // TODO: There could a tighter connection here with the GPU
-  // architecture choice that we are not cross referencing.
   return llvm::StringSwitch<std::string>(CudaVersionStr.str())
       // TODO: These CUDA to PTX version translations will have
       // to be watched between CUDA and LLVM resources.  It is
-      // not uncommon for LLVM to lag behind CUDA PTX versions.
+      // not uncommon for LLVM to lag well behind CUDA PTX versions.
       // The details below are based on Cuda 11.6 and LLVM 13.x.
       .Case("10.0", "+ptx63")
       .Case("10.1", "+ptx64")
@@ -380,22 +377,25 @@ static std::string PTXVersionFromCudaVersion() {
       .Case("11.3", "+ptx72")
       .Case("11.4", "+ptx72")
       .Case("11.5", "+ptx72")
-      .Case("11.6", "+ptx72")
-      .Default("+ptx72"); // TODO: fall back or go with latest?
+      .Case("11.6", "+ptx72")  // TODO: should be at best ptx76.
+      .Case("11.7", "+ptx72")  // TODO: should be at best ptx77.
+      .Case("11.8", "+ptx72")  // TODO: should be at best ptx78.
+      .Default("+ptx72");
 }
 
-// Helper function to configure the details of our post-Tapir transformation
-// passes.
-//
-//
+// Some named values to make optimization levels a bit
+// easier to read in the code.
 const unsigned OptLevel0 = 0;
 const unsigned OptLevel1 = 1;
 const unsigned OptLevel2 = 2;
 const unsigned OptLevel3 = 3;
-
+// Code size.
 const unsigned SizeLevel0 = 0;
 const unsigned SizeLevel1 = 1;
 const unsigned SizeLevel2 = 2;
+
+// Helper function to configure the details of our post-Tapir transformation
+// passes.
 
 // NOTES: From the NVPTX target documentation.
 //  (See: https://llvm.org/docs/NVPTXUsage.html)
@@ -433,11 +433,10 @@ const unsigned SizeLevel2 = 2;
 static
 void runKernelOptimizationPasses(Module &KM, unsigned OptLevel = OptLevel3,
                                  unsigned SizeLevel = OptLevel2) {
-
   // TODO: Need to spend some time exploring the selected set of passes here.
   if (OptLevel > 0) {
+    LLVM_DEBUG(dbgs() << "\tcuabi: optimizing generated kernel module...\n");
     legacy::PassManager PM;
-    LLVM_DEBUG(dbgs() << "\trunning kernel module optimizations...\n");
     PM.add(createReassociatePass());
     PM.add(createGVNPass());
     PM.add(createCFGSimplificationPass());
@@ -445,7 +444,7 @@ void runKernelOptimizationPasses(Module &KM, unsigned OptLevel = OptLevel3,
     PM.add(createCFGSimplificationPass());
     PM.add(createVerifierPass());
     PM.run(KM);
-    LLVM_DEBUG(dbgs() << "\t\tpasses complete...\n");
+    LLVM_DEBUG(dbgs() << "\t\tpasses (+verifier) complete.\n");
   }
 }
 
@@ -472,9 +471,9 @@ CudaLoop::CudaLoop(Module &M, Module &KM, const std::string &KN,
     KernelName = UN;
   }
 
-  LLVM_DEBUG(dbgs() << "cuabi: cuda loop outliner creation:\n"
-                    << "\tbase kernel name: " << KernelName << "\n"
-                    << "\tmodule name     : " << KernelModule.getName()
+  LLVM_DEBUG(dbgs() << "cuabi: creating cuda loop outliner:\n"
+                    << "\tkernel name: " << KernelName << "\n"
+                    << "\tmodule     : " << KernelModule.getName()
                     << "\n\n");
 
   LLVMContext &Ctx = KernelModule.getContext();
@@ -581,6 +580,8 @@ CudaLoop::CudaLoop(Module &M, Module &KM, const std::string &KN,
                             Int32Ty, // host pointer
                             Int64Ty, // device pointer
                             Int64Ty);  // number of bytes to copy
+
+  LLVM_DEBUG(dbgs() << "\t\tdone.\n");
 }
 
 CudaLoop::~CudaLoop() {}
@@ -736,10 +737,9 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
 
   // TODO: process loop prior to outlining to do GPU/CUDA-specific things
   // like capturing global variables, etc.
-  LLVM_DEBUG(dbgs() << "cuabi: preprocessing tapir loop for kernel '"
+  LLVM_DEBUG(dbgs() << "\tcuabi: preprocessing parallel loop for kernel '"
                     << KernelName << "', in module '"
                     << KernelModule.getName() << "'.\n");
-
 
   // Collect the top-level entities (Function, GlobalVariable, GlobalAlias
   // and GlobalIFunc) that are used in the outlined loop. Since the outlined
@@ -748,7 +748,7 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
   // in the CUDA-centric ctor.
   std::set<GlobalValue *> UsedGlobalValues;
 
-  LLVM_DEBUG(dbgs() << "\tgathering and analyzing global values...\n");
+  LLVM_DEBUG(dbgs() << "\t\t- gathering and analyzing global values...\n");
 
   Loop &L = *TL.getLoop();
 
@@ -776,12 +776,12 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
 
       VMap[G] = NewG;
 
-      LLVM_DEBUG(dbgs() << "\tcreated kernel-side global variable '"
+      LLVM_DEBUG(dbgs() << "\t\t\tcreated kernel-side global variable '"
                         << NewG->getName() << "'.\n");
       TTarget->pushGlobalVariable(G);
 
     } else if (dyn_cast<GlobalAlias>(V))
-      llvm_unreachable("kitsune: GlobalAlias not implemented.");
+      llvm_unreachable("cuabi: fatal error, GlobalAlias not implemented!");
   }
 
   // Create declarations for all functions first. These may be needed in the
@@ -1411,12 +1411,14 @@ void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
   }
 }
 
-void CudaABI::postProcessHelper(Function &F) { /* no-op */
+void CudaABI::postProcessHelper(Function &F) {
+  /* no-op */
 }
 
 void CudaABI::preProcessOutlinedTask(llvm::Function &, llvm::Instruction *,
                                      llvm::Instruction *, bool,
-                                     BasicBlock *) { /* no-op */
+                                     BasicBlock *) {
+  /* no-op */
 }
 
 void CudaABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
@@ -1426,15 +1428,18 @@ void CudaABI::postProcessOutlinedTask(Function &F, Instruction *DetachPt,
 }
 
 void CudaABI::postProcessRootSpawner(Function &F,
-                                     BasicBlock *TFEntry) { /* no-op */
+                                     BasicBlock *TFEntry) {
+  /* no-op */
 }
 
 void CudaABI::processSubTaskCall(TaskOutlineInfo &TOI,
-                                 DominatorTree &DT) { /* no-op */
+                                 DominatorTree &DT) {
+  /* no-op */
 }
 
 void CudaABI::preProcessRootSpawner(llvm::Function &,
-                                    BasicBlock *TFEntry) { /* no-op */
+                                    BasicBlock *TFEntry) {
+  /* no-op */
 }
 
 CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
@@ -2202,18 +2207,20 @@ CudaABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
   std::replace(ModuleName.begin(), ModuleName.end(), '.', '_');
   std::replace(ModuleName.begin(), ModuleName.end(), '-', '_');
 
-  std::string KN;
+  Loop* TheLoop = TL->getLoop();
+  Function *Fn = TheLoop->getHeader()->getParent();
+  std::string KN = Fn->getName().str();
 
   if (M.getNamedMetadata("llvm.dbg.cu") || M.getNamedMetadata("llvm.dbg")) {
     // If we have debug info in the module go ahead and use a line number
     // based naming scheme for kernel names. This is purely for some extra
     // context (and sanity?) on the compiler development side...
     unsigned LineNumber = TL->getLoop()->getStartLoc()->getLine();
-    KN = CUABI_KERNEL_NAME_PREFIX + ModuleName + "_" + Twine(LineNumber).str();
+    KN = CUABI_KERNEL_NAME_PREFIX + KN + "_" + Twine(LineNumber).str();
   } else {
     // In the non-debug mode we use a consecutive numbering scheme for our
     // kernel names (this is currently handled via the 'make unique' parameter).
-    KN = CUABI_KERNEL_NAME_PREFIX + ModuleName;
+    KN = CUABI_KERNEL_NAME_PREFIX + KN;
   }
 
   CudaLoop *CLOP = new CudaLoop(M, KM, KN, this);

@@ -15,7 +15,7 @@ clang_flags=${cxx_flags} ${opt_flags} ${clang_info_flags}
 #
 kitsune_kokkos_flags = -fkokkos -fkokkos-no-init -I${kitsune_prefix}/include
 tapir_cu_launch_flags=-I${CUDA_HOME}/include
-tapir_cu_flags = -ffp-contract=fast -ftapir=cuda -mllvm -cuabi-streams=true -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-opt-level=3 -mllvm -cuabi-run-post-opts=false -mllvm -debug-only="cuda-abi"
+tapir_cu_flags = -ffp-contract=fast -ftapir=cuda -mllvm -cuabi-streams=false -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags} -mllvm -cuabi-opt-level=3 -mllvm -cuabi-run-post-opts=false -mllvm -debug-only="cuda-abi"
 tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1 -mllvm -cuabi-default-grainsize=1
 ####
 
