@@ -50,4 +50,60 @@ extern "C" {
 #define forall _kitsune_forall
 #endif
 
+
+#if defined(_tapir_cuda_target)
+  #ifdef __cplusplus
+    extern "C" void* __kitrt_cuMemAllocManaged(size_t);
+    template <typename T>
+    inline __attribute__((always_inline))
+      T* alloc(size_t N) {
+      return (T*)__kitrt_cuMemAllocManaged(sizeof(T) * N);
+    }
+  
+    extern "C" void __kitrt_cuMemFree(void*);
+    template <typename T>
+    void dealloc(T* array) {
+      __kitrt_cuMemFree((void*)array);
+    }
+  #endif
+#endif // _tapir_cuda_target
+
+
+#if defined(_tapir_hip_target)
+  #ifdef __cplusplus
+    extern "C" void* __kitrt_hipMemAllocManaged(size_t);
+    template <typename T>
+    inline __attribute__((always_inline))
+      T* alloc(size_t N) {
+      return (T*)__kitrt_hipMemAllocManaged(sizeof(T) * N);
+    }
+  
+    extern "C" void __kitrt_hipMemFree(void*);
+    template <typename T>
+    void dealloc(T* array) {
+      __kitrt_hipMemFree((void*)array);
+    }
+  #endif 
+#endif // _tapir_hip_target
+
+
+#if defined(_tapir_opencilk_target)
+#include <stdlib.h>
+  #ifdef __cplusplus
+    template <typename T>
+    inline __attribute__((always_inline))
+      T* alloc(size_t N) {
+      return (T*)malloc(sizeof(T) * N);	
+    }
+  
+    extern "C" void __kitrt_hipMemFree(void*);
+    template <typename T>
+    void dealloc(T* array) {
+      free(array);
+    }
+  #endif // __cplusplus
+#endif // _tapir_opencilk_target
+
+
 #endif
+

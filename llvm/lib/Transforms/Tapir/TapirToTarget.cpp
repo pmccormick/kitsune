@@ -244,7 +244,6 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
 
       // Record sync instructions in this function.
       if (SyncInst *SI = dyn_cast<SyncInst>(&I)) {
-        fprintf(stderr, "~~~~ push a sync.\n");
         Syncs.push_back(SI);
       }
     }
@@ -274,7 +273,6 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
 
   // Process the set of syncs.
   while (!Syncs.empty()) {
-    fprintf(stderr, "lowering a sync...\n");
     SyncInst *SI = Syncs.pop_back_val();
     Target->lowerSync(*SI);
     Changed = true;

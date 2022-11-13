@@ -1,4 +1,5 @@
 # Flags for the CUDA runtime ABI target.
+-D_tapir_cuda_target
 ${KITSUNE_CUDA_ABI_TARGET_EXTRA_LINK_FLAGS}
 -lkitrt
 ${KITSUNE_CUDA_ABI_TARGET_LINK_LIBS}
