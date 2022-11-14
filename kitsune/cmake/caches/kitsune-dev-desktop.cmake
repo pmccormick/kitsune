@@ -48,13 +48,7 @@ set(COMPILER_RT_DEFAULT_TARGET_ONLY ON CACHE STRING "")
 
 set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 80 CACHE STRING "")
 set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_80 CACHE STRING "")
-
-# CUDA/NVCC is really only happy with older host compilers.  So
-# you might need to tweak to make things happy but we typically
-# need to fall back to older compilers than what we use to build
-# LLVM/Clang/etc.  gcc 8.x and 9.x are typically safe here...
-set(CUDA_HOST_COMPILER "gcc-11" CACHE STRING "")
-
+set(CUDA_HOST_COMPILER "$ENV{CUDA_HOME}/bin/gcc" CACHE STRING "")
 
 # Various helpful LLVM-level settings for development/debugging.
 set(CLANG_ROUND_TRIP_CC1_ARGS OFF CACHE BOOL "")
