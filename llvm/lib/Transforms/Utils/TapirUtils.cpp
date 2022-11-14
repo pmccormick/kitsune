@@ -1770,8 +1770,8 @@ void llvm::fixupTaskFrameExternalUses(Spindle *TF, const TaskInfo &TI,
       if (isTaskFrameResume(BB->getTerminator(), TaskFrame)) {
         InvokeInst *TFResume = cast<InvokeInst>(BB->getTerminator());
         assert((nullptr == TFResumeContin) ||
-               (TFResumeContin == TFResume->getUnwindDest()) &&
-               "Multiple taskframe.resume destinations found");
+               ((TFResumeContin == TFResume->getUnwindDest()) &&
+               "Multiple taskframe.resume destinations found"));
         TFResumeContin = TFResume->getUnwindDest();
       }
     }

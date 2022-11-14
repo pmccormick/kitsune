@@ -1958,11 +1958,15 @@ void TargetLibraryInfoImpl::addTapirTargetLibraryFunctions(
     break;
   }
   case TapirTargetID::None:
+  case TapirTargetID::Off:
   case TapirTargetID::Serial:
   case TapirTargetID::Cheetah:
   case TapirTargetID::Cuda:
   case TapirTargetID::OpenMP:
   case TapirTargetID::Qthreads:
+  case TapirTargetID::OpenCL:
+  case TapirTargetID::GPU:
+  case TapirTargetID::Realm:
   case TapirTargetID::Last_TapirTargetID:
     break;
   }

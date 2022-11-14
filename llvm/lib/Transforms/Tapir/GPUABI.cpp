@@ -272,7 +272,7 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // Compile the kernel 
   //LLVMM.getFunctionList().remove(TOI.Outline); 
   //TOI.Outline->eraseFromParent(); 
-  LLVMContext &LLVMCtx = LLVMM.getContext();
+  //LLVMContext &LLVMCtx = LLVMM.getContext();
 
   ValueToValueMapTy VMap; 
   // We recursively add definitions and declarations to the device module
@@ -373,7 +373,7 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   bcw.writeStrtab(); 
 
   char* heapbuf = new char[mbuf.size()];
-  for(int i=0; i<mbuf.size(); i++) { heapbuf[i] = mbuf[i]; } 
+  for(size_t i=0; i<mbuf.size(); i++) { heapbuf[i] = mbuf[i]; } 
 
   std::string strbuf(mbuf.data(), mbuf.size()); 
   std::ofstream out("compile_time.bc"); 
@@ -391,9 +391,9 @@ void LLVMLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   //Value *TripCount = ReplCall->getArgOperand(getLimitArgIndex(*Parent,
   //                                                            TOI.InputSet));
 
-  Value *KernelID = ConstantInt::get(Int32Ty, MyKernelID);
-  Value *LLVMPtr = B.CreateBitCast(LLVMGlobal, VoidPtrTy);
-  Type *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
+  //Value *KernelID = ConstantInt::get(Int32Ty, MyKernelID);
+  //Value *LLVMPtr = B.CreateBitCast(LLVMGlobal, VoidPtrTy);
+  //Type *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
 
   Constant *kernelSize = ConstantInt::get(Int64Ty, 
     LLVMGlobal->getInitializer()->getType()->getArrayNumElements()); 
