@@ -1,3 +1,4 @@
 # Flags for the OpenCilk runtime ABI target.
+-D_tapir_opencilk_target
 ${KITSUNE_OPENCILK_TARGET_EXTRA_LINK_FLAGS} 
 

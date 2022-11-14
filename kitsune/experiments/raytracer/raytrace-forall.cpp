@@ -9,7 +9,7 @@
 #include <time.h>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-#include "kitrt/kitcuda/cuda.h"
+#include "kitrt/cuda/cuda.h"
 
 #define DEFAULT_WIDTH  2048
 #define DEFAULT_HEIGHT 1024

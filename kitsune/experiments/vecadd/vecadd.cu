@@ -1,5 +1,3 @@
-
-#include <cuda_runtime.h>
 #include <float.h>
 #include <fstream>
 #include <iostream>
@@ -10,7 +8,6 @@
 #include <stdlib.h>
 #include <string>
 #include <time.h>
-
 #include "kitsune/timer.h"
 
 const size_t VEC_SIZE = 1024 * 1024 * 256;

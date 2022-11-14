@@ -33,7 +33,7 @@ set(CMAKE_BUILD_TYPE Release CACHE STRING "")
 # you are working on.  By default we provide the full suite of
 # clang+tools, openmp, lld, and a debugger via lldb.
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;openmp;
+  clang;clang-tools-extra;lld;compiler-rt 
   CACHE STRING "")
 
 set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 80 CACHE STRING "")
@@ -45,7 +45,7 @@ set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_80 CACHE STRING "")
 # LLVM/Clang/etc.  gcc 8.x and 9.x are typically safe here...
 set(CUDA_HOST_COMPILER "gcc" CACHE STRING "")
 
-set(_runtimes_list "cheetah;cilktools;kitsune")
+set(_runtimes_list "openmp;cheetah;cilktools;kitsune")
 
 # Various helpful LLVM-level settings for development/debugging.
 set(CLANG_ROUND_TRIP_CC1_ARGS OFF CACHE BOOL "")
@@ -90,6 +90,7 @@ set(CLANG_ENABLE_KITSUNE ON CACHE BOOL
   "Enable Kitsune features in Clang.")
 set(KITSUNE_ENABLE_GPU_ABI_TARGET ON CACHE BOOL "")
 set(KITSUNE_ENABLE_CUDA_ABI_TARGET ON CACHE BOOL "")
+set(KITSUNE_ENABLE_HIP_ABI_TARGET ON CACHE BOOL "")
 set(KITSUNE_ENABLE_OPENMP_ABI_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_QTHREADS_ABI_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_OPENCL_ABI_TARGET OFF CACHE BOOL "")

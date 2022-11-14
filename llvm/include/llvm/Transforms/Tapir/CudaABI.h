@@ -72,12 +72,15 @@ public:
 
   std::unique_ptr<Module>& getLibDeviceModule();
 
-      void pushGlobalVariable(GlobalVariable *GV);
+  void pushGlobalVariable(GlobalVariable *GV);
   bool hasGlobalVariables() const {
     return !GlobalVars.empty();
   }
   int globalVarCount() const {
     return GlobalVars.size();
+  }
+  void pushSR(Value *SR) {
+    SyncRegList.insert(SR);
   }
 
   private:
@@ -93,17 +96,20 @@ public:
 
     std::unique_ptr<Module> LibDeviceModule;
 
-        typedef std::list<std::string> StringListTy;
+    typedef std::list<std::string> StringListTy;
     StringListTy ModulePTXFileList;
     typedef std::list<GlobalVariable *> GlobalVarListTy;
     GlobalVarListTy GlobalVars;
+
+    typedef std::set<Value*> SyncRegionListTy;
+    SyncRegionListTy SyncRegList;
 
     Module   KM;
     TargetMachine *PTXTargetMachine;
 };
 
 /// The loop outline process for transforming a Tapir parallel loop
-/// represention into a Cuda runtime and PTX --> fat binary kernel
+/// representation into a Cuda runtime and PTX --> fat binary kernel
 /// execution.
 ///
 ///  * The loop processor requires a CUDA install and that the 'ptxas'
@@ -147,9 +153,14 @@ private:
   Function *CUSyncThreads = nullptr;
 
   FunctionCallee KitCudaLaunchFn = nullptr;
-  FunctionCallee KitCudaLaunchModuleFn = nullptr;
-  FunctionCallee KitCudaWaitFn   = nullptr;
+  FunctionCallee KitCudaModuleLaunchFn = nullptr;
+  FunctionCallee KitCudaSyncFn = nullptr;
+
+  // Runtime prefetch support entry points.
   FunctionCallee KitCudaMemPrefetchFn = nullptr;
+  FunctionCallee KitCudaMemPrefetchOnStreamFn = nullptr;
+  FunctionCallee KitCudaStreamMemPrefetchFn = nullptr;
+
   FunctionCallee KitCudaCreateFBModuleFn = nullptr;
   FunctionCallee KitCudaGetGlobalSymbolFn = nullptr;
   FunctionCallee KitCudaMemcpySymbolToDeviceFn = nullptr;

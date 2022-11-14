@@ -7,7 +7,8 @@
 #include <kitsune.h>
 #include <cmath>
 
-#include "kitrt/kitcuda/cuda.h"
+#include "kitrt/cuda/cuda.h"
+#include "kitrt/memory_map.h"
 
 using namespace std;
 
@@ -55,19 +56,19 @@ T* alloc(int N) {
 
 template <typename T>
 void dealloc(T* array) {
-  // We don't really need this -- we cleanup all runtime
-  // allocations via a global dtor at program exit.
+  // We don't really need this in the forall version.  The 
+  // runtime will cleanup allocations. 
   __kitrt_cuMemFree((void*)array);
 }
 
+
+
 template <typename T>
-void cpy(T* dst, const T* src, int N) {
-  __kitrt_cuMemNeedsPrefetch((void *)dst);
-  __kitrt_cuMemNeedsPrefetch((void *)src);
-  forall(int i = 0; i < N; i++)
+inline __attribute__((always_inline))
+void cpy(T* dst, T* src, int N) {
+  forall(unsigned int i = 0; i < N; i++)
     dst[i] = src[i];
 }
-
 
 void dump(float* variables, int nel, int nelr)
 {
@@ -100,10 +101,8 @@ void dump(float* variables, int nel, int nelr)
 
 void initialize_variables(int nelr,
                           float* variables,
-                          const float* ff_variable)
+                          float* ff_variable)
 {
-  __kitrt_cuMemNeedsPrefetch((void *)variables);
-  __kitrt_cuMemNeedsPrefetch((void *)ff_variable);
   forall(int i = 0; i < nelr; i++) {
     for(int j = 0; j < NVAR; j++)
       variables[i + j*nelr] = ff_variable[j];
@@ -217,7 +216,7 @@ void compute_flux(int nelr,
                   const Float3 ff_flux_contribution_momentum_z,
                   const Float3 ff_flux_contribution_density_energy) {
   using namespace std;
-  const float smoothing_coefficient = float(0.2f);
+  const float smoothing_coefficient = 0.2f;
 
   forall(int blk = 0; blk < nelr/block_length; ++blk) {
     int b_start = blk*block_length;
@@ -251,12 +250,12 @@ void compute_flux(int nelr,
                                 flux_contribution_i_momentum_z,
                                 flux_contribution_i_density_energy);
 
-      float flux_i_density = float(0.0f);
+      float flux_i_density = 0.0f;
       Float3 flux_i_momentum;
-      flux_i_momentum.x = float(0.0f);
-      flux_i_momentum.y = float(0.0f);
-      flux_i_momentum.z = float(0.0f);
-      float flux_i_density_energy = float(0.0f);
+      flux_i_momentum.x = 0.0f;
+      flux_i_momentum.y = 0.0f;
+      flux_i_momentum.z = 0.0f;
+      float flux_i_density_energy = 0.0f;
 
       Float3 velocity_nb;
       float density_nb, density_energy_nb;
@@ -298,7 +297,7 @@ void compute_flux(int nelr,
                                     flux_contribution_nb_density_energy);
 
           // artificial viscosity
-          factor = -normal_len*smoothing_coefficient*float(0.5f) *
+          factor = -normal_len*smoothing_coefficient*0.5f *
                         (speed_i + sqrtf(speed_sqd_nb) +
                          speed_of_sound_i + speed_of_sound_nb);
           flux_i_density += factor*(density_i-density_nb);
@@ -308,7 +307,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(momentum_i.z-momentum_nb.z);
 
           // accumulate cell-centered fluxes
-          factor = float(0.5f)*normal.x;
+          factor = 0.5f*normal.x;
           flux_i_density += factor*(momentum_nb.x+momentum_i.x);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.x
                                     + flux_contribution_i_density_energy.x);
@@ -319,7 +318,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(flux_contribution_nb_momentum_z.x
                                     + flux_contribution_i_momentum_z.x);
 
-          factor = float(0.5f)*normal.y;
+          factor = 0.5f*normal.y;
           flux_i_density += factor*(momentum_nb.y+momentum_i.y);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.y
                                     + flux_contribution_i_density_energy.y);
@@ -330,7 +329,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(flux_contribution_nb_momentum_z.y
                                     + flux_contribution_i_momentum_z.y);
 
-          factor = float(0.5f)*normal.z;
+          factor = 0.5f*normal.z;
           flux_i_density += factor*(momentum_nb.z+momentum_i.z);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.z
                                     + flux_contribution_i_density_energy.z);
@@ -345,8 +344,8 @@ void compute_flux(int nelr,
           flux_i_momentum.y += normal.y*pressure_i;
           flux_i_momentum.z += normal.z*pressure_i;
         } else if(nb == -2) { // a far field boundary
-          factor = float(0.5f)*normal.x;
-          flux_i_density += factor*(ff_variable[VAR_MOMENTUM]+momentum_i.x);
+          factor = 0.5f*normal.x;
+          flux_i_density += factor * (ff_variable[VAR_MOMENTUM] + momentum_i.x);
           flux_i_density_energy += factor*(ff_flux_contribution_density_energy.x
                                     + flux_contribution_i_density_energy.x);
           flux_i_momentum.x += factor*(ff_flux_contribution_momentum_x.x
@@ -461,6 +460,7 @@ int main(int argc, char** argv)
                                            (ff_speed*ff_speed)) +
     (ff_pressure / float(GAMMA-1.0f));
 
+
   Float3 ff_momentum;
   ff_momentum.x = *(ff_variable+VAR_MOMENTUM+0);
   ff_momentum.y = *(ff_variable+VAR_MOMENTUM+1);
@@ -521,24 +521,25 @@ int main(int argc, char** argv)
 
   // Create arrays and set initial conditions
   float* variables = alloc<float>(nelr*NVAR);
-  initialize_variables(nelr, variables, ff_variable);
 
+  auto start = chrono::steady_clock::now();
+  initialize_variables(nelr, variables, ff_variable);
+  
   float* old_variables = alloc<float>(nelr*NVAR);
   float* fluxes = alloc<float>(nelr*NVAR);
   float* step_factors = alloc<float>(nelr);
 
-  cout << iterations << " ";
-  auto start = chrono::steady_clock::now();
   double copy_total = 0.0;
   double sf_total = 0.0;
   double rk_total = 0.0;
   // Begin iterations
   for(int i = 0; i < iterations; i++) {
-
+    
     auto copy_start = chrono::steady_clock::now();
     cpy(old_variables, variables, nelr*NVAR);
     auto copy_end = chrono::steady_clock::now();
-    copy_total += chrono::duration<double>(copy_end-copy_start).count();
+    double time = chrono::duration<double>(copy_end-copy_start).count();
+    copy_total += time;
 
     // for the first iteration we compute the time step
     auto sf_start = chrono::steady_clock::now();
@@ -561,6 +562,7 @@ int main(int argc, char** argv)
   }
 
   auto end = chrono::steady_clock::now();
+  cout << iterations << " ";
   cout << copy_total << " "
        << sf_total << " "
        << rk_total << " "

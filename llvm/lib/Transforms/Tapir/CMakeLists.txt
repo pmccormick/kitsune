@@ -5,6 +5,7 @@ add_llvm_component_library(LLVMTapirOpts
   CilkRTSCilkFor.cpp
   CudaABI.cpp
   DRFScopedNoAliasAA.cpp
+  HipABI.cpp
   LoopSpawningTI.cpp
   LoopStripMine.cpp
   LoopStripMinePass.cpp
@@ -19,6 +20,7 @@ add_llvm_component_library(LLVMTapirOpts
   SerialABI.cpp
   SerializeSmallTasks.cpp
   Tapir.cpp
+  TapirGPUUtils.cpp
   TapirToTarget.cpp
   TapirLoopInfo.cpp
 

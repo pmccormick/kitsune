@@ -145,8 +145,8 @@ bool CodeGenFunction::ParseAndValidateParallelFor(const CallExpr* CE,
   // Parse a vector of IV bounds, can be either an *Expr or an MDRangePolicy
   SmallVector<std::pair<const Expr*, const Expr*>,6> BoundsList;
 
-  if (const CXXTemporaryObjectExpr *CXXTO = dyn_cast<CXXTemporaryObjectExpr>(SE);
-    CXXTO && CXXTO->getBestDynamicClassType()->getNameAsString() == "MDRangePolicy") {
+  const CXXTemporaryObjectExpr *CXXTO = dyn_cast<CXXTemporaryObjectExpr>(SE); 
+  if (CXXTO && CXXTO->getBestDynamicClassType()->getNameAsString() == "MDRangePolicy") {
     // The first non-name argument is an MDRangePolicy, extract both lower and upper bounds
     // for multiple induction variables
 
@@ -207,7 +207,7 @@ bool CodeGenFunction::ParseAndValidateParallelFor(const CallExpr* CE,
   // DO WAY MORE ERROR CHECKING...
 
   // Pack everything up
-  for (int i=0; i<Params.size(); ++i)
+  for (size_t i=0; i<Params.size(); ++i)
     IVInfos.push_back({Params[i],BoundsList[i]});
 
   // Everything was parsed correctly
@@ -228,8 +228,8 @@ void CodeGenFunction::EmitAndInitializeKokkosIV(
   
   // Determine the initial value (default is 0)
   llvm::Value *InitValue = IVInfo.second.first ? 
-    EmitScalarExpr(IVInfo.second.first): 
-    InitValue = llvm::ConstantInt::get(ConvertType(IV->getType()), 0);
+    EmitScalarExpr(IVInfo.second.first) : 
+    llvm::ConstantInt::get(ConvertType(IV->getType()), 0);
 
   // Store the initial value into the address
   Builder.CreateStore(InitValue, GetAddrOfLocalVar(IV));
