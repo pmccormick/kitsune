@@ -76,7 +76,6 @@ if ((CMAKE_GENERATOR MATCHES "Visual Studio") AND (MSVC_TOOLSET_VERSION LESS 142
                   "host compiler, pass -Thost=x64 on the CMake command line.")
 endif()
 
-set (LLVM_EXTERNAL_PROJECTS "kitsune")
 if (CMAKE_GENERATOR STREQUAL "Xcode" AND NOT CMAKE_OSX_ARCHITECTURES)
   # Some CMake features like object libraries get confused if you don't
   # explicitly specify an architecture setting with the Xcode generator.
@@ -116,7 +115,7 @@ endif()
 # LLVM_EXTERNAL_${project}_SOURCE_DIR using LLVM_ALL_PROJECTS
 # This allows an easy way of setting up a build directory for llvm and another
 # one for llvm+clang+... using the same sources.
-set(LLVM_ALL_PROJECTS "cheetah;clang;clang-tools-extra;compiler-rt;kitsune-rt;libc;libclc;libcxx;libcxxabi;libunwind;lld;lldb;mlir;openmp;parallel-libs;polly;pstl")
+set(LLVM_ALL_PROJECTS "cheetah;clang;clang-tools-extra;compiler-rt;kitsune;libc;libclc;libcxx;libcxxabi;libunwind;lld;lldb;mlir;openmp;parallel-libs;polly;pstl")
 # The flang project is not yet part of "all" projects (see C++ requirements)
 set(LLVM_EXTRA_PROJECTS "flang")
 # List of all known projects in the mono repo
@@ -147,6 +146,18 @@ if ("flang" IN_LIST LLVM_ENABLE_PROJECTS)
 
   if (NOT "clang" IN_LIST LLVM_ENABLE_PROJECTS)
     message(FATAL_ERROR "Clang is not enabled, but is required for the Flang driver")
+  endif()
+endif()
+
+if ("kitsune" IN_LIST LLVM_ENABLE_PROJECTS)
+  if (NOT "cheetah" IN_LIST LLVM_ENABLE_PROJECTS)
+    message(STATUS "Enabling cheetah as a dependency to kitsune.")
+    list(APPEND LLVM_ENABLE_PROJECTS "cheetah")
+  endif()    
+
+  if (NOT "clang" IN_LIST LLVM_ENABLE_PROJECTS)
+    message(STATUS "Clang is not enabled, but is required by Kitsune.")
+    list(APPEND LLVM_ENABLE_PROJECTS "clang")
   endif()
 endif()
 

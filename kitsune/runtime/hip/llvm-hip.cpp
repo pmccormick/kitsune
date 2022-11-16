@@ -16,7 +16,7 @@
 #include<llvm/Support/raw_os_ostream.h>
 #include<llvm/Target/TargetMachine.h>
 #include<llvm/Support/ToolOutputFile.h>
-#include<llvm/Support/TargetRegistry.h>
+#include<llvm/MC/TargetRegistry.h>
 #include<llvm/Transforms/IPO/PassManagerBuilder.h>
 #define __HIP_PLATFORM_HCC__ 1
 #include<hip/hip_runtime.h>
@@ -47,17 +47,10 @@ extern "C" {
 
     Function& F = *m.getFunction("kitsune_kernel");
 
-    AttrBuilder Attrs;
-    Attrs.addAttribute("target-cpu", gcnarch);
-    //Attrs.addAttribute("target-features", cudafeatures + ",+" + cudaarch);
-    /*
-      Attrs.addAttribute(Attribute::NoRecurse);
-      Attrs.addAttribute(Attribute::Convergent);
-    */
+    F.addFnAttr("target-cpu", gcnarch);
     F.removeFnAttr("target-cpu");
     F.removeFnAttr("target-features");
     F.setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
-    F.addAttributes(AttributeList::FunctionIndex, Attrs);
 
     auto tid = Intrinsic::getDeclaration(&m, Intrinsic::amdgcn_workitem_id_x);
 

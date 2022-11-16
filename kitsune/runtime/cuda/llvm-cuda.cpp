@@ -72,7 +72,7 @@
 #include <llvm/Support/InitLLVM.h>
 #include <llvm/Support/Process.h>
 #include <llvm/Support/SourceMgr.h>
-#include <llvm/Support/TargetRegistry.h>
+#include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/ToolOutputFile.h>
 #include <llvm/Support/circular_raw_ostream.h>
@@ -195,20 +195,10 @@ std::string __kitrt_cuLLVMtoPTX(Module& m, CUdevice device) {
   m.setTargetTriple(TT.str());
   Function& F = *m.getFunction("kitsune_kernel");
 
-  AttrBuilder Attrs;
-  Attrs.addAttribute("target-cpu", cudaarch);
-  Attrs.addAttribute("target-features", cudafeatures + ",+" + cudaarch);
-  /*
-  Attrs.addAttribute(Attribute::NoRecurse);
-  Attrs.addAttribute(Attribute::Convergent);
-  */
+  F.addFnAttr("target-cpu", cudaarch);
+  F.addFnAttr("target-features", cudafeatures + ",+" + cudaarch);
   F.removeFnAttr("target-cpu");
   F.removeFnAttr("target-features");
-  /*
-  F.removeFnAttr(Attribute::StackProtectStrong);
-  F.removeFnAttr(Attribute::UWTable);
-  */
-  F.addAttributes(AttributeList::FunctionIndex, Attrs);
   NamedMDNode *Annotations =
     m.getOrInsertNamedMetadata("nvvm.annotations");
 
@@ -234,7 +224,7 @@ std::string __kitrt_cuLLVMtoPTX(Module& m, CUdevice device) {
   // PTXAS doesn't like .<n> global names
   for(GlobalVariable & g : m.globals()){
     auto name = g.getName().str();
-    for(int i=0; i<name.size(); i++){
+    for(size_t i=0; i<name.size(); i++){
       if(name[i] == '.') name[i] = '_';
       //std::cout << name << std::endl;
       g.setName(name);
@@ -331,7 +321,7 @@ std::string __kitrt_cuLLVMtoPTX(Module& m, CUdevice device) {
   Builder.OptLevel = 3;
   Builder.VerifyInput = 1;
   Builder.Inliner = createFunctionInliningPass();
-  Builder.populateLTOPassManager(PM);
+  //Builder.populateLTOPassManager(PM);
   Builder.populateFunctionPassManager(FPM);
   Builder.populateModulePassManager(PM);
 
