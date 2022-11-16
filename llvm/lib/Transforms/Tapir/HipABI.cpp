@@ -113,14 +113,20 @@ static cl::opt<bool>
              "successful completion of the transforms "
              "various steps."));
 
-/// Generate code to prefetch data prior to kernel launches.  This is literally
-/// in the few lines right before a launch so obviously less than ideal.
+/// Generate code to prefetch data prior to kernel launches. 
 static cl::opt<bool>
-    CodeGenDisablePrefetch("hipabi-disable-prefetch", cl::init(false),
-                           cl::Hidden,
-                           cl::desc("Disable insertion of calls to do data "
+    CodeGenPrefetch("hipabi-prefetch", cl::init(true),
+                    cl::Hidden,
+                    cl::desc("Enable/disable generation of calls to do data "
                                     "prefetching for memory managed kernel  "
                                     "parameters."));
+
+static cl::opt<bool>
+    CodeGenStreams("hipabi-streams", cl::init(false),
+                    cl::Hidden,
+                    cl::desc("Generate prefetch and kernel launches "
+                             "as a combined set of stream operations."));
+
 
 /// Set the HIP ABI's default grain size value.  This is used internally
 /// by the transform.
@@ -767,7 +773,7 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
 
     // TODO: This is still experimental and obviously lacking any
     // significant heuristics about when to issue a prefetch...
-    if (!CodeGenDisablePrefetch) {
+    if (CodeGenPrefetch) {
       Type *VT = V->getType();
       if (VT->isPointerTy()) {
         Value *VoidPP = B.CreateBitCast(V, VoidPtrTy);
