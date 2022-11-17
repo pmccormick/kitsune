@@ -5,6 +5,40 @@ functionality of the corresponding LLVM release.  In the sections below each
 release includes this version number for reference and a pointer to the corresponding
 set of LLVM release notes.
 
+### Release 15.0.2 
+
+  Corresponding LLVM reelase notes: 
+     * [LLVM 15 Release Notes](https://releases.llvm.org/15.0.0/docs/ReleaseNotes.html)
+     * [LLVM 14 Release Notes](https://releases.llvm.org/14.0.0/docs/ReleaseNotes.html)
+
+  ADDITIONS/IMPROVEMENTS
+    * Several features and code clean up on CUDA target transform code. 
+    * HIP/AMDGPU target support is complete but not yet tuned/optimized.  
+    * Shared code at both runtime and code gen levels for CUDA and HIP. 
+    * Cleaner prefetch and stream code generation support (including syncs). 
+    * Runtime tweaks to better support streams and reduce some code gen 
+      complexity. (streams are currently introducing a slow down and we 
+      will look at a point release to address the issue). 
+    * Tweaks to CUDA transform arguments to be a bit more clear (mirrored 
+      in HIP transform). 
+    * Target attributes at the source level to support code transformation 
+      and generation for multiple architectures. 
+
+  BUG FIXES 
+    * Fix for bad codegen when forall loop iteration variable type differs 
+      from the runtime type (e.g., trip counts of different types w/ GPU 
+      kernel launch).
+    * Fix for leaking streams (now that makes a lot of sense) that would 
+      eventually exhaust GPU resources in long-running applications. 
+    * Improved handling of some forms of constant global variables so 
+      they are supported (automatically transformed for device-side code).
+    * Added support for transforming code at the module level to avoid 
+      some repetitive code generation requirements in previous versions 
+      (Tapir-level addition).
+    * CUDA code generation stack overflow (alloca in wrong spot). 
+    * Structure overhaul of the CUDA transform to keep all loops within a 
+      single module vs. one per loop.  (also related to module fix above)
+
 ### Release 13.0.1 RC 2 
 
   * Added features for correct registration of generated executables with the
