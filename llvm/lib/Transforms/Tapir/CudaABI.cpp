@@ -1063,8 +1063,11 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn) {
       FnName = "fast_tanf";
     else if (Fn->getName() == "llvm.tan.f64")
       FnName = "tan";
-    else
-      report_fatal_error("cuabi: no transform for llvm intrinsic.");
+    else {
+      errs() << "cuabi: unable to transform intrinsic call: " << Fn->getName() << "\n";
+      //report_fatal_error("cuabi: no transform for llvm intrinsic!");
+      return nullptr;
+    }
   } else
     FnName = Fn->getName().str();
 

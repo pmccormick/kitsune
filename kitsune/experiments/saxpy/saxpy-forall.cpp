@@ -16,7 +16,6 @@
 #include <math.h>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-#include "kitrt/cuda/cuda.h"
 
 using namespace std;
 using namespace kitsune;
@@ -42,30 +41,28 @@ int main(int argc, char *argv[]) {
   fprintf(stdout, "problem size: %ld\n", N);
 
   timer r;
-
-  float *x = (float*)__kitrt_cuMemAllocManaged(sizeof(float) * N);
-  float *y = (float*)__kitrt_cuMemAllocManaged(sizeof(float) * N);
-
-  __kitrt_cuEnableEventTiming(0);
+  float *x = alloc<float>(N);
+  float *y = alloc<float>(N);
   forall(size_t i = 0; i < N; i++) {
     x[i] = DEFAULT_X_VALUE;
     y[i] = DEFAULT_Y_VALUE;
   }
-  double time = __kitrt_cuGetLastEventTime();
+
   forall(size_t i = 0; i < N; i++) {
     y[i] = DEFAULT_A_VALUE * x[i] + y[i];
   }
-  time = time + __kitrt_cuGetLastEventTime();
-  printf("kernel time: %7.6g\n", time);
 
+  int retval = 0;
   if (! check_saxpy(y, N)) {
-    abort();
+    fprintf(stderr, "incorrect results!\n");
+    retval = 1;
     return 1;
-  }
-  else {
+  } else {
     double rtime = r.seconds();
     fprintf(stdout, "total runtime: %7.6g\n", rtime);
-    return 0;
   }
+  dealloc(x);
+  dealloc(y);
+  return retval;
 }
 
