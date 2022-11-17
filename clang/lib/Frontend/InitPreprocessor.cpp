@@ -1265,6 +1265,9 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
     break;
   }
 
+  if (LangOpts.Kitsune)
+    Builder.defineMacro("__kitsune", "100");
+
   // Add macro to indicate whether pedigrees are enabled.
   if (LangOpts.CilkOptions.has(CilkOption::CilkOpt_Pedigrees))
     Builder.defineMacro("__cilk_pedigrees__");

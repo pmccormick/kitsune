@@ -9,7 +9,6 @@
 #include <time.h>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-#include "kitrt/cuda/cuda.h"
 
 #define DEFAULT_WIDTH  2048
 #define DEFAULT_HEIGHT 1024
@@ -188,9 +187,9 @@ int main(int argc, char **argv)
     }
   }
 
-  Pixel *img = (Pixel*)__kitrt_cuMemAllocManaged(sizeof(Pixel) * imageWidth * imageHeight);
-  kitsune::timer t;
   unsigned totalPixels = imageWidth * imageHeight;
+  Pixel *img = alloc<Pixel>(totalPixels);
+  kitsune::timer t;
   forall(size_t i = 0; i < totalPixels; ++i) { 
     int x = i % imageWidth;
     int y = i / imageWidth;
@@ -233,5 +232,6 @@ int main(int argc, char **argv)
     fprintf(stderr, "saved image file.\n");
   }
 
+  dealloc(img);
   return 0;
 }

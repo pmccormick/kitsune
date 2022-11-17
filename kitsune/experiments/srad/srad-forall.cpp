@@ -5,7 +5,6 @@
 #include <chrono>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-#include "kitrt/cuda/cuda.h"
 
 using namespace std;
 using namespace kitsune;
@@ -79,25 +78,25 @@ int main(int argc, char* argv[])
   fprintf(stdout, "rows = %d\n", rows);
   fprintf(stdout, "columns = %d\n", cols);
   fprintf(stdout, "number of iterations = %d\n", niter);
-  
+
   timer r;
-  
+
   size_I = cols * rows;
   size_R = (r2-r1+1)*(c2-c1+1);
 
-  I = (float *)__kitrt_cuMemAllocManaged(sizeof(float) * size_I);
-  J = (float *)__kitrt_cuMemAllocManaged(sizeof(float) * size_I);
-  c = (float *)__kitrt_cuMemAllocManaged(sizeof(float) * size_I);
+  I = alloc<float>(size_I);
+  J = alloc<float>(size_I);
+  c = alloc<float>(size_I);
 
-  iN = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * rows);
-  iS = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * rows);
-  jW = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * cols);
-  jE = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * cols);
+  iN = alloc<int>(rows);
+  iS = alloc<int>(rows);
+  jW = alloc<int>(cols);
+  jE = alloc<int>(cols);
 
-  dN = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
-  dS = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
-  dW = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
-  dE = (float *)__kitrt_cuMemAllocManaged(sizeof(float)* size_I);
+  dN = alloc<float>(size_I);
+  dS = alloc<float>(size_I);
+  dW = alloc<float>(size_I);
+  dE = alloc<float>(size_I);
 
   forall(int i=0; i < rows; i++) {
     iN[i] = i-1;
@@ -140,7 +139,7 @@ int main(int argc, char* argv[])
         // directional derivatives
         dN[k] = J[iN[i] * cols + j] - Jc;
         dS[k] = J[iS[i] * cols + j] - Jc;
-        dE[k] = J[i * cols + jE[j]] - Jc;	
+        dE[k] = J[i * cols + jE[j]] - Jc;
         dW[k] = J[i * cols + jW[j]] - Jc;
 
         float G2 = (dN[k]*dN[k] + dS[k]*dS[k] +
@@ -185,6 +184,17 @@ int main(int argc, char* argv[])
   double rtime = r.seconds();
   fprintf(stdout, "runtime: %7.6g\n", rtime);
 
+  dealloc(I);
+  dealloc(J);
+  dealloc(c);
+  dealloc(iN);
+  dealloc(iS);
+  dealloc(jW);
+  dealloc(jE);
+  dealloc(dN);
+  dealloc(dS);
+  dealloc(dW);
+  dealloc(dE);
   /*
   FILE *fp = fopen("srad-forall.dat", "wb");
   if (fp != NULL) {

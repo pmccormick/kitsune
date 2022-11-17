@@ -55,11 +55,11 @@ int main (int argc, char* argv[]) {
     random_fill(B, size);
     B.modify_host();
 
+    timer t;
     A.sync_device();
     B.sync_device();
     C.sync_device();
     C.modify_device();
-    timer t;
     Kokkos::parallel_for(size, KOKKOS_LAMBDA(const int i) {
       C.d_view(i) = A.d_view(i) + B.d_view(i);
       }

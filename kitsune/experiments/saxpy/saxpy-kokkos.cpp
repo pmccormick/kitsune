@@ -15,7 +15,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include "kitsune/timer.h"
-#include "kitrt/kitcuda/cuda.h"
 #include "Kokkos_DualView.hpp"
 
 typedef Kokkos::DualView<float*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> SaxpyDualView;
@@ -63,9 +62,9 @@ int main(int argc, char *argv[]) {
     SaxpyDualView x = SaxpyDualView("x", N);
     SaxpyDualView y = SaxpyDualView("y", N);
 
-    x.modify_device();
-    y.modify_device();
     kitsune::timer t;
+    x.sync_device();
+    y.sync_device();
     Kokkos::parallel_for("init", N, KOKKOS_LAMBDA(const int &i) {
       x.d_view(i) = DEFAULT_X_VALUE;
       y.d_view(i) = DEFAULT_Y_VALUE;

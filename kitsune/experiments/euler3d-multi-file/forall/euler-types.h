@@ -2,8 +2,6 @@
 #define EULER_TYPES_H_
 #include <math.h>
 #include <kitsune.h>
-#include "kitrt/cuda/cuda.h"
-#include "kitrt/memory_map.h"
 
 #define block_length 1
 /*
@@ -36,22 +34,6 @@
 struct Float3 {
   float x, y, z;
 };
-
-/*
- * Generic functions
- */
-template <typename T>
-inline __attribute__((always_inline))
-T* alloc(int N) {
-  return (T*)__kitrt_cuMemAllocManaged(sizeof(T) * N);
-}
-
-template <typename T>
-void dealloc(T* array) {
-  // We don't really need this in the forall version.  The 
-  // runtime will cleanup allocations. 
-  __kitrt_cuMemFree((void*)array);
-}
 
 template <typename T>
 inline __attribute__((always_inline))

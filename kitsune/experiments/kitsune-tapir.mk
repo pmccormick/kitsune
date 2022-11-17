@@ -19,6 +19,8 @@ ifeq ($(KITSUNE_STRIPMINE),)
 else
   stripmine_flags = $(KITSUNE_STRIPMINE)
 endif
+#
+##################################
 
 
 ##################################
@@ -29,7 +31,7 @@ endif
 #  * cuabi-run-post-opts=true|false : run an additional post-outline optimization
 #                  pass on the host-side code.
 #  * cuabi-arch=arch-name : nvidia gpu target architecture (e.g., sm_80). See the
-#    cuda.mk file for extra details. 
+#                  cuda.mk file for extra details. 
 #  
 tapir_cu_flags = -ftapir=cuda \
  -mllvm -cuabi-opt-level=${opt_level} \
@@ -46,6 +48,7 @@ endif
 ifneq ($(KITSUNE_DEBUG),)
   tapir_cu_flags = ${tapir_cu_flags} -mllvm -debug-only="cuda-abi"
 endif
+##################################
 
 
 ##################################

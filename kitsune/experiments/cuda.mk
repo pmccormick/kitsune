@@ -12,13 +12,12 @@ $(info cuda architecture: ${NVARCH})
 
 nvcc=${CUDA_HOME}/bin/nvcc
 nvcc_c_flags = -arch=${NVARCH}
-nvcc_cxx_flags = -std c++17 \
+nvcc_cxx_flags = --std c++17 \
  --no-exceptions \
  --expt-extended-lambda \
  -expt-relaxed-constexpr \
  -arch=${NVARCH}\
- -O${opt_level} \
- -Xptxas -O${opt_level}
+ -O${opt_level}
 
-clang_cu_flags=-xcuda --cuda-gpu_arch=${NVARCH}
+clang_cu_flags=-xcuda --cuda-gpu-arch=${NVARCH} -O${opt_level} 
 

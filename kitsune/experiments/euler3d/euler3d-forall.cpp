@@ -7,9 +7,6 @@
 #include <kitsune.h>
 #include <cmath>
 
-#include "kitrt/cuda/cuda.h"
-#include "kitrt/memory_map.h"
-
 using namespace std;
 
 struct Float3 {
@@ -44,24 +41,6 @@ struct Float3 {
 #else
 #define __restrict
 #endif
-
-/*
- * Generic functions
- */
-template <typename T>
-inline __attribute__((always_inline))
-T* alloc(int N) {
-  return (T*)__kitrt_cuMemAllocManaged(sizeof(T) * N);
-}
-
-template <typename T>
-void dealloc(T* array) {
-  // We don't really need this in the forall version.  The 
-  // runtime will cleanup allocations. 
-  __kitrt_cuMemFree((void*)array);
-}
-
-
 
 template <typename T>
 inline __attribute__((always_inline))
@@ -568,5 +547,15 @@ int main(int argc, char** argv)
        << rk_total << " "
        << chrono::duration<double>(end-start).count() << endl;
   dump(variables, nel, nelr);
+
+  dealloc(ff_variable);
+  dealloc(areas);
+  dealloc(elements_surrounding_elements);
+  dealloc(normals);
+  dealloc(variables);
+  dealloc(old_variables);
+  dealloc(fluxes);
+  dealloc(step_factors);
+
   return 0;
 }

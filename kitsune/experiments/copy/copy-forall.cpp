@@ -5,8 +5,6 @@
 #include <kitsune.h>
 #include <cmath>
 #include "kitsune/timer.h"
-#include "kitrt/cuda/cuda.h"
-#include "kitrt/memory_map.h"
 
 using namespace std;
 using namespace kitsune;
@@ -15,23 +13,9 @@ const size_t DEFAULT_ARRAY_SIZE = 1024 * 1024 * 128;
 const unsigned int DEFAULT_ITERATIONS = 10;
 
 template <typename T>
-T* alloc(int N) {
-  return (T*)__kitrt_cuMemAllocManaged(sizeof(T) * N);
-}
-
-template <typename T>
-void dealloc(T* array) {
-  __kitrt_cuMemFree((void*)array);
-}
-
-template <typename T>
 void random_fill(T* data, size_t N) {
   for(size_t i = 0; i < N; ++i)
     data[i] = rand() / (T)RAND_MAX;
-  // we've updated the data array -- flag it for
-  // prefetching the next time we launch a kernel
-  // (forall loop) that uses it...
-  __kitrt_memNeedsPrefetch(data);
 }
 
 template <typename T>
@@ -40,14 +24,6 @@ bool check(const T* data0, const T* data1, size_t N) {
     if (data0[i] != data1[i])
       return false;
   }
-  // In the process of the check we've paged 'data1'
-  // back to the host.  Flag it as needing a prefetch
-  // again; this forces all pages to be moved prior
-  // to a kernel launch that is dependent upon it.
-  // This highlights an issue with UVM usage as we
-  // would really like a copy resident on the GPU and
-  // here to be checked on the CPU...
-  __kitrt_memNeedsPrefetch((void *)data1);
   return true;
 }
 
@@ -101,3 +77,4 @@ int main(int argc, char** argv) {
        << endl;
   return 0;
 }
+

@@ -1,22 +1,43 @@
 include ../experiments.mk 
 
-clangxx_flags=${clangxx_flags} ${opt_flags}
+cxx_flags += -I${kitsune_prefix}/include 
 
-all: euler3d.${host_arch} \
-     euler3d-forall.cuda.${host_arch} \
-     euler3d-forall.hip.${host_arch} 
+targets = euler3d-forall.opencilk.${host_arch}
 
-# Serial version.
-euler3d.${host_arch}: euler3d.cpp
-	/usr/bin/time ${clangxx} ${clangxx_flags} -o $@ $<
+ifeq ($(KITSUNE_ENABLE_CUDA), TRUE)
+  targets += euler3d-forall.cuda.${host_arch}
+  targets += euler3d-kokkos.nvcc.${host_arch}
+  targets += euler3d-kokkos.clang.${host_arch}
+endif 
 
-# Kitsune forall versions. 
-euler3d-forall.cuda.${host_arch}: euler-forall.cpp
-	/usr/bin/time ${clangxx} ${clangxx_flags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-euler3d-forall.hip.${host_arch}: euler-forall.cpp
-	/usr/bin/time ${clangxx} ${clangxx_flags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-euler3d-forall.cheetah.${host_arch}: euler-forall.cpp
-	/usr/bin/time ${clangxx} ${clangxx_flags} ${tapir_cheetah_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+ifeq ($(KITSUNE_ENABLE_HIP), TRUE)
+  targets += euler3d-forall.hip.${host_arch}
+endif 
+
+all: ${targets} 
+
+
+#############################
+# Kitsune+Tapir versions.
+#
+euler3d-forall.opencilk.${host_arch}: euler3d-forall.cpp
+	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_opencilk_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
+	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+euler3d-forall.hip.${host_arch}: euler3d-forall.cpp
+	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+#
+#############################
+
+
+#############################
+# Kokkos versions w/ both nvcc and clang for comparison.
+euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp
+	/usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
+	/usr/bin/time ${clangxx} ${cxx_flags} ${clang_cu_flags} ${kokkos_cu_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+# 
+#############################
 
 clean:
 	-rm -f *.${host_arch}

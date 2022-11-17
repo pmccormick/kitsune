@@ -1,54 +1,45 @@
-include ../common.mk
-include ../cuda.mk
-include ../kokkos.mk
-include ../gcc.mk
+include ../experiments.mk
 
-# General (shared) flags (see common.mk)
-clang_flags=${cxx_flags} ${opt_flags} ${clang_info_flags}
-# kitsune kokkos mode flags.
+cxx_flags += -I${kitsune_prefix}/include 
 
-#### Kitsune+Tapir options
-#  Notes:
-#   -ftapir=cuda will target the CUDA ABI transform.
-#   -cuabi-verbose dumps kernel stats via ptxas output.
-#   -cuabi-keep-files saves intermediate files (.ll, .ptx, .fatbin) on disk for a closer look at codegen details.
-#
-tapir_cu_launch_flags=-I${CUDA_HOME}/include
-tapir_cu_flags=-ftapir=cuda -ffp-contract=fast -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags}
-tapir_stripmine_flags=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1 -mllvm -cuabi-default-grainsize=1
-####
+targets = copy-forall.opencilk.${host_arch}
 
-#### CUDA flags
-nvcc_flags=--std c++17 -m64 -arch=${NVARCH} --resource-usage ${opt_flags} --no-exceptions -I${kitsune_prefix}/include 
-nvcc_kokkos_flags=${nvcc_flags} -I${kokkos_cuda_prefix}/include -I${kitsune_prefix}/include
-clang_cuda_flags=-xcuda --cuda-gpu-arch=${NVARCH} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include
-####
+ifeq ($(KITSUNE_ENABLE_CUDA),TRUE)
+  targets += copy-forall.cuda.${host_arch}
+  targets += copy-kokkos.nvcc.${host_arch}
+  targets += copy-kokkos.clang.${host_arch}
+endif
+ifeq ($(KITSUNE_ENABLE_HIP),TRUE)
+  targets += copy-forall.hip.${host_arch}
+endif
 
-#### Kokkos stuff
-kokkos_cu_flags=-I${kokkos_cu_prefix}/include
-kokkos_clang_flags=${clang_cuda_flags} -I${kokkos_cu_prefix}/include
-kokkos_nvcc_flags=-I${kokkos_cu_prefix}/include ${nvcc_cxx_flags} ${opt_flags} -m64 -arch=${NVARCH} --resource-usage --no-exceptions -I${kitsune_prefix}/include
+all: ${targets}
 
-
-all: copy-forall.cuda.${host_arch} \
-     copy-kokkos.nvcc.${host_arch} \
-     copy-kokkos.clang.${host_arch} 
-
+#############################
+# Kitsune+Tapir versions.
+copy-forall.opencilk.${host_arch}: copy-forall.cpp 
+	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_opencilk_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 copy-forall.cuda.${host_arch}: copy-forall.cpp
-	${clangxx} ${clang_flags} ${tapir_cu_flags} ${tapir_stripmine_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+copy-forall.hip.${host_arch}: copy-forall.cpp
+	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+#############################
 
+
+#############################
+# Kokkos version. 
 copy-kokkos.nvcc.${host_arch}: copy-kokkos.cpp
-	 ${nvcc_wrapper} ${kokkos_nvcc_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-
+	/usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 copy-kokkos.clang.${host_arch}: copy-kokkos.cpp
-	 ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+	/usr/bin/time ${clangxx} ${cxx_flags} ${clang_cu_flags} ${kokkos_cu_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+#
+#############################
+
 
 clean:
 	-rm -f *.${host_arch}
 	-rm -f *.fatbin
 	-rm -rf *-cfg-tmp
 	-rm -f *.bc
-	-rm -f *.fatbin
-	-rm -f *.ppm *.jpg
-	-rm -f *.ll *.ptx *.csv *.log *.s *.fbin *.tapir
-	-rm -f *.dat
+	-rm -f *.ll *.ptx *.csv *.log *.fbin *.s
+	

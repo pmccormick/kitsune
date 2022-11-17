@@ -8,11 +8,26 @@
 #include <stdlib.h>
 #include <time.h>
 #include "Kokkos_Core.hpp"
-#include "kitrt/kitcuda/cuda.h"
+#ifdef __kitsune
+#include <kitsune.h>
+#endif 
 
 #define DEFAULT_WIDTH  2048
 #define DEFAULT_HEIGHT 1024
 #define BPP 3
+
+#ifndef __kitsune 
+
+template <typename T>
+T* alloc(size_t N) {
+  return new T[N];
+}
+
+template <typename T>
+void dealloc(T* ptr) {
+  delete []ptr;
+}
+#endif 
 
 struct Pixel {
   unsigned char r, g, b;
@@ -183,13 +198,12 @@ int main(int argc, char **argv)
   
   Kokkos::initialize(argc, argv);
   {
-    Pixel *img = (Pixel*)__kitrt_cuMemAllocManaged(sizeof(Pixel) * imageWidth * imageHeight);
+    Pixel *img = alloc<Pixel>(imageWidth * imageHeight);
     unsigned int samplesCount = 1 << 7;
 
     if (argc > 1 )
       samplesCount = atoi(argv[1]);
 
-    __kitrt_cuEnableEventTiming(1);    
     Kokkos::parallel_for(imageWidth * imageHeight, KOKKOS_LAMBDA(const unsigned int i) {
 	int x = i % imageWidth;
 	int y = i / imageWidth;
@@ -217,7 +231,6 @@ int main(int argc, char **argv)
 	img[i].g = (unsigned char)color.y;
 	img[i].b = (unsigned char)color.z;
       });
-    __kitrt_cuDisableEventTiming();    
 
     std::ofstream myfile;
     myfile.open ("raytrace-kokkos-noview.ppm");
@@ -225,6 +238,8 @@ int main(int argc, char **argv)
     for(int i = (imageWidth*imageHeight)-1; i >= 0; i--) {
       myfile << img[i].r << img[i].g << img[i].b;
     }
+
+    dealloc(img);
   }
   Kokkos::finalize();
   return EXIT_SUCCESS;
