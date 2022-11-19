@@ -206,7 +206,7 @@ static bool __kitrt_cuLoadDLSyms() {
   if (dlHandle)
     return true;
 
-  if (dlHandle = dlopen("libcuda.so", RTLD_LAZY)) {
+  if ((dlHandle = dlopen("libcuda.so", RTLD_LAZY))) {
     DLSYM_LOAD(cuInit);
     DLSYM_LOAD(cuGetErrorName);
     DLSYM_LOAD(cuGetErrorString);
@@ -495,7 +495,17 @@ uint64_t __kitrt_cuGetGlobalSymbol(const char *SN, void *CM) {
   // work we ignore the size parameter (which is NULL below).
   CUdeviceptr devPtr;
   size_t bytes;
-  CU_SAFE_CALL(cuModuleGetGlobal_v2_p(&devPtr, &bytes, Module, SN));
+  CUresult result;
+  if ((result = cuModuleGetGlobal_v2_p(&devPtr, &bytes, Module, SN)) != CUDA_SUCCESS) {
+    fprintf(stderr, "kitrt: error finding symbol '%s'.\n", SN);
+    const char *msg;
+    cuGetErrorName_p(result, &msg);
+    fprintf(stderr, "kitrt %s:%d:\n", __FILE__, __LINE__);
+    fprintf(stderr, "  %s failed ('%s')\n", "cuModuleGetGlobal()", msg);
+    cuGetErrorString_p(result, &msg);
+    fprintf(stderr, "  error: '%s'\n", msg);
+    exit(1);
+  }
   return devPtr;
 }
 

@@ -34,7 +34,7 @@ if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
   #
   FetchContent_Declare(kokkos
     GIT_REPOSITORY      https://github.com/kokkos/kokkos.git
-    GIT_TAG             3.5.00
+    GIT_TAG             release-candidate-4.0.0
     SOURCE_DIR          ${KITSUNE_KOKKOS_SRC_DIR}
     UPDATE_DISCONNECTED TRUE
     CMAKE_ARGS          ${KITSUNE_KOKKOS_BUILD_ARGS}
@@ -46,7 +46,7 @@ endif()
 
 option(KITSUNE_ENABLE_KITRT "Build and install the Kitsune runtime library (kitrt)." ON)
 if (KITSUNE_ENABLE_KITRT)
-  # TODO: Need to update to add JIT GPU target and Realm back into the mix. 
+  # TODO: Need to update to add JIT GPU target and Realm back into the mix.
   set(KITSUNE_ALL_KITRT_TARGETS "cuda;hip" CACHE STRING "List of all Kitsune runtime targets.")
   set(KITSUNE_ENABLE_KITRT_TARGETS "" CACHE STRING
     "Semicolon-separated list of runtime targets to build (or \"all\".)")
@@ -84,12 +84,12 @@ if (KITSUNE_ENABLE_KITRT)
   endif()
 
   if (NOT KITSUNE_ENABLE_KITRT_TARGETS STREQUAL "'")
-    message(STATUS "Kitsune runtime targets list: ${KITSUNE_ENABLE_KITRT_TARGETS}") 
+    message(STATUS "Kitsune runtime targets list: ${KITSUNE_ENABLE_KITRT_TARGETS}")
     foreach(rt_target IN LISTS KITSUNE_ENABLE_KITRT_TARGETS)
       message(STATUS "  runtime target: ${rt_target}")
       string(TOUPPER "${rt_target}" upper_target)
       if (rt_target IN_LIST KITSUNE_ENABLE_KITRT_TARGETS)
-        set(KITRT_ENABLE_${upper_target} ON) 
+        set(KITRT_ENABLE_${upper_target} ON)
 	    # CACHE
 	    # BOOL "Build kitsune runtime support for ${upper_target} target.")
       endif()

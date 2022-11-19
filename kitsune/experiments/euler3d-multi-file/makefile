@@ -15,16 +15,23 @@ VPATH := ./forall/:./kokkos/
 
 all: ${targets} 
 
-forall_src = forall/compute_flux.cpp \
+forall_lto_src = forall/compute_flux.cpp \
    forall/compute_step_factor.cpp \
    forall/time_step.cpp 
 
-forall_objs := $(patsubst %.cpp, forall/%.o, $(notdir $(forall_src)))
-forall/%.o: forall/%.cpp 
-	/usr/bin/time $(clangxx) -c -flto ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $<
+forall_src = forall/euler3d-forall.cpp 
 
-euler3d-forall.cuda.${host_arch}:  ${forall_objs} forall/euler3d-forall.cpp
-	echo /usr/bin/time ${clangxx} ${cxx_flags} -flto ${kitflags} ${tapir_cu_flags} forall/euler3d-forall.cpp -o $@ ${forall_objs} ${link_flags} -Xlinker -rpath=${kitsune_prefix}/lib 
+forall_lto_objs := $(patsubst %.cpp, forall/%.lto.o, $(notdir $(forall_lto_src)))
+forall_objs := $(patsubst %.cpp, forall/%.o, $(notdir $(forall_src)))
+forall/%.lto.o: forall/%.cpp 
+	/usr/bin/time ${clangxx} -c -flto ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $<
+forall/%.o: forall/%.cpp
+	/usr/bin/time ${clangxx} -c ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $<
+
+euler3d-forall.cuda.${host_arch}:  ${forall_lto_objs} ${forall_objs}
+	/usr/bin/time ${clangxx} -flto -fuse-ld=lld -ftapir=cuda \
+	${tapir_cu_lto_flags} -o $@ ${forall_lto_objs} ${forall_objs} ${link_flags} \
+	-Xlinker -rpath=${kitsune_prefix}/lib
 
 kokkos_src = kokkos/compute_flux.cpp \
    kokkos/compute_step_factor.cpp \
@@ -32,11 +39,12 @@ kokkos_src = kokkos/compute_flux.cpp \
    kokkos/euler3d-kokkos.cpp
 kokkos_objs := $(patsubst %.cpp, kokkos/%.o, $(notdir $(kokkos_src)))
 kokkos/%.o: kokkos/%.cpp 
-	/usr/bin/time ${clangxx} -c ${cxx_flags} ${clang_cu_flags} ${kokkos_cu_flags} -I${kitsune_prefix}/include -o $@ $<
+	/usr/bin/time ${clangxx} -c ${cxx_flags} ${clang_cu_flags} ${kokkos_cu_flags} \
+		-I${kitsune_prefix}/include -o $@ $<
 
 euler3d-kokkos.cuda.${host_arch}: ${kokkos_objs}
-	/usr/bin/time ${clangxx} ${link_flags} -o $@ ${kokkos_objs} ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-
+	/usr/bin/time ${clangxx} ${link_flags} -o $@ ${kokkos_objs} ${kokkos_ld_flags} ${kokkos_ld_libs} \
+		-Xlinker -rpath=${kokkos_cu_prefix}/lib
 
 clean:
 	-rm -f *.${host_arch} *.o forall/*.o  kokkos/*.o 

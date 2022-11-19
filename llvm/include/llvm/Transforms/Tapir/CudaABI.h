@@ -131,8 +131,6 @@ private:
   std::string KernelName;          // A unique name for the kernel.
   Module  &KernelModule;           // PTX module holds the generated kernel(s).
 
-  FunctionCallee GetThreadIdx = nullptr;
-
   // Cuda/PTX thread index access.
   Function *CUThreadIdxX  = nullptr,
            *CUThreadIdxY  = nullptr,

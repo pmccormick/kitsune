@@ -11,13 +11,14 @@ endif
 ifneq ($(KITSUNE_OPT_FLAGS),)
   opt_flags = $(KITSUNE_OPT_FLAGS)
 else
-  opt_flags = -march=native -O${opt_level}
+  opt_flags = -O${opt_level}
 endif 
 
 ##################################
 # EXPERIMENTS-WIDE C and CXX FLAGS 
-c_flags = -march=native $(CFLAGS) 
-cxx_flags = -std=c++17 -fno-exceptions $(CXX_FLAGS)
+#c_flags = -march=native $(CFLAGS) 
+c_flags = $(CFLAGS) 
+cxx_flags = -std=c++17 -march=native -fno-exceptions $(CXX_FLAGS)
 
 ifneq ($(KITSUNE_VERBOSE),)
   clang_flags = ${clang_flags} -v

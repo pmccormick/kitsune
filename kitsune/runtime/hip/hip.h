@@ -70,6 +70,10 @@ extern "C" {
 /// @return True on success, false otherwise.
 bool __kitrt_hipInit();
 
+/// @brief Handle a +xnack-specific configuration. call before __kitrt_hipInit(). 
+/// @return void 
+void __kitrt_hipEnableXnack(); 
+
 /// @brief Clean up -- release resources for HIP support.
 void __kitrt_hipDestroy();
 
@@ -109,6 +113,16 @@ void __kitrt_hipMemPrefetchIfManaged(void *vp, size_t size);
 /// @param vp: Pointer to kitsune runtime managed memory.
 void __kitrt_hipMemPrefetch(void *vp);
 
+/// @brief Prefetch the specified data on the given stream.
+/// @return A new stream the prefetch was issued on.
+/// @param vp: starting address to prefetch.
+void* __kitrt_hipStreamMemPrefetch(void *vp);
+
+/// @brief Prefetch the specified data on the given stream.
+/// @param vp: starting address to prefetch.
+/// @param stream: the stream to issue the prefetch on.
+void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream);
+
 /// @brief Copy the given symbol from host to device.
 /// @param hostPtr: Pointer to the host-side symbol.
 /// @param devPtr: Pointer to the destination symbol on the GPU.
@@ -116,23 +130,28 @@ void __kitrt_hipMemPrefetch(void *vp);
 void __kitrt_hipMemcpySymbolToDevice(void *hostPtr, void *devPtr, size_t size);
 
 // ---- Kernel operations, launching, streams, etc.
-
-
 void *__kitrt_hipCreateObjectModule(const void *image);
 
 uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod);
 
-void *__kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
-                                void **fatBinArgs, uint64_t numElements);
+void __kitrt_hipLaunchKernel(const void *fatBin,     // fat binary w/ kernel
+                             const char *kernelName, // kernel to launch
+                             void *kernelArgs,       // args to kernel
+                             uint64_t numElements,   // trip count
+                             void *stream,           // stream to run in
+                             size_t argSize);        // size in bytes of KernelArgs
 
-void  *__kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
+void __kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
+                               void **kernelArgs, uint64_t numElements);
+
+void  __kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
                                    void **args, uint64_t numElements);
 
 void __kitrt_hipStreamSynchronize(void *vStream);
 
+void __kitrt_hipSynchronizeStreams();
 
 // ---- Event management and handling.
-
 void *__kitrt_hipCreateEvent();
 
 void __kitrt_hipDestroyEvent(void *E);

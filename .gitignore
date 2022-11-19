@@ -28,7 +28,7 @@
 
 # Nested build directory
 /build*
-
+.ccache*
 # External projects 
 /cheetah 
 /cilktools

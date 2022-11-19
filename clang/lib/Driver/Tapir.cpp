@@ -42,6 +42,7 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
       .Case("cilkplus", TapirTargetID::Cilk)
       .Case("opencilk", TapirTargetID::OpenCilk)
       .Case("cuda", TapirTargetID::Cuda)
+      .Case("hip", TapirTargetID::Hip)
       .Case("openmp", TapirTargetID::OpenMP)
       .Case("qthreads", TapirTargetID::Qthreads)
       .Case("realm", TapirTargetID::Realm)
@@ -52,6 +53,8 @@ TapirTargetID clang::parseTapirTarget(const ArgList &Args) {
   return TapirTarget;
 }
 
+
+// TODO: Is this deprecated? Should we just use the -cuabi-arch flag instead...
 TapirNVArchTargetID clang::parseTapirNVArchTarget(const ArgList &Args) {
   TapirNVArchTargetID NVArch = TapirNVArchTargetID::Off;
   if (const Arg *A = Args.getLastArg(options::OPT_ftapir_nvarch_EQ))
@@ -83,10 +86,19 @@ clang::serializeTapirTarget(TapirTargetID Target) {
     TapirTargetStr = "cheetah";
     break;
   case TapirTargetID::Cilk:
-    TapirTargetStr = "cilkplus";
+    TapirTargetStr = "cilkplus"; // TODO: deprecated?
     break;
   case TapirTargetID::Cuda:
     TapirTargetStr = "cuda";
+    break;
+  case TapirTargetID::Hip:
+    TapirTargetStr = "hip";
+    break;
+  case TapirTargetID::Realm:
+    TapirTargetStr = "realm";
+    break;
+  case TapirTargetID::OpenCL: // TODO: deprecated?
+    TapirTargetStr = "opencl";
     break;
   case TapirTargetID::GPU:
     TapirTargetStr = "gpu";
@@ -97,8 +109,10 @@ clang::serializeTapirTarget(TapirTargetID Target) {
   case TapirTargetID::OpenMP:
     TapirTargetStr = "openmp";
     break;
-  case TapirTargetID::Qthreads:
+  case TapirTargetID::Qthreads: // TODO: deprecated?
     TapirTargetStr = "qthreads";
+    break;
+  case TapirTargetID::Off:
     break;
   case TapirTargetID::Last_TapirTargetID:
     break;

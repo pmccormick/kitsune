@@ -171,7 +171,7 @@ if (KITSUNE_ENABLE_HIP_ABI_TARGET)
       CACHE
       STRING "Default HIP runtime ABI target Clang .cfg filename.")
   set(KITSUNE_HIP_TARGET_LINK_LIBS_FLAGS
-	  "-L${ROCM_PATH}/lib -L${ROCM_PATH}/hip/lib -lamdhip64 -lrocm-core"
+	  "-L${ROCM_PATH}/lib -L${ROCM_PATH}/hip/lib -lamdhip64"
       CACHE STRING "Link library flags (-L, -lxxx) needed for the for the HIP runtime ABI target.")
   message(STATUS "KITSUNE_HIP_TARGET_LINK_LIBS_FLAGS=${KITSUNE_HIP_TARGET_LINK_LIBS_FLAGS}")
   set(KITSUNE_HIP_TARGET_EXTRA_LINK_FLAGS 

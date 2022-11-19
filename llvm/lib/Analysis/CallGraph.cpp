@@ -174,7 +174,6 @@ CallGraphNode *CallGraph::getOrInsertFunction(const Function *F) {
   auto &CGN = FunctionMap[F];
   if (CGN)
     return CGN.get();
-
   assert((!F || F->getParent() == &M) && "Function not in current module!");
   CGN = std::make_unique<CallGraphNode>(this, const_cast<Function *>(F));
   return CGN.get();

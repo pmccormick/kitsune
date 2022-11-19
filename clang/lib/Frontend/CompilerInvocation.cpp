@@ -4676,6 +4676,8 @@ bool CompilerInvocation::CreateFromArgsImpl(
       LangOpts.Tapir = TapirTargetID::Realm;
     else if (Name == "cuda")
       LangOpts.Tapir = TapirTargetID::Cuda;
+    else if (Name == "hip")
+      LangOpts.Tapir = TapirTargetID::Hip;
     else if (Name == "opencl")
       LangOpts.Tapir = TapirTargetID::OpenCL;
     else if (Name == "gpu")

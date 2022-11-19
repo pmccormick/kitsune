@@ -22,7 +22,7 @@ copy-forall.opencilk.${host_arch}: copy-forall.cpp
 copy-forall.cuda.${host_arch}: copy-forall.cpp
 	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 copy-forall.hip.${host_arch}: copy-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+	/usr/bin/time ${clangxx} -mllvm -debug-only=hipabi ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 #############################
 
 

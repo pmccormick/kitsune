@@ -45,7 +45,7 @@ set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_80 CACHE STRING "")
 # LLVM/Clang/etc.  gcc 8.x and 9.x are typically safe here...
 set(CUDA_HOST_COMPILER "gcc" CACHE STRING "")
 
-set(_runtimes_list "openmp;cheetah;cilktools;kitsune")
+set(_runtimes_list "cheetah;cilktools;kitsune")
 
 # Various helpful LLVM-level settings for development/debugging.
 set(CLANG_ROUND_TRIP_CC1_ARGS OFF CACHE BOOL "")
@@ -83,7 +83,7 @@ set(CLANG_VENDOR "kitsune+tapir" CACHE STRING "")
 set(CLANG_VENDOR_UTI "gov.lanl.kitsune" CACHE STRING "")
 
 #set(LLVM_TARGETS_TO_BUILD X86;AArch64;AMDGPU;NVPTX;RISCV CACHE STRING "")
-set(LLVM_TARGETS_TO_BUILD "X86;NVPTX" CACHE STRING "")
+set(LLVM_TARGETS_TO_BUILD "X86;NVPTX;AMDGPU" CACHE STRING "")
 
 # Enable Kitsune mode within the toolchain.
 set(CLANG_ENABLE_KITSUNE ON CACHE BOOL

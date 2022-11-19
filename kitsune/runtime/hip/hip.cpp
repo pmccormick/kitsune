@@ -57,6 +57,10 @@
 #include <cstring>
 #include <dlfcn.h>
 #include <iostream>
+#include <list>
+#include <vector>
+#include <map>
+#include <unordered_map>
 #include <sstream>
 #include <stdbool.h>
 
@@ -95,10 +99,10 @@ static double _kitrtLastEventTime = 0.0;
 
 
 // === Kernel launch parameters.
-static bool _kitrtUseHueristicLaunchParameters = false;
-static unsigned _kitrtDefaultThreadsPerBlock = 256;
-static unsigned _kitrtDefaultBlocksPerGrid = 0;
-static bool _kitrtUseCustomLaunchParameters = false;
+//static bool _kitrtUseHueristicLaunchParameters = false;
+//static unsigned _kitrtDefaultThreadsPerBlock = 256;
+//static unsigned _kitrtDefaultBlocksPerGrid = 0;
+//static bool _kitrtUseCustomLaunchParameters = false;
 
 // Enable auto-prefetching of managed memory pointers.
 // This is a very simple approach that likely will
@@ -106,12 +110,21 @@ static bool _kitrtUseCustomLaunchParameters = false;
 // significantly avoid page miss costs.
 static bool _kitrt_hipEnablePrefetch = true;
 
+// When the compiler generates a prefetch-driven series of kernel
+// launches we have multiple prefetch-to-launch streams to
+// synchronize -- we keep these streams in an active list that
+// will be synchronized and then destroyed post the outter prefetch
+// loop construct.
+typedef std::list<hipStream_t> KitRTActiveStreamsList;
+static KitRTActiveStreamsList _kitrtActiveStreams;
+
 // Declare the various dynamic entry points into the the HIP
 // API for use in the runtime.  This is helpful feature for
 // use during JIT compilation or related similar operations.
 
 // ---- Initialize, properties, error handling, clean up, etc.
 DECLARE_DLSYM(hipInit);
+DECLARE_DLSYM(hipDeviceSynchronize);
 DECLARE_DLSYM(hipSetDevice);
 DECLARE_DLSYM(hipGetDevice);
 DECLARE_DLSYM(hipGetDeviceCount);
@@ -130,9 +143,11 @@ DECLARE_DLSYM(hipMemPrefetchAsync);
 DECLARE_DLSYM(hipModuleLoadData);
 DECLARE_DLSYM(hipModuleGetGlobal);
 DECLARE_DLSYM(hipStreamCreate);
+DECLARE_DLSYM(hipStreamCreateWithFlags);
 DECLARE_DLSYM(hipStreamDestroy);
 DECLARE_DLSYM(hipStreamSynchronize);
 DECLARE_DLSYM(hipModuleGetFunction);
+DECLARE_DLSYM(hipLaunchKernel);
 DECLARE_DLSYM(hipModuleLaunchKernel);
 // ---- Event management and handling.
 DECLARE_DLSYM(hipEventCreate);
@@ -140,6 +155,24 @@ DECLARE_DLSYM(hipEventDestroy);
 DECLARE_DLSYM(hipEventRecord);
 DECLARE_DLSYM(hipEventSynchronize);
 DECLARE_DLSYM(hipEventElapsedTime);
+
+// The runtime maintains a map from fat binary images to CUDA modules
+// (CUmodule).  This avoids a redundant load of the fat binary into a
+// module when looking up kernels from the generated code.
+//
+// TODO: Is there a faster path here for lookup?  Is a map more
+// complicated than necessary?
+typedef std::unordered_map<const void*, hipModule_t>  KitRTModuleMap;
+static KitRTModuleMap _kitrtModuleMap;
+
+// Alongside the module map the runtime also maintains a map from
+// kernel name to CUDA function (CUfunction).  Like the modules this
+// avoids a call into the module to search for the kernel.
+//
+// TODO: Ditto from above.  Is there a faster path here for lookup?
+// Is a map more complicated than necessary?
+typedef std::unordered_map<const char *, hipFunction_t>  KitRTKernelMap;
+static KitRTKernelMap _kitrtKernelMap;
 
 // TODO: Should we want to move this into a cmake-level
 // configuration option?
@@ -156,9 +189,10 @@ static bool __kitrt_hipLoadDLSyms() {
   if (dlHandle)
     return true; // don't reload symbols...
 
-  if (dlHandle = dlopen(HIP_DSO_LIBNAME, RTLD_LAZY)) {
+  if ((dlHandle = dlopen(HIP_DSO_LIBNAME, RTLD_LAZY))) {
     // ---- Initialize, properties, error handling, clean up, etc.
     DLSYM_LOAD(hipInit);
+    DLSYM_LOAD(hipDeviceSynchronize);
     DLSYM_LOAD(hipSetDevice);
     DLSYM_LOAD(hipGetDevice);
     DLSYM_LOAD(hipGetDeviceCount);
@@ -177,10 +211,11 @@ static bool __kitrt_hipLoadDLSyms() {
     // ---- Kernel operations, modules, launching, streams, etc.
     DLSYM_LOAD(hipModuleLoadData);
     DLSYM_LOAD(hipModuleGetGlobal);
-    DLSYM_LOAD(hipModuleLaunchKernel);
+    DLSYM_LOAD(hipLaunchKernel);
     DLSYM_LOAD(hipModuleGetFunction);
     DLSYM_LOAD(hipModuleLaunchKernel);
     DLSYM_LOAD(hipStreamCreate);
+    DLSYM_LOAD(hipStreamCreateWithFlags);
     DLSYM_LOAD(hipStreamDestroy);
     DLSYM_LOAD(hipStreamSynchronize);
     // ---- Event management and handling.
@@ -202,19 +237,27 @@ extern "C" {
 
 #define HIP_SAFE_CALL(x)                                                       \
   {                                                                            \
-    hipError_t result = x;                                                     \
-    if (result != hipSuccess) {                                                \
+    hipError_t hip_result = x;                                                 \
+    if (hip_result != hipSuccess) {                                            \
+      fprintf(stderr, "kitrt: %s:%d:\n", __FILE__, __LINE__);                  \
       const char *msg;                                                         \
-      msg = hipGetErrorName_p(result);                                         \
-      fprintf(stderr, "kitrt %s:%d:\n, __FILE__, __LINE__");                   \
+      msg = hipGetErrorName_p(hip_result);                                     \
       fprintf(stderr, "  %s failed ('%s')\n", #x, msg);                        \
-      msg = hipGetErrorString_p(result);                                       \
+      msg = hipGetErrorString_p(hip_result);                                   \
       fprintf(stderr, "  error: '%s'\n", msg);                                 \
       abort();                                                                 \
     }                                                                          \
   }
 
 // ---- Initialization, properties, clean up, etc.
+//
+
+static bool _kitrt_enableXnack = false;
+
+void __kitrt_hipEnableXnack() {
+  _kitrt_enableXnack = true;
+} 
+
 
 bool __kitrt_hipInit() {
 
@@ -223,6 +266,11 @@ bool __kitrt_hipInit() {
     return true;
   }
 
+  if (_kitrt_enableXnack) {
+    putenv("HSA_XNACK=1");
+  }
+
+
   if (!__kitrt_hipLoadDLSyms()) {
     fprintf(stderr, "kitrt: unable to resolve dynamic symbols for HIP.\n");
     fprintf(stderr, "       check environment settings and installation.\n");
@@ -230,17 +278,19 @@ bool __kitrt_hipInit() {
     abort();
   }
 
-  // We follow the CUDA-style path for initialization (per the AMD docs,
-  // "most HIP APIs implicitly initialize the HIP runtime. This [call]
-  // provides control over the timing of the initialization.").
+  // Note: From the HIP docs, "most HIP APIs implicitly initialize the
+  // HIP runtime. This [call] provides control over the timing of the
+  // initialization.".  Follow the same path as we use for CUDA
+  // to keep things consistent.
   HIP_SAFE_CALL(hipInit_p(0));
 
 
   // Make sure we have at least one compute device available.
   int count;
-  HIP_SAFE_CALL(hipGetDeviceCount_p(&count));
+  hipGetDeviceCount_p(&count);
   if (count <= 0) {
-    fprintf(stderr, "kitrt: warning -- no HIP devices found!\n");
+    fprintf(stderr, "kitrt: warning -- no HIP GPU devices found!\n");
+    abort();
     return false;
   }
 
@@ -299,7 +349,7 @@ bool __kitrt_hipInit() {
     abort(); // TODO: eventually want to return false so JIT runtime won't fail.
   } else {
     #ifdef _KITRT_VERBOSE_
-    fprintf(stderr, "kitrt: hip runtime component successfully initialized.\n");
+    fprintf(stderr, "kitrt: hip runtime componenr successfully initialized.\n");
     #endif
     _kitrt_hipIsInitialized = true;
   }
@@ -360,9 +410,36 @@ void __kitrt_hipDisablePrefetch() {
   _kitrt_hipEnablePrefetch = false;
 }
 
+void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
+  assert(vp && "unexpected null pointer!");
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: prefetch request for pointer %p on stream %p.\n", vp,
+          stream);
+  #endif
+  if (__kitrt_hipIsMemManaged(vp) && not __kitrt_isMemPrefetched(vp)) {
+    size_t size = __kitrt_getMemAllocSize(vp);
+    if (size > 0) {
+      HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
+                                         (hipStream_t)stream));
+      __kitrt_markMemPrefetched(vp);
+      //HIP_SAFE_CALL(hipDeviceSynchronize());
+    }
+  }
+}
+
+void *__kitrt_hipStreamMemPrefetch(void *vp) {
+  hipStream_t stream;
+  HIP_SAFE_CALL(hipStreamCreateWithFlags_p(&stream, hipStreamNonBlocking));
+  __kitrt_hipMemPrefetchOnStream(vp, stream);
+  _kitrtActiveStreams.push_back(stream);
+  return (void *)stream;
+}
+
 void __kitrt_hipMemPrefetchAsync(void *vp, size_t size) {
   assert(vp && "unexpected null pointer!");
+  HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
   HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID, NULL));
+  //HIP_SAFE_CALL(hipDeviceSynchronize());
   __kitrt_markMemPrefetched(vp);
 }
 
@@ -428,34 +505,29 @@ uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod) {
   return (uint64_t)devPtr;
 }
 
-void *__kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
+void __kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
                                     void **args, uint64_t numElements) {
   hipFunction_t function;
   HIP_SAFE_CALL(hipModuleGetFunction_p(&function,
                                        (hipModule_t)module,
                                        kernelName));
-
   #ifdef _KITRT_VERBOSE_
   fprintf(stderr, "kitrt: module-launch of hip kernel '%s'.\n", kernelName);
   #endif
 
-  // TODO: The HIP documentation is not entirely clear about the
-  // existence of a default stream...  This could break...
-
-  // TODO: need to set launch parameters!
   int threadsPerBlock, blocksPerGrid;
-
   __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
 
+  // Note the discrepancy between hip and cuda here -- for hip the module
+  // lauch is the same as the "standard" cuda launch.
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(function,
                                         blocksPerGrid, 1, 1,
-                                        threadsPerBlock, 1, 1, 0,
-                                        nullptr, /* default stream */
-                                        args, NULL));
-  return nullptr;
+                                        threadsPerBlock, 1, 1,
+                                        0, nullptr, /* default stream */
+                                        args, nullptr));
 }
 
-void *__kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
+void __kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
                                 void **fatBinArgs, uint64_t numElements) {
   assert(fatBin && "request to launch null fat binary image!");
   assert(kernelName && "request to launch kernel w/ null name!");
@@ -464,18 +536,92 @@ void *__kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
   // allocated resources -- as it stands we will "leak" modules,
   // streams, functions, etc.
   static bool module_built = false;
-  hipModule_t module;
+  static hipModule_t module;
   if (!module_built) {
     HIP_SAFE_CALL(hipModuleLoadData_p(&module, fatBin));
     module_built = true;
   }
 
-  return __kitrt_hipLaunchModuleKernel(module, kernelName, fatBinArgs,
-                                       numElements);
+  __kitrt_hipLaunchModuleKernel(module, kernelName, fatBinArgs, numElements);
 }
+
+// Launch a kernel on the default stream.
+void __kitrt_hipLaunchKernel(const void *fatBin,
+                             const char *kernelName,
+                             void *kernelArgs,
+                             size_t numElements,
+                             void *stream,
+                             size_t argsSize) {
+  assert(fatBin && "request to launch with null fat binary image!");
+  assert(kernelName && "request to launch kernel w/ null name!");
+  assert(kernelArgs && "request to launch kernel w/ null fatbin args!");
+  int threadsPerBlock, blocksPerGrid;
+  hipFunction_t kFunc;
+
+  // TODO: Not sure of the advantages of the kernel and module maps
+  // for the hip API.  Needs some work to determine if it is really
+  // a worthwhile time-savings.
+  //
+  // Check to see if we've encountered the kernel before. If so we
+  // can directly launch it, if not we look for it in the fat-binary
+  // (or module).
+  KitRTKernelMap::iterator kern_it = _kitrtKernelMap.find(kernelName);
+  if (kern_it == _kitrtKernelMap.end()) {
+    // Look for the hip module associated with the fat binary. If it
+    // isn't found we need to create one and cache it away for further
+    // invocations.
+    hipModule_t module;
+    KitRTModuleMap::iterator mod_it = _kitrtModuleMap.find(fatBin);
+    if (mod_it == _kitrtModuleMap.end()) {
+      HIP_SAFE_CALL(hipModuleLoadData_p(&module, fatBin));
+      _kitrtModuleMap[fatBin] = module;
+    } else
+      module = mod_it->second;
+    HIP_SAFE_CALL(hipModuleGetFunction_p(&kFunc, module, kernelName));
+    _kitrtKernelMap[kernelName] = kFunc;
+  } else {
+    kFunc = kern_it->second;
+  }
+
+  __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "launch parameters for %s:\n", kernelName);
+  fprintf(stderr, "\tnumber of overall elements: %ld\n", numElements);
+  fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
+  fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
+  fprintf(stderr, "\targument size = %d\n", argsSize);
+  #endif
+
+  void *configArgs[] = {
+    HIP_LAUNCH_PARAM_BUFFER_POINTER, kernelArgs,
+    HIP_LAUNCH_PARAM_BUFFER_SIZE, &argsSize,
+    HIP_LAUNCH_PARAM_END};
+
+  // Note the discrepancy between hip and cuda here -- for hip the module
+  // launch is the same as the "standard" cuda launch.
+  HIP_SAFE_CALL(hipModuleLaunchKernel_p(kFunc,
+                blocksPerGrid, 1, 1,
+                threadsPerBlock, 1, 1,
+                0, (hipStream_t)stream,
+                nullptr, (void**)&configArgs[0]));
+}
+
 
 void __kitrt_hipStreamSynchronize(void *vStream) {
   HIP_SAFE_CALL(hipStreamSynchronize_p((hipStream_t)vStream));
+}
+
+void __kitrt_hipSynchronizeStreams() {
+  // If the active stream is empty, our launch path went through the
+  // default stream.  Otherwise, we need to sync on each of the active
+  // streams.
+  HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
+  HIP_SAFE_CALL(hipDeviceSynchronize_p());
+  while (not _kitrtActiveStreams.empty()) {
+    hipStream_t stream = _kitrtActiveStreams.front();
+    HIP_SAFE_CALL(hipStreamDestroy(stream));
+    _kitrtActiveStreams.pop_front();
+  }
 }
 
 // ---- Event management and handling.
@@ -508,9 +654,24 @@ float __kitrt_hipElapsedEventTime(void *start, void *stop) {
   assert(stop && "unexpected null stop event!");
   float msecs;
   HIP_SAFE_CALL(hipEventElapsedTime_p(&msecs,
-                                      (hipEvent_t)start,
-                                      (hipEvent_t)stop));
+                           (hipEvent_t)start,
+                           (hipEvent_t)stop));
   return msecs;
 }
+
+// ---- Event management for timing, etc.
+
+void __kitrt_hipEnableEventTiming(unsigned report) {
+  _kitrtEnableTiming = true;
+  _kitrtReportTiming = report > 0;
+}
+
+void __kitrt_hipDisableEventTiming() {
+  _kitrtEnableTiming = false;
+  _kitrtReportTiming = false;
+  _kitrtLastEventTime = 0.0;
+}
+
+double __kitrt_hipGetLastEventTime() { return _kitrtLastEventTime; }
 
 } // extern "C"

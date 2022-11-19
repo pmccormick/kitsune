@@ -76,6 +76,8 @@ extern "C" {
   /// Initialize the shared portion of the runtime.
   extern bool __kitrt_CommonInit();
 
+  /// Initialize the supported runtimes.
+  extern bool __kitrt_runtimesInit();
 
   /// Enable/Disable the runtime's verbose operating mode.  This will
   /// provide runtime status reports to stderr during program

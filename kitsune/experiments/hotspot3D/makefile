@@ -18,7 +18,7 @@ BLOCKS_PER_GRID?=0
 #   -cuabi-keep-files saves intermediate files (.ll, .ptx, .fatbin) on disk for a closer look at codegen details. 
 #
 tapir_cu_launch_flags=-I${CUDA_HOME}/include
-tapir_cu_flags=-mllvm --debug-only=cuda-abi -ftapir=cuda -ffp-contract=fast -mllvm -cuabi-keep-files -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags}
+tapir_cu_flags=-mllvm --debug-only=cudaabi -ftapir=cuda -ffp-contract=fast -mllvm -cuabi-keep-files -mllvm -cuabi-verbose -mllvm -cuabi-arch=${NVARCH} ${tapir_cu_launch_flags}
 tapir_stripmine_flags=-mllvm -stripmine-count=${GRAINSIZE} -mllvm -stripmine-coarsen-factor=${COARSEN_FACTOR} -mllvm -cuabi-default-grainsize=${GRAINSIZE}
 ####
 

@@ -6,9 +6,19 @@
 #include <float.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <time.h>
-#include <kitsune.h>
 #include "kitsune/timer.h"
+#include "hip/hip_runtime.h"
+
+
+#define HIPCHECK(error)                          \
+  if (error != hipSuccess) {                     \
+    printf("error: '%s' (%d) at %s:%d\n",        \
+    hipGetErrorString(error), error, __FILE__,   \
+        __LINE__);                               \
+    exit(1);                                     \
+  }                                              \
+
+
 
 #define DEFAULT_WIDTH  2048
 #define DEFAULT_HEIGHT 1024
@@ -20,30 +30,30 @@ struct Pixel {
 
 struct Vec {
   float x,y,z;
-  __attribute__((always_inline)) Vec(float v = 0) {x = y = z = v;}
-  __attribute__((always_inline)) Vec(float a, float b, float c = 0.0f) {x = a; y = b; z = c;}
-  __attribute__((always_inline)) Vec operator+(const Vec r) const  { return Vec(x + r.x , y + r.y , z + r.z); }
-  __attribute__((always_inline)) Vec operator*(const Vec r) const { return   Vec(x * r.x , y * r.y , z * r.z); }
-  __attribute__((always_inline)) float operator%(const Vec r) const {return     x * r.x + y * r.y + z * r.z;}
-  __attribute__((always_inline)) Vec operator!() { return *this * (1.0/sqrtf(*this % *this)); }
+  __forceinline__ __device__ Vec(float v = 0.0f) {x = y = z = v;}
+  __forceinline__ __device__ Vec(float a, float b, float c = 0.0f) {x = a;y = b;z = c;}
+  __forceinline__ __device__ Vec operator+(const Vec r) const  { return Vec(x + r.x , y + r.y , z + r.z); }
+  __forceinline__ __device__ Vec operator*(const Vec r) const { return  Vec(x * r.x , y * r.y , z * r.z); }
+  __forceinline__ __device__ float operator%(const Vec r) const {return x * r.x + y * r.y + z * r.z;}
+  __forceinline__ __device__ Vec operator!() { return *this * (1.0/sqrtf(*this % *this)); }
 };
 
-inline __attribute__((always_inline))
+ __device__
 float randomVal(unsigned int& x) {
   x = (214013*x+2531011);
-  return ((x>>16)&0x7FFF) / 66635.0f;
+  return ((x>>16)&0x7FFF) / (float)66635;
 }
 
 // Rectangle CSG equation. Returns minimum signed distance from
-// space carved bylowerLeft vertex and opposite rectangle vertex 
+// space carved by lowerLeft vertex and opposite rectangle vertex 
 // upperRight.
-inline __attribute__((always_inline))
-float BoxTest(const Vec &position, Vec lowerLeft, Vec upperRight) {
+ __device__
+float BoxTest(const Vec& position, Vec lowerLeft, Vec upperRight) {
   lowerLeft = position + lowerLeft * -1.0f;
   upperRight = upperRight + position * -1.0f;
-  return -fminf(fminf(fminf(lowerLeft.x, upperRight.x), 
-                      fminf(lowerLeft.y, upperRight.y)),
-		fminf(lowerLeft.z, upperRight.z));
+  return -fminf(
+      fminf(fminf(lowerLeft.x, upperRight.x), fminf(lowerLeft.y, upperRight.y)),
+      fminf(lowerLeft.z, upperRight.z));
 }
 
 #define HIT_NONE 0
@@ -52,12 +62,13 @@ float BoxTest(const Vec &position, Vec lowerLeft, Vec upperRight) {
 #define HIT_SUN 3
 
 // Sample the world using Signed Distance Fields.
-inline __attribute__((always_inline))
+ __device__
 float QueryDatabase(const Vec& position, int &hitType) {
   float distance = 1e9;//FLT_MAX;
   Vec f = position; // Flattened position (z=0)
   f.z = 0;
-const float lines[10*4] = {
+
+  const float lines[10*4] = {
     -21.0f,  0.0f, -21.0f, 16.0f,
     -21.0f,  0.0f, -15.0f,  0.0f,
     -11.0f,  0.0f,  -7.0f, 16.0f,
@@ -78,7 +89,7 @@ const float lines[10*4] = {
   }
 
   distance = sqrtf(distance); // Get real distance, not square distance.
-  distance = powf(powf(distance, 8.0f) + powf(position.z, 8.0f), 0.125f) - 0.5f;
+  distance = powf(powf(distance, 8)+powf(position.z, 8), 0.125f) - 0.5f;
   hitType = HIT_LETTER;
 
   float roomDist;
@@ -103,7 +114,7 @@ const float lines[10*4] = {
 
 // Perform signed sphere marching
 // Returns hitType 0, 1, 2, or 3 and update hit position/normal
-inline __attribute__((always_inline)) 
+ __device__
 int RayMarching(const Vec& origin, const Vec& direction, Vec& hitPos, Vec& hitNorm) {
   int hitType = HIT_NONE;
   int noHitCount = 0;
@@ -111,18 +122,18 @@ int RayMarching(const Vec& origin, const Vec& direction, Vec& hitPos, Vec& hitNo
   // Signed distance marching
   float d; // distance from closest object in world.
   for (float total_d = 0.0f; total_d < 100.0f; total_d += d) {
-    d = QueryDatabase(hitPos = origin + direction * total_d, hitType);
-    if (d < .01f || ++noHitCount > 99) {
-      hitNorm = !Vec(QueryDatabase(hitPos + Vec(0.01f, 0.00f), noHitCount) - d,
-                     QueryDatabase(hitPos + Vec(0.00f, 0.01f), noHitCount) - d,
-                     QueryDatabase(hitPos + Vec(0.00f, 0.00f, 0.01f), noHitCount) - d);
-      return hitType;
+    if ((d = QueryDatabase(hitPos = origin + direction * total_d, hitType)) < .01f || ++noHitCount > 99) {
+      return hitNorm =
+          !Vec(QueryDatabase(hitPos + Vec(0.01f, 0.00f), noHitCount) - d,
+               QueryDatabase(hitPos + Vec(0.00f, 0.01f), noHitCount) - d,
+               QueryDatabase(hitPos + Vec(0.00f, 0.00f, 0.01f), noHitCount) - d),
+          hitType;
     }
   }
-  return HIT_NONE;
+  return 0;
 }
 
-inline __attribute__((always_inline)) 
+ __device__
 Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
   Vec sampledPosition;
   Vec normal;
@@ -130,12 +141,12 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
   Vec attenuation(1.0f);
   Vec lightDirection(!Vec(0.6f, 0.6f, 1.0f)); // Directional light
 
-  for (int bounceCount = 8; bounceCount--;) {  
+  for (int bounceCount = 8; bounceCount--;) {
     int hitType = RayMarching(origin, direction, sampledPosition, normal);
     if (hitType == HIT_NONE)
       break;                     // No hit. This is over, return color.
     else if (hitType == HIT_LETTER) { // Specular bounce on a letter. No color acc.
-      direction = direction + normal * (normal % direction * -2.0f);
+      direction = direction + normal * (normal % direction * -2);
       origin = sampledPosition + direction * 0.1f;
       attenuation = attenuation * 0.2f; // Attenuation via distance traveled.
     } else if (hitType == HIT_WALL) { // Wall hit uses color yellow?
@@ -164,17 +175,49 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
     } else if (hitType == HIT_SUN) { //
       color = color + attenuation * Vec(50, 80, 100);
       break; // Sun Color
-    } 
+    }
   }
   return color;
 }
 
+__global__
+void PathTracer(int samplesCount, Pixel *img, int N, 
+                unsigned imgWidth, unsigned imgHeight) {
+  int index  = blockIdx.x * blockDim.x + threadIdx.x;
+  if (index < N) {
+    int x = index % imgWidth;
+    int y = index / imgWidth;
+    unsigned int v = index;
+    const Vec position(-12.0f, 5.0f, 25.0f);
+    const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
+    const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / imgWidth);
+    // Cross-product to get the up vector
+    const Vec up(goal.y *left.z - goal.z * left.y,
+               goal.z *left.x - goal.x * left.z,
+               goal.x *left.y - goal.y * left.x);
+    Vec color;
+    for (unsigned int p = samplesCount; p--;) {
+      Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;
+      color = color + Trace(position,
+                          !((goal+rand_left) + left *
+                            ((x+randomVal(v)) - imgWidth / 2.0f + randomVal(v)) + up *
+                            ((y+randomVal(v)) - imgHeight / 2.0f + randomVal(v))), v);
+    }
+    // Reinhard tone mapping
+    color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
+    Vec o = color + 1.0f;
+    color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
+    img[index].r = (unsigned char)color.x;
+    img[index].g = (unsigned char)color.y;
+    img[index].b = (unsigned char)color.z;
+  }
+}
 
 int main(int argc, char **argv)
 {
   unsigned int samplesCount = 1 << 7;
-  unsigned int imageWidth = DEFAULT_WIDTH;
-  unsigned int imageHeight = DEFAULT_HEIGHT;
+  unsigned imageWidth = DEFAULT_WIDTH;
+  unsigned imageHeight = DEFAULT_HEIGHT;
   if (argc > 1) {
     if (argc == 2)
       samplesCount = atoi(argv[1]);
@@ -186,60 +229,36 @@ int main(int argc, char **argv)
       fprintf(stderr, "usage: raytracer [#samples] [img-width img-height])\n");
       return 1;   
     }
-  }
+  }  
 
   fprintf(stderr, "image size: %d x %d\n", imageWidth, imageHeight);
   fprintf(stderr, "sample count %d\n", samplesCount);
 
+  hipDeviceProp_t devProp;
+  hipGetDeviceProperties(&devProp, 0);
+
+  Pixel *img;
   unsigned int totalPixels = imageWidth * imageHeight;
-  Pixel *img = alloc<Pixel>(totalPixels);
+  HIPCHECK(hipMallocManaged(&img, totalPixels * sizeof(Pixel)));
 
-  forall(unsigned int i = 0; i < totalPixels; ++i) { 
-    img[i].r = img[i].g = img[i].b = 0.0f;
-  }
-
-  kitsune::timer t;
-  forall(unsigned int i = 0; i < totalPixels; ++i) { 
-    int x = i % imageWidth;
-    int y = i / imageWidth;;
-    unsigned int v = i;
-    const Vec position(-12.0f, 5.0f, 25.0f);
-    const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
-    const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / imageWidth);
-    // Cross-product to get the up vector
-    const Vec up(goal.y *left.z - goal.z * left.y,
-                 goal.z *left.x - goal.x * left.z,
-                 goal.x *left.y - goal.y * left.x);
-    Vec color;
-    for (unsigned int p = samplesCount, v = i; p--;) {
-      Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;
-      float xf = x + randomVal(v);
-      float yf = y + randomVal(v);
-      color = color + Trace(position, !((goal+rand_left) + left *
-			           ((xf - imageWidth / 2.0f) + randomVal(v)) + up *
-			           ((yf - imageHeight / 2.0f) + randomVal(v))), v);
-    }
-    // Reinhard tone mapping
-    color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
-    Vec o = color + 1.0f;
-    color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
-    img[i].r = (unsigned char)color.x;
-    img[i].g = (unsigned char)color.y;
-    img[i].b = (unsigned char)color.z;
+  int threadsPerBlock = 256;
+  int blocksPerGrid = (totalPixels + threadsPerBlock - 1) / threadsPerBlock;
+  kitsune::timer t;  
+  hipMemPrefetchAsync(img, totalPixels * sizeof(Pixel), 0, 0);
+  hipLaunchKernelGGL(PathTracer, dim3(blocksPerGrid), dim3(threadsPerBlock), 0, 0, samplesCount,
+                     img,totalPixels, imageWidth, imageHeight);
+  HIPCHECK(hipDeviceSynchronize());
+  double loop_secs = t.seconds();
+  std::cout << "runtime: " << loop_secs << " second(s)." << std::endl;
+  
+  std::ofstream myfile;
+  myfile.open ("raytrace-hip.ppm");
+  myfile << "P6 " << imageWidth << " " << imageHeight << " 255 ";
+  for(int i = totalPixels-1; i >= 0; i--) {
+    myfile << img[i].r << img[i].g << img[i].b;
   }
   
-  double loop_secs = t.seconds();
-  std::cout << loop_secs << std::endl;  
-  std::ofstream myfile;
-  myfile.open ("raytrace-forall.ppm");
-  if (myfile.is_open()) {
-    myfile << "P6 " << imageWidth << " " << imageHeight << " 255 ";
-    for(int i = totalPixels-1; i >= 0; i--) {
-      myfile << img[i].r << img[i].g << img[i].b;
-    }
-    myfile.close();
-    fprintf(stderr, "saved image file.\n");
-  }
-  dealloc(img);
+  fprintf(stderr, "saved image file.\n");
+  hipFree(img);
   return 0;
 }

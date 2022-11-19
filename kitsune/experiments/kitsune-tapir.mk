@@ -11,7 +11,6 @@ else
 endif
 
 ##################################
-# Stripming flags: For GPUs our best results are often
 # to disable stripming transformations.
 ifeq ($(KITSUNE_STRIPMINE),)
   stripmine_flags = -mllvm -stripmine-count=1 \
@@ -41,12 +40,14 @@ tapir_cu_flags = -ftapir=cuda \
  -mllvm -cuabi-arch=${NVARCH} \
  ${stripmine_flags}
 
+tapir_cu_lto_flags = -Wl,--tapir-target=cuda,--lto-O${opt_level},-mllvm,-cuabi-opt-level=${opt_level},-mllvm,-cuabi-arch=${NVARCH},-mllvm,-cuabi-prefetch=true,-mllvm,-cuabi-streams=false,-mllvm,-cuabi-verbose=true,-mllvm,--debug-only=cuabi,-mllvm,-stripmine-coarsen-factor=1
+
 ifneq ($(KITSUNE_VERBOSE),)
   tapir_cu_flags = ${tapir_cu_flags} -mllvm -cuabi-verbose=true 
 endif
 
 ifneq ($(KITSUNE_DEBUG),)
-  tapir_cu_flags = ${tapir_cu_flags} -mllvm -debug-only="cuda-abi"
+  tapir_cu_flags = ${tapir_cu_flags} -mllvm -debug-only=cuabi
 endif
 ##################################
 
@@ -54,21 +55,22 @@ endif
 ##################################
 # HIP-centric target flags:
 #  * hipabi-opt-level = [0...3] : kernel-centric optimization level.
-#  * hipabi-prefetch=true|false : enable/disable data prefetching code gen.
+#  * hipabi-disable-prefetch : disable data prefetching code gen.
 #  * hipabi-streams=true|false : enable/disable pipelined stream generation.
 #  * hipabi-run-post-opts=true|false : run an additional post-outline optimization
 #                  pass on the host-side code.
-#  * cuabi-arch=arch-name : amd gpu target architecture and extra settings
-#                  (e.g., gfx908:xnack+). See the hip.mk file for extra details.
+#  * hipabiarch=arch-name : amd gpu target architecture and extra settings
+#                  (e.g., gfx908). See the hip.mk file for extra details.
 #  
 tapir_hip_flags = -ftapir=hip \
- -mllvm -hipabi-opt-level=${opt_level} \
- -mllvm -hipabi-prefetch=true \
- -mllvm -hipabi-streams=false \
- -mllvm -hipabi-run-post-opts=false \
- -mllvm -hipabi-arch=${HIPARCH} \
- ${stripmine_flags}
-
+${stripmine_flags} \
+-mwavefrontsize64 \
+-mllvm -hipabi-opt-level=${opt_level} \
+-mllvm -hipabi-arch=${HIPARCH} \
+-mllvm -hipabi-xnack=true
+#-mllvm -amdgpu-internalize-symbols \
+#-mllvm -amdgpu-function-calls=false \
+#-mllvm --amdhsa-code-object-version=4
 
 ##################################
 # OpenCilk target flags:
@@ -79,11 +81,11 @@ tapir_opencilk_flags = -ftapir=opencilk
 # Verbose and debug mode flags.
 # 
 ifneq ($(KITSUNE_VERBOSE),)
-  tapir_hip_flags = ${tapir_hip_flags} -mllvm -hipabi-verbose=true 
+  tapir_hip_flags = ${tapir_hip_flags} 
 endif
 
 ifneq ($(KITSUNE_DEBUG),)
-  tapir_hip_flags = ${tapir_hip_flags} -mllvm -debug-only="hip-abi"
+  tapir_hip_flags = ${tapir_hip_flags} -mllvm -debug-only=hipabi
 endif
 
 ##################################

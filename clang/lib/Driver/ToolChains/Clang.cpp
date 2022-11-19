@@ -6079,8 +6079,8 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     auto const &Triple = getToolChain().getTriple();
 
     // At least one runtime has been implemented for these operating systems.
-    if (!Triple.isOSLinux() && !Triple.isOSFreeBSD() && !Triple.isMacOSX())
-      D.Diag(diag::err_drv_cilk_unsupported);
+    //if (!Triple.isOSLinux() && !Triple.isOSFreeBSD() && !Triple.isMacOSX())
+    //  D.Diag(diag::err_drv_cilk_unsupported);
 
     /* JFC: Is it possible to confuse with with -fno-opencilk? */
     bool OpenCilk = Args.hasArgNoClaim(options::OPT_fopencilk);
@@ -6093,9 +6093,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
       }
     }
 
-    if (Cheetah && Triple.getArch() != llvm::Triple::x86_64) {
-      D.Diag(diag::err_drv_cilk_unsupported);
-    }
+    //if (Cheetah && Triple.getArch() != llvm::Triple::x86_64) {
+    //  D.Diag(diag::err_drv_cilk_unsupported);
+    //}
     if (OpenCilk) {
       switch (Triple.getArch()) {
       case llvm::Triple::x86:

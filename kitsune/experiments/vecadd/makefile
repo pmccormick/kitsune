@@ -1,6 +1,7 @@
 include ../experiments.mk
 
-cxx_flags += -I${kitsune_prefix}/include 
+amdgpu_flags = # -mllvm -amdgpu-internalize-symbols -mllvm -amdgpu-early-inline-all=true -mllvm -amdgpu-function-calls=false
+cxx_flags += -I${kitsune_prefix}/include  -mllvm -debug-only=hipabi ${amdgpu_flags} -mllvm -hipabi-keep-files=true 
 
 targets = vecadd-forall.opencilk.${host_arch}
 
@@ -50,8 +51,8 @@ vecadd-kokkos.clang.${host_arch}: vecadd-kokkos.cpp
 
 clean:
 	-rm -f *.${host_arch}
-	-rm -f *.fatbin
+	-rm -f *.fatbin *.hipfb
 	-rm -rf *-cfg-tmp
-	-rm -f *.bc
-	-rm -f *.ll *.ptx *.csv *.log *.fbin *.s
+	-rm -f *.bc *.a *.o *.so 
+	-rm -f *.ll *.ptx *.csv *.log *.fbin *.s *.cui 
 	

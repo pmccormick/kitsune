@@ -72,6 +72,10 @@ public:
     DLLExportStorageClass = 2  ///< Function to be accessible from DLL.
   };
 
+void mutateValueType(Type *Ty) {
+  ValueType = Ty;
+}
+
 protected:
   GlobalValue(Type *Ty, ValueTy VTy, Use *Ops, unsigned NumOps,
               LinkageTypes Linkage, const Twine &Name, unsigned AddressSpace)

@@ -7,22 +7,18 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the Kitsune+Tapir CUDA ABI to convert Tapir
-// instructions to calls into the CUDA-centric portions of the Kitsune
-// runtime and produce a fully compiled (non-JIT) executable that is
-// suitable for a given architecture target.  Some of the key aspects
-// of this transform are discussed in the LLVM NVPTX target documentation.
+// This file implements the Kitsune+Tapir CUDA ABI to transform Tapir
+// IR into CUDA-centric code that includes PTX code as well as
+// supporting calls into the Kitsune runtime to produce an associated
+// set of GPU kernels for the Tapir parallel constructs.
 //
-//     https://llvm.org/docs/NVPTXUsage.html)
-//
-// In addition, looking at some of the details in how Clang handles
-// CUDA code generation can be helpful -- although the Kitsune runtime
-// also helps to simplify certain code generation details.
-//
-// TODO: Quick overview of key remaining work within current code base.
-//    1. Check updates for CUDA and PTX version matches.
-//    2. Flush out command line arguments and align with ptxas
-//       feature set.
+// All Tapir constructs in a module are converted into device-side
+// (outlined) functions that are stored in a specific "kernel" LLVM
+// Module.  This process follows the callback sequence supported by
+// Tapir's lowering mechanisms as well as components such as the NVPTX
+// target (https://llvm.org/docs/NVPTXUsage.html).  Further details of
+// some of the structure required for code transformation are taken
+// from CUDA's code gen of CUDA programs.
 //
 //===----------------------------------------------------------------------===//
 //
@@ -42,6 +38,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Option/ArgList.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorOr.h"
@@ -68,10 +65,11 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "cuda-abi"
-static const std::string CUABI_PREFIX = "__cuabi";
-static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 
+// REMINDER: You can use -mllvm -debug-only="cuabi" to get verbose output
+// during the transformation from Tapir to Cuda.
+#define DEBUG_TYPE "cuabi"
+static const std::string CUABI_PREFIX = "__cuabi";
 
 // ---- CUDA transformation-specific command line arguments.
 //
@@ -82,7 +80,6 @@ static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 //   -mllvm -cuabi-option[...]
 //
 
-
 // Select a specific target NVIDIA GPU architecture.
 //
 // This will be passed directly on to ptxas.
@@ -92,6 +89,7 @@ static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 // follows the trends of longer term CUDA support.  Although exposed here, we
 // have not tested 32-bit host support.
 //
+/// Selected target GPU architecture. Passed directly to ptxas.
 static cl::opt<std::string>
     GPUArch("cuabi-arch", cl::init("sm_75"), cl::NotHidden,
             cl::desc("Target GPU architecture for CUDA ABI transformation."
@@ -101,7 +99,7 @@ static cl::opt<std::string>
 static cl::opt<std::string>
     HostMArch("cuabi-march", cl::init("64"), cl::NotHidden,
               cl::desc("Specify 32- or 64-bit host architecture."
-                       "(default=64-bit)."));
+                       " (default=64-bit)."));
 
 /// Enable verbose mode.  Handled internally as well as passed on to
 /// ptxas to provide additional details (register use, etc.).
@@ -114,7 +112,7 @@ static cl::opt<bool>
 static cl::opt<bool>
     Debug("cuabi-debug", cl::init(false), cl::NotHidden,
           cl::desc("Enable debug information for GPU device code. "
-                   "(default=false)"));
+                   " (default=false)"));
 
 /// Surpress the generation of debug sections in the final object
 /// file.  This option is ignored if not used with the debug or
@@ -484,8 +482,6 @@ CudaLoop::CudaLoop(Module &M, Module &KM, const std::string &KN,
   PointerType *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
   PointerType *CharPtrTy = Type::getInt8PtrTy(Ctx);
 
-  GetThreadIdx = KernelModule.getOrInsertFunction("gtid", Int32Ty);
-
   // Thread index values -- equivalent to Cuda's builtins:  threadIdx.[x,y,z].
   CUThreadIdxX = Intrinsic::getDeclaration(&KernelModule,
                                            Intrinsic::nvvm_read_ptx_sreg_tid_x);
@@ -839,7 +835,8 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
                            << DeviceF->getName() << "' into kernel module.\n");
 
         // GPU calls are slow, try to force inlining...
-        DeviceF->addFnAttr(Attribute::AlwaysInline);
+        if (OptLevel > 1 && not DeviceF->hasFnAttribute(Attribute::NoInline))
+          DeviceF->addFnAttr(Attribute::AlwaysInline);
       }
     }
   }
@@ -879,26 +876,24 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
               VMap[T->getDetach()->getSyncRegion()]);
   ClonedSyncReg->eraseFromParent();
 
-  // Set the helper function to have external linkage.
-  Function *Helper = Out.Outline;
-  Helper->setName(KernelName);
-  //Helper->setLinkage(Function::ExternalLinkage);
-  //
-  // Set the target features for the helper.
-  Helper->addFnAttr("target-cpu", GPUArch);
-  Helper->addFnAttr("target-features",
+  // Get the kernel function for this loop and clean up
+  // any stray (target related) attributes that were
+  // attached as part of the host-side target that
+  // occurred before outlining.
+  Function *KernelF = Out.Outline;
+  KernelF->setName(KernelName);
+  KernelF->removeFnAttr("target-cpu");
+  KernelF->removeFnAttr("target-features");
+  KernelF->removeFnAttr("personality");
+  KernelF->addFnAttr("target-cpu", GPUArch);
+  KernelF->addFnAttr("target-features",
                      PTXVersionFromCudaVersion() + "," + GPUArch);
-  Helper->removeFnAttr("target-cpu");
-  Helper->removeFnAttr("target-features");
-  Helper->removeFnAttr("personality");
-
   NamedMDNode *Annotations =
       KernelModule.getOrInsertNamedMetadata("nvvm.annotations");
   SmallVector<Metadata *, 3> AV;
-  AV.push_back(ValueAsMetadata::get(Helper));
+  AV.push_back(ValueAsMetadata::get(KernelF));
   AV.push_back(MDString::get(Ctx, "kernel"));
-  AV.push_back(
-      ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
+  AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
   Annotations->addOperand(MDNode::get(Ctx, AV));
 
   // Verify that the Thread ID corresponds to a valid iteration.  Because
@@ -909,7 +904,7 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
   Value *Grainsize;
   {
     // TODO: We really only want a grainsize of 1 for now...
-    auto OutlineArgsIter = Helper->arg_begin();
+    auto OutlineArgsIter = KernelF->arg_begin();
     // End argument is the first LC arg.
     End = &*OutlineArgsIter++;
 
@@ -918,8 +913,8 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI,
     //if (unsigned ConstGrainsize = TLI.getGrainsize())
     //  Grainsize = ConstantInt::get(PrimaryIV->getType(), ConstGrainsize);
     //else
-      Grainsize = ConstantInt::get(PrimaryIV->getType(),
-                                    DefaultGrainSize.getValue());
+      Grainsize = ConstantInt::get(PrimaryIV->getType(), 1);
+                                    //DefaultGrainSize.getValue());
   }
 
   IRBuilder<> B(Entry->getTerminator());
@@ -1038,7 +1033,7 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn) {
   // complex; e.g., printf().
   if (Fn->getName() == "printf" || Fn->getName() == "fprintf") {
     report_fatal_error("cuabi: printf is currently unsupported "
-                       "parallel loops... :-(\n");
+                       "in parallel loops... :-(\n");
   }
 
   std::string FnName;
@@ -1064,7 +1059,6 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn) {
     else if (Fn->getName() == "llvm.tan.f64")
       FnName = "tan";
     else {
-      errs() << "cuabi: unable to transform intrinsic call: " << Fn->getName() << "\n";
       //report_fatal_error("cuabi: no transform for llvm intrinsic!");
       return nullptr;
     }
@@ -1098,26 +1092,6 @@ void CudaLoop::transformForPTX(Function &F) {
   LLVM_DEBUG(dbgs() << "Transforming function '" << F.getName() << "' "
                     << "in preparation for PTX generation.\n");
 
-  // ThreadID.x
-  auto tid = Intrinsic::getDeclaration(&KernelModule,
-                                       Intrinsic::nvvm_read_ptx_sreg_tid_x);
-  // BlockID.x
-  auto ctaid = Intrinsic::getDeclaration(&KernelModule,
-                                         Intrinsic::nvvm_read_ptx_sreg_ctaid_x);
-  // BlockDim.x
-  auto ntid = Intrinsic::getDeclaration(&KernelModule,
-
-  Intrinsic::nvvm_read_ptx_sreg_ntid_x);
-
-  IRBuilder<> B(F.getEntryBlock().getFirstNonPHI());
-
-  // Compute blockDim.x * blockIdx.x + threadIdx.x;
-  Value *tidv = B.CreateCall(tid, {}, "thread_idx");
-  Value *ntidv = B.CreateCall(ntid, {}, "block_idx");
-  Value *ctaidv = B.CreateCall(ctaid, {}, "block_dimx");
-  Value *tidoff = B.CreateMul(ctaidv, ntidv, "block_off");
-  Value *gtid = B.CreateAdd(tidoff, tidv, "cu_idx");
-
   // PTX doesn't like .<n> global names, rename them to
   // replace the '.' with an underscore, '_'.
   for (GlobalVariable &G : KernelModule.globals()) {
@@ -1128,10 +1102,8 @@ void CudaLoop::transformForPTX(Function &F) {
 
   // We now need to walk the kernel (outlined loop) and look for
   // unresolved function calls.  In particular we need to check
-  // to see if they can be resolved via CUDA's libdevice.  We do
-  // this by walking each instruction in the function looking for
-  // function calls.
-  LLVM_DEBUG(dbgs() << "cuabi: search for unresolved functions in kernel...\n");
+  // to see if they can be resolved via CUDA's libdevice.
+  LLVM_DEBUG(dbgs() << "cuabi: search for unresolved calls in outlined kernel...\n");
   std::list<CallInst*> Replaced;
   for(auto I = inst_begin(&F); I != inst_end(&F); I++) {
     if (auto CI = dyn_cast<CallInst>(&*I)) {
@@ -1140,7 +1112,7 @@ void CudaLoop::transformForPTX(Function &F) {
         Function *DF = resolveLibDeviceFunction(CF);
         if (DF != nullptr) {
           CallInst *NCI = dyn_cast<CallInst>(CI->clone());
-          NCI->insertAfter(CI);
+          NCI->insertBefore(CI);
           NCI->setCalledFunction(DF);
           CI->replaceAllUsesWith(NCI);
           Replaced.push_back(CI);
@@ -1151,28 +1123,6 @@ void CudaLoop::transformForPTX(Function &F) {
 
   for(auto CI : Replaced)
     CI->eraseFromParent();
-
-  std::vector<Instruction *> TIDs;
-  for (auto &F : KernelModule) {
-    for (auto &BB : F) {
-      for (auto &I : BB) {
-        if (auto *CI = dyn_cast<CallInst>(&I)) {
-          if (Function *F = CI->getCalledFunction()) {
-            if (F->getName() == "gtid")
-              TIDs.push_back(&I);
-          }
-        }
-      }
-    }
-  }
-
-  for (auto P : TIDs) {
-    P->replaceAllUsesWith(gtid);
-    P->eraseFromParent();
-  }
-
-  if (auto *F = KernelModule.getFunction("gtid"))
-    F->eraseFromParent();
 
   if (KeepIntermediateFiles) {
     std::error_code EC;
@@ -1236,7 +1186,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
         Value *VoidPP = B.CreateBitCast(V, VoidPtrTy);
         if (prefetchStream == nullptr) { // stream codegen enabled...
           LLVM_DEBUG(dbgs() << "creating initial prefetch stream.\n");
-          prefetchStream = B.CreateCall(KitCudaStreamMemPrefetchFn,
+          prefetchStream = B.CreateCall(KitCudaMemPrefetchFn,
                                         {VoidPP}, "_cuabi.prefetch_stream");
         } else {
           LLVM_DEBUG(dbgs() << "code gen prefetch.\n");
@@ -1278,11 +1228,11 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL,
     TCCI = TripCount; // Simplify cases in launch code gen below...
 
   if (not TTarget->hasGlobalVariables()) {
-    LLVM_DEBUG(dbgs() << "creating non-globals kernel launch.\n");
+    LLVM_DEBUG(dbgs() << "\tcreating kernel launch (no globals).\n");
     B.CreateCall(KitCudaLaunchFn,
                  {DummyFBPtr, KNameParam, argsPtr, TCCI, prefetchStream});
   } else {
-    LLVM_DEBUG(dbgs() << "creating kernel launch w/ globals.\n");
+    LLVM_DEBUG(dbgs() << "\tcreating kernel launch (w/ globals).\n");
     Value *CuModule = B.CreateCall(KitCudaCreateFBModuleFn, {DummyFBPtr});
     B.CreateCall(KitCudaModuleLaunchFn,
                    {CuModule, KNameParam, argsPtr, TCCI, prefetchStream});
@@ -1295,7 +1245,7 @@ CudaABI::CudaABI(Module &M)
       M.getContext()) {
 
   LLVM_DEBUG(dbgs() << "cuabi: creating tapir target for module '"
-                    << M.getName() << "'\n");
+                    << M.getName() << "' (w/ kernel module: '" << KM.getName() << "')\n");
 
   // Create a module (KM) to hold all device side functions for
   // all parallel constructs in the module we are processing (M).
@@ -1384,10 +1334,11 @@ Value *CudaABI::lowerGrainsizeCall(CallInst *GrainsizeCall) {
 void CudaABI::lowerSync(SyncInst &SI) {
   // no-op...
   // The CUDA transformations split the code into device and host
-  // side modules ()
+  // side modules.
 }
 
-void CudaABI::addHelperAttributes(Function &F) { /* no-op */
+void CudaABI::addHelperAttributes(Function &F) {
+  /* no-op */
 }
 
 void CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
@@ -1689,7 +1640,7 @@ CudaABIOutputFile
 CudaABI::createFatbinaryFile(CudaABIOutputFile &AsmFile) {
   std::error_code EC;
   SmallString<255> FatbinFilename(AsmFile->getFilename());
-  sys::path::replace_extension(FatbinFilename, ".fbin");
+  sys::path::replace_extension(FatbinFilename, ".cufatbin");
   CudaABIOutputFile FatbinFile;
   FatbinFile = std::make_unique<ToolOutputFile>(FatbinFilename, EC,
                                             sys::fs::OpenFlags::OF_None);
@@ -1861,7 +1812,7 @@ Function *CudaABI::createCtor(GlobalVariable *Fatbinary,
   Function *CtorFn = Function::Create(
           FunctionType::get(VoidTy, VoidPtrTy, false),
           GlobalValue::InternalLinkage,
-          CUABI_PREFIX + ".ctor." + M.getName(), &M);
+          CUABI_PREFIX + ".ctor." + KM.getName(), &M);
 
   BasicBlock *CtorEntryBB = BasicBlock::Create(Ctx, "entry", CtorFn);
   IRBuilder<> CtorBuilder(CtorEntryBB);
@@ -2083,55 +2034,61 @@ CudaABIOutputFile CudaABI::generatePTX() {
   // generate a PTX file.  The PTX file will be named the same as
   // the original input source module (M) with the extension changed
   // to PTX.
-  StringRef filename = sys::path::filename(M.getName());
-  SmallString<255> PTXFileName({CUABI_PREFIX, filename});
+  std::string ModelPTXFileName = std::string(CUABI_PREFIX) + "%%-%%-%%_" + KM.getName().str();
+  SmallString<1024> PTXFileName;
+  sys::fs::createUniquePath(ModelPTXFileName.c_str(), PTXFileName, true);
   sys::path::replace_extension(PTXFileName, ".ptx");
 
   LLVM_DEBUG(dbgs() << "\tgenerating PTX file '"
-                    << PTXFileName.c_str() << "'.\n");
+                    << PTXFileName << "'.\n");
 
   std::unique_ptr<ToolOutputFile> PTXFile;
   PTXFile = std::make_unique<ToolOutputFile>(PTXFileName, EC,
                 sys::fs::OpenFlags::OF_None);
   PTXFile->keep();
 
-  //pushPTXFilename(PTXFileName.c_str());
-
   KM.addModuleFlag(llvm::Module::Override, "nvvm-reflect-ftz", true);
 
-  // TODO: Need to update to new pass manager... Yay?
-  legacy::PassManager PM;
-  legacy::FunctionPassManager FPM(&KM);
-  PassManagerBuilder PMB;
-  PMB.OptLevel = OptLevel;
-  PMB.VerifyInput = 1;
-  PMB.Inliner = createFunctionInliningPass(PMB.OptLevel, 0, false);
-  PMB.DisableUnrollLoops = false;
-  PMB.LoopVectorize = false;
-  PMB.SLPVectorize = false;
-  PMB.populateFunctionPassManager(FPM);
-  PMB.populateModulePassManager(PM);
-  PTXTargetMachine->adjustPassManager(PMB);
+  PipelineTuningOptions pto;
+  pto.LoopVectorization = OptLevel > 2;
+  pto.SLPVectorization = OptLevel > 2;
+  pto.LoopUnrolling = true;
+  pto.LoopInterleaving = true;
+  pto.LoopStripmine = true;
+  LoopAnalysisManager lam;
+  FunctionAnalysisManager fam;
+  CGSCCAnalysisManager cgam;
+  ModuleAnalysisManager mam;
+PassBuilder pb(PTXTargetMachine, pto);
+  pb.registerModuleAnalyses(mam);
+  pb.registerCGSCCAnalyses(cgam);
+  pb.registerFunctionAnalyses(fam);
+  pb.registerLoopAnalyses(lam);
+  PTXTargetMachine->registerPassBuilderCallbacks(pb);
+  pb.crossRegisterProxies(lam, fam, cgam, mam);
+  OptimizationLevel optLevels[] = {
+      OptimizationLevel::O0,
+      OptimizationLevel::O1,
+      OptimizationLevel::O2,
+      OptimizationLevel::O3,
+  };
+  OptimizationLevel optLevel = OptimizationLevel::O2;
+  if (OptLevel >= 0 && OptLevel <= 3)
+    optLevel = optLevels[OptLevel];
+  ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
+  mpm.addPass(VerifierPass());
+  LLVM_DEBUG(dbgs() << "\t\t* module: " << KM.getName() << "\n");
+  mpm.run(KM, mam);
 
   // Setup the passes and request that the output goes to the
   // specified PTX file.
-  bool Fail = PTXTargetMachine->addPassesToEmitFile(PM, PTXFile->os(),
+  legacy::PassManager PassMgr;
+  if (PTXTargetMachine->addPassesToEmitFile(PassMgr, PTXFile->os(),
                            nullptr, CodeGenFileType::CGFT_AssemblyFile,
-                           false);
-  if (Fail)
+                           false))
     report_fatal_error("Cuda ABI transform -- PTX generation failed!");
-
-  FPM.doInitialization();
-  for(Function &Fn : KM)
-    FPM.run(Fn);
-  FPM.doFinalization();
-  PM.run(KM);
-
-  // TODO: Not sure we need to force 'keep' here as we return
-  // the output file but will keep it here for now just to play it
-  // safe.
-  PTXFile->keep();
-  return PTXFile;
+  PassMgr.run(KM);
+  return std::move(PTXFile);
 }
 
 void CudaABI::postProcessModule() {
@@ -2201,12 +2158,11 @@ CudaABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
   // parallel tapir loop constructs into suitable GPU device
   // code.  We hand the outliner the kernel module (KM) as
   // the destination for all generated (device-side) code.
-  std::string ModuleName = sys::path::filename(M.getName()).str();
-
+  //std::string ModuleName = sys::path::filename(KM.getName()).str();
   // PTX dislikes names containing '.' -- replace them with
   // underscores.  TODO: Is this still true?
-  std::replace(ModuleName.begin(), ModuleName.end(), '.', '_');
-  std::replace(ModuleName.begin(), ModuleName.end(), '-', '_');
+  //std::replace(ModuleName.begin(), ModuleName.end(), '.', '_');
+  //std::replace(ModuleName.begin(), ModuleName.end(), '-', '_');
 
   Loop* TheLoop = TL->getLoop();
   Function *Fn = TheLoop->getHeader()->getParent();
@@ -2217,11 +2173,11 @@ CudaABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
     // based naming scheme for kernel names. This is purely for some extra
     // context (and sanity?) on the compiler development side...
     unsigned LineNumber = TL->getLoop()->getStartLoc()->getLine();
-    KN = CUABI_KERNEL_NAME_PREFIX + KN + "_" + Twine(LineNumber).str();
+    KN = CUABI_PREFIX + KN + "_" + Twine(LineNumber).str();
   } else {
     // In the non-debug mode we use a consecutive numbering scheme for our
     // kernel names (this is currently handled via the 'make unique' parameter).
-    KN = CUABI_KERNEL_NAME_PREFIX + KN;
+    KN = CUABI_PREFIX + KN;
   }
 
   CudaLoop *CLOP = new CudaLoop(M, KM, KN, this);

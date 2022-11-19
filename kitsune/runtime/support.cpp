@@ -73,19 +73,19 @@ extern "C" {
 
 // Get info about supported runtime targets.
 bool __kitrt_isCudaSupported() {
-  return _kitrtEnabledRuntimes | KITRT_CudaSupport;
+  return _kitrtEnabledRuntimes & KITRT_CudaSupport;
 }
 
 bool __kitrt_isHipSupported() {
-  return _kitrtEnabledRuntimes | KITRT_HipSupport;
+  return _kitrtEnabledRuntimes & KITRT_HipSupport;
 }
 
 bool __kitrt_isCheetahSupported() {
-  return _kitrtEnabledRuntimes | KITRT_CheetahSupport;
+  return _kitrtEnabledRuntimes & KITRT_CheetahSupport;
 }
 
 bool __kitrt_isRealmSuported() {
-  return _kitrtEnabledRuntimes | KITRT_RealmSupport;
+  return _kitrtEnabledRuntimes & KITRT_RealmSupport;
 }
 
 bool __kitrt_runtimesInit() {
@@ -147,6 +147,7 @@ bool __kitrt_runtimesInit() {
       fprintf(stderr, "| Cheetah [sic]   :     no                |\n");
     fprintf(stderr,   "|-----------------------------------------|\n\n");
   }
+  return true;
 }
 
 } // extern

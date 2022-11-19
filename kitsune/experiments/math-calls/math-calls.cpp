@@ -4,39 +4,53 @@
 #include <chrono>
 #include <kitsune.h>
 #include <cmath>
-#include "kitsune/timer.h"
-#include "kitrt/cuda/cuda.h"
-#include "kitrt/memory_map.h"
 
 using namespace std;
-using namespace kitsune;
 
 const size_t DEFAULT_ARRAY_SIZE = 1024 * 1024 * 128;
 
-template <typename T>
-T* alloc(int N) {
-  return (T*)__kitrt_cuMemAllocManaged(sizeof(T) * N);
-}
-
-template <typename T>
-void dealloc(T* array) {
-  __kitrt_cuMemFree((void*)array);
-}
+struct testit {
+  float a, b;
+};
 
 template <typename T>
 void random_fill(T* data, size_t N) {
   for(size_t i = 0; i < N; ++i)
-    data[i] = 3.14 * (rand() / (T)RAND_MAX);
-  __kitrt_memNeedsPrefetch(data);
+    data[i] = (2.0 * 3.142) * (rand() / (T)RAND_MAX);
+}
+
+__attribute__((noinline))
+void struct_test(testit *ti) {
+  ti->a = 4;
+  ti->b = ti->a + 4;
+}
+
+template <typename T>
+__attribute__((noinline))
+T math_call(T value) {
+  testit t;
+  struct_test(&t);
+  return fminf(value, 1234.56 - t.a + t.b);
+}
+
+template <typename T>
+__attribute__((noinline))
+T math_call2(T value) {
+  return sqrtf(value);
 }
 
 template <typename T>
 void parallel_work(T* dst, const T* src, int N) {
-  forall(int i = 0; i < N; i++) {
-    dst[i] = cos(2.0f/3.14 - src[i]) * ((sin(src[i]) * sin(src[i])) + (cos(src[i]) * cos(src[i])));
+  forall(size_t i = 0; i < N; i++) {
+    dst[i] = fminf(math_call(src[i]) + math_call2(src[i]), 100.0);
   } 
 }
 
+void print(float *data, size_t N) {
+  for(size_t i = 0; i < N; i++) 
+    printf("%f  ", data[i]);
+  printf("\n\n");
+}
 
 int main(int argc, char** argv) {
   size_t array_size = DEFAULT_ARRAY_SIZE;
@@ -46,8 +60,10 @@ int main(int argc, char** argv) {
   float *data0 = alloc<float>(array_size);
   float *data1 = alloc<float>(array_size);
   random_fill(data0, array_size);
+  print(data0, 10);
   auto start = chrono::steady_clock::now();
   parallel_work(data1, data0, array_size);
+  print(data1, 10);
   auto end = chrono::steady_clock::now();
   cout  << "Execution time: "
           << chrono::duration<double>(end-start).count()

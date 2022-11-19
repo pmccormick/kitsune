@@ -1,5 +1,5 @@
 # Flags for the HIP runtime ABI target.
--Dtapir_hip_target
+-D_tapir_hip_target
 ${KITSUNE_HIP_TARGET_EXTRA_LINK_FLAGS} 
 ${KITSUNE_HIP_TARGET_LINK_LIBS_FLAGS}
 

@@ -155,12 +155,15 @@ CodeGenFunction::GetTapirTargetAttr(ArrayRef<const Attr *> Attrs) {
 
 
 // Stolen from CodeGenFunction.cpp
+/*
+TODO: Remove when safe...
 static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
   if (!BB) return;
   if (!BB->use_empty())
     return CGF.CurFn->getBasicBlockList().push_back(BB);
   delete BB;
 }
+*/
 
 llvm::Instruction *CodeGenFunction::EmitLabeledSyncRegionStart(StringRef SV) {
   // Start the sync region.  To ensure the syncregion.start call dominates all

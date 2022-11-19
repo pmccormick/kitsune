@@ -18,6 +18,9 @@ set(KITRT_INCLUDE_DIR ${KITSUNE_RUNTIME_DIR})
 # launches, etc.).
 option(KITRT_ENABLE_DEBUG "Enable debug mode features for the runtime." OFF)
 option(KITRT_ENABLE_VERBOSE "Enable verbose execution mode for debuggin." OFF)
+set(KITSUNE_BITCODE_INSTALL_DIR  "lib/bitcode/" CACHE STRING
+  "Location to install Kitsune's runtime bitcode files.")
+
 
 include_directories(${KITSUNE_SOURCE_DIR}/include)
 include_directories(${KITSUNE_RUNTIME_INCLUDE_DIR})
@@ -65,7 +68,7 @@ if (KITRT_ENABLE_HIP)
   message(STATUS "Kitsune runtime adding HIP components to build...")
   # TODO: This probably needs external settings in order to
   # manage moudles and other ways to install rocm...
-  list(APPEND CMAKE_PREFIX_PATH 
+  list(APPEND CMAKE_PREFIX_PATH
        $ENV{ROCM_PATH}/hip $ENV{ROCM_PATH}
        /opt/rocm/hip /opt/rocm)
   find_package(hip REQUIRED)
@@ -77,8 +80,11 @@ if (KITRT_ENABLE_HIP)
     hip/hip.cpp
     hip/llvm-hip.cpp)
   list(APPEND KITRT_LINK_LIBS hip::host)
+
+  add_subdirectory(hip)
 endif()
 
+set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 message(STATUS "kitsune runtime library source files: ${KITRT_SRCS}")
 add_library(kitrt SHARED ${KITRT_SRCS})
 target_include_directories(kitrt

@@ -812,10 +812,12 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
   }
 
   bool IsTapir = C.getInputArgs().hasArg(options::OPT_ftapir_EQ);
+  /*
   if (IsTapir && (IsCuda || IsHIP)) {
     Diag(clang::diag::err_drv_mix_tapir_cuda_hip);
     return;
   }
+  */
 
   if (IsCuda) {
     const ToolChain *HostTC = C.getSingleOffloadToolChain<Action::OFK_Host>();

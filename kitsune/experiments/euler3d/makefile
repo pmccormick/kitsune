@@ -1,6 +1,6 @@
 include ../experiments.mk 
 
-cxx_flags += -I${kitsune_prefix}/include 
+cxx_flags += -I${kitsune_prefix}/include -fPIC -fno-vectorize 
 
 targets = euler3d-forall.opencilk.${host_arch}
 
@@ -12,6 +12,7 @@ endif
 
 ifeq ($(KITSUNE_ENABLE_HIP), TRUE)
   targets += euler3d-forall.hip.${host_arch}
+  targets += euler3d-kokkos.hip.${host_arch}
 endif 
 
 all: ${targets} 
@@ -36,6 +37,8 @@ euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp
 	/usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
 	/usr/bin/time ${clangxx} ${cxx_flags} ${clang_cu_flags} ${kokkos_cu_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
+	/usr/bin/time ${clangxx} ${cxx_flags} ${clang_hip_flags} ${kokkos_hip_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 # 
 #############################
 
@@ -46,7 +49,7 @@ clean:
 	-rm -f *.bc
 	-rm -f *.fatbin
 	-rm -f *.ppm *.jpg
-	-rm -f *.ll *.ptx *.csv *.log *.s *.fbin *.tapir
+	-rm -f *.ll *.ptx *.csv *.log *.s *.fbin *.tapir *.o 
 	-rm -f *.dat
 
 #### CUDA flags

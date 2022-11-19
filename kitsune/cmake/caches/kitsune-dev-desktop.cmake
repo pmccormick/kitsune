@@ -23,35 +23,33 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/kitsune CACHE STRING "")
 # Combine this setting with the parallel build parameters. This is 
 # one reason we encourage ninja use above as you can separately set
 # the number of compilation and linking threads. 
-#set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
 set(CMAKE_BUILD_TYPE Release CACHE STRING "")
-set(LLVM_PARALLEL_COMPILE_JOBS 20 CACHE STRING "")
-set(LLVM_PARALLEL_LINK_JOBS 6 CACHE STRING "")
+set(LLVM_PARALLEL_COMPILE_JOBS 12 CACHE STRING "")
+set(LLVM_PARALLEL_LINK_JOBS 4 CACHE STRING "")
 
 # note: hip requires lld... 
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;lld   
+  clang;clang-tools-extra;lld;lldb;mlir 
   CACHE STRING "")
 # note: hip requires compiler-rt
 set(LLVM_ENABLE_RUNTIMES 
-    compiler-rt;openmp;cheetah;cilktools;kitsune
+    cheetah;cilktools;compiler-rt;kitsune # ;openmp
     CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD 
     X86;NVPTX;AMDGPU 
     CACHE STRING "")
 
-set(COMPILER_RT_BUILD_SANITIZERS OFF CACHE STRING "")
-set(COMPILER_RT_BUILD_XRAY OFF CACHE STRING "")
-set(COMPILER_RT_BUILD_MEMPROF OFF CACHE STRING "")
-set(COMPILER_RT_BUILD_LIBFUZZER OFF CACHE STRING "")
-set(COMPILER_RT_DEFAULT_TARGET_ONLY ON CACHE STRING "")
+#set(COMPILER_RT_BUILD_SANITIZERS OFF CACHE STRING "")
+#set(COMPILER_RT_BUILD_XRAY OFF CACHE STRING "")
+#set(COMPILER_RT_BUILD_MEMPROF OFF CACHE STRING "")
+#set(COMPILER_RT_BUILD_LIBFUZZER OFF CACHE STRING "")
+#set(COMPILER_RT_DEFAULT_TARGET_ONLY ON CACHE STRING "")
 
 set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 80 CACHE STRING "")
 set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_80 CACHE STRING "")
 set(CUDA_HOST_COMPILER "$ENV{CUDA_HOME}/bin/gcc" CACHE STRING "")
 
 # Various helpful LLVM-level settings for development/debugging.
-set(CLANG_ROUND_TRIP_CC1_ARGS OFF CACHE BOOL "")
 set(LLVM_ENABLE_WARNINGS ON CACHE BOOL "") 
 set(LLVM_ENABLE_ASSERTIONS ON CACHE BOOL "")
 set(LLVM_ENABLE_BACKTRACES ON CACHE BOOL "")
@@ -65,6 +63,8 @@ set(LLVM_INSTALL_BINUTILS_SYMLINKS ON CACHE BOOL "")
 set(LLVM_BUILD_LLVM_DYLIB ON CACHE BOOL "")
 set(LLVM_DYLIB_COMPONENTS "all" CACHE STRING "")
 set(LLVM_LINK_LLVM_DYLIB ON CACHE BOOL "")
+set(LLVM_CCACHE_BUILD OFF CACHE BOOL "")
+#set(LLVM_CCACHE_DIR "${CMAKE_BINARY_DIR}/.ccache" CACHE STRING "")
 
 # Various helpful Clang-level settings for development/debugging.
 set(CLANG_BUILD_TOOLS ON CACHE BOOL "")
@@ -76,8 +76,7 @@ set(CLANG_VENDOR_UTI "gov.lanl.kitsune" CACHE STRING "")
 
 
 # Enable Kitsune mode within the toolchain.
-set(CLANG_ENABLE_KITSUNE ON CACHE BOOL
-  "Enable Kitsune features in Clang.")
+set(CLANG_ENABLE_KITSUNE ON CACHE BOOL "")
 set(KITSUNE_ENABLE_CUDA_ABI_TARGET ON CACHE BOOL "")
 set(KITSUNE_ENABLE_HIP_ABI_TARGET OFF CACHE BOOL "")
 
@@ -86,8 +85,8 @@ set(KITSUNE_ENABLE_KOKKOS_SUPPORT ON CACHE BOOL
   "Enable custom recognition and compilation of Kokkos.")
 
 # Enable the Kitsune runtime.
-set(KITSUNE_ENABLE_KITRT ON CACHE BOOL "Enable the kitsune runtime.")
-set(KITSUNE_ENABLE_DEBUG OFF CACHE BOOL "Enable debugging/assertion mode for the kitsune runtime.")
+set(KITSUNE_ENABLE_KITRT ON CACHE BOOL "")
+set(KITSUNE_ENABLE_DEBUG OFF CACHE BOOL "")
 
 set(KITSUNE_BUILD_EXAMPLES OFF CACHE BOOL "")
 set(KITSUNE_EXPERIMENTS OFF CACHE BOOL "")

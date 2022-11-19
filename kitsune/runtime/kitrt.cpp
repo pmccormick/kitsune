@@ -122,7 +122,6 @@ extern "C" {
       __kitrt_disableStackTraces();
 
     // Initialize the supported runtime layer(s).
-    bool __kitrt_runtimesInit();
     return __kitrt_runtimesInit();
   }
 

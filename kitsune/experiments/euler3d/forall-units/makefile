@@ -2,7 +2,7 @@ include ../../common.mk
 include ../../cuda.mk
 
 tapir_flags = -ffp-contract=fast -ftapir=cuda -mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1 -mllvm -cuabi-default-grainsize=1 -mllvm -cuabi-streams=false -mllvm -cuabi-arch=${NVARCH} -mllvm -cuabi-opt-level=3 -mllvm -cuabi-run-post-opts=false 
-# -mllvm -debug-only="cuda-abi"
+# -mllvm -debug-only=cudaabi
 clang_flags = ${cxx_flags} ${opt_flags} ${clang_info_flags} -I${CUDA_HOME}/include ${tapir_flags}
 
 link_flags=-ftapir=cuda 

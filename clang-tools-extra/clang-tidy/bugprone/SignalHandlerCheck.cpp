@@ -13,7 +13,7 @@
 
 // This is the minimal set of safe functions.
 // https://wiki.sei.cmu.edu/confluence/display/c/SIG30-C.+Call+only+asynchronous-safe+functions+within+signal+handlers
-constexpr std::initializer_list<llvm::StringRef> MinimalConformingFunctions = {
+std::initializer_list<llvm::StringRef> MinimalConformingFunctions = {
     "signal", "abort", "_Exit", "quick_exit"};
 
 // The POSIX-defined set of safe functions.
@@ -22,7 +22,7 @@ constexpr std::initializer_list<llvm::StringRef> MinimalConformingFunctions = {
 // mentioned POSIX specification was not updated after 'quick_exit' appeared
 // in the C11 standard.
 // Also, we want to keep the "minimal set" a subset of the "POSIX set".
-constexpr std::initializer_list<llvm::StringRef> POSIXConformingFunctions = {
+std::initializer_list<llvm::StringRef> POSIXConformingFunctions = {
     "_Exit",
     "_exit",
     "abort",
