@@ -552,15 +552,12 @@ int main(int argc, char** argv)
 
     // Create arrays and set initial conditions
     View<float> variables = View<float>("variables", nelr * NVAR);
-    cout << iterations << " "; 
 
     auto start = chrono::steady_clock::now();
     initialize_variables(nelr, variables, ff_variable);
-
     View<float> old_variables = View<float>("old_variables", nelr*NVAR);
     View<float> fluxes = View<float>("fluxes", nelr*NVAR);
     View<float> step_factors = View<float>("step_factors", nelr);
-
     // Begin iterations
     double copy_total = 0.0;
     double sf_total = 0.0;
@@ -594,7 +591,8 @@ int main(int argc, char** argv)
     }
 
     auto end = chrono::steady_clock::now();
-    cout << copy_total << " "
+    cout << iterations << " " 
+         << copy_total << " "
 	 << sf_total << " "
 	 << rk_total << " "
 	 << chrono::duration<double>(end-start).count() << endl;

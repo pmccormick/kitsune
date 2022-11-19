@@ -150,7 +150,7 @@ float compute_speed_of_sound(float density, float pressure)
   return sqrtf(float(GAMMA)*pressure/density);
 }
 
-
+//inline __attribute__((always_inline))
 void compute_step_factor(int nelr,
                          const float* __restrict variables,
                          const float* areas,
@@ -503,7 +503,6 @@ int main(int argc, char** argv)
 
   auto start = chrono::steady_clock::now();
   initialize_variables(nelr, variables, ff_variable);
-  
   float* old_variables = alloc<float>(nelr*NVAR);
   float* fluxes = alloc<float>(nelr*NVAR);
   float* step_factors = alloc<float>(nelr);

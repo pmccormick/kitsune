@@ -11,7 +11,6 @@ else
 endif
 
 ##################################
-# Stripming flags: For GPUs our best results are often
 # to disable stripming transformations.
 ifeq ($(KITSUNE_STRIPMINE),)
   stripmine_flags = -mllvm -stripmine-count=1 \
@@ -37,9 +36,13 @@ tapir_cu_flags = -ftapir=cuda \
  -mllvm -cuabi-opt-level=${opt_level} \
  -mllvm -cuabi-prefetch=true \
  -mllvm -cuabi-streams=false \
- -mllvm -cuabi-run-post-opts=false \
+ -mllvm -cuabi-run-post-opts=false\
+ -mllvm -cuabi-verbose=true \
+ -mllvm -debug-only="cuabi" \
  -mllvm -cuabi-arch=${NVARCH} \
  ${stripmine_flags}
+
+tapir_cu_lto_flags = -Wl,--tapir-target=cuda,--lto-O${opt_level},-mllvm,-cuabi-opt-level=${opt_level},-mllvm,-cuabi-arch=${NVARCH},-mllvm,-cuabi-prefetch=true,-mllvm,-cuabi-streams=false,-mllvm,-cuabi-verbose=true,-mllvm,--debug-only="cuabi",-mllvm,-stripmine-coarsen-factor=1
 
 ifneq ($(KITSUNE_VERBOSE),)
   tapir_cu_flags = ${tapir_cu_flags} -mllvm -cuabi-verbose=true 

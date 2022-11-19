@@ -82,7 +82,6 @@ static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 //   -mllvm -cuabi-option[...]
 //
 
-
 // Select a specific target NVIDIA GPU architecture.
 //
 // This will be passed directly on to ptxas.
@@ -92,6 +91,7 @@ static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 // follows the trends of longer term CUDA support.  Although exposed here, we
 // have not tested 32-bit host support.
 //
+/// Selected target GPU architecture. Passed directly to ptxas.
 static cl::opt<std::string>
     GPUArch("cuabi-arch", cl::init("sm_75"), cl::NotHidden,
             cl::desc("Target GPU architecture for CUDA ABI transformation."
@@ -101,7 +101,7 @@ static cl::opt<std::string>
 static cl::opt<std::string>
     HostMArch("cuabi-march", cl::init("64"), cl::NotHidden,
               cl::desc("Specify 32- or 64-bit host architecture."
-                       "(default=64-bit)."));
+                       " (default=64-bit)."));
 
 /// Enable verbose mode.  Handled internally as well as passed on to
 /// ptxas to provide additional details (register use, etc.).
@@ -114,7 +114,7 @@ static cl::opt<bool>
 static cl::opt<bool>
     Debug("cuabi-debug", cl::init(false), cl::NotHidden,
           cl::desc("Enable debug information for GPU device code. "
-                   "(default=false)"));
+                   " (default=false)"));
 
 /// Surpress the generation of debug sections in the final object
 /// file.  This option is ignored if not used with the debug or

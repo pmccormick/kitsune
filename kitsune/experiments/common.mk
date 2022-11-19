@@ -16,7 +16,8 @@ endif
 
 ##################################
 # EXPERIMENTS-WIDE C and CXX FLAGS 
-c_flags = -march=native $(CFLAGS) 
+#c_flags = -march=native $(CFLAGS) 
+c_flags = $(CFLAGS) 
 cxx_flags = -std=c++17 -fno-exceptions $(CXX_FLAGS)
 
 ifneq ($(KITSUNE_VERBOSE),)
