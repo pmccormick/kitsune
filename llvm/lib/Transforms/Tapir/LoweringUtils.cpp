@@ -19,6 +19,7 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/Tapir/CilkABI.h"
 #include "llvm/Transforms/Tapir/CudaABI.h"
+#include "llvm/Transforms/Tapir/HipABI.h"
 #include "llvm/Transforms/Tapir/OpenCilkABI.h"
 #include "llvm/Transforms/Tapir/OpenMPABI.h"
 #include "llvm/Transforms/Tapir/OpenCLABI.h"
@@ -49,6 +50,8 @@ TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
     return new CilkABI(M);
   case TapirTargetID::Cuda:
     return new CudaABI(M);
+  case TapirTargetID::Hip:
+    return new HipABI(M);
   case TapirTargetID::Cheetah:
   case TapirTargetID::OpenCilk:
     return new OpenCilkABI(M);

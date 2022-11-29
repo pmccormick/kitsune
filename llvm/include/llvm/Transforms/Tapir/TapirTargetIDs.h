@@ -23,30 +23,31 @@ enum class TapirTargetID {
   None,     // Perform no lowering
   Serial,   // Lower to serial projection
   Cheetah,  // Lower to the Cheetah ABI
-  Cilk,     // Lower to the Cilk Plus ABI
+  Cilk,     // Lower to the Cilk Plus ABI (TODO: deprecated?)
   Cuda,     // Lower to Cuda ABI
   OpenCilk, // Lower to OpenCilk ABI
-  OpenCL,   // Lower to OpenCL ABI
-  OpenMP,   // Lower to OpenMP
-  GPU,   // Lower to OpenCL
-  Qthreads, // Lower to Qthreads
-  Realm,    // Lower to Realm
+  Hip,      // Lower to the Hip (AMD GPU) ABI.
+  OpenCL,   // Lower to OpenCL ABI (TODO: deprecated?)
+  OpenMP,   // Lower to OpenMP (TODO: Needs to be updated.)
+  GPU,      // Lower for LLVM JIT.
+  Qthreads, // Lower to Qthreads (TODO: deprecated?)
+  Realm,    // Lower to Realm (TODO: Needs to be updated.)
   Last_TapirTargetID
 };
 
 enum class TapirNVArchTargetID {
   Off,      // Completely disabled (i.e., -ftapir != gpu|cuda)
-  SM_50,    // Maxwell -- NOTE: to be depcreated with CUDA 12.x 
-  SM_52,    
-  SM_53, 
-  SM_60,    // Pascal 
+  SM_50,    // Maxwell -- NOTE: to be depcreated with CUDA 12.x
+  SM_52,
+  SM_53,
+  SM_60,    // Pascal
   SM_61,
   SM_62,
-  SM_70,    // Volta  
-  SM_72, 
-  SM_75,    // Turing 
+  SM_70,    // Volta
+  SM_72,
+  SM_75,    // Turing
   SM_80,    // Ampere
-  // NOTE: LLVM 13.x PTX supports only up through SM_80. 
+  // NOTE: LLVM 13.x PTX supports only up through SM_80.
   // TODO: Update this enum when we sync w/ upstream LLVM.
   Last_TapirNVArchTargetID
 };

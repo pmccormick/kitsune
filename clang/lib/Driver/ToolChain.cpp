@@ -1528,7 +1528,7 @@ void ToolChain::AddOpenCilkABIBitcode(const ArgList &Args,
     if (IsLTO)
       CmdArgs.push_back(
           Args.MakeArgString("--plugin-opt=opencilk-abi-bitcode=" + P));
-    return; 
+    return;
   }
 
   bool UseAsan = getSanitizerArgs(Args).needsAsanRt();
@@ -1721,6 +1721,17 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       CmdArgs.push_back("-lkitrt");
       #if defined(KITSUNE_CUDA_EXTRA_LINK_LIBS)
       ExtractArgsFromString(KITSUNE_CUDA_EXTRA_LINK_LIBS, CmdArgs, Args);
+      #endif
+    }
+    break;
+
+  case TapirTargetID::Hip:
+    if (!KITSUNE_ENABLE_CUDA_ABI_TARGET)
+      getDriver().Diag(diag::warn_drv_tapir_hip_target_disabled);
+    else {
+      CmdArgs.push_back("-lkitrt");
+      #if defined(KITSUNE_HIP_EXTRA_LINK_LIBS)
+      ExtractArgsFromString(KITSUNE_HIP_EXTRA_LINK_LIBS, CmdArgs, Args);
       #endif
     }
     break;

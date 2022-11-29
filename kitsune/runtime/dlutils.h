@@ -54,7 +54,7 @@
 #ifndef __KITRT_DL_UTILS_H__
 #define __KITRT_DL_UTILS_H__
 
-#define DECLARE_DLSYM(funcName) extern decltype(funcName)* funcName##_p = NULL;
+#define DECLARE_DLSYM(funcName) decltype(funcName)* funcName##_p = NULL;
 
 #define DLSYM_LOAD(funcName)                                                   \
   if (!(funcName##_p = (decltype(funcName) *)dlsym(dlHandle, #funcName))) {    \

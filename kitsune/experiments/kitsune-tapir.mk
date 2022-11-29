@@ -66,12 +66,12 @@ endif
 #  
 tapir_hip_flags = -ftapir=hip \
  -mllvm -hipabi-opt-level=${opt_level} \
- -mllvm -hipabi-prefetch=true \
- -mllvm -hipabi-streams=false \
- -mllvm -hipabi-run-post-opts=false \
  -mllvm -hipabi-arch=${HIPARCH} \
  ${stripmine_flags}
 
+ #-mllvm -hipabi-prefetch=true \
+ #-mllvm -hipabi-streams=false \
+ #-mllvm -hipabi-run-post-opts=false \
 
 ##################################
 # OpenCilk target flags:
