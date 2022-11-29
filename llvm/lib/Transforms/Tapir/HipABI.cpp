@@ -113,7 +113,7 @@ static cl::opt<bool>
              "successful completion of the transforms "
              "various steps."));
 
-/// Generate code to prefetch data prior to kernel launches. 
+/// Generate code to prefetch data prior to kernel launches.
 static cl::opt<bool>
     CodeGenPrefetch("hipabi-prefetch", cl::init(true),
                     cl::Hidden,
@@ -1089,7 +1089,7 @@ HipABIOutputFile HipABI::createBundleFile() {
   opt::ArgStringList LDDArgList;
 
   LDDArgList.push_back(LLDExe->c_str());
-  std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch + ":xnack+";
+  std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch + ":sramecc+:xnack-";
   LDDArgList.push_back(mcpu_arg.c_str());
   LDDArgList.push_back("-shared");
   LDDArgList.push_back("-plugin-opt=-amdgpu-internalize-symbols");
@@ -1150,7 +1150,7 @@ HipABIOutputFile HipABI::createBundleFile() {
   opt::ArgStringList BundleArgList;
   BundleArgList.push_back(Bundler->c_str());
   BundleArgList.push_back("-type=o");
-  std::string input_args = "-inputs=/dev/null," +
+  std::string input_args = "-input=/dev/null," +
                            LinkedObjFile->getFilename().str();
   BundleArgList.push_back(input_args.c_str());
 
@@ -1159,7 +1159,7 @@ HipABIOutputFile HipABI::createBundleFile() {
                            "--" + GPUArch.c_str();
   BundleArgList.push_back(target_arg.c_str());
 
-  std::string output_arg = "--outputs=" + BundleFile->getFilename().str();
+  std::string output_arg = "--output=" + BundleFile->getFilename().str();
   BundleArgList.push_back(output_arg.c_str());
   BundleArgList.push_back(nullptr);
 
