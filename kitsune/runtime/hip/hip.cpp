@@ -95,10 +95,10 @@ static double _kitrtLastEventTime = 0.0;
 
 
 // === Kernel launch parameters.
-static bool _kitrtUseHueristicLaunchParameters = false;
-static unsigned _kitrtDefaultThreadsPerBlock = 256;
-static unsigned _kitrtDefaultBlocksPerGrid = 0;
-static bool _kitrtUseCustomLaunchParameters = false;
+//static bool _kitrtUseHueristicLaunchParameters = false;
+//static unsigned _kitrtDefaultThreadsPerBlock = 256;
+//static unsigned _kitrtDefaultBlocksPerGrid = 0;
+//static bool _kitrtUseCustomLaunchParameters = false;
 
 // Enable auto-prefetching of managed memory pointers.
 // This is a very simple approach that likely will
@@ -444,7 +444,6 @@ void *__kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
 
   // TODO: need to set launch parameters!
   int threadsPerBlock, blocksPerGrid;
-
   __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
 
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(function,
@@ -512,5 +511,20 @@ float __kitrt_hipElapsedEventTime(void *start, void *stop) {
                                       (hipEvent_t)stop));
   return msecs;
 }
+
+// ---- Event management for timing, etc.
+
+void __kitrt_hipEnableEventTiming(unsigned report) {
+  _kitrtEnableTiming = true;
+  _kitrtReportTiming = report > 0;
+}
+
+void __kitrt_hipDisableEventTiming() {
+  _kitrtEnableTiming = false;
+  _kitrtReportTiming = false;
+  _kitrtLastEventTime = 0.0;
+}
+
+double __kitrt_hipGetLastEventTime() { return _kitrtLastEventTime; }
 
 } // extern "C"

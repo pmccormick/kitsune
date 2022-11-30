@@ -44,11 +44,11 @@ public:
   /// Process Function F before any function outlining is performed.  This
   /// routine should not modify the CFG structure.
   virtual void preProcessFunction(Function &F, TaskInfo &TI,
-                                  bool ProcessingTapirLoops) 
+                                  bool ProcessingTapirLoops) override
   { /* no-op */ }
 
   // Add attributes to the Function Helper produced from outlining a task.
-  void addHelperAttributes(Function &F) 
+  void addHelperAttributes(Function &F) override
   { /* no-op */ }
 
   // Pre-process the Function F that has just been outlined from a task.  This
@@ -58,7 +58,7 @@ public:
                               Instruction *DetachPt,
                               Instruction *TaskFrameCreate,
                               bool isSpawner,
-                              BasicBlock *BB)
+                              BasicBlock *BB) override
   { /* no-op */ }
 
   // Post-process the Function F that has just been outlined from a task.  This
@@ -66,29 +66,29 @@ public:
   // the tasks in the original function.
   void postProcessOutlinedTask(Function &F, Instruction *DetachPtr,
                                Instruction *TaskFrameCreate, bool IsSpawner,
-                               BasicBlock *TFEntry)
+                               BasicBlock *TFEntry) override 
   { /* no-op */ }
 
   // Pre-process the root Function F as a function that can spawn subtasks.
-  void preProcessRootSpawner(Function &F, BasicBlock *TFEntry)
+  void preProcessRootSpawner(Function &F, BasicBlock *TFEntry) override 
   { /* no-op */ }
 
   // Post-process the root Function F as a function that can spawn subtasks.
-  void postProcessRootSpawner(Function &F, BasicBlock *TFEntry)
+  void postProcessRootSpawner(Function &F, BasicBlock *TFEntry) override 
   { /* no-op */ }
 
   // Process the invocation of a task for an outlined function.  This routine is
   // invoked after processSpawner once for each child subtask.
-  void processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT)
+  void processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) override 
   { /* no-op */ }
 
   // Process Function F at the end of the lowering process.
-  void postProcessFunction(Function &F, bool OutliningTapirLoops)
+  void postProcessFunction(Function &F, bool OutliningTapirLoops) override 
   { /* no-op */ }
 
   /// @brief  Add a global var of those that need a host-to-device connection.
   /// @param GV: The global variable to add to the set.
-  void pushGlobalVariable(GlobalVariable *GV);
+  void pushGlobalVariable(GlobalVariable *GV); 
 
   /// @brief Any global variables to handle for host-to-device code gen?
   /// @return True if there are globals to process, false otherwise.
@@ -100,7 +100,7 @@ public:
 
   // Process a generated helper Function F produced via outlining, at the end of
   // the lowering process.
-  void postProcessHelper(Function &F) 
+  void postProcessHelper(Function &F) override 
   { /* no-op */ }
 
   // Return the HIP outline processor associated with this target.
@@ -191,33 +191,35 @@ public:
                             ValueSet &InputSet,
                             const SmallVectorImpl<Value *> &LCArgs,
                             const SmallVectorImpl<Value *> &LCInputs,
-                            const ValueSet &TLInputsFixed);
+                            const ValueSet &TLInputsFixed) override;
 
   /// Returns an integer identifying the index of the helper-function argument
   /// in Args that specifies the starting iteration number.  This return value
   /// must complement the behavior of setupLoopOutlineArgs().
-  unsigned getIVArgIndex(const Function &F, const ValueSet &Args) const;
+  unsigned getIVArgIndex(const Function &F, 
+		         const ValueSet &Args) const override;
 
   /// Returns an integer identifying the index of the helper-function argument
   /// in Args that specifies the ending iteration number.  This return value
   /// must complement the behavior of setupLoopOutlineArgs().
   unsigned getLimitArgIndex(const Function &F,
-                            const ValueSet &Args) const;
+                            const ValueSet &Args) const override;
 
   /// Process the TapirLoop before it is outlined -- just prior to the
   /// outlining occurs.  This allows the VMap and related details to be
   /// customized prior to outlining related operations (e.g. cloning of
   /// LLVM constructs).
-  void preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap);
+  void preProcessTapirLoop(TapirLoopInfo &TL, 
+                           ValueToValueMapTy &VMap) override;
 
   /// Processes an outlined Function Helper for a Tapir loop, just after the
   /// function has been outlined.
   void postProcessOutline(TapirLoopInfo &TL, TaskOutlineInfo &Out,
-                          ValueToValueMapTy &VMap);
+                          ValueToValueMapTy &VMap) override;
 
   /// Processes a call to an outlined Function Helper for a Tapir loop.
   void processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
-                               DominatorTree &DT);
+                               DominatorTree &DT) override;
 
   std::string getKernelName() const { return KernelName; }
   unsigned getKernelID() const { return KernelID; }
