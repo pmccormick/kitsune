@@ -743,6 +743,8 @@ def Ofast : Joined<["-"], "Ofast">, Group<O_Group>, Flags<[CC1Option]>;
 def P : Flag<["-"], "P">, Flags<[CC1Option,FlangOption,FC1Option]>, Group<Preprocessor_Group>,
   HelpText<"Disable linemarker output in -E mode">,
   MarshallingInfoNegativeFlag<PreprocessorOutputOpts<"ShowLineMarkers">>;
+def parallel_jobs_EQ : Joined<["-"], "parallel-jobs=">, Flags<[NoXarchOption]>,
+  HelpText<"Number of parallel jobs">;
 def Qy : Flag<["-"], "Qy">, Flags<[CC1Option]>,
   HelpText<"Emit metadata containing compiler name and version">;
 def Qn : Flag<["-"], "Qn">, Flags<[CC1Option]>,
@@ -2634,12 +2636,12 @@ def fno_openmp_target_debug : Flag<["-"], "fno-openmp-target-debug">, Group<f_Gr
 def fopenmp_target_debug_EQ : Joined<["-"], "fopenmp-target-debug=">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, HelpHidden]>;
 def fopenmp_target_fast : Flag<["-"], "fopenmp-target-fast">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, HelpHidden]>;
 def fno_openmp_target_fast : Flag<["-"], "fno-openmp-target-fast">, Group<f_Group>, Flags<[CC1Option, NoArgumentUnused, HelpHidden]>;
-def fopenmp_target_ignore_env_vars : Flag<["-"], "fopenmp-target-ignore-env-vars">, Group<f_Group>, 
-  Flags<[CC1Option, NoArgumentUnused, HelpHidden]>, 
+def fopenmp_target_ignore_env_vars : Flag<["-"], "fopenmp-target-ignore-env-vars">, Group<f_Group>,
+  Flags<[CC1Option, NoArgumentUnused, HelpHidden]>,
   HelpText<"Assert that device related environment variables can be ignored while generating code">,
   MarshallingInfoFlag<LangOpts<"OpenMPTargetIgnoreEnvVars">>;
-def fno_openmp_target_ignore_env_vars : Flag<["-"], "fno-openmp-target-ignore-env-vars">, Group<f_Group>, 
-  Flags<[CC1Option, NoArgumentUnused, HelpHidden]>, 
+def fno_openmp_target_ignore_env_vars : Flag<["-"], "fno-openmp-target-ignore-env-vars">, Group<f_Group>,
+  Flags<[CC1Option, NoArgumentUnused, HelpHidden]>,
   HelpText<"Assert that device related environment variables cannot be ignored while generating code">,
   MarshallingInfoFlag<LangOpts<"OpenMPTargetIgnoreEnvVars">>;
 def fopenmp_assume_teams_oversubscription : Flag<["-"], "fopenmp-assume-teams-oversubscription">,
@@ -4893,6 +4895,39 @@ defm devirtualize : BooleanFFlag<"devirtualize">, Group<clang_ignored_gcc_optimi
 defm devirtualize_speculatively : BooleanFFlag<"devirtualize-speculatively">,
     Group<clang_ignored_gcc_optimization_f_Group>;
 
+
+//===----------------------------------------------------------------------===//
+// FLangOption + NoXarchOption
+//===----------------------------------------------------------------------===//
+
+def flang_experimental_exec : Flag<["-"], "flang-experimental-exec">,
+  Flags<[FlangOption, FlangOnlyOption, NoXarchOption, HelpHidden]>,
+  HelpText<"Enable support for generating executables (experimental)">;
+
+//===----------------------------------------------------------------------===//
+// FLangOption + CoreOption + NoXarchOption
+//===----------------------------------------------------------------------===//
+
+def Xflang : Separate<["-"], "Xflang">,
+  HelpText<"Pass <arg> to the flang compiler">, MetaVarName<"<arg>">,
+  Flags<[FlangOption, FlangOnlyOption, NoXarchOption, CoreOption]>,
+  Group<CompileOnly_Group>;
+
+//===----------------------------------------------------------------------===//
+// FlangOption and FC1 Options
+//===----------------------------------------------------------------------===//
+let Flags = [FC1Option, FlangOption, FlangOnlyOption, HelpHidden] in {
+
+def cpp : Flag<["-"], "cpp">, Group<f_Group>,
+  HelpText<"Enable predefined and command line preprocessor macros">;
+def nocpp : Flag<["-"], "nocpp">, Group<f_Group>,
+  HelpText<"Disable predefined and command line preprocessor macros">;
+def module_dir : JoinedOrSeparate<["-"], "module-dir">, MetaVarName<"<dir>">,
+  HelpText<"Put MODULE files in <dir>">,
+  DocBrief<[{This option specifies where to put .mod files for compiled modules.
+  It is also added to the list of directories to be searched by an USE statement.
+  The default is the current directory.}]>;
+
 // Generic gfortran options.
 def A_DASH : Joined<["-"], "A-">, Group<gfortran_Group>;
 def J : JoinedOrSeparate<["-"], "J">, Flags<[RenderJoined]>, Group<gfortran_Group>;
@@ -5098,38 +5133,6 @@ def fsycl : Flag<["-"], "fsycl">, Flags<[NoXarchOption, CoreOption]>,
   Group<sycl_Group>, HelpText<"Enables SYCL kernels compilation for device">;
 def fno_sycl : Flag<["-"], "fno-sycl">, Flags<[NoXarchOption, CoreOption]>,
   Group<sycl_Group>, HelpText<"Disables SYCL kernels compilation for device">;
-
-//===----------------------------------------------------------------------===//
-// FLangOption + NoXarchOption
-//===----------------------------------------------------------------------===//
-
-def flang_experimental_exec : Flag<["-"], "flang-experimental-exec">,
-  Flags<[FlangOption, FlangOnlyOption, NoXarchOption, HelpHidden]>,
-  HelpText<"Enable support for generating executables (experimental)">;
-
-//===----------------------------------------------------------------------===//
-// FLangOption + CoreOption + NoXarchOption
-//===----------------------------------------------------------------------===//
-
-def Xflang : Separate<["-"], "Xflang">,
-  HelpText<"Pass <arg> to the flang compiler">, MetaVarName<"<arg>">,
-  Flags<[FlangOption, FlangOnlyOption, NoXarchOption, CoreOption]>,
-  Group<CompileOnly_Group>;
-
-//===----------------------------------------------------------------------===//
-// FlangOption and FC1 Options
-//===----------------------------------------------------------------------===//
-let Flags = [FC1Option, FlangOption, FlangOnlyOption, HelpHidden] in {
-
-def cpp : Flag<["-"], "cpp">, Group<f_Group>,
-  HelpText<"Enable predefined and command line preprocessor macros">;
-def nocpp : Flag<["-"], "nocpp">, Group<f_Group>,
-  HelpText<"Disable predefined and command line preprocessor macros">;
-//def module_dir : JoinedOrSeparate<["-"], "module-dir">, MetaVarName<"<dir>">,
-//  HelpText<"Put MODULE files in <dir>">,
-//  DocBrief<[{This option specifies where to put .mod files for compiled modules.
-//It is also added to the list of directories to be searched by an USE statement.
-//The default is the current directory.}]>;
 
 def ffixed_form : Flag<["-"], "ffixed-form">, Group<f_Group>,
   HelpText<"Process source files in fixed form">;

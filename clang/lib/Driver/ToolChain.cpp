@@ -1080,6 +1080,7 @@ void ToolChain::AddFortranStdlibLibArgs(const ArgList &Args,
 
   // Allways link Fortran executables with Pthreads
   CmdArgs.push_back("-lpthread");
+}
 
 
 /// The string produced by CMake configuration parameters for multiple
@@ -1087,9 +1088,9 @@ void ToolChain::AddFortranStdlibLibArgs(const ArgList &Args,
 /// use as arguments.  This helper extracts them into individal
 /// arguments.
 void ToolChain::ExtractArgsFromString(const char *s,
-				      ArgStringList &CmdArgs,
-				      const ArgList &Args,
-				      const char delimiter) const {
+                                      ArgStringList &CmdArgs,
+                                      const ArgList &Args,
+                                      const char delimiter) const {
   std::string ArgString(s);
   std::string token;
   std::istringstream TokenStream(ArgString);

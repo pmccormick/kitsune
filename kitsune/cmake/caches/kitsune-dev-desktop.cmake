@@ -29,11 +29,11 @@ set(LLVM_PARALLEL_LINK_JOBS 4 CACHE STRING "")
 
 # note: hip requires lld... 
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;lld;lldb;mlir 
+  clang;clang-tools-extra;lld;lldb;mlir;openmp 
   CACHE STRING "")
 # note: hip requires compiler-rt
 set(LLVM_ENABLE_RUNTIMES 
-    cheetah;cilktools;compiler-rt;kitsune;openmp
+    cheetah;cilktools;compiler-rt;kitsune
     CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD 
     X86;NVPTX;AMDGPU 

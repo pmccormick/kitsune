@@ -1031,33 +1031,6 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
         return;
       }
 
-      if (IsTapir) {
-        Diag(clang::diag::err_drv_mix_tapir_omp_offload);
-        return;
-      }
-
-      if (OpenMPTargets->getNumValues()) {
-        // We expect that -fopenmp-targets is always used in conjunction with
-        // the option -fopenmp specifying a valid runtime with offloading
-        // support, i.e. libomp or libiomp.
-        bool HasValidOpenMPRuntime = C.getInputArgs().hasFlag(
-            options::OPT_fopenmp, options::OPT_fopenmp_EQ,
-            options::OPT_fno_openmp, false);
-        if (HasValidOpenMPRuntime) {
-          OpenMPRuntimeKind OpenMPKind = getOpenMPRuntime(C.getInputArgs());
-          HasValidOpenMPRuntime =
-              OpenMPKind == OMPRT_OMP || OpenMPKind == OMPRT_IOMP5;
-        }
-      }
-
-      llvm::copy(OpenMPTargets->getValues(), std::back_inserter(OpenMPTriples));
-    } else if (C.getInputArgs().hasArg(options::OPT_offload_arch_EQ) &&
-               !IsHIP && !IsCuda) {
-      const ToolChain *HostTC = C.getSingleOffloadToolChain<Action::OFK_Host>();
-      auto AMDTriple = getHIPOffloadTargetTriple(*this, C.getInputArgs());
-      auto NVPTXTriple = getNVIDIAOffloadTargetTriple(*this, C.getInputArgs(),
-                                                      HostTC->getTriple());
-
       // First, handle errors in command line for OpenMP target offload
       bool IsHostOffloading =
           (OpenMPTargets->getNumValues() == 1) &&
@@ -1085,12 +1058,12 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
           return;
         }
       }
-
       //  process legacy option -fopenmp-targets -Xopenmp-target and -march
       auto status = GetTargetInfoFromMarch(C, OffloadArchs);
       if (!status)
-        return;
+       return;
     }
+
     auto status = GetTargetInfoFromOffloadArchOpts(C, OffloadArchs);
     if (!status)
       return;
@@ -1110,8 +1083,8 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
               StringRef(Arch->data() + Loc, Arch->size() - Loc));
         }
 
-        auto &&ConflictingArchs =
-            getConflictTargetIDCombination(OffloadArchsRef);
+        auto &&ConflictingArchs
+            = getConflictTargetIDCombination(OffloadArchsRef);
         if (ConflictingArchs) {
           C.getDriver().Diag(clang::diag::err_drv_bad_offload_arch_combo)
               << ConflictingArchs.getValue().first
@@ -1139,7 +1112,7 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
 
         std::string NormalizedName =
             Twine(TT.normalize() + "-" + OpenMPTargetArch).str();
-        
+
         // Make sure we don't have a duplicate triple.
         auto Duplicate = FoundNormalizedTriples.find(NormalizedName);
         if (Duplicate != FoundNormalizedTriples.end()) {
@@ -1165,8 +1138,9 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
           const ToolChain *HostTC =
               C.getSingleOffloadToolChain<Action::OFK_Host>();
           assert(HostTC && "Host toolchain should be always defined.");
-          auto &DeviceTC = ToolChains[NormalizedName + "/" +
-                                      HostTC->getTriple().normalize()];
+          auto &DeviceTC =
+              ToolChains[NormalizedName + "/" +
+                      HostTC->getTriple().normalize()];
           if (!DeviceTC) {
             if (TT.isNVPTX())
               DeviceTC = std::make_unique<toolchains::CudaToolChain>(
@@ -1186,9 +1160,8 @@ void Driver::CreateOffloadingDeviceToolChains(Compilation &C,
         // Each value of -fopenmp-targets gets instance of offload toolchain
         C.addOffloadDeviceToolChain(TC, Action::OFK_OpenMP);
       } // end foreach openmp target
-    }   // end has openmp offload targets
+    } // end has openmp offload targets
   }
-
   //
   // TODO: Add support for other offloading programming models here.
   //
@@ -1697,11 +1670,11 @@ Compilation *Driver::BuildCompilation(ArrayRef<const char *> ArgList) {
   }
 
   // Force -parallel-jobs=1 when verbose is set to avoid corrupted output
-  if (Args.hasArg(options::OPT_v))
-    setNumberOfParallelJobs(1);
-  else
-    setNumberOfParallelJobs(
-        getLastArgIntValue(Args, options::OPT_parallel_jobs_EQ, 1, Diags));
+  //if (Args.hasArg(options::OPT_v))
+  //  setNumberOfParallelJobs(1);
+  //else
+  //  setNumberOfParallelJobs(
+  //      getLastArgIntValue(Args, options::OPT_parallel_jobs_EQ, 1, Diags));
 
   // Remove existing compilation database so that each job can append to it.
   if (Arg *A = Args.getLastArg(options::OPT_MJ))

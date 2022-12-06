@@ -593,14 +593,14 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     }
   }
 
-  // Add any kitsune-centric runtime libraries. 
-  getToolChain().AddKitsuneLibArgs(Args, CmdArgs);
-  
+  // Add any kitsune-centric runtime libraries.
+  //getToolChain().AddKitsuneLibArgs(Args, CmdArgs);
+
   addCSIRuntime(ToolChain, Args, CmdArgs);
   addCilktoolRuntime(ToolChain, Args, CmdArgs);
 
   ToolChain.AddTapirRuntimeLibArgs(Args, CmdArgs);
-  
+
   if (D.CCCIsCXX() &&
       !Args.hasArg(options::OPT_nostdlib, options::OPT_nodefaultlibs,
                    options::OPT_r)) {

@@ -14098,6 +14098,15 @@ static bool isShuffleFoldableLoad(SDValue V) {
          ISD::isNON_EXTLoad(peekThroughOneUseBitcasts(V).getNode());
 }
 
+template<typename T>
+static bool isSoftFP16(T VT, const X86Subtarget &Subtarget) {
+  return VT.getScalarType() == MVT::f16 && !Subtarget.hasFP16();
+}
+
+template<typename T>
+bool X86TargetLowering::isSoftFP16(T VT) const {
+  return ::isSoftFP16(VT, Subtarget);
+}
 /// Try to lower insertion of a single element into a zero vector.
 ///
 /// This is a common pattern that we have especially efficient patterns to lower
@@ -14108,6 +14117,9 @@ static SDValue lowerShuffleAsElementInsertion(
     SelectionDAG &DAG) {
   MVT ExtVT = VT;
   MVT EltVT = VT.getVectorElementType();
+
+  if (isSoftFP16(EltVT, Subtarget))
+    return SDValue();
 
   int V2Index =
       find_if(Mask, [&Mask](int M) { return M >= (int)Mask.size(); }) -
@@ -19415,6 +19427,15 @@ SDValue X86TargetLowering::LowerVSELECT(SDValue Op, SelectionDAG &DAG) const {
   SDValue LHS = Op.getOperand(1);
   SDValue RHS = Op.getOperand(2);
 
+  SDLoc dl(Op);
+  MVT VT = Op.getSimpleValueType();
+  if (isSoftFP16(VT)) {
+    MVT NVT = VT.changeVectorElementTypeToInteger();
+    return DAG.getBitcast(VT, DAG.getNode(ISD::VSELECT, dl, NVT, Cond,
+                                          DAG.getBitcast(NVT, LHS),
+                                          DAG.getBitcast(NVT, RHS)));
+  }
+
   // A vselect where all conditions and data are constants can be optimized into
   // a single vector load by SelectionDAGLegalize::ExpandBUILD_VECTOR().
   if (ISD::isBuildVectorOfConstantSDNodes(Cond.getNode()) &&
@@ -19438,8 +19459,6 @@ SDValue X86TargetLowering::LowerVSELECT(SDValue Op, SelectionDAG &DAG) const {
   if (!Subtarget.hasSSE41())
     return SDValue();
 
-  SDLoc dl(Op);
-  MVT VT = Op.getSimpleValueType();
   unsigned EltSize = VT.getScalarSizeInBits();
   unsigned NumElts = VT.getVectorNumElements();
 
@@ -20827,6 +20846,45 @@ static SDValue lowerINT_TO_FP_vXi64(SDValue Op, SelectionDAG &DAG,
   return Cvt;
 }
 
+static SDValue promoteXINT_TO_FP(SDValue Op, SelectionDAG &DAG) {
+  bool IsStrict = Op->isStrictFPOpcode();
+  SDValue Src = Op.getOperand(IsStrict ? 1 : 0);
+  SDValue Chain = IsStrict ? Op->getOperand(0) : DAG.getEntryNode();
+  MVT VT = Op.getSimpleValueType();
+  MVT NVT = VT.isVector() ? VT.changeVectorElementType(MVT::f32) : MVT::f32;
+  SDLoc dl(Op);
+
+  SDValue Rnd = DAG.getIntPtrConstant(0, dl);
+  if (IsStrict)
+    return DAG.getNode(
+        ISD::STRICT_FP_ROUND, dl, {VT, MVT::Other},
+        {Chain,
+         DAG.getNode(Op.getOpcode(), dl, {NVT, MVT::Other}, {Chain, Src}),
+         Rnd});
+  return DAG.getNode(ISD::FP_ROUND, dl, VT,
+                     DAG.getNode(Op.getOpcode(), dl, NVT, Src), Rnd);
+}
+
+static bool isLegalConversion(MVT VT, bool IsSigned,
+                              const X86Subtarget &Subtarget) {
+  if (VT == MVT::v4i32 && Subtarget.hasSSE2() && IsSigned)
+    return true;
+  if (VT == MVT::v8i32 && Subtarget.hasAVX() && IsSigned)
+    return true;
+  if (Subtarget.hasVLX() && (VT == MVT::v4i32 || VT == MVT::v8i32))
+    return true;
+  if (Subtarget.useAVX512Regs()) {
+    if (VT == MVT::v16i32)
+      return true;
+    if (VT == MVT::v8i64 && Subtarget.hasDQI())
+      return true;
+  }
+  if (Subtarget.hasDQI() && Subtarget.hasVLX() &&
+      (VT == MVT::v2i64 || VT == MVT::v4i64))
+    return true;
+  return false;
+}
+
 SDValue X86TargetLowering::LowerSINT_TO_FP(SDValue Op,
                                            SelectionDAG &DAG) const {
   bool IsStrict = Op->isStrictFPOpcode();
@@ -20836,6 +20894,11 @@ SDValue X86TargetLowering::LowerSINT_TO_FP(SDValue Op,
   MVT SrcVT = Src.getSimpleValueType();
   MVT VT = Op.getSimpleValueType();
   SDLoc dl(Op);
+
+  if (isSoftFP16(VT))
+    return promoteXINT_TO_FP(Op, DAG);
+  else if (isLegalConversion(SrcVT, true, Subtarget))
+    return Op;
 
   if (Subtarget.isTargetWin64() && SrcVT == MVT::i128)
     return LowerWin64_INT128_TO_FP(Op, DAG);
@@ -21335,6 +21398,11 @@ SDValue X86TargetLowering::LowerUINT_TO_FP(SDValue Op,
 
   if (DstVT == MVT::f128)
     return SDValue();
+
+  if (isSoftFP16(DstVT))
+    return promoteXINT_TO_FP(Op, DAG);
+  else if (isLegalConversion(SrcVT, false, Subtarget))
+    return Op;
 
   if (DstVT.isVector())
     return lowerUINT_TO_FP_vec(Op, DAG, Subtarget);
@@ -22156,6 +22224,18 @@ SDValue X86TargetLowering::LowerFP_TO_INT(SDValue Op, SelectionDAG &DAG) const {
   SDLoc dl(Op);
 
   SDValue Res;
+  if (isSoftFP16(SrcVT)) {
+    MVT NVT = VT.isVector() ? VT.changeVectorElementType(MVT::f32) : MVT::f32;
+    if (IsStrict)
+      return DAG.getNode(Op.getOpcode(), dl, {VT, MVT::Other},
+                         {Chain, DAG.getNode(ISD::STRICT_FP_EXTEND, dl,
+                                             {NVT, MVT::Other}, {Chain, Src})});
+    return DAG.getNode(Op.getOpcode(), dl, VT,
+                       DAG.getNode(ISD::FP_EXTEND, dl, NVT, Src));
+  } else if (isTypeLegal(SrcVT) && isLegalConversion(VT, IsSigned, Subtarget)) {
+    return Op;
+  }
+
   if (VT.isVector()) {
     if (VT == MVT::v2i1 && SrcVT == MVT::v2f64) {
       MVT ResVT = MVT::v4i32;
@@ -22564,7 +22644,7 @@ X86TargetLowering::LowerFP_TO_INT_SAT(SDValue Op, SelectionDAG &DAG) const {
 
   // This code is only for floats and doubles. Fall back to generic code for
   // anything else.
-  if (!isScalarFPTypeInSSEReg(SrcVT))
+  if (!isScalarFPTypeInSSEReg(SrcVT) ||  isSoftFP16(SrcVT))
     return SDValue();
 
   EVT SatVT = cast<VTSDNode>(Node->getOperand(1))->getVT();
@@ -24038,6 +24118,8 @@ static SDValue LowerVSETCC(SDValue Op, const X86Subtarget &Subtarget,
     MVT EltVT = Op0.getSimpleValueType().getVectorElementType();
     assert(EltVT == MVT::f16 || EltVT == MVT::f32 || EltVT == MVT::f64);
 #endif
+    if (isSoftFP16(EltVT, Subtarget))
+      return SDValue();
 
     bool IsSignaling = Op.getOpcode() == ISD::STRICT_FSETCCS;
     SDValue Chain = IsStrict ? Op.getOperand(0) : SDValue();
@@ -24599,6 +24681,9 @@ SDValue X86TargetLowering::LowerSETCC(SDValue Op, SelectionDAG &DAG) const {
   ISD::CondCode CC =
       cast<CondCodeSDNode>(Op.getOperand(IsStrict ? 3 : 2))->get();
 
+  if (isSoftFP16(Op0.getValueType()))
+    return SDValue();
+
   // Handle f128 first, since one possible outcome is a normal integer
   // comparison which gets handled by emitFlagsForSetcc.
   if (Op0.getValueType() == MVT::f128) {
@@ -24789,6 +24874,13 @@ SDValue X86TargetLowering::LowerSELECT(SDValue Op, SelectionDAG &DAG) const {
   MVT VT = Op1.getSimpleValueType();
   SDValue CC;
 
+  if (isSoftFP16(VT)) {
+    MVT NVT = VT.changeTypeToInteger();
+    return DAG.getBitcast(VT, DAG.getNode(ISD::SELECT, DL, NVT, Cond,
+                                          DAG.getBitcast(NVT, Op1),
+                                          DAG.getBitcast(NVT, Op2)));
+  }
+
   // Lower FP selects into a CMP/AND/ANDN/OR sequence when the necessary SSE ops
   // are available or VBLENDV if AVX is available.
   // Otherwise FP cmovs get lowered into a less efficient branch sequence later.
@@ -24853,7 +24945,8 @@ SDValue X86TargetLowering::LowerSELECT(SDValue Op, SelectionDAG &DAG) const {
     return DAG.getNode(X86ISD::SELECTS, DL, VT, Cmp, Op1, Op2);
   }
 
-  if (Cond.getOpcode() == ISD::SETCC) {
+  if (Cond.getOpcode() == ISD::SETCC &&
+      !isSoftFP16(Cond.getOperand(0).getSimpleValueType())) {
     if (SDValue NewCond = LowerSETCC(Cond, DAG)) {
       Cond = NewCond;
       // If the condition was updated, it's possible that the operands of the
@@ -25082,7 +25175,7 @@ SDValue X86TargetLowering::LowerSELECT(SDValue Op, SelectionDAG &DAG) const {
   // condition is true.
   SDValue Ops[] = { Op2, Op1, CC, Cond };
   return DAG.getNode(X86ISD::CMOV, DL, Op.getValueType(), Ops);
-}
+  }
 
 static SDValue LowerSIGN_EXTEND_Mask(SDValue Op,
                                      const X86Subtarget &Subtarget,
@@ -25531,8 +25624,10 @@ SDValue X86TargetLowering::LowerBRCOND(SDValue Op, SelectionDAG &DAG) const {
   SDValue Dest  = Op.getOperand(2);
   SDLoc dl(Op);
 
+  // Bail out when we don't have native compare instructions.
   if (Cond.getOpcode() == ISD::SETCC &&
-      Cond.getOperand(0).getValueType() != MVT::f128) {
+      Cond.getOperand(0).getValueType() != MVT::f128 &&
+      !isSoftFP16(Cond.getOperand(0).getValueType())) {
     SDValue LHS = Cond.getOperand(0);
     SDValue RHS = Cond.getOperand(1);
     ISD::CondCode CC = cast<CondCodeSDNode>(Cond.getOperand(2))->get();
@@ -44649,7 +44744,7 @@ static SDValue combineSelect(SDNode *N, SelectionDAG &DAG,
   }
 
   // Early exit check
-  if (!TLI.isTypeLegal(VT))
+  if (!TLI.isTypeLegal(VT) ||  isSoftFP16(VT, Subtarget))
     return SDValue();
 
   if (SDValue V = combineVSelectWithAllOnesOrZeros(N, DAG, DCI, Subtarget))
