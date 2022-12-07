@@ -1152,16 +1152,18 @@ HipABIOutputFile HipABI::createBundleFile() {
   opt::ArgStringList BundleArgList;
   BundleArgList.push_back(Bundler->c_str());
   BundleArgList.push_back("-type=o");
-  std::string input_args = "-input=/dev/null," +
-                           LinkedObjFile->getFilename().str();
-  BundleArgList.push_back(input_args.c_str());
+  std::string input_arg0 = "-input=/dev/null";
+  BundleArgList.push_back(input_arg0.c_str());
+  std::string input_arg1 = "-input=" +
+                  LinkedObjFile->getFilename().str();
+  BundleArgList.push_back(input_arg1.c_str());
 
   std::string target_arg = "-targets=host-" + M.getTargetTriple() +
                            ",hipv4-" + KernelModule.getTargetTriple() +
                            "--" + GPUArch.c_str();
   BundleArgList.push_back(target_arg.c_str());
 
-  std::string output_arg = "--output=" + BundleFile->getFilename().str();
+  std::string output_arg = "-output=" + BundleFile->getFilename().str();
   BundleArgList.push_back(output_arg.c_str());
   BundleArgList.push_back(nullptr);
 

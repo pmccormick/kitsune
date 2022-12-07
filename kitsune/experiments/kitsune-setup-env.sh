@@ -7,11 +7,11 @@ export ROCM_PATH=/opt/rocm
 export HIP_PATH=$ROCM_PATH/hip
 export KITSUNE_SRC=/home/pat/projects/kitsune-15.x
 export KITSUNE_PREFIX=/projects/kitsune/15.x
-export KITSUNE_BUILD=$KITSUNE_HOME/build
+export KITSUNE_BUILD=$KITSUNE_SRC/build
 
-export LD_LIBRARY_PATH=$KITSUNE_PREFIX/lib
-export LIBRARY_PATH=$KITSUNE_PREFIX/lib
-export PATH=$KITSUNE_PREFIX/bin:$PATH:$CUDA_HOME/bin
+export LD_LIBRARY_PATH=$KITSUNE_PREFIX/lib:$LD_LIBRARY_PATH
+export LIBRARY_PATH=$KITSUNE_PREFIX/lib:$LIBRARY_PATH
+#export PATH=$KITSUNE_PREFIX/bin:$PATH:$CUDA_HOME/bin
 
-cd $KITSUNE_HOME
+cd $KITSUNE_SRC
 
