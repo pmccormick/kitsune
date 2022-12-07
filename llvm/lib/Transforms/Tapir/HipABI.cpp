@@ -1149,7 +1149,20 @@ HipABIOutputFile HipABI::createBundleFile() {
   if ((EC = Bundler.getError()))
     report_fatal_error("'clang-offload-bundler' not found! "
                        "check your path?");
+
+  // "/opt/rocm-5.3.0/llvm/bin/clang-offload-bundler" -unbundle -type=a 
+  //        -input=/opt/rocm-5.3.0/llvm/bin/../lib/clang/15.0.0/lib/linux/libclang_rt.builtins-x86_64.a 
+  //        -targets=hip-amdgcn-amd-amdhsa-gfx90a -output=/tmp/libbc-clang_rt.builtins-x86_64-amdgcn-gfx90a-dfed04.a 
+  //        -allow-missing-bundles -hip-openmp-compatible
   opt::ArgStringList BundleArgList;
+  std::string offload_target = "-targets=hipv4-amdgcn-amd-amdhsa" + 
+          KernelModule.getTargetTriple() + "--" + GPUArch.c_str();
+  BundleArgList.push_back(Bundler->c_str());
+  BundleArgList.push_back("-unbundle");
+  BundleArgList.push_back(offload_target.c_str());
+  BundleArgList.push_back("-type=a");
+  BundleArgList.push_back("-input=");
+
   BundleArgList.push_back(Bundler->c_str());
   BundleArgList.push_back("-type=o");
   std::string input_arg0 = "-input=/dev/null";

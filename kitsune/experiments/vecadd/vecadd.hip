@@ -65,6 +65,7 @@ int main(int argc, char *argv[]) {
   hipLaunchKernelGGL(VectorAdd, blocksPerGrid, threadsPerBlock, 0, 0, A, B, C, size);
   hipDeviceSynchronize();
   double ktime = k.seconds(); 
+  fprintf(stdout, "kernel runtime: %7lg\n", ktime);
 
   // Sanity check the results...
   size_t error_count = 0;
