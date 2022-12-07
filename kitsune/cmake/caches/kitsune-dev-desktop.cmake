@@ -29,7 +29,7 @@ set(LLVM_PARALLEL_LINK_JOBS 4 CACHE STRING "")
 
 # note: hip requires lld... 
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;lld;lldb;mlir;openmp 
+  clang;clang-tools-extra;lld;lldb;mlir
   CACHE STRING "")
 # note: hip requires compiler-rt
 set(LLVM_ENABLE_RUNTIMES 
