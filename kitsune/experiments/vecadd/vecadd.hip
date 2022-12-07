@@ -63,6 +63,7 @@ int main(int argc, char *argv[]) {
   int blocksPerGrid = (size + threadsPerBlock - 1) / threadsPerBlock;
   kitsune::timer k;
   hipLaunchKernelGGL(VectorAdd, blocksPerGrid, threadsPerBlock, 0, 0, A, B, C, size);
+  hipDeviceSynchronize();
   double ktime = k.seconds(); 
 
   // Sanity check the results...
