@@ -1077,9 +1077,64 @@ HipABIOutputFile HipABI::createBundleFile() {
     FnPassMgr.run(Fn);
   PassMgr.run(KernelModule);
 
+  std::string ErrMsg;
+  bool ExecFailed;
+
   // We should now have an object file for the next steps of
   // getting the linked and bundled files created with the
   // clang bundler...
+  // Extract/unbundle code from the builtins so we can use it in the
+  // transformed HIP target code.
+  //
+  // "/opt/rocm-5.3.0/llvm/bin/clang-offload-bundler" -unbundle -type=a
+  //        -input=/opt/rocm-5.3.0/llvm/bin/../lib/clang/15.0.0/lib/linux/libclang_rt.builtins-x86_64.a
+  //        -targets=hip-amdgcn-amd-amdhsa-gfx90a
+  //        -output=/tmp/libbc-clang_rt.builtins-x86_64-amdgcn-gfx90a-dfed04.a
+  //        -allow-missing-bundles -hip-openmp-compatible
+  auto Bundler = sys::findProgramByName("clang-offload-bundler");
+  if ((EC = Bundler.getError()))
+    report_fatal_error("'clang-offload-bundler' not found! "
+                       "check your path?");
+  opt::ArgStringList BundleArgList;
+  std::string offload_target = "-targets=hipv4-amdgcn-amd-amdhsa" +
+                               KernelModule.getTargetTriple() + "--" +
+                               GPUArch.c_str();
+  std::string builtins_path =
+      "/opt/rocm-5.3.0/llvm/bin/../lib/clang/15.0.0/lib/linux/";
+  std::string builtin_lib = "libclang_rt.builtins-x86_64.a";
+  std::string offload_input = "-input=";
+  offload_input = offload_input + builtins_path + builtin_lib;
+  std::string offload_output = "-output=";
+  std::string builtin_output = GPUArch.c_str() + std::string("_") + builtin_lib;
+  offload_output = offload_output + builtin_output;
+  BundleArgList.push_back(Bundler->c_str());
+  BundleArgList.push_back("-unbundle");
+  BundleArgList.push_back("-allow-missing-bundles");
+  BundleArgList.push_back(offload_target.c_str());
+  BundleArgList.push_back("-type=a");
+  BundleArgList.push_back(offload_input.c_str());
+  BundleArgList.push_back(offload_output.c_str());
+  BundleArgList.push_back(nullptr);
+  auto BundleArgs = toStringRefArray(BundleArgList.data());
+  LLVM_DEBUG(dbgs() << "hipabi: clang offload bundler builtins command line:\n";
+             unsigned c = 0; for (auto dbg_arg
+                                  : BundleArgs) {
+               dbgs() << "\t" << c << ". " << dbg_arg << "\n";
+               c++;
+             } dbgs() << "\n\n";);
+
+  int ExecStat = sys::ExecuteAndWait(*Bundler, BundleArgs, None, {},
+                                 0, // secs to wait. 0 is unlimited.
+                                 0, // memory limit. 0 is unlimited.
+                                 &ErrMsg, &ExecFailed);
+  if (ExecFailed)
+    report_fatal_error("hipabi: 'clang-offload-bundler' execution failed!");
+
+  if (ExecStat != 0)
+    report_fatal_error("hipabi: 'clang-offload-bundler' failure - " +
+                       StringRef(ErrMsg));
+
+  BundleArgList.clear();
 
   auto LLDExe = sys::findProgramByName("ld.lld");
   if ((EC = LLDExe.getError()))
@@ -1120,6 +1175,7 @@ HipABIOutputFile HipABI::createBundleFile() {
   LDDArgList.push_back("-o");
   std::string linked_objfile(LinkedObjFile->getFilename().str().c_str());
   LDDArgList.push_back(linked_objfile.c_str());
+  LDDArgList.push_back(offload_output.c_str());
   std::string objfilename (ObjFile->getFilename().str().c_str());
   LDDArgList.push_back(objfilename.c_str());
   LDDArgList.push_back(nullptr);
@@ -1134,9 +1190,7 @@ HipABIOutputFile HipABI::createBundleFile() {
              dbgs() << "\n\n";
   );
 
-  std::string ErrMsg;
-  bool ExecFailed;
-  int ExecStat = sys::ExecuteAndWait(*LLDExe, LDDArgs, None, {},
+  ExecStat = sys::ExecuteAndWait(*LLDExe, LDDArgs, None, {},
                                      0, // secs to wait -- 0 --> unlimited.
                                      0, // memory limit -- 0 --> unlimited.
                                      &ErrMsg, &ExecFailed);
@@ -1144,59 +1198,6 @@ HipABIOutputFile HipABI::createBundleFile() {
     report_fatal_error("hipabi: 'ldd' execution failed!");
   if (ExecStat != 0)
     report_fatal_error("hipabi: 'ldd' failure - " + StringRef(ErrMsg));
-
-  auto Bundler = sys::findProgramByName("clang-offload-bundler");
-  if ((EC = Bundler.getError()))
-    report_fatal_error("'clang-offload-bundler' not found! "
-                       "check your path?");
-
-  // Extract/unbundle code from the builtins so we can use it in the
-  // transformed HIP target code.
-  //
-  // "/opt/rocm-5.3.0/llvm/bin/clang-offload-bundler" -unbundle -type=a
-  //        -input=/opt/rocm-5.3.0/llvm/bin/../lib/clang/15.0.0/lib/linux/libclang_rt.builtins-x86_64.a
-  //        -targets=hip-amdgcn-amd-amdhsa-gfx90a -output=/tmp/libbc-clang_rt.builtins-x86_64-amdgcn-gfx90a-dfed04.a
-  //        -allow-missing-bundles -hip-openmp-compatible
-  opt::ArgStringList BundleArgList;
-  std::string offload_target = "-targets=hipv4-amdgcn-amd-amdhsa" +
-          KernelModule.getTargetTriple() + "--" + GPUArch.c_str();
-  std::string builtins_path =
-      "/opt/rocm-5.3.0/llvm/bin/../lib/clang/15.0.0/lib/linux/";
-  std::string builtin_lib =
-      "libclang_rt.builtins-x86_64.a";
-  std::string offload_input = "-input=";
-  offload_input = offload_input + builtins_path + builtin_lib;
-  std::string offload_output = "-output=";
-  std::string builtin_output = GPUArch.c_str() + std::string("_") + builtin_lib;
-  BundleArgList.push_back(Bundler->c_str());
-  BundleArgList.push_back("-unbundle");
-  BundleArgList.push_back("-allow-missing-bundles");
-  BundleArgList.push_back(offload_target.c_str());
-  BundleArgList.push_back("-type=a");
-  BundleArgList.push_back(offload_input.c_str());
-  BundleArgList.push_back(offload_output.c_str());
-  BundleArgList.push_back(nullptr);
-  auto BundleArgs = toStringRefArray(BundleArgList.data());
-  LLVM_DEBUG(dbgs() << "hipabi: clang offload bundler builtins command line:\n";
-             unsigned c = 0; for (auto dbg_arg
-                                  : BundleArgs) {
-               dbgs() << "\t" << c << ". " << dbg_arg << "\n";
-               c++;
-             } dbgs() << "\n\n";);
-
-  ExecStat = sys::ExecuteAndWait(*Bundler, BundleArgs, None, {},
-                                 0, // secs to wait. 0 is unlimited.
-                                 0, // memory limit. 0 is unlimited.
-                                 &ErrMsg, &ExecFailed);
-  if (ExecFailed)
-    report_fatal_error("hipabi: 'clang-offload-bundler' execution failed!");
-
-  if (ExecStat != 0)
-    report_fatal_error("hipabi: 'clang-offload-bundler' failure - " +
-                       StringRef(ErrMsg));
-
-  BundleArgList.clear();
-
 
   BundleArgList.push_back(Bundler->c_str());
   BundleArgList.push_back("-type=o");
