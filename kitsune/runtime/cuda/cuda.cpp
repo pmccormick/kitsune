@@ -282,9 +282,16 @@ extern "C" {
 
 bool __kitrt_cuInit() {
 
-  if (_kitrt_cuIsInitialized)
+  if (_kitrt_cuIsInitialized) {
+    fprintf(stderr, "kitrt: warning, multiple cuda initialization paths!\n");    
     return true;
+  }
 
+  if (!__kitrt_init()) {  
+    fprintf(stderr, "kitrt: failed to initialize kitsunne runtime.\n");
+    abort();
+  }
+  
   if (!__kitrt_cuLoadDLSyms()) {
     fprintf(stderr, "kitrt: unable to resolve dynamic symbols for CUDA.\n");
     fprintf(stderr, "       check enviornment settings and installation.\n");

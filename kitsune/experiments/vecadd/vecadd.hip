@@ -21,7 +21,7 @@ void random_fill(float *data, size_t N) {
 __global__ void VectorAdd(float *A, float *B, float *C, size_t N) {
   size_t i = blockDim.x * blockIdx.x + threadIdx.x;
   if (i < N)
-    C[i] = A[i] + B[i];
+    C[i] = sqrtf(A[i]) + B[i];
 }
 
 
@@ -30,14 +30,9 @@ int main(int argc, char *argv[]) {
   if (argc > 1 )
     size = atol(argv[1]);
   fprintf(stdout, "problem size: %ld\n", size);
-
-  hipDeviceProp_t devProp;
-  hipGetDeviceProperties(&devProp, 0);
-  std::cout << " System minor " << devProp.minor << std::endl;
-  std::cout << " System major " << devProp.major << std::endl;
-  std::cout << " agent prop name " << devProp.name << std::endl;
-
+  hipInit(0);
   kitsune::timer r;
+  r.reset();
 
   hipError_t err = hipSuccess;
   float *A, *B, *C;
@@ -62,10 +57,21 @@ int main(int argc, char *argv[]) {
   int threadsPerBlock = 256;
   int blocksPerGrid = (size + threadsPerBlock - 1) / threadsPerBlock;
   kitsune::timer k;
-  hipLaunchKernelGGL(VectorAdd, blocksPerGrid, threadsPerBlock, 0, 0, A, B, C, size);
-  hipDeviceSynchronize();
+  fprintf(stdout, "start test\n");
+  k.reset();
+  kitsune::timer f;
+  for(int i = 0; i < 20; i++) {
+    f.reset();
+    hipMemPrefetchAsync(A, sizeof(float) *  size, 0, NULL);
+    hipMemPrefetchAsync(B, sizeof(float) *  size, 0, NULL);
+    hipMemPrefetchAsync(C, sizeof(float) *  size, 0, NULL);
+    hipLaunchKernelGGL(VectorAdd, blocksPerGrid, threadsPerBlock, 0, 0, A, B, C, size);
+    hipDeviceSynchronize();
+    double ftime = f.seconds(); 
+    fprintf(stdout, "  runtime: %7lg\n", ftime);
+  }
   double ktime = k.seconds(); 
-  fprintf(stdout, "kernel runtime: %7lg\n", ktime);
+  fprintf(stdout, "kernel runtime: %7lg\n", ktime/20.0);
 
   // Sanity check the results...
   size_t error_count = 0;
@@ -74,6 +80,10 @@ int main(int argc, char *argv[]) {
     if (C[i] != sum)
       error_count++;
   }
+
+  hipFree(A);
+  hipFree(B);
+  hipFree(C);  
 
   if (error_count != 0)
     printf("bad result!\n");

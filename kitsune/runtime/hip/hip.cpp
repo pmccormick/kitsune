@@ -223,6 +223,11 @@ bool __kitrt_hipInit() {
     return true;
   }
 
+  if (!__kitrt_init()) {  
+    fprintf(stderr, "kitrt: failed to initialize kitsunne runtime.\n");
+    abort();
+  }
+  
   if (!__kitrt_hipLoadDLSyms()) {
     fprintf(stderr, "kitrt: unable to resolve dynamic symbols for HIP.\n");
     fprintf(stderr, "       check environment settings and installation.\n");

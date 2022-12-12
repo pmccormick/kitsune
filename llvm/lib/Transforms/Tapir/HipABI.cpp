@@ -647,6 +647,7 @@ Function *HipLoop::resolveDeviceFunction(Function *Fn) {
     return KernFn;
   }
   Function *DevFn = nullptr;
+  /*
   const std::string AMDGCN_PREFIX = "llvm.amdgcn.";
   std::string IntrinsicName = AMDGCN_PREFIX + Fn->getName().str();
   Intrinsic::ID IntrinsicID = Fn->lookupIntrinsicID(IntrinsicName);
@@ -655,6 +656,7 @@ Function *HipLoop::resolveDeviceFunction(Function *Fn) {
     LLVM_DEBUG(dbgs() << "\tfound device intrinsic: "
                       << IntrinsicName << "()\n");
   }
+  */
   return DevFn;
 }
 
@@ -1096,8 +1098,7 @@ HipABIOutputFile HipABI::createBundleFile() {
     report_fatal_error("'clang-offload-bundler' not found! "
                        "check your path?");
   opt::ArgStringList BundleArgList;
-  std::string offload_target = "-targets=hipv4-amdgcn-amd-amdhsa" +
-                               KernelModule.getTargetTriple() + "--" +
+  std::string offload_target = std::string("-targets=hip-amdgcn-amd-amdhsa-") +
                                GPUArch.c_str();
   std::string builtins_path =
       "/opt/rocm-5.3.0/llvm/bin/../lib/clang/15.0.0/lib/linux/";
@@ -1110,6 +1111,7 @@ HipABIOutputFile HipABI::createBundleFile() {
   BundleArgList.push_back(Bundler->c_str());
   BundleArgList.push_back("-unbundle");
   BundleArgList.push_back("-allow-missing-bundles");
+  BundleArgList.push_back("-hip-openmp-compatible");
   BundleArgList.push_back(offload_target.c_str());
   BundleArgList.push_back("-type=a");
   BundleArgList.push_back(offload_input.c_str());
@@ -1144,13 +1146,15 @@ HipABIOutputFile HipABI::createBundleFile() {
   opt::ArgStringList LDDArgList;
 
   LDDArgList.push_back(LLDExe->c_str());
-  std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch +
-            ":sramecc+:xnack+:tgsplit+";
+  std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch;
   LDDArgList.push_back(mcpu_arg.c_str());
-  LDDArgList.push_back("-plugin-opt=-mattr=+tgsplit");
   LDDArgList.push_back("-shared");
+  LDDArgList.push_back("--no-undefined");
   LDDArgList.push_back("-plugin-opt=-amdgpu-internalize-symbols");
-
+  LDDArgList.push_back("-plugin-opt=no-opaque-pointers");
+  LDDArgList.push_back("-plugin-opt=-mattr=-xnack");
+  LDDArgList.push_back("-plugin-opt=-amdgpu-early-inline-all=true");
+  LDDArgList.push_back("-plugin-opt=-amdgpu-function-calls=false");
   std::string optlevel_arg = "-plugin-opt=";
   switch (OptLevel) {
     case 0:
@@ -1170,12 +1174,10 @@ HipABIOutputFile HipABI::createBundleFile() {
                                 __FILE__, __LINE__);
   }
   LDDArgList.push_back(optlevel_arg.c_str());
-  LDDArgList.push_back("-plugin-opt=-amdgpu-early-inline-all=true");
-  LDDArgList.push_back("-plugin-opt=-amdgpu-function-calls=false");
   LDDArgList.push_back("-o");
   std::string linked_objfile(LinkedObjFile->getFilename().str().c_str());
   LDDArgList.push_back(linked_objfile.c_str());
-  LDDArgList.push_back(offload_output.c_str());
+  LDDArgList.push_back(builtin_output.c_str());
   std::string objfilename (ObjFile->getFilename().str().c_str());
   LDDArgList.push_back(objfilename.c_str());
   LDDArgList.push_back(nullptr);
@@ -1206,6 +1208,7 @@ HipABIOutputFile HipABI::createBundleFile() {
   std::string input_arg1 = "-input=" +
                   LinkedObjFile->getFilename().str();
   BundleArgList.push_back(input_arg1.c_str());
+  BundleArgList.push_back("-bundle-align=4096");
 
   std::string target_arg = "-targets=host-" + M.getTargetTriple() +
                            ",hipv4-" + KernelModule.getTargetTriple() +

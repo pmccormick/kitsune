@@ -25,7 +25,7 @@ euler3d-forall.opencilk.${host_arch}: euler3d-forall.cpp
 euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
 	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 euler3d-forall.hip.${host_arch}: euler3d-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+	/usr/bin/time ${clangxx} -v -mllvm -debug-only="hip-abi" ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 #
 #############################
 

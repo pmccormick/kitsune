@@ -16,6 +16,9 @@ endif
 all: ${targets}
 
 
+#hip_junk=-idirafter /opt/rocm/include -include __clang_hip_runtime_wrapper.h -isystem /opt/rocm-5.3.0/llvm/lib/clang/15.0.0/include/.. -isystem /opt/rocm/hsa/include -isystem /opt/rocm/hip/include
+hip_junk=
+
 #############################
 # Kitsune+Tapir versions.
 vecadd-forall.opencilk.${host_arch}: vecadd-forall.cpp 
@@ -24,7 +27,7 @@ vecadd-forall.opencilk.${host_arch}: vecadd-forall.cpp
 vecadd-forall.cuda.${host_arch}: vecadd-forall.cpp
 	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 vecadd-forall.hip.${host_arch}: vecadd-forall.cpp
-	/usr/bin/time ${clangxx} -v -mllvm -debug-only="hip-abi" ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+	/usr/bin/time ${clangxx} -v -mllvm -debug-only="hip-abi" ${cxx_flags} ${kitflags} ${tapir_hip_flags} ${hip_junk} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib -lclang_rt.builtins-x86_64
 # 
 #############################
 
