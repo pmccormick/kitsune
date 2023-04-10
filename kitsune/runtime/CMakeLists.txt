@@ -80,7 +80,6 @@ if (KITRT_ENABLE_HIP)
     hip/hip.cpp
     hip/llvm-hip.cpp)
   list(APPEND KITRT_LINK_LIBS hip::host)
-
   add_subdirectory(hip)
 endif()
 

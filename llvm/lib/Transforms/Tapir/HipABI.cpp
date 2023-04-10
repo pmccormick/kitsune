@@ -75,42 +75,25 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "hipabi"
+#define DEBUG_TYPE "hipabi"  // support for -debug-only=hipabi 
 
 static const std::string HIPABI_PREFIX = "__hipabi";
 static const std::string HIPABI_KERNEL_NAME_PREFIX = HIPABI_PREFIX + ".kern.";
 
 // ---- HIP transformation-specific command line arguments.
 //
-// The transform has its own set of command line arguments that provide
-// additional functionality, debugging, etc.  As a reminder, these can
-// used in the form:
+//  Usage: -mllvm -hipabi-[option...]
 //
-//    -mllvm -hipabi-option[...]
-//
+
+// Select the target GPU/GCN architecture.
+// TODO: Checking here for a valid target string -- we will fail at some
+// point but not gracefully with malformed/unknown architectures.
 
 #ifndef _HIPABI_DEFAULT_ARCH
 #define _HIPABI_DEFAULT_ARCH "gfx90a"
 #endif
 
-//
-// TODO: Need to work on making sure we understand the nuances
-// here of address space selection.  In some cases, wrong address
-// spaces seem to cause crashes but in others they are performance
-// optimizaitons.  Some of the documentation details seem
-// incomplete.
-//
-// See https://llvm.org/docs/AMDGPUUsage.html#amdgpu-address-spaces-table.
-//
-static const unsigned GlobalAddrSpace = 1; // global virtual addresses.
-static const unsigned ConstAddrSpace = 4;  // indicates that the data will not
-                                           // change during the execution of the
-                                           // kernel.
-static const unsigned AllocaAddrSpace = 5; // "private" (scratch, 32-bit)
-
-// Select the target GPU/GCN architecture.
-// TODO: Checking here for a valid target string -- we will fail at some
-// point but not gracefully with malformed/unknown architectures.
+/// Target GPU architecture.
 static cl::opt<std::string> GPUArch(
     "hipabi-arch", cl::init(_HIPABI_DEFAULT_ARCH), cl::NotHidden,
     cl::desc("Target AMDGCN architecture. (default: #_HIPABI_DEFAULT_ARCH)"));
@@ -186,7 +169,26 @@ static cl::opt<unsigned> DefaultGrainSize(
     cl::desc("The default grainsize used by the transform "
              "when analysis fails to determine one. (default=1)"));
 
-// --- Local helper functions
+
+// --- Address spaces. 
+//
+// TODO: Need to work on making sure we understand the nuances
+// here for address space selection.  In some cases, wrong address
+// spaces seem to cause crashes, in others they are performance
+// optimizaitons, and sometimes they almost seem to be no-ops...
+// Some of the AMD documentation details seem incomplete.
+//
+//   See: https://llvm.org/docs/AMDGPUUsage.html#amdgpu-address-spaces-table.
+//
+static const unsigned GlobalAddrSpace = 1; // global virtual addresses.
+static const unsigned ConstAddrSpace  = 4; // indicates that the data will not
+                                           // change during the execution of the
+                                           // kernel.
+static const unsigned AllocaAddrSpace = 5; // "private" (scratch, 32-bit)
+
+
+
+// --- Some utility functions for helping during the transformation. 
 
 /// @brief Is the given function an AMD GPU kernel.
 /// @param F -- the Function to inspect.
@@ -379,8 +381,6 @@ void HipABI::transformConstants(Function *Fn) {
             for (Use &idx : GEP->indices())
               opt_vec.push_back(idx.get());
             ArrayRef<Value *> IdxList(opt_vec);
-            PointerType *NewPTy =
-                PointerType::getWithSamePointeeType(PTy, AddrSpace);
             Type *DestTy = GetElementPtrInst::getIndexedType(
                 GEP->getSourceElementType(), IdxList);
             assert(DestTy && "GEP indices invalid!");
@@ -501,7 +501,7 @@ static void transformForGCN(Function &F, Module &DevMod, Module &KernelModule) {
     }
   }
 
-  LLVM_DEBUG("\t\t\treplacing identifiied call instructions...\n");
+  LLVM_DEBUG(dbgs() << "\t\t\treplacing identifiied call instructions...\n");
   for (auto I : Replaced) {
     CallInst *CI = I.first;
     CallInst *NCI = I.second;
@@ -510,7 +510,7 @@ static void transformForGCN(Function &F, Module &DevMod, Module &KernelModule) {
     CI->eraseFromParent();
   }
 
-  LLVM_DEBUG("\t\t\treplacing identifiied alloca instructions...\n");
+  LLVM_DEBUG(dbgs() << "\t\t\treplacing identifiied alloca instructions...\n");
   for (auto I : AllocaReplaced) {
     AllocaInst *AI = I.first;
     AddrSpaceCastInst *AC = I.second;
@@ -632,7 +632,6 @@ Value *HipLoop::emitWorkItemId(IRBuilder<> &Builder, int ItemIndex, int Low,
   LLVMContext &Ctx = KernelModule.getContext();
   Type *Int32Ty = Type::getInt32Ty(Ctx);
   llvm::MDBuilder MDHelper(Ctx);
-  llvm::MDNode *RangeMD = MDHelper.createRange(APInt(64, Low), APInt(64, High));
   Constant *IndexVal = ConstantInt::get(Int32Ty, ItemIndex, ".x");
 
   std::string WIName = "threadIdx.";
@@ -1247,7 +1246,6 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     prefetchStream = ConstantPointerNull::get(VoidPtrTy);
   }
 
-  Type *Int32Ty = Type::getInt32Ty(Ctx);
   Type *Int64Ty = Type::getInt64Ty(Ctx);
   const DataLayout &DL = M.getDataLayout();
   StructType *KernelArgsTy = createKernelArgsType();
@@ -1310,7 +1308,6 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   Value *VPKernArgs = B.CreateBitCast(KernelArgs, VoidPtrTy);
   LLVM_DEBUG(dbgs() << "\tcreating kernel launch...\n");
   assert(KitHipLaunchFn && "no kitsune hip launch function!");
-  Value *ArgsVoidPtr = B.CreateBitCast(KernelArgs, VoidPtrTy);
   B.CreateCall(KitHipLaunchFn, {ProxyFBPtr, KNameParam, VPKernArgs, TCCI,
                                 prefetchStream, ArgsSize});
 }
@@ -1351,6 +1348,7 @@ HipABI::HipABI(Module &InputModule)
 
   llvm::CodeGenOpt::Level TMOptLevel;
   llvm::CodeModel::Model TMCodeModel = CodeModel::Model::Large;
+
   if (OptLevel == 0)
     TMOptLevel = CodeGenOpt::Level::None;
   else if (OptLevel == 1)
@@ -1646,7 +1644,7 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
       OptimizationLevel::O3,
   };
   OptimizationLevel optLevel = OptimizationLevel::O2;
-  if (OptLevel >= 0 && OptLevel <= 3)
+  if (OptLevel <= 3) // unsigned... 
     optLevel = optLevels[OptLevel];
   ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
   mpm.addPass(VerifierPass());
@@ -2037,11 +2035,12 @@ void HipABI::postProcessModule() {
     }
     puts->replaceAllUsesWith(printf);
   }
+
   // Do the final transformation step for the *device* functions
   // in the kernel module.  Note that we have already completed
   // the transformations for the outlined loops (the kernel functions)
   // so we skip them here...
-  Function *KFunc;
+  //Function *KFunc;
   for (Function &F : KernelModule) {
     LLVM_DEBUG(dbgs() << "\tdevice function: " << F.getName() << "() ");
     if (F.isDeclaration())
@@ -2051,7 +2050,7 @@ void HipABI::postProcessModule() {
       transformCallingConv(F);
       transformArguments(&F);
       transformConstants(&F);
-      KFunc = &F;
+      //KFunc = &F;
     } else {
       LLVM_DEBUG(dbgs() << "(transforming)\n");
       transformForGCN(F, *LibDeviceModule, KernelModule);
@@ -2122,7 +2121,7 @@ void HipABI::postProcessModule() {
         OptimizationLevel::O3,
     };
     OptimizationLevel optLevel = optLevels[OptLevel];
-    if (OptLevel >= 0 && OptLevel <= 3)
+    if (OptLevel <= 3) // unsigned... 
       optLevel = optLevels[OptLevel];
 
     ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);

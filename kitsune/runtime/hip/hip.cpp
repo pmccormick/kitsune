@@ -266,10 +266,8 @@ bool __kitrt_hipInit() {
     return true;
   }
 
-  if (_kitrt_enableXnack) {
-    putenv("HSA_XNACK=1");
-  }
-
+  if (_kitrt_enableXnack)
+    (void)setenv("HSA_XNACK", "1", 1);
 
   if (!__kitrt_hipLoadDLSyms()) {
     fprintf(stderr, "kitrt: unable to resolve dynamic symbols for HIP.\n");

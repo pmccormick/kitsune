@@ -65,11 +65,18 @@ extern "C" {
     void dealloc(T* array) {
       __kitrt_cuMemFree((void*)array);
     }
+  #else 
+    inline __attribute__((always_inline))
+    void *alloc(size_t total_bytes) {
+      return __kitrt_cuMemAllocManaged(total_bytes);
+    }
+
+    inline __attribute__((always_inline))
+    void dealloc(void *array) {
+      __kitrt_cuMemFree(array);
+    }
   #endif
-#endif // _tapir_cuda_target
-
-
-#if defined(_tapir_hip_target)
+#elif defined(_tapir_hip_target)
   #ifdef __cplusplus
     extern "C" void* __kitrt_hipMemAllocManaged(size_t);
     template <typename T>
@@ -83,13 +90,21 @@ extern "C" {
     void dealloc(T* array) {
       __kitrt_hipMemFree((void*)array);
     }
+  #else 
+    inline __attribute__((always_inline))
+    void *alloc(size_t total_bytes) {
+      return __kitrt_hipMemAllocManaged(total_bytes);
+    }
+
+    inline __attribute__((always_inline))
+    void dealloc(void *array) {
+       __kitrt_hipMemFree(array);
+    }
   #endif 
-#endif // _tapir_hip_target
-
-
-#if defined(_tapir_opencilk_target)
-#include <stdlib.h>
+#else 
+  // For CPU-side runtimes just use malloc... 
   #ifdef __cplusplus
+    #include <cstdlib>
     template <typename T>
     inline __attribute__((always_inline))
       T* alloc(size_t N) {
@@ -101,9 +116,18 @@ extern "C" {
     void dealloc(T* array) {
       free(array);
     }
-  #endif // __cplusplus
-#endif // _tapir_opencilk_target
+  #else 
+    #include <stdlib.h>
+    inline __attribute__((always_inline))
+    void *alloc(size_t total_bytes) {
+      return (void*)malloc(total_bytes);
+    }
 
+    inline __attribute__((always_inline))
+    void dealloc(T* array) {
+       free(array);
+    }
+  #endif // __cplusplus
+#endif // cpu targets
 
 #endif
-

@@ -1,4 +1,4 @@
-ifneq ($(CUDA_HOME),)
+ifneq ($(CUDA_PATH),)
   NVARCH?=sm_80
   cuda_prefix=$(CUDA_HOME)
   $(info cuda install prefix: ${cuda_prefix})

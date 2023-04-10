@@ -60,24 +60,16 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Vectorize.h"
 
-#include <fstream>
-#include <sstream>
-
 using namespace llvm;
 
+#define DEBUG_TYPE "cuabi"  // support for -debug-only=cudabi
 
-// REMINDER: You can use -mllvm -debug-only="cuabi" to get verbose output
-// during the transformation from Tapir to Cuda.
-#define DEBUG_TYPE "cuabi"
 static const std::string CUABI_PREFIX = "__cuabi";
+static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + ".kern.";
 
 // ---- CUDA transformation-specific command line arguments.
 //
-// The transform has its own set of command line arguments that provide
-// additional control and functionality, debugging, etc.  As a reminder,
-// these can be used in the form:
-//
-//   -mllvm -cuabi-option[...]
+//   Usage: -mllvm -cuabi-[option...]
 //
 
 // Select a specific target NVIDIA GPU architecture.
@@ -89,24 +81,31 @@ static const std::string CUABI_PREFIX = "__cuabi";
 // follows the trends of longer term CUDA support.  Although exposed here, we
 // have not tested 32-bit host support.
 //
-/// Selected target GPU architecture. Passed directly to ptxas.
-static cl::opt<std::string>
-    GPUArch("cuabi-arch", cl::init("sm_75"), cl::NotHidden,
-            cl::desc("Target GPU architecture for CUDA ABI transformation."
-                     "(default: sm_75)"));
+
+#ifndef _CUDAABI_DEFAULT_ARCH
+#define _CUDAABI_DEFAULT_ARCH "sm86"
+#endif
+
+/// Target GPU architecture.
+// This is handed to ptxas to do the codegen (i.e., use the same arch string).
+// We have only tested with SM_75 and later so YMMV with earlier targets.
+static cl::opt<std::string> GPUArch(
+    "cuabi-arch", cl::init(_CUDAABI_DEFAULT_ARCH), cl::NotHidden,
+    cl::desc("Target GPU architecture for CUDA ABI transformation."
+    "(default: " _CUDAABI_DEFAULT_ARCH ")"));
 
 /// Select 32- vs. 64-bit host architecture. Passed directly to ptxas.
+// TODO: This can be deprecated for our use cases. 
 static cl::opt<std::string>
-    HostMArch("cuabi-march", cl::init("64"), cl::NotHidden,
+    HostMArch("cuabi-march", cl::init("64"), cl::Hidden,
               cl::desc("Specify 32- or 64-bit host architecture."
                        " (default=64-bit)."));
 
-/// Enable verbose mode.  Handled internally as well as passed on to
-/// ptxas to provide additional details (register use, etc.).
+/// Enable verbose mode in the second tools (e.g., ptxas).  
 static cl::opt<bool>
     Verbose("cuabi-verbose", cl::init(false), cl::NotHidden,
-            cl::desc("Enable verbose mode and also print out code "
-                     "generation statistics. (default=off)"));
+            cl::desc("Enable verbose mode for cuda toolchain components. "
+                     "(default=off)"));
 
 /// Enable debug mode. Passed directly to ptxas.
 static cl::opt<bool>
@@ -1304,8 +1303,12 @@ std::unique_ptr<Module>& CudaABI::getLibDeviceModule() {
     llvm::SMDiagnostic SMD;
     Optional<std::string> CudaPath = sys::Process::FindInEnvPath("CUDA_HOME",
                       "nvvm/libdevice/libdevice.10.bc");
-    if (!CudaPath)
-      report_fatal_error("Unable to load cuda libdevice.10.bc!");
+    if (!CudaPath) {
+      CudaPath = sys::Process::FindInEnvPath("CUDA_PATH", 
+                    "nvvm/libdevice/libdevice.10.bc");
+      if (!CudaPath)                     
+        report_fatal_error("Unable to load cuda libdevice.10.bc!");
+    }
 
     LibDeviceModule = parseIRFile(*CudaPath, SMD, Ctx);
     if (not LibDeviceModule)
@@ -2072,10 +2075,10 @@ PassBuilder pb(PTXTargetMachine, pto);
       OptimizationLevel::O2,
       OptimizationLevel::O3,
   };
-  OptimizationLevel optLevel = OptimizationLevel::O2;
+  OptimizationLevel OptimizationLevel = OptimizationLevel::O2;
   if (OptLevel >= 0 && OptLevel <= 3)
-    optLevel = optLevels[OptLevel];
-  ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
+    OptimizationLevel = optLevels[OptLevel];
+  ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(OptimizationLevel);
   mpm.addPass(VerifierPass());
   LLVM_DEBUG(dbgs() << "\t\t* module: " << KM.getName() << "\n");
   mpm.run(KM, mam);

@@ -1,3 +1,5 @@
+
+
 #include <iostream>
 #include <fstream>
 #include <math.h>
@@ -9,10 +11,6 @@
 #include <time.h>
 #include <kitsune.h>
 #include "kitsune/timer.h"
-
-#define DEFAULT_WIDTH  2048
-#define DEFAULT_HEIGHT 1024
-#define BPP 3
 
 struct Pixel {
   unsigned char r, g, b;
@@ -58,11 +56,11 @@ float QueryDatabase(const Vec& position, int &hitType) {
   Vec f = position; // Flattened position (z=0)
   f.z = 0;
 const float lines[10*4] = {
-    -21.0f,  0.0f, -21.0f, 16.0f,
-    -21.0f,  0.0f, -15.0f,  0.0f,
-    -11.0f,  0.0f,  -7.0f, 16.0f,
+    -20.0f,  0.0f, -20.0f, 16.0f,
+    -20.0f,  0.0f, -14.0f,  0.0f,
+    -11.0f,  0.0f,  -7.0f, 16.0f, 
      -3.0f,  0.0f,  -7.0f, 16.0f,
-     -6.5f,  5.0f,  -9.5f,  5.0f,
+     -5.5f,  5.0f,  -9.5f,  5.0f,
       0.0f,  0.0f,   0.0f, 16.0f,
       6.0f,  0.0f,   6.0f, 16.0f,
       0.0f, 16.0f,   6.0f,  0.0f,
@@ -172,31 +170,35 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
 
 int main(int argc, char **argv)
 {
-  unsigned int samplesCount = 1 << 7;
-  unsigned int imageWidth = DEFAULT_WIDTH;
-  unsigned int imageHeight = DEFAULT_HEIGHT;
+  unsigned int sampleCount = 1 << 7;
+  unsigned int imageWidth = 1280;
+  unsigned int imageHeight = 1024;
   if (argc > 1) {
     if (argc == 2)
-      samplesCount = atoi(argv[1]);
+      sampleCount = atoi(argv[1]);
     else if (argc == 4) {
       imageWidth = atoi(argv[2]);
-      samplesCount = atoi(argv[1]);
+      sampleCount = atoi(argv[1]);
       imageHeight = atoi(argv[3]);
     } else {
       fprintf(stderr, "usage: raytracer [#samples] [img-width img-height])\n");
       return 1;   
     }
   }
-
-  fprintf(stderr, "image size: %d x %d\n", imageWidth, imageHeight);
-  fprintf(stderr, "sample count %d\n", samplesCount);
-
+  
   unsigned int totalPixels = imageWidth * imageHeight;
+
+  std::cout << "image size: " << imageWidth << "x" << imageHeight << std::endl;
+  std::cout << "samples per pixel: " << sampleCount << std::endl;
+  std::cout << "running..." << std::flush;
+
   Pixel *img = alloc<Pixel>(totalPixels);
 
+  #ifdef MIMIC_PREFETCH
   forall(unsigned int i = 0; i < totalPixels; ++i) { 
     img[i].r = img[i].g = img[i].b = 0.0f;
   }
+  #endif
 
   kitsune::timer t;
   forall(unsigned int i = 0; i < totalPixels; ++i) { 
@@ -211,7 +213,7 @@ int main(int argc, char **argv)
                  goal.z *left.x - goal.x * left.z,
                  goal.x *left.y - goal.y * left.x);
     Vec color;
-    for (unsigned int p = samplesCount, v = i; p--;) {
+    for (unsigned int p = sampleCount, v = i; p--;) {
       Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;
       float xf = x + randomVal(v);
       float yf = y + randomVal(v);
@@ -220,7 +222,7 @@ int main(int argc, char **argv)
 			           ((yf - imageHeight / 2.0f) + randomVal(v))), v);
     }
     // Reinhard tone mapping
-    color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
+    color = color * (1.0f / sampleCount) + 14.0f / 241.0f;
     Vec o = color + 1.0f;
     color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
     img[i].r = (unsigned char)color.x;
@@ -229,7 +231,9 @@ int main(int argc, char **argv)
   }
   
   double loop_secs = t.seconds();
-  std::cout << loop_secs << std::endl;  
+  std::cout << "\n\nfinished: " << loop_secs << "seconds.\n";
+
+
   std::ofstream myfile;
   myfile.open ("raytrace-forall.ppm");
   if (myfile.is_open()) {

@@ -19,7 +19,6 @@ set(KITSUNE_BINARY_DIR  ${CMAKE_CURRENT_BINARY_DIR})
 if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
   set(KITSUNE_KOKKOS_SRC_DIR  ${LLVM_BINARY_DIR}/kokkos)
   set(KITSUNE_KOKKOS_BUILD_ARGS
-      -DKokkos_CXX_STANDARD=17
       -DKokkos_ENABLE_SERIAL=ON -DBUILD_TESTING=OFF
       -DBUILD_SHARED_LIBS=ON -DCMAKE_BUILD_TYPE=Release)
   #
@@ -32,16 +31,17 @@ if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
   #
   # TODO: Look for newer Kokkos updates.
   #
-  FetchContent_Declare(kokkos
+  message(STATUS "kokkos fetch content: ${KITSUNE_KOKKOS_SRC_DIR}")
+  FetchContent_Declare(
+    kokkos
     GIT_REPOSITORY      https://github.com/kokkos/kokkos.git
-    GIT_TAG             release-candidate-4.0.0
+    GIT_TAG             606866d   # 4.0.00
     SOURCE_DIR          ${KITSUNE_KOKKOS_SRC_DIR}
-    UPDATE_DISCONNECTED TRUE
     CMAKE_ARGS          ${KITSUNE_KOKKOS_BUILD_ARGS}
+    UPDATE_DISCONNECTED FALSE
     PATCH_COMMAND patch -p0 --verbose --input=${KITSUNE_SOURCE_DIR}/patches/Kokkos_MemorySpace.patch)
-
+  #
   FetchContent_MakeAvailable(kokkos)
-
 endif()
 
 option(KITSUNE_ENABLE_KITRT "Build and install the Kitsune runtime library (kitrt)." ON)
