@@ -1,0 +1,57 @@
+--- core/src/impl/Kokkos_MemorySpace.hpp	2023-04-11 09:59:49.202573113 -0600
++++ Kokkos_MemorySpace.hpp	2023-04-11 10:02:21.662578811 -0600
+@@ -41,6 +41,7 @@
+ SharedAllocationHeader *checked_allocation_with_header(MemorySpace const &space,
+                                                        std::string const &label,
+                                                        size_t alloc_size) {
++#ifdef KITSUNE_ENABLE_EXCEPTIONS
+   try {
+     return reinterpret_cast<SharedAllocationHeader *>(space.allocate(
+         label.c_str(), alloc_size + sizeof(SharedAllocationHeader),
+@@ -49,12 +50,18 @@
+     safe_throw_allocation_with_header_failure(space.name(), label, failure);
+   }
+   return nullptr;  // unreachable
++#else
++    return reinterpret_cast<SharedAllocationHeader *>(space.allocate(
++        label.c_str(), alloc_size + sizeof(SharedAllocationHeader),
++        alloc_size));
++#endif
+ }
+ 
+ template <class ExecutionSpace, class MemorySpace>
+ SharedAllocationHeader *checked_allocation_with_header(
+     ExecutionSpace const &exec_space, MemorySpace const &space,
+     std::string const &label, size_t alloc_size) {
++#ifdef KITSUNE_ENABLE_EXCEPTIONS  
+   try {
+     return reinterpret_cast<SharedAllocationHeader *>(space.allocate(
+         exec_space, label.c_str(), alloc_size + sizeof(SharedAllocationHeader),
+@@ -63,6 +70,11 @@
+     safe_throw_allocation_with_header_failure(space.name(), label, failure);
+   }
+   return nullptr;  // unreachable
++#else 
++    return reinterpret_cast<SharedAllocationHeader *>(space.allocate(
++        exec_space, label.c_str(), alloc_size + sizeof(SharedAllocationHeader),
++        alloc_size));
++#endif
+ }
+ 
+ }  // end namespace Impl
+
+--- core/src/impl/Kokkos_HostSharedPtr.hpp	2022-01-18 11:08:32.912279796 -0700
++++ Kokkos_HostSharedPtr.hpp	2022-01-18 11:09:24.021140035 -0700
+@@ -73,12 +73,8 @@
+                   std::is_copy_constructible_v<Deleter>);
+ #endif
+     if (element_ptr) {
+-      try {
+         m_control = new Control{deleter, 1};
+-      } catch (...) {
+         deleter(element_ptr);
+-        throw;
+-      }
+     }
+   }
+ 

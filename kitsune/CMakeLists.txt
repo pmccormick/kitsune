@@ -35,11 +35,12 @@ if (KITSUNE_ENABLE_KOKKOS_SUPPORT)
   FetchContent_Declare(
     kokkos
     GIT_REPOSITORY      https://github.com/kokkos/kokkos.git
-    GIT_TAG             606866d   # 4.0.00
+    GIT_TAG             606866d # 4.0.00
     SOURCE_DIR          ${KITSUNE_KOKKOS_SRC_DIR}
     CMAKE_ARGS          ${KITSUNE_KOKKOS_BUILD_ARGS}
     UPDATE_DISCONNECTED FALSE
-    PATCH_COMMAND patch -p0 --verbose --input=${KITSUNE_SOURCE_DIR}/patches/Kokkos_MemorySpace.patch)
+    # Kokkos has exceptions that we have to disable to currently work with kitsune+tapir. 
+    PATCH_COMMAND patch -p0 --verbose --input=${KITSUNE_SOURCE_DIR}/patches/Kokkos_Exceptions.patch)
   #
   FetchContent_MakeAvailable(kokkos)
 endif()
