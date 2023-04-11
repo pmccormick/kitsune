@@ -186,41 +186,39 @@ int main(int argc, char **argv) {
   
   Kokkos::initialize(argc, argv); {
     DualViewVector img = DualViewVector("img", imageWidth, imageHeight);
-    for (int y = imageHeight; y--;) 
-      for (int x = imageWidth; x--;) 
-        img.h_view(x,y,0) = img.h_view(x,y,1) = img.h_view(x,y,2) = 0;
     kitsune::timer t;
     Kokkos::parallel_for("get_color", imageWidth*imageHeight, KOKKOS_LAMBDA(const unsigned int& i) {
-        int x = i % imageWidth;
-        int y = i / imageWidth;
-        unsigned int v = i;
-        const Vec position(-12.0f, 5.0f, 25.0f);
-        const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
-        const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / imageWidth);
-        // Cross-product to get the up vector
-        const Vec up(goal.y *left.z - goal.z * left.y,
-		     goal.z *left.x - goal.x * left.z,
-		     goal.x *left.y - goal.y * left.x);
-        Vec color;
-        for (int p = samplesCount; p--;) {
-	  Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;	  
-	  float xf = x + randomVal(v);
-	  float yf = y + randomVal(v);	  
-          color = color + Trace(position, !((goal+rand_left) + left *
-					    ((xf - imageWidth / 2.0f) + randomVal(v)) + up *
-					    ((yf - imageHeight / 2.0f) + randomVal(v))), v);
-        }
-        // Reinhard tone mapping
-        color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
-        Vec o = color + 1.0f;
-        color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
-        img.d_view(x,y,0) = color.x;
-        img.d_view(x,y,1) = color.y;
-        img.d_view(x,y,2) = color.z;
-      });
+      int x = i % imageWidth;
+      int y = i / imageWidth;
+      unsigned int v = i;
+      const Vec position(-12.0f, 5.0f, 25.0f);
+      const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
+      const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / imageWidth);
+      // Cross-product to get the up vector
+      const Vec up(goal.y *left.z - goal.z * left.y,
+                   goal.z *left.x - goal.x * left.z,
+                   goal.x *left.y - goal.y * left.x);
+      Vec color;
+      for (int p = samplesCount; p--;) {
+        Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;	  
+        float xf = x + randomVal(v);
+        float yf = y + randomVal(v);	  
+        color = color + Trace(position, !((goal+rand_left) + left *
+                      ((xf - imageWidth / 2.0f) + randomVal(v)) + up *
+                      ((yf - imageHeight / 2.0f) + randomVal(v))), v);
+      }
+      // Reinhard tone mapping
+      color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
+      Vec o = color + 1.0f;
+      color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
+      img.d_view(x,y,0) = color.x;
+      img.d_view(x,y,1) = color.y;
+      img.d_view(x,y,2) = color.z;
+    });
     Kokkos::fence(); // synchronize between host and device.
     double loop_secs = t.seconds();
-    std::cout << loop_secs << std::endl;    
+    std::cout << loop_secs << std::endl;
+    
     img.sync_host();      
     std::ofstream myfile;
     myfile.open ("raytrace-kokkos.ppm");
@@ -230,7 +228,6 @@ int main(int argc, char **argv) {
         myfile << (char)img.h_view(x,y,0) << (char)img.h_view(x,y,1) << (char)img.h_view(x,y,2);
       }
     }
-  }
-  Kokkos::finalize();
+  }  Kokkos::finalize();
   return EXIT_SUCCESS;
 }
