@@ -187,6 +187,7 @@ int main(int argc, char **argv) {
   Kokkos::initialize(argc, argv); {
     DualViewVector img = DualViewVector("img", imageWidth, imageHeight);
     kitsune::timer t;
+    img.modify_device();
     Kokkos::parallel_for("get_color", imageWidth*imageHeight, KOKKOS_LAMBDA(const unsigned int& i) {
       int x = i % imageWidth;
       int y = i / imageWidth;
@@ -211,9 +212,9 @@ int main(int argc, char **argv) {
       color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
       Vec o = color + 1.0f;
       color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
-      img.d_view(x,y,0) = color.x;
-      img.d_view(x,y,1) = color.y;
-      img.d_view(x,y,2) = color.z;
+      img.d_view(x,y,0) = (unsigned char)color.x;
+      img.d_view(x,y,1) = (unsigned char)color.y;
+      img.d_view(x,y,2) = (unsigned char)color.z;
     });
     Kokkos::fence(); // synchronize between host and device.
     double loop_secs = t.seconds();

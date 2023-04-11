@@ -4,7 +4,7 @@ ifneq ($(CUDA_PATH),)
   $(info cuda install prefix: ${cuda_prefix})
   $(info cuda architecture: ${NVARCH})
 
-  nvcc=${CUDA_HOME}/bin/nvcc
+  nvcc=${CUDA_PATH}/bin/nvcc
   nvcc_c_flags = -arch=${NVARCH}
   nvcc_cxx_flags = --std c++17 --no-exceptions --expt-extended-lambda \
 		   --expt-relaxed-constexpr -arch=${NVARCH}
