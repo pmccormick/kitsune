@@ -49,6 +49,9 @@ raytracer-kokkos.clang.${host_arch}: raytracer-kokkos.cpp
 # 
 #############################
 
+raytracer.cuda.${host_arch}: raytracer.cu 
+	/usr/bin/time ${nvcc} ${nvcc_cxx_flags} -O${opt_level} -I${kitsune_prefix}/include -o $@ $< ${cuda_ld_flags} ${cuda_libs} 
+
 raytracer-hip.hipcc.${host_arch}: raytracer-hip.cpp
 	/usr/bin/time ${hipcc} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include -o $@ $<
 
@@ -71,20 +74,3 @@ clean:
 #clang_cuda_flags=-xcuda --cuda-gpu-arch=${NVARCH} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include
 ####
 
-#### Kokkos stuff
-#kokkos_cu_flags=-I${kokkos_cu_prefix}/include
-#kokkos_clang_flags=${clang_cuda_flags} -I${kokkos_cu_prefix}/include
-#kokkos_nvcc_flags=-x cu -I${kokkos_cu_prefix}/include ${nvcc_cxx_flags} ${opt_flags} -m64 -arch=${NVARCH} --resource-usage --no-exceptions -I${kitsune_prefix}/include
-#all: raytracer.${host_arch} \
-#     raytracer-forall.cuda.${host_arch} \
-#     raytracer-kokkos.nvcc.${host_arch} \
-#     raytracer-kokkos.clang.${host_arch} \
-#     raytracer-kokkos-noview.kitsune.${host_arch} \
-#     raytracer-kokkos-noview.clang.${host_arch}
-
-
-#raytracer-kokkos.nvcc.${host_arch}: raytracer-kokkos.cpp
-#	 /usr/bin/time ${nvcc} ${kokkos_nvcc_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-
-#raytracer-kokkos.clang.${host_arch}: raytracer-kokkos.cpp
-#	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
