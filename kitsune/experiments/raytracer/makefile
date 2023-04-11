@@ -37,7 +37,7 @@ raytracer-forall.hip.${host_arch}: raytracer-forall.cpp
 #############################
 # Kokkos versions 
 raytracer-kokkos.nvcc.${host_arch}: raytracer-kokkos.cpp
-	/usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+	/usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -O${opt_level} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 raytracer-kokkos.clang.${host_arch}: raytracer-kokkos.cpp
 	/usr/bin/time ${clangxx} ${cxx_flags} ${clang_cu_flags} ${kokkos_cu_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
 
