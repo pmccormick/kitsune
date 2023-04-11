@@ -1,5 +1,5 @@
---- core/src/impl/Kokkos_MemorySpace.hpp	2023-04-11 09:59:49.202573113 -0600
-+++ Kokkos_MemorySpace.hpp	2023-04-11 10:02:21.662578811 -0600
+--- core/src/impl/Kokkos_MemorySpace.hpp	2023-04-11 12:01:09.976178587 -0600
++++ Kokkos_MemorySpace.hpp	2023-04-11 12:01:37.029512936 -0600
 @@ -41,6 +41,7 @@
  SharedAllocationHeader *checked_allocation_with_header(MemorySpace const &space,
                                                         std::string const &label,
@@ -39,7 +39,6 @@
  }
  
  }  // end namespace Impl
-
 --- core/src/impl/Kokkos_HostSharedPtr.hpp	2022-01-18 11:08:32.912279796 -0700
 +++ Kokkos_HostSharedPtr.hpp	2022-01-18 11:09:24.021140035 -0700
 @@ -73,12 +73,8 @@
