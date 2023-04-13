@@ -3495,6 +3495,11 @@ void CompilerInvocation::GenerateLangArgs(const LangOptions &Opts,
   if (Opts.IgnoreXCOFFVisibility)
     GenerateArg(Args, OPT_mignore_xcoff_visibility, SA);
 
+  if (Opts.Kokkos)
+    GenerateArg(Args, OPT_fkokkos, SA);
+  if (Opts.KokkosNoInit)
+    GenerateArg(Args, OPT_fkokkos_no_init, SA);
+
   if (Opts.getCilk() == LangOptions::Cilk_opencilk)
     GenerateArg(Args, OPT_fopencilk, SA);
   if (Opts.getCilk() == LangOptions::Cilk_plus)
