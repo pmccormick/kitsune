@@ -3984,11 +3984,6 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.KokkosNoInit = Args.hasArg(options::OPT_fkokkos_no_init) ? 1: 0;
   Opts.FleCSI = Args.hasArg(options::OPT_fflecsi) ? 1 : 0;
   
-  llvm::errs() << "Opts.Kitsune       = " << Opts.Kitsune << "\n";
-  llvm::errs() << "Opts.Kokkos        = " << Opts.Kokkos << "\n";
-  llvm::errs() << "Opts.KokkosNoInit  = " << Opts.KokkosNoInit << "\n";
-  llvm::errs() << "Opts.FleCSI        = " << Opts.FleCSI << "\n";      
-
   // Check if -fopenmp-simd is specified.
   bool IsSimdSpecified =
       Args.hasFlag(options::OPT_fopenmp_simd, options::OPT_fno_openmp_simd,
