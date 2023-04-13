@@ -486,6 +486,10 @@ ENUM_CODEGENOPT(ZeroCallUsedRegs, llvm::ZeroCallUsedRegs::ZeroCallUsedRegsKind,
 /// Whether to use opaque pointers.
 CODEGENOPT(OpaquePointers, 1, 0)
 
+/// Whether to do custom kokkos-specific code generation. 
+CODEGENOPT(Kokkos, 1, 0)
+CODEGENOPT(KokkosNoInit, 1, 0)
+
 #undef CODEGENOPT
 #undef ENUM_CODEGENOPT
 #undef VALUE_CODEGENOPT

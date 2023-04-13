@@ -1447,6 +1447,12 @@ void CompilerInvocation::GenerateCodeGenArgs(
           serializeTapirTarget(Opts.getTapirTarget()))
     GenerateArg(Args, OPT_ftapir_EQ, *TapirTargetStr, SA);
 
+  if (Opts.Kokkos)
+    GenerateArg(Args, OPT_fkokkos, SA);
+
+  if (Opts.KokkosNoInit)
+    GenerateArg(Args, OPT_fkokkos_no_init, SA);
+
   Optional<StringRef> DebugInfoVal;
   switch (Opts.DebugInfo) {
   case codegenoptions::DebugLineTablesOnly:
@@ -3969,13 +3975,14 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Check if -fkitsune is specified.
   Opts.Kitsune = Args.hasArg(options::OPT_fkitsune) ? 1 : 0;
-
-  // Check if -fkokkos is specified.
   Opts.Kokkos = Args.hasArg(options::OPT_fkokkos) ? 1 : 0;
   Opts.KokkosNoInit = Args.hasArg(options::OPT_fkokkos_no_init) ? 1: 0;
-
-  // Check if -fflecsi is specified.
   Opts.FleCSI = Args.hasArg(options::OPT_fflecsi) ? 1 : 0;
+  
+  llvm::errs() << "Opts.Kitsune       = " << Opts.Kitsune << "\n";
+  llvm::errs() << "Opts.Kokkos        = " << Opts.Kokkos << "\n";
+  llvm::errs() << "Opts.KokkosNoInit  = " << Opts.KokkosNoInit << "\n";
+  llvm::errs() << "Opts.FleCSI        = " << Opts.FleCSI << "\n";      
 
   // Check if -fopenmp-simd is specified.
   bool IsSimdSpecified =

@@ -1650,8 +1650,8 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
   mpm.addPass(VerifierPass());
   LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");
   mpm.run(KernelModule, mam);
+  
   legacy::PassManager PassMgr;
-
   if (AMDTargetMachine->addPassesToEmitFile(PassMgr, ObjFile->os(), nullptr,
                                             CodeGenFileType::CGFT_ObjectFile,
                                             false))

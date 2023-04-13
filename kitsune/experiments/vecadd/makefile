@@ -1,7 +1,6 @@
 include ../experiments.mk
 
-amdgpu_flags = # -mllvm -amdgpu-internalize-symbols -mllvm -amdgpu-early-inline-all=true -mllvm -amdgpu-function-calls=false
-cxx_flags += -I${kitsune_prefix}/include  -mllvm -debug-only=hipabi ${amdgpu_flags} -mllvm -hipabi-keep-files=true 
+cxx_flags += -I${kitsune_prefix}/include
 
 targets = vecadd-forall.opencilk.${host_arch}
 
@@ -26,6 +25,10 @@ vecadd-forall.cuda.${host_arch}: vecadd-forall.cpp
 	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 vecadd-forall.hip.${host_arch}: vecadd-forall.cpp
 	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+
+vecadd-kokkos-noview.kitsune.${host_arch}: vecadd-kokkos-noview.cpp
+	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} -mllvm -debug-only=cuda-abi -mllvm -cuabi-keep-files -fkokkos -fkokkos-no-init -O${opt_level} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+
 # 
 #############################
 

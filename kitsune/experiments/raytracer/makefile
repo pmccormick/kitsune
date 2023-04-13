@@ -29,8 +29,8 @@ raytracer-forall.opencilk.${host_arch}: raytracer-forall.cpp
 raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp
 	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 
-raytracer-kokkos.kitsune.${host_arch}: raytracer-kokkos.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${opt_flags} -fkokkos -fkokkos-no-init ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+raytracer-kokkos.kitsune.${host_arch}: raytracer-kokkos-noview.cpp
+	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} -mllvm -debug-only=cuabi -mllvm -cuabi-keep-files ${opt_flags} -fkokkos -fkokkos-no-init ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
 
 raytracer-forall.hip.${host_arch}: raytracer-forall.cpp
 	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} ${opt_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib 

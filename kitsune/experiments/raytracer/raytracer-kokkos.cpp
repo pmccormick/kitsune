@@ -184,11 +184,12 @@ int main(int argc, char **argv) {
   fprintf(stderr, "image size: %d x %d\n", imageWidth, imageHeight);
   fprintf(stderr, "sample count %d\n", samplesCount);
   
+  size_t totalPixels = imageWidth * imageHeight;
   Kokkos::initialize(argc, argv); {
     DualViewVector img = DualViewVector("img", imageWidth, imageHeight);
     kitsune::timer t;
     img.modify_device();
-    Kokkos::parallel_for("get_color", imageWidth*imageHeight, KOKKOS_LAMBDA(const unsigned int& i) {
+    Kokkos::parallel_for(totalPixels, KOKKOS_LAMBDA(const unsigned int i) {
       int x = i % imageWidth;
       int y = i / imageWidth;
       unsigned int v = i;
