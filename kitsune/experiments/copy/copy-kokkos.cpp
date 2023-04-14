@@ -1,9 +1,11 @@
+#include "Kokkos_Core.hpp"
+#include "Kokkos_DualView.hpp"
+
 #include <iostream>
 #include <fstream>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
-#include "Kokkos_DualView.hpp"
 
 
 template <typename T>

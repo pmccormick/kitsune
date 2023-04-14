@@ -1,5 +1,7 @@
 # Flags for the HIP runtime ABI target.
 -D_tapir_hip_target
+-L${CMAKE_INSTALL_PREFIX}/lib
 ${KITSUNE_HIP_TARGET_EXTRA_LINK_FLAGS} 
+-lkitrt
 ${KITSUNE_HIP_TARGET_LINK_LIBS_FLAGS}
 

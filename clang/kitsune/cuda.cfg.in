@@ -1,6 +1,6 @@
 # Flags for the CUDA runtime ABI target.
 -D_tapir_cuda_target
--L${CMAKE_INSTALL_PREFIX}/lib/
+-L${CMAKE_INSTALL_PREFIX}/lib
 ${KITSUNE_CUDA_ABI_TARGET_EXTRA_LINK_FLAGS}
 -lkitrt
 ${KITSUNE_CUDA_ABI_TARGET_LINK_LIBS}

@@ -4,24 +4,24 @@
 # 
 KITSUNE_PREFIX?=/projects/kitsune/${host_arch}/15.x
 KITSUNE_OPTLEVEL?=3
-KITSUNE_OPTFLAGS?=-O${KITSUNE_OPTLEVEL}
+KITSUNE_OPTFLAGS?=-O$(KITSUNE_OPTLEVEL)
 
 # For now we disable stripmining on GPUs.
 GPU_STRIPMINE_FLAGS?=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1
 
 ##################################
 TAPIR_CUDA_FLAGS?=-ftapir=cuda \
- -O${KITSUNE_OPTLEVEL} \
+ -O$(KITSUNE_OPTLEVEL) \
  -ffp-contract=fast \
- -mllvm -cuabi-opt-level=${KITSUNE_OPTLEVEL} \
+ -mllvm -cuabi-opt-level=$(KITSUNE_OPTLEVEL) \
  -mllvm -cuabi-prefetch=true \
  -mllvm -cuabi-streams=false \
  -mllvm -cuabi-run-post-opts=false \
- -mllvm -cuabi-arch=${CUDA_ARCH} \
+ -mllvm -cuabi-arch=$(CUDA_ARCH) \
  $(GPU_STRIPMINE_FLAGS)
 
 TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda,--lto-O${KITSUNE_OPTLEVEL},\
--mllvm,-cuabi-opt-level=${KITSUNE_OPTLEVEL},-mllvm,-cuabi-arch=${NVARCH},\
+-mllvm,-cuabi-opt-level=${KITSUNE_OPTLEVEL},-mllvm,-cuabi-arch=$(CUDA_ARCH),\
 -mllvm,-cuabi-prefetch=true,-mllvm,-cuabi-streams=false,\
 -mllvm,-stripmine-coarsen-factor=1,-mllvm,-stripmine-count=1
 
@@ -34,15 +34,15 @@ endif
 ##################################
 TAPIR_HIP_FLAGS?=-ftapir=hip \
   -ffp-contract=fast \
-  -mllvm -hipabi-opt-level=${opt_level} \
-  -mllvm -hipabi-arch=${AMDGPU_ARCH} \
+  -mllvm -hipabi-opt-level=$(KITSUNE_OPTLEVEL) \
+  -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
   -mllvm -hipabi-xnack=true \
   -mllvm -amdgpu-internalize-symbols \
   -mllvm -amdgpu-function-calls=false \
   $(GPU_STRIPMINE_FLAGS)
 
-TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O${KITSUNE_OPTLEVEL},\
--mllvm,-hipabi-opt-level=${opt_level},-mllvm,-chipabi-arch=${AMDGPU_ARCH},\
+TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O$(KITSUNE_OPTLEVEL),\
+-mllvm,-hipabi-opt-level=$(KITSUNE_OPTLEVEL),-mllvm,-chipabi-arch=$(AMDGPU_ARCH),\
 -mllvm,-stripmine-coarsen-factor=1,-mllvm,-stripmine-count=1
 
 ifneq ($(KITSUNE_VERBOSE),)

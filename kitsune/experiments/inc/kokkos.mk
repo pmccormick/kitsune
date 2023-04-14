@@ -8,7 +8,7 @@ endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   KOKKOS_HIP_PREFIX?=$(KITSUNE_PREFIX)/opt/kokkos/hip
-  KOKKOS_HIP_LIBS=-L$(KOKKOS_HIP_PREFIX)/lib64 -lkokkoscore -ldl
+  KOKKOS_HIP_LIBS=-L$(KOKKOS_HIP_PREFIX)/lib -lkokkoscore -ldl
   KOKKOS_HIPCC=$(ROCM_PATH)/bin/hipcc 
-  KOKKOS_HIP_FLAGS?=$(HIPCC_CXX_FLAGS) -I$(KOKKOS_HIP_PREFIX)/include/
+  KOKKOS_HIP_FLAGS?=$(HIPCC_CXX_FLAGS) -std=c++17 -I$(KOKKOS_HIP_PREFIX)/include/
 endif
