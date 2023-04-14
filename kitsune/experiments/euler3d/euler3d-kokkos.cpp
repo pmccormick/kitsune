@@ -1,14 +1,14 @@
 /// Copyright 2009, Andrew Corrigan, acorriga@gmu.edu
 // This code is from the AIAA-2009-4001 paper
 
+#include "Kokkos_DualView.hpp"
+
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <chrono>
 #include <cmath>
 
-using namespace std;
-
-#include "Kokkos_DualView.hpp"
 template <typename T>
 using View = Kokkos::DualView<T*>;
 
@@ -58,6 +58,7 @@ void cpy(View<T> &dst, View<T> &src, int N) {
 
 void dump(View<float> &variables, int nel, int nelr)
 {
+  using namespace std;
   variables.sync_host();
 
   {
@@ -438,22 +439,33 @@ void time_step(int j, int nelr,
  */
 int main(int argc, char** argv)
 {
+  using namespace std;
+
   if (argc < 2) {
     cout << "specify data file name" << endl;
-    return 1;
+    return 0;
   }
 
-  int iterations = ITERATIONS;
+  int iterations = 2000;
   if (argc > 2)
     iterations = atoi(argv[2]);
 
   const char* data_file_name = argv[1];
 
+  cout << setprecision(5);
+  cout << "\n";
+  cout << "---- euler3d benchmark (kokkos) ----\n\n"
+       << "  Input file : " << data_file_name << "\n" 
+       << "  Iterations : " << iterations << ".\n\n"; 
+
+
+      
+  cout << "  Reading input data, allocating arrays, initializing data, etc..." 
+       << std::flush;
+  auto total_start_time = chrono::steady_clock::now();
+
   // these need to be computed the first time in order to compute time step
-
-
   Kokkos::initialize(argc, argv); {
-
     View<float> ff_variable("ff_variable", NVAR);
     Float3 ff_flux_contribution_momentum_x,
            ff_flux_contribution_momentum_y,
@@ -552,8 +564,10 @@ int main(int argc, char** argv)
 
     // Create arrays and set initial conditions
     View<float> variables = View<float>("variables", nelr * NVAR);
+    cout << "  done.\n\n";
 
-    auto start = chrono::steady_clock::now();
+    cout << "  Starting benchmark...\n" << std::flush;
+    auto start_time = chrono::steady_clock::now();
     initialize_variables(nelr, variables, ff_variable);
     View<float> old_variables = View<float>("old_variables", nelr*NVAR);
     View<float> fluxes = View<float>("fluxes", nelr*NVAR);
@@ -590,13 +604,20 @@ int main(int argc, char** argv)
       rk_total += chrono::duration<double>(rk_end-rk_start).count();
     }
 
-    auto end = chrono::steady_clock::now();
-    cout << iterations << " " 
-         << copy_total << " "
-	 << sf_total << " "
-	 << rk_total << " "
-	 << chrono::duration<double>(end-start).count() << endl;
     dump(variables, nel, nelr);
+
+    auto end_time = chrono::steady_clock::now();
+    double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+    double total_time = chrono::duration<double>(end_time-total_start_time).count();
+
+    cout << "\n"
+         << "      Total time : " << total_time << " seconds.\n"
+         << "    Compute time : " << elapsed_time << " seconds.\n"
+         << "            copy : " << copy_total << " seconds.\n"
+         << "              sf : " << sf_total << " seconds.\n"
+         << "              rk : " << rk_total << " seconds.\n"
+         << "----\n\n";
+
   } Kokkos::finalize();
 
   return 0;

@@ -1,76 +1,50 @@
 include ../experiments.mk 
 
-cxx_flags += -Xclang -no-opaque-pointers -I${kitsune_prefix}/include
-opt_flags += -ffp-contract=fast
-
 targets = raytracer-forall.opencilk.${host_arch}
 
-ifeq ($(KITSUNE_ENABLE_CUDA), TRUE)
+ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += raytracer-forall.cuda.${host_arch}
   targets += raytracer-kokkos.nvcc.${host_arch}
-  targets += raytracer-kokkos.clang.${host_arch}
-endif 
+  targets += raytracer.cuda.${host_arch}
+endif
 
-ifeq ($(KITSUNE_ENABLE_HIP), TRUE)
+ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += raytracer-forall.hip.${host_arch}
   targets += raytracer-kokkos.hipcc.${host_arch}
-  targets += raytracer-kokkos.clang.${host_arch}
-  targets += raytracer-hip.hipcc.${host_arch}
-  targets += raytracer-hip.clang.${host_arch}
-endif 
+endif
 
-all: ${targets} 
+all: ${targets}
 
-#############################
-# Kitsune+Tapir versions.
-#
-raytracer-forall.opencilk.${host_arch}: raytracer-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_opencilk_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+# forall-based tests
+raytracer-forall.opencilk.${host_arch}: raytracer-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+raytracer-forall.hip.${host_arch}: raytracer-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 
-raytracer-kokkos.kitsune.${host_arch}: raytracer-kokkos-noview.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} -mllvm -debug-only=cuabi -mllvm -cuabi-keep-files ${opt_flags} -fkokkos -fkokkos-no-init ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+# kokkos-based tests (w/out views)
+raytracer-kokkos.cuda.kitsune.${host_arch}: raytracer-kokkos-no-view.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+raytracer-kokkos.hip.kitsune.${host_arch}: raytracer-kokkos-no-view.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 
-raytracer-forall.hip.${host_arch}: raytracer-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} ${opt_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib 
-#
-#############################
+# kokkos-based tests (using views -- currently not compatible w/ kitsune)
+raytracer-kokkos.nvcc.${host_arch}: raytracer-kokkos.cpp 
+	/usr/bin/time $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+raytracer-kokkos.hipcc.${host_arch}: raytracer-kokkos.cpp 
+	/usr/bin/time $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 
+# cuda version 
+raytracer.cuda.${host_arch}: raytracer.cu
+	/usr/bin/time $(NVCC) $(NVCC_CXX_FLAGS) -o $@ $<
 
-#############################
-# Kokkos versions 
-raytracer-kokkos.nvcc.${host_arch}: raytracer-kokkos.cpp
-	/usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -O${opt_level} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
+# hip version 
+raytracer.hip.${host_arch}: raytracer-hip.cpp
+	/usr/bin/time $(HIPCC) $(HIPCC_CXX_FLAGS) -o $@ $<
 
-raytracer-kokkos.hipcc.${host_arch}: raytracer-kokkos.cpp
-	/usr/bin/time ${hipcc} -v ${cxx_flags} ${opt_flags} ${kokkos_hip_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_hip_ld_flags} ${kokkos_libs} -Xlinker -rpath=${kokkos_hip_prefix}/lib64
-
-# 
-#############################
-
-raytracer.cuda.${host_arch}: raytracer.cu 
-	/usr/bin/time ${nvcc} ${nvcc_cxx_flags} -O${opt_level} -I${kitsune_prefix}/include -o $@ $< ${cuda_ld_flags} ${cuda_libs} 
-
-raytracer-hip.hipcc.${host_arch}: raytracer-hip.cpp
-	/usr/bin/time ${hipcc} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include -o $@ $<
-
-raytracer-hip.clang.${host_arch}: raytracer-hip.cpp
-	/usr/bin/time ${clangxx} ${clang_hip_flags} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include -o $@ $< ${hip_ld_flags} ${hip_libs} 
 
 clean:
-	-rm -f *.${host_arch}
-	-rm -f *.fatbin
-	-rm -rf *-cfg-tmp
-	-rm -f *.bc
-	-rm -f *.o *.so *.a *.hipfb
-	-rm -f *.ppm *.jpg
-	-rm -f *.ll *.ptx *.csv *.log *.s *.fbin *.tapir
-	-rm -f *.dat
-
-#### CUDA flags
-#nvcc_flags=--std c++17 -m64 -arch=${NVARCH} --resource-usage ${opt_flags} --no-exceptions -I${kitsune_prefix}/include
-#nvcc_kokkos_flags=${nvcc_flags} -I${kokkos_cuda_prefix}/include -I${kitsune_prefix}/include
-#clang_cuda_flags=-xcuda --cuda-gpu-arch=${NVARCH} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include
-####
+	-rm -f *.${host_arch} *.ll *.o
+	-rm -f *~ core *~ *.ppm 
 

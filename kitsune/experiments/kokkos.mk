@@ -1,18 +1,14 @@
-# serial kokkos (part of the default kitsune install)
-kokkos_prefix=${kitsune_prefix} 
-kokkos_libs=-lkokkoscore -ldl 
 
-# kokkos w/ cuda.
-kokkos_cu_prefix=${kitsune_prefix}/opt/kokkos/cuda/
-kokkos_cu_flags=-I${kokkos_cu_prefix}/include
-nvcc_wrapper=${kokkos_cu_prefix}/bin/nvcc_wrapper
-kokkos_nvcc_flags=${kokkos_cu_flags} ${nvcc_cxx_flags}
-kokkos_ld_flags=-L${kokkos_cu_prefix}/lib -L${CUDA_HOME}/lib64 ${kokkos_libs}
+ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
+  KOKKOS_CUDA_PREFIX?=$(KITSUNE_PREFIX)/opt/kokkos/cuda
+  KOKKOS_CUDA_LIBS=-L$(KOKKOS_CUDA_PREFIX)/lib64 -lkokkoscore -ldl
+  KOKKOS_NVCC=$(KOKKOS_CUDA_PREFIX)/bin/nvcc_wrapper
+  KOKKOS_NVCC_FLAGS?= $(NVCC_CXX_FLAGS) -I$(KOKKOS_CUDA_PREFIX)/include/
+endif
 
-# kokkos w/ hip
-kokkos_hip_prefix=${kitsune_prefix}/opt/kokkos/hip
-kokkos_hip_flags=-I${kokkos_hip_prefix}/include 
-kokkos_hip_ld_flags=-L${kokkos_hip_prefix}/lib64 
-
-
-
+ifeq ($(BUILD_HIP_EXPERIMENTS),true)
+  KOKKOS_HIP_PREFIX?=$(KITSUNE_PREFIX)/opt/kokkos/hip
+  KOKKOS_HIP_LIBS=-L$(KOKKOS_HIP_PREFIX)/lib64 -lkokkoscore -ldl
+  KOKKOS_HIPCC=$(ROCM_PATH)/bin/hipcc 
+  KOKKOS_HIP_FLAGS?=$(HIPCC_CXX_FLAGS) -I$(KOKKOS_HIP_PREFIX)/include/
+endif

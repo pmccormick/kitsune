@@ -1,80 +1,41 @@
 include ../experiments.mk 
 
-cxx_flags += -I${kitsune_prefix}/include -fPIC -fno-vectorize 
-
 targets = euler3d-forall.opencilk.${host_arch}
 
-ifeq ($(KITSUNE_ENABLE_CUDA), TRUE)
+ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += euler3d-forall.cuda.${host_arch}
   targets += euler3d-kokkos.nvcc.${host_arch}
-  targets += euler3d-kokkos.clang.${host_arch}
-endif 
+  targets += euler3d.cuda.${host_arch}
+endif
 
-ifeq ($(KITSUNE_ENABLE_HIP), TRUE)
+ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += euler3d-forall.hip.${host_arch}
-  targets += euler3d-kokkos.hip.${host_arch}
-endif 
+  targets += euler3d-kokkos.hipcc.${host_arch}
+endif
 
-all: ${targets} 
+all: ${targets}
 
+# forall-based tests
+euler3d-forall.opencilk.${host_arch}: euler3d-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+euler3d-forall.hip.${host_arch}: euler3d-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 
-#############################
-# Kitsune+Tapir versions.
-#
-euler3d-forall.opencilk.${host_arch}: euler3d-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_opencilk_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-euler3d-forall.hip.${host_arch}: euler3d-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-#
-#############################
+# kokkos-based tests (w/out views)
+euler3d-kokkos.cuda.kitsune.${host_arch}: euler3d-kokkos-no-view.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+euler3d-kokkos.hip.kitsune.${host_arch}: euler3d-kokkos-no-view.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 
-
-#############################
-# Kokkos versions w/ both nvcc and clang for comparison.
-euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp
-	/usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${clang_cu_flags} ${kokkos_cu_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${clang_hip_flags} ${kokkos_hip_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-# 
-#############################
+# kokkos-based tests (using views -- currently not compatible w/ kitsune)
+euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp 
+	/usr/bin/time $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+euler3d-kokkos.hipcc.${host_arch}: euler3d-kokkos.cpp 
+	/usr/bin/time $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 
 clean:
-	-rm -f *.${host_arch}
-	-rm -f *.fatbin
-	-rm -rf *-cfg-tmp
-	-rm -f *.bc
-	-rm -f *.fatbin
-	-rm -f *.ppm *.jpg
-	-rm -f *.ll *.ptx *.csv *.log *.s *.fbin *.tapir *.o 
-	-rm -f *.dat
+	-rm -f *.${host_arch} *.ll *.o
+	-rm -f *~ core *~ *.ppm 
 
-#### CUDA flags
-#nvcc_flags=--std c++17 -m64 -arch=${NVARCH} --resource-usage ${opt_flags} --no-exceptions -I${kitsune_prefix}/include
-#nvcc_kokkos_flags=${nvcc_flags} -I${kokkos_cuda_prefix}/include -I${kitsune_prefix}/include
-#clang_cuda_flags=-xcuda --cuda-gpu-arch=${NVARCH} ${cxx_flags} ${opt_flags} -I${kitsune_prefix}/include
-####
-
-#### Kokkos stuff
-#kokkos_cu_flags=-I${kokkos_cu_prefix}/include
-#kokkos_clang_flags=${clang_cuda_flags} -I${kokkos_cu_prefix}/include
-#kokkos_nvcc_flags=-x cu -I${kokkos_cu_prefix}/include ${nvcc_cxx_flags} ${opt_flags} -m64 -arch=${NVARCH} --resource-usage --no-exceptions -I${kitsune_prefix}/include
-#all: euler3d.${host_arch} \
-#     euler3d-forall.cuda.${host_arch} \
-#     euler3d-kokkos.nvcc.${host_arch} \
-#     euler3d-kokkos.clang.${host_arch} \
-#     euler3d-kokkos-noview.kitsune.${host_arch} \
-#     euler3d-kokkos-noview.clang.${host_arch}
-
-
-#euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp
-#	 /usr/bin/time ${nvcc} ${kokkos_nvcc_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-
-#euler3d-kokkos.clang.${host_arch}: euler3d-kokkos.cpp
-#	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-
-#euler3d-kokkos-noview.clang.${host_arch}: euler3d-kokkos-noview.cpp
-#	 /usr/bin/time ${clangxx} ${clang_cuda_flags} ${kokkos_cu_flags} -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -lkitrt -lLLVM -Xlinker -rpath=${kokkos_cu_prefix}/lib

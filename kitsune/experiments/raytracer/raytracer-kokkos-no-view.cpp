@@ -1,19 +1,15 @@
+#include "Kokkos_Core.hpp"
+
 #include <iostream>
+#include <iomanip>
 #include <fstream>
+#include <chrono>
 #include <math.h>
-#include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <float.h>
 #include <limits.h>
-#include <stdlib.h>
-#include <time.h>
-#include "Kokkos_Core.hpp"
 #include <kitsune.h>
-#include "kitsune/timer.h"
-
-#define DEFAULT_WIDTH  2048
-#define DEFAULT_HEIGHT 1024
-#define BPP 3
 
 struct Pixel {
   unsigned char r, g, b;
@@ -29,7 +25,8 @@ struct Vec {
   KOKKOS_FORCEINLINE_FUNCTION Vec operator!() { return *this * (1.0/sqrtf(*this % *this)); }
 };
 
-KOKKOS_FORCEINLINE_FUNCTION float randomVal(unsigned int& x) {
+KOKKOS_FORCEINLINE_FUNCTION 
+float randomVal(unsigned int& x) {
   x = (214013*x+2531011);
   return ((x>>16)&0x7FFF) / (float)66635;
 }
@@ -37,7 +34,8 @@ KOKKOS_FORCEINLINE_FUNCTION float randomVal(unsigned int& x) {
 // Rectangle CSG equation. Returns minimum signed distance from
 // space carved by
 // lowerLeft vertex and opposite rectangle vertex upperRight.
-KOKKOS_FORCEINLINE_FUNCTION float BoxTest(const Vec& position, Vec lowerLeft, Vec upperRight) {
+KOKKOS_FORCEINLINE_FUNCTION 
+float BoxTest(const Vec& position, Vec lowerLeft, Vec upperRight) {
   lowerLeft = position + lowerLeft * -1.0f;
   upperRight = upperRight + position * -1.0f;
   return -fminf(
@@ -51,18 +49,18 @@ KOKKOS_FORCEINLINE_FUNCTION float BoxTest(const Vec& position, Vec lowerLeft, Ve
 #define HIT_SUN 3
 
 // Sample the world using Signed Distance Fields.
-KOKKOS_FORCEINLINE_FUNCTION float QueryDatabase(const Vec& position, int &hitType) {
+KOKKOS_FORCEINLINE_FUNCTION 
+float QueryDatabase(const Vec& position, int &hitType) {
   float distance = 1e9;//FLT_MAX;
   Vec f = position; // Flattened position (z=0)
   f.z = 0;
 
-
-  static const float lines[10*4] = {
-    -21.0f,  0.0f, -21.0f, 16.0f,
-    -21.0f,  0.0f, -15.0f,  0.0f,
-    -11.0f,  0.0f,  -7.0f, 16.0f,
+  const float lines[10*4] = {
+    -20.0f,  0.0f, -20.0f, 16.0f,
+    -20.0f,  0.0f, -14.0f,  0.0f,
+    -11.0f,  0.0f,  -7.0f, 16.0f, 
      -3.0f,  0.0f,  -7.0f, 16.0f,
-     -6.5f,  5.0f,  -9.5f,  5.0f,
+     -5.5f,  5.0f,  -9.5f,  5.0f,
       0.0f,  0.0f,   0.0f, 16.0f,
       6.0f,  0.0f,   6.0f, 16.0f,
       0.0f, 16.0f,   6.0f,  0.0f,
@@ -70,7 +68,8 @@ KOKKOS_FORCEINLINE_FUNCTION float QueryDatabase(const Vec& position, int &hitTyp
       9.0f,  0.0f,  15.0f,  0.0f
   };
 
-  for (int i = 0; i < sizeof(lines)/sizeof(float); i += sizeof(float)) {
+
+  for (unsigned i = 0; i < sizeof(lines)/sizeof(float); i += sizeof(float)) {
     Vec begin = Vec(lines[i], lines[i + 1]) * 0.5f;
     Vec e = Vec(lines[i + 2], lines[i + 3]) * 0.5f + begin * -1.0f;
     Vec o = f + (begin + e * fminf(-fminf((((begin + f * -1) % e )/(e % e)), 0),1)) * -1.0f;
@@ -169,72 +168,84 @@ KOKKOS_FORCEINLINE_FUNCTION Vec Trace(Vec origin, Vec direction, unsigned int& r
   return color;
 }
 
-int main(int argc, char **argv)
-{
-  unsigned int samplesCount = 1 << 7;
-  unsigned imageWidth = DEFAULT_WIDTH;
-  unsigned imageHeight = DEFAULT_HEIGHT;
+int main(int argc, char **argv) {
+  using namespace std;
+  
+  unsigned int sampleCount = 1 << 7;
+  unsigned imageWidth = 1280;
+  unsigned imageHeight = 1024;
+
   if (argc > 1) {
     if (argc == 2)
-      samplesCount = atoi(argv[1]);
+      sampleCount = atoi(argv[1]);
     else if (argc == 4) {
       imageWidth = atoi(argv[2]);
-      samplesCount = atoi(argv[1]);
+      sampleCount = atoi(argv[1]);
       imageHeight = atoi(argv[3]);
     } else {
-      fprintf(stderr, "usage: raytracer [#samples] [img-width img-height])\n");
+      cout << "usage: raytracer [#samples] [img-width img-height]\n";
       return 1;   
     }
   }
-  
-  fprintf(stderr, "image size: %d x %d\n", imageWidth, imageHeight);
-  fprintf(stderr, "sample count %d\n", samplesCount);
+  cout << setprecision(5) << "\n";
+  cout << "---- Raytracer benchmark (kokkos) ----\n"
+       << "  Image size    : " << imageWidth << "x" << imageHeight << "\n"
+       << "  Samples/pixel : " << sampleCount << "\n\n";
 
-  unsigned int totalPixels = imageWidth * imageHeight;    
-  Pixel *img = alloc<Pixel>(totalPixels);
+  cout << "  Allocating image..." << std::flush;
 
-  Kokkos::initialize(argc, argv);
-  {
-    kitsune::timer t;
+
+  Kokkos::initialize(argc, argv); {
+    unsigned int totalPixels = imageWidth * imageHeight;    
+    Pixel *img = alloc<Pixel>(totalPixels);
+    cout << "  done.\n\n";
+
+    cout << "  Starting benchmark..." << std::flush;
+
+    auto start_time = chrono::steady_clock::now();
     Kokkos::parallel_for(totalPixels, KOKKOS_LAMBDA(const unsigned int i) {
-	int x = i % imageWidth;
-	int y = i / imageWidth;
-	unsigned int v = i;
-	const Vec position(-12.0f, 5.0f, 25.0f);
-	const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
-	const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / imageWidth);
-	// Cross-product to get the up vector
-	const Vec up(goal.y *left.z - goal.z * left.y,
-		     goal.z *left.x - goal.x * left.z,
-		     goal.x *left.y - goal.y * left.x);
-	Vec color;
-	for (unsigned int p = samplesCount; p--;) {
-	  Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;
-	  color = color + Trace(position,
-				!((goal+rand_left) + left *
-				  ((x+randomVal(v)) - imageWidth / 2.0f + randomVal(v)) + up *
-				  ((y+randomVal(v)) - imageHeight / 2.0f + randomVal(v))), v);
-	}
-	// Reinhard tone mapping
-	color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
-	Vec o = color + 1.0f;
-	color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
-	img[i].r = (unsigned char)color.x;
-	img[i].g = (unsigned char)color.y;
-	img[i].b = (unsigned char)color.z;
-      });
-    double loop_secs = t.seconds();
-    std::cout << "runtime: "<< loop_secs << " seconds.\n";
-    std::ofstream myfile;
-    myfile.open ("raytrace-kokkos-noview.ppm");
-    myfile << "P6 " << imageWidth << " " << imageHeight << " 255 ";
-    for(int i = (imageWidth*imageHeight)-1; i >= 0; i--) {
-      myfile << img[i].r << img[i].g << img[i].b;
-    }
+      int x = i % imageWidth;
+      int y = i / imageWidth;
+      const Vec position(-12.0f, 5.0f, 25.0f);
+      const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
+      const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / imageWidth);
+      // Cross-product to get the up vector
+      const Vec up(goal.y *left.z - goal.z * left.y,
+                   goal.z *left.x - goal.x * left.z,
+                   goal.x *left.y - goal.y * left.x);
+      Vec color;
+      for (unsigned int p = sampleCount, v = i; p--;) {
+        Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;
+        float xf = x + randomVal(v);
+        float yf = y + randomVal(v);	  
+        color = color + Trace(position, !((goal+rand_left) + left *
+                      ((xf - imageWidth / 2.0f) + randomVal(v)) + up *
+                      ((yf - imageHeight / 2.0f) + randomVal(v))), v);
+      }
+      // Reinhard tone mapping
+      color = color * (1.0f / sampleCount) + 14.0f / 241.0f;
+      Vec o = color + 1.0f;
+      color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
+      img[i].r = (unsigned char)color.x;
+      img[i].g = (unsigned char)color.y;
+      img[i].b = (unsigned char)color.z;
+    });
+    Kokkos::fence(); // synchronize between host and device.
 
+    auto end_time = chrono::steady_clock::now();
+    double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+
+    cout << "\n\n  Total time: " << elapsed_time << " seconds.\n";
+    cout << "  Pixels/second: " << totalPixels / elapsed_time << ".\n\n";
+
+    cout << "  Saving image...";
+    std::ofstream img_file;
+    img_file.open ("raytrace-kokkos-no-view.ppm");
+    img_file << "P6 " << imageWidth << " " << imageHeight << " 255 ";
+    for(int i = totalPixels-1; i >= 0; i--)
+      img_file << img[i].r << img[i].g << img[i].b;
+    img_file.close();
     dealloc(img);
-    
   } Kokkos::finalize();
-
-  return EXIT_SUCCESS;
+  return 0;
 }

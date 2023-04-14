@@ -1,13 +1,20 @@
 ifneq ($(CUDA_PATH),)
-  NVARCH?=sm_80
-  cuda_prefix=$(CUDA_HOME)
-  $(info cuda install prefix: ${cuda_prefix})
-  $(info cuda architecture: ${NVARCH})
+  CUDA_ARCH?=sm_80
 
-  nvcc=${CUDA_PATH}/bin/nvcc
-  nvcc_c_flags = -arch=${NVARCH}
-  nvcc_cxx_flags = --std c++17 --no-exceptions --expt-extended-lambda \
-		   --expt-relaxed-constexpr -arch=${NVARCH}
-  clang_cu_flags=-xcuda --cuda-gpu-arch=${NVARCH} -O${opt_level} 
+  NVCC=$(CUDA_PATH)/bin/nvcc
+  NVCC_C_FLAGS?=-arch=$(CUDA_ARCH)
+  NVCC_CXX_FLAGS?=-arch=$(CUDA_ARCH) \
+    --no-exceptions \
+    --expt-extended-lambda \
+    --expt-relaxed-constexpr \
+    -O$(KITSUNE_OPTLEVEL)
+
+  CLANG_CUDA=$(KITSUNE_PREFIX)/bin/clang 
+  CLANG_CUDA_FLAGS=-xcuda --cuda-gpu-arch=$(CUDA_ARCH) \
+    -O$(KITSUNE_OPTLEVEL)
+
+  BUILD_CUDA_EXPERIMENTS=true
+  $(info note: cuda experiments enabled)
+else 
+  BUILD_CUDA_EXPERIMENTS=false
 endif 
-

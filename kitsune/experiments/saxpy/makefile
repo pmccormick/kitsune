@@ -1,47 +1,41 @@
-include ../experiments.mk
-
-cxx_flags += -I${kitsune_prefix}/include 
+include ../experiments.mk 
 
 targets = saxpy-forall.opencilk.${host_arch}
 
-ifeq ($(KITSUNE_ENABLE_CUDA),TRUE)
+ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += saxpy-forall.cuda.${host_arch}
   targets += saxpy-kokkos.nvcc.${host_arch}
-  targets += saxpy-kokkos.clang.${host_arch}
+  targets += saxpy.cuda.${host_arch}
 endif
-ifeq ($(KITSUNE_ENABLE_HIP),TRUE)
+
+ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += saxpy-forall.hip.${host_arch}
+  targets += saxpy-kokkos.hipcc.${host_arch}
 endif
 
 all: ${targets}
 
-
-#############################
-# Kitsune+Tapir versions.
+# forall-based tests
 saxpy-forall.opencilk.${host_arch}: saxpy-forall.cpp 
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_opencilk_flags} -o $@ $< \
-	-Xlinker -rpath=${kitsune_prefix}/lib
-saxpy-forall.cuda.${host_arch}: saxpy-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-saxpy-forall.hip.${host_arch}: saxpy-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-#
-#############################
+	/usr/bin/time $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+saxpy-forall.cuda.${host_arch}: saxpy-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+saxpy-forall.hip.${host_arch}: saxpy-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 
+# kokkos-based tests (w/out views)
+#saxpy-kokkos.cuda.kitsune.${host_arch}: saxpy-kokkos-no-view.cpp 
+#	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+#saxpy-kokkos.hip.kitsune.${host_arch}: saxpy-kokkos-no-view.cpp 
+#	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 
-#############################
-# Kokkos versions w/ both nvcc and clang for comparison. 
-saxpy-kokkos.nvcc.${host_arch}: saxpy-kokkos.cpp
-	/usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib 
-saxpy-kokkos.clang.${host_arch}: saxpy-kokkos.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${clang_cu_flags} ${kokkos_cu_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib 
-#
-#############################
+# kokkos-based tests (using views -- currently not compatible w/ kitsune)
+saxpy-kokkos.nvcc.${host_arch}: saxpy-kokkos.cpp 
+	/usr/bin/time $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+saxpy-kokkos.hipcc.${host_arch}: saxpy-kokkos.cpp 
+	/usr/bin/time $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 
 clean:
-	-rm -f *.${host_arch}
-	-rm -f *.fbin *.s *.ptx *.ll 
-	-rm -rf *-cfg-tmp
-	-rm -f *.bc
-	-rm -f *.fatbin
-	-rm -f *.csv *.log *.s 
+	-rm -f *.${host_arch} *.ll *.o
+	-rm -f *~ core *~ *.ppm 
+

@@ -1,15 +1,18 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
-#include <chrono>
-#include "kitsune/timer.h"
 #include "Kokkos_DualView.hpp"
 
-using namespace kitsune;
+#include <iostream>
+#include <iomanip>
+#include <chrono>
+#include <cmath>
 
-typedef Kokkos::DualView<float*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> FloatDualView;
-typedef Kokkos::DualView<int*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> IntDualView;
+typedef Kokkos::DualView<float*, Kokkos::LayoutRight, 
+                         Kokkos::DefaultExecutionSpace> 
+  FloatDualView;
+
+typedef Kokkos::DualView<int*, Kokkos::LayoutRight, 
+                         Kokkos::DefaultExecutionSpace> 
+  IntDualView;
+
 
 void random_matrix(FloatDualView &I, int rows, int cols) {
   srand(7);
@@ -20,24 +23,25 @@ void random_matrix(FloatDualView &I, int rows, int cols) {
   }
 }
 
-void usage(int argc, char **argv)
-{
+void usage(int argc, char **argv) {
   fprintf(stderr,
         "Usage: %s <rows> <cols> <y1> <y2> <x1> <x2> <lambda> <no. of iter>\n",
         argv[0]);
-  fprintf(stderr, "\t<rows>   - number of rows\n");
-  fprintf(stderr, "\t<cols>    - number of cols\n");
-  fprintf(stderr, "\t<y1> 	 - y1 value of the speckle\n");
-  fprintf(stderr, "\t<y2>      - y2 value of the speckle\n");
-  fprintf(stderr, "\t<x1>       - x1 value of the speckle\n");
-  fprintf(stderr, "\t<x2>       - x2 value of the speckle\n");
-  fprintf(stderr, "\t<lambda>   - lambda (0,1)\n");
-  fprintf(stderr, "\t<no. of iter>   - number of iterations\n");
-  exit(1);
+  fprintf(stderr, "\t<rows>        - number of rows\n");
+  fprintf(stderr, "\t<cols>        - number of cols\n");
+  fprintf(stderr, "\t<y1> 	       - y1 value of the speckle\n");
+  fprintf(stderr, "\t<y2>          - y2 value of the speckle\n");
+  fprintf(stderr, "\t<x1>          - x1 value of the speckle\n");
+  fprintf(stderr, "\t<x2>          - x2 value of the speckle\n");
+  fprintf(stderr, "\t<lambda>      - lambda (0,1)\n");
+  fprintf(stderr, "\t<no. of iter> - number of iterations\n");
+  exit(1); 
 }
 
 int main(int argc, char* argv[])
 {
+  using namespace std;
+
   int rows, cols, size_I, size_R, niter = 20;
   float q0sqr, sum, sum2, tmp, meanROI,varROI ;
   int r1, r2, c1, c2;
@@ -71,25 +75,35 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
-  Kokkos::initialize(argc, argv); {
-    timer r;  
+  cout << setprecision(5);
+  cout << "\n";
+  cout << "---- srad benchmark (kokkos) ----\n"
+       << "  Row size    : " << rows << ".\n"
+       << "  Column size : " << cols << ".\n" 
+       << "  Iterations  : " << niter << ".\n\n";
 
+  Kokkos::initialize(argc, argv); {
     size_I = cols * rows;
     size_R = (r2-r1+1)*(c2-c1+1);
+
+    cout << "  Allocating arrays..." 
+         << std::flush;
 
     FloatDualView I  = FloatDualView("I", size_I);
     FloatDualView J  = FloatDualView("J", size_I);
     FloatDualView c  = FloatDualView("c", size_I);
-
     IntDualView   iN = IntDualView("iN", rows);
     IntDualView   iS = IntDualView("iS", rows);
     IntDualView   jW = IntDualView("jW", cols);
     IntDualView   jE = IntDualView("jE", cols);
-
     FloatDualView dN = FloatDualView("dN", size_I);
     FloatDualView dS = FloatDualView("dS", size_I);
     FloatDualView dW = FloatDualView("dW", size_I);
     FloatDualView dE = FloatDualView("dE", size_I);
+    cout << "  done.\n\n";
+
+    cout << "  Starting benchmark...\n" << std::flush;
+    auto start_time = chrono::steady_clock::now();
 
     Kokkos::parallel_for("rows", rows, KOKKOS_LAMBDA(const int &i) {
       iN.d_view(i) = i-1;
@@ -206,8 +220,11 @@ int main(int argc, char* argv[])
       });
       Kokkos::fence();      
     }
-    double rtime = r.seconds();
-    fprintf(stdout, "runtime: %7.6g\n", rtime);
+    auto end_time = chrono::steady_clock::now();
+    double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+    cout << "  Running time: " << elapsed_time << " seconds.\n"
+         << "----\n\n";
+
     /*
     J.sync_host();
     auto V = J.view_host();

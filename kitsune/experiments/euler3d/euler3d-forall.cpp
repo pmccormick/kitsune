@@ -1,13 +1,11 @@
 /// Copyright 2009, Andrew Corrigan, acorriga@gmu.edu
 // This code is from the AIAA-2009-4001 paper
-
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <chrono>
-#include <kitsune.h>
 #include <cmath>
-
-using namespace std;
+#include <kitsune.h>
 
 struct Float3 {
   float x, y, z;
@@ -20,7 +18,6 @@ struct Float3 {
  *
  */
 #define GAMMA 1.4
-#define ITERATIONS 2000
 #define NDIM 3
 #define NNB 4
 #define RK 3	// 3rd order RK
@@ -52,6 +49,7 @@ void cpy(T* dst, T* src, int N) {
 
 void dump(float* variables, int nel, int nelr)
 {
+  using namespace std;
   {
     ofstream file("density-forall.dat");
     file << nel << " " << nelr << endl;
@@ -399,17 +397,32 @@ void time_step(int j, int nelr, float* old_variables, float* variables,
  */
 int main(int argc, char** argv)
 {
+  using namespace std;
+
   if (argc < 2) {
     cout << "specify data file name" << endl;
     return 0;
   }
 
-  int iterations = ITERATIONS;
+  int iterations = 2000;
   if (argc > 2)
     iterations = atoi(argv[2]);
 
   const char* data_file_name = argv[1];
 
+  cout << setprecision(5);
+  cout << "\n";
+  cout << "---- euler3d benchmark (forall) ----\n\n"
+       << "  Input file : " << data_file_name << "\n" 
+       << "  Iterations : " << iterations << ".\n\n"; 
+
+      
+  cout << "  Reading input data, allocating arrays, initializing data, etc..." 
+       << std::flush;
+  auto total_start_time = chrono::steady_clock::now();
+
+  // these need to be computed the first time in order to compute time step
+       
   float *ff_variable = alloc<float>(NVAR);
   Float3 ff_flux_contribution_momentum_x,
     ff_flux_contribution_momentum_y,
@@ -501,8 +514,10 @@ int main(int argc, char** argv)
 
   // Create arrays and set initial conditions
   float* variables = alloc<float>(nelr*NVAR);
+  cout << "  done.\n\n";
 
-  auto start = chrono::steady_clock::now();
+  cout << "  Starting benchmark...\n" << std::flush;
+  auto start_time = chrono::steady_clock::now();
   initialize_variables(nelr, variables, ff_variable);
   float* old_variables = alloc<float>(nelr*NVAR);
   float* fluxes = alloc<float>(nelr*NVAR);
@@ -511,6 +526,7 @@ int main(int argc, char** argv)
   double copy_total = 0.0;
   double sf_total = 0.0;
   double rk_total = 0.0;
+
   // Begin iterations
   for(int i = 0; i < iterations; i++) {
     
@@ -539,14 +555,19 @@ int main(int argc, char** argv)
     auto rk_end = chrono::steady_clock::now();
     rk_total += chrono::duration<double>(rk_end-rk_start).count();
   }
-
-  auto end = chrono::steady_clock::now();
-  cout << iterations << " ";
-  cout << copy_total << " "
-       << sf_total << " "
-       << rk_total << " "
-       << chrono::duration<double>(end-start).count() << endl;
   dump(variables, nel, nelr);
+
+  auto end_time = chrono::steady_clock::now();
+  double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+  double total_time = chrono::duration<double>(end_time-total_start_time).count();
+
+  cout << "\n"
+       << "      Total time : " << total_time << " seconds.\n"
+       << "    Compute time : " << elapsed_time << " seconds.\n"
+       << "            copy : " << copy_total << " seconds.\n"
+       << "              sf : " << sf_total << " seconds.\n"
+       << "              rk : " << rk_total << " seconds.\n"
+       << "----\n\n";
 
   dealloc(ff_variable);
   dealloc(areas);

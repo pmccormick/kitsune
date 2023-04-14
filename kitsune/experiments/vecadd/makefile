@@ -1,61 +1,42 @@
 include ../experiments.mk
 
-cxx_flags += -I${kitsune_prefix}/include
-
 targets = vecadd-forall.opencilk.${host_arch}
 
-ifeq ($(KITSUNE_ENABLE_CUDA),TRUE)
+ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += vecadd-forall.cuda.${host_arch}
   targets += vecadd-kokkos.nvcc.${host_arch}
-  targets += vecadd-kokkos.clang.${host_arch}
 endif
-ifeq ($(KITSUNE_ENABLE_HIP),TRUE)
+
+ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += vecadd-forall.hip.${host_arch}
+  targets += vecadd-kokkos.hipcc.${host_arch}
 endif
 
 all: ${targets}
 
-
-#############################
-# Kitsune+Tapir versions.
+# forall-based tests
 vecadd-forall.opencilk.${host_arch}: vecadd-forall.cpp 
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_opencilk_flags} -o $@ $< \
-	-Xlinker -rpath=${kitsune_prefix}/lib
-vecadd-forall.cuda.${host_arch}: vecadd-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-vecadd-forall.hip.${host_arch}: vecadd-forall.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+	/usr/bin/time $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+vecadd-forall.cuda.${host_arch}: vecadd-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+vecadd-forall.hip.${host_arch}: vecadd-forall.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 
-vecadd-kokkos-noview.kitsune.${host_arch}: vecadd-kokkos-noview.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} -mllvm -debug-only=cuda-abi -mllvm -cuabi-keep-files -fkokkos -fkokkos-no-init -O${opt_level} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
+# kokkos-based tests (w/out views)
+vecadd-kokkos.cuda.kitsune.${host_arch}: vecadd-kokkos-no-views.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+vecadd-kokkos.hip.kitsune.${host_arch}: vecadd-kokkos-no-views.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 
-# 
-#############################
-
-
-#############################
-# Cuda version w/ both nvcc and clang for comparison.
-vecadd-cuda.nvcc.${host_arch}: vecadd.cu
-	/usr/bin/time ${nvcc} -I${kitsune_prefix}/include ${nvcc_cxx_flags} -o $@ $<
-vecadd-cuda.clang.${host_arch}: vecadd.cu
-	/usr/bin/time ${clangxx} ${clang_cuda_flags} -o $@ $< -L${CUDA_HOME}/lib64 -lcudart_static -ldl -lrt -pthread
-# 
-#############################
+# kokkos-based tests (using views -- currently not compatible w/ kitsune)
+vecadd-kokkos.nvcc.${host_arch}: vecadd-kokkos.cpp 
+	/usr/bin/time $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+vecadd-kokkos.hipcc.${host_arch}: vecadd-kokkos.cpp 
+	/usr/bin/time $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 
 
-#############################
-# Kokkos version w/ both nvcc and clang for comparison.
-vecadd-kokkos.nvcc.${host_arch}: vecadd-kokkos.cpp
-	/usr/bin/time ${nvcc_wrapper} ${kokkos_nvcc_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-vecadd-kokkos.clang.${host_arch}: vecadd-kokkos.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${clang_cu_flags} ${kokkos_cu_flags} -I${kitsune_prefix}/include -o $@ $< ${kokkos_ld_flags} ${kokkos_ld_libs} -Xlinker -rpath=${kokkos_cu_prefix}/lib
-# 
-#############################
 
 clean:
-	-rm -f *.${host_arch}
-	-rm -f *.fatbin *.hipfb
-	-rm -rf *-cfg-tmp
-	-rm -f *.bc *.a *.o *.so 
-	-rm -f *.ll *.ptx *.csv *.log *.fbin *.s *.cui 
-	
+	-rm -f *.${host_arch} *.ll *.o
+	-rm -f *~ core *~
+

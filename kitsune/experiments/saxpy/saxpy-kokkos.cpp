@@ -1,35 +1,17 @@
-//
-// Copyright(c) 2020 Triad National Security, LLC
-// All rights reserved.
-//
-// This file is part of the kitsune / llvm project.  It is released under
-// the LLVM license.
-//
-// Simple example of an element-wise vector sum.
-// To enable kitsune+tapir compilation add the flags to a standard
-// clang compilation:
-//
-//    * -ftapir=rt-target : the runtime ABI to target.
-//
-#include <cstdio>
-#include <stdlib.h>
-#include <math.h>
-#include "kitsune/timer.h"
 #include "Kokkos_DualView.hpp"
 
-typedef Kokkos::DualView<float*, Kokkos::LayoutRight, Kokkos::DefaultExecutionSpace> SaxpyDualView;
+#include <iostream>
+#include <iomanip>
+#include <chrono>
 
-using namespace std;
-using namespace kitsune;
-
-
-const size_t DEFAULT_SIZE = 1 << 26;
+typedef Kokkos::DualView<float*, Kokkos::LayoutRight, 
+                         Kokkos::DefaultExecutionSpace>
+  SaxpyDualView;
 
 // Unlike kitsune+tapir Kokkos has no way to handle these values as
-// global constants with a dynamic allocation/assignment.  As a result
-// we have to stuff in some CUDA-centric pieces; perhaps Kokkos has
-// some equivalent to this that is similar to KOKKOS_INLINE_FUNCTION?
-// For now we will just use CUDA syntax to do this...
+// global constants with a dynamic allocation/assignment.  As a result,
+// we have to explicitly use gpu-centric declarations.
+// Kokkos probably has some equivalent to this... 
 __managed__ __device__ float DEFAULT_X_VALUE;
 __managed__ __device__ float DEFAULT_Y_VALUE;
 __managed__ __device__ float DEFAULT_A_VALUE;
@@ -43,54 +25,76 @@ bool check_saxpy(const SaxpyDualView &v, size_t N) {
 }
 
 int main(int argc, char *argv[]) {
-  int retval;
-  // We must initialize these here -- they will be paged to the
-  // GPU given they are managed...
+  using namespace std;
+
+  size_t size = 1 << 28;
+  unsigned int iterations = 10;
+  if (argc > 1) {
+    size = atol(argv[1]);
+    if (argc == 2) 
+      iterations = atoi(argv[2]);
+    else {
+      cout << "usage: saxpy [size] [iterations]\n";
+      return 1;
+    }
+  }
+
+  cout << setprecision(5);
+  cout << "\n";
+  cout << "---- saxpy benchmark (kokkos) ----\n"
+       << "  Problem size: " << size << " elements.\n\n";
+  cout << "  Allocating arrays..." 
+       << std::flush;
+
   DEFAULT_X_VALUE = rand() % 1000000;
   DEFAULT_Y_VALUE = rand() % 1000000;
   DEFAULT_A_VALUE = rand() % 1000000;
 
-  size_t N = DEFAULT_SIZE;
-  if (argc > 1)
-    N = atol(argv[1]);
-
-  fprintf(stdout, "problem size: %ld\n", N);
-
-  timer r;
-
   Kokkos::initialize(argc, argv); {
-    SaxpyDualView x = SaxpyDualView("x", N);
-    SaxpyDualView y = SaxpyDualView("y", N);
+    SaxpyDualView x = SaxpyDualView("x", size);
+    SaxpyDualView y = SaxpyDualView("y", size);
+    cout << "  done.\n\n";
 
-    kitsune::timer t;
-    x.sync_device();
-    y.sync_device();
-    Kokkos::parallel_for("init", N, KOKKOS_LAMBDA(const int &i) {
-      x.d_view(i) = DEFAULT_X_VALUE;
-      y.d_view(i) = DEFAULT_Y_VALUE;
-    });
-    Kokkos::fence();
-    double ktime = t.seconds();
-    t.reset();
-    y.modify_device();
-    Kokkos::parallel_for("saxpy", N, KOKKOS_LAMBDA(const int &i) {
-      y.d_view(i) = DEFAULT_A_VALUE * x.d_view(i) + y.d_view(i);
-    });
-    Kokkos::fence();
-    ktime = ktime + t.seconds();
-    fprintf(stdout, "kernel time: %7.6g\n", ktime);
-    y.sync_host();
+    cout << "  Starting benchmark...\n" << std::flush;
+    auto start_total_time = chrono::steady_clock::now();
+    double iteration_total_time = 0;
+    for(unsigned int t = 0; t < iterations; t++) {
+      auto start_time = chrono::steady_clock::now();
+      x.modify_device();
+      y.modify_device();
+      Kokkos::parallel_for("init", size, KOKKOS_LAMBDA(const int i) {
+        x.d_view(i) = DEFAULT_X_VALUE;
+        y.d_view(i) = DEFAULT_Y_VALUE;
+      });
+      Kokkos::fence();
 
-    if (! check_saxpy(y, N)) {
-      abort();
-      retval = 1;
-    } else {
-      double rtime = r.seconds();
-      fprintf(stdout, "total runtime: %7.6g\n", rtime);
-      retval = 0;
+      y.modify_device();
+      Kokkos::parallel_for("saxpy", size, KOKKOS_LAMBDA(const int &i) {
+        y.d_view(i) = DEFAULT_A_VALUE * x.d_view(i) + y.d_view(i);
+      });
+      Kokkos::fence();
+      auto end_time = chrono::steady_clock::now();
+      double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+      cout << "\t" << t << ". iteration time: " << elapsed_time << " seconds.\n";
+      iteration_total_time += elapsed_time;
+    }
+    y.sync_host();   // can't just leave the data in place to check so we add the cost.
+ 
+
+    cout << "\n  Checking final result..." << std::flush;
+
+    if (not check_saxpy(y, size)) {
+      cout << "  incorrect result found!\n";
+      return 1;
+    } else { 
+      auto end_total_time = chrono::steady_clock::now();
+      double elapsed_total_time = chrono::duration<double>(end_total_time-start_total_time).count();
+      cout << "  pass (answers match).\n\n"
+           << "  Total time: " << elapsed_total_time << " seconds.\n"
+           << "  Average iteration time: " << iteration_total_time / iterations << " seconds.\n"
+           << "----\n\n";
     }
   } Kokkos::finalize();
-
-  return retval;
+  return 0;
 }
 

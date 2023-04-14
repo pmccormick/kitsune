@@ -1,13 +1,8 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
+#include <iostream>
+#include <iomanip>
 #include <chrono>
+#include <cmath>
 #include <kitsune.h>
-#include "kitsune/timer.h"
-
-using namespace std;
-using namespace kitsune;
 
 void random_matrix(float *I, int rows, int cols) {
   srand(7);
@@ -23,19 +18,21 @@ void usage(int argc, char **argv)
   fprintf(stderr,
         "Usage: %s <rows> <cols> <y1> <y2> <x1> <x2> <lambda> <no. of iter>\n",
         argv[0]);
-  fprintf(stderr, "\t<rows>   - number of rows\n");
-  fprintf(stderr, "\t<cols>    - number of cols\n");
-  fprintf(stderr, "\t<y1> 	 - y1 value of the speckle\n");
-  fprintf(stderr, "\t<y2>      - y2 value of the speckle\n");
-  fprintf(stderr, "\t<x1>       - x1 value of the speckle\n");
-  fprintf(stderr, "\t<x2>       - x2 value of the speckle\n");
-  fprintf(stderr, "\t<lambda>   - lambda (0,1)\n");
-  fprintf(stderr, "\t<no. of iter>   - number of iterations\n");
+  fprintf(stderr, "\t<rows>        - number of rows\n");
+  fprintf(stderr, "\t<cols>        - number of cols\n");
+  fprintf(stderr, "\t<y1> 	       - y1 value of the speckle\n");
+  fprintf(stderr, "\t<y2>          - y2 value of the speckle\n");
+  fprintf(stderr, "\t<x1>          - x1 value of the speckle\n");
+  fprintf(stderr, "\t<x2>          - x2 value of the speckle\n");
+  fprintf(stderr, "\t<lambda>      - lambda (0,1)\n");
+  fprintf(stderr, "\t<no. of iter> - number of iterations\n");
   exit(1);
 }
 
 int main(int argc, char* argv[])
 {
+  using namespace std;
+
   int rows, cols, size_I, size_R, niter = 20;
   float *I, *J, q0sqr, sum, sum2, tmp, meanROI,varROI ;
   float Jc, G2, L, num, den, qsqr;
@@ -49,7 +46,6 @@ int main(int argc, char* argv[])
   if (argc == 9) {
     rows = atoi(argv[1]); //number of rows in the domain
     cols = atoi(argv[2]); //number of cols in the domain
-
     r1   = atoi(argv[3]); //y1 position of the speckle
     r2   = atoi(argv[4]); //y2 position of the speckle
     c1   = atoi(argv[5]); //x1 position of the speckle
@@ -58,14 +54,14 @@ int main(int argc, char* argv[])
     niter = atoi(argv[8]); //number of iterations
   } else if (argc == 1) {
     // run with a default configuration.
-    rows = 12800;
-    cols = 12800;
+    rows = 16000;    
+    cols = 16000;
     r1 = 0;
     r2 = 127;
     c1 = 0;
     c2 = 127;
     lambda = 0.5;
-    niter = 10;
+    niter = 20;
   } else {
     usage(argc, argv);
   }
@@ -75,11 +71,15 @@ int main(int argc, char* argv[])
     exit(1);
   }
 
-  fprintf(stdout, "rows = %d\n", rows);
-  fprintf(stdout, "columns = %d\n", cols);
-  fprintf(stdout, "number of iterations = %d\n", niter);
-
-  timer r;
+  cout << setprecision(5);
+  cout << "\n";
+  cout << "---- srad benchmark (forall) ----\n"
+       << "  Row size    : " << rows << ".\n"
+       << "  Column size : " << cols << ".\n" 
+       << "  Iterations  : " << niter << ".\n\n";
+       
+  cout << "  Allocating arrays..." 
+       << std::flush;
 
   size_I = cols * rows;
   size_R = (r2-r1+1)*(c2-c1+1);
@@ -87,16 +87,18 @@ int main(int argc, char* argv[])
   I = alloc<float>(size_I);
   J = alloc<float>(size_I);
   c = alloc<float>(size_I);
-
   iN = alloc<int>(rows);
   iS = alloc<int>(rows);
   jW = alloc<int>(cols);
   jE = alloc<int>(cols);
-
   dN = alloc<float>(size_I);
   dS = alloc<float>(size_I);
   dW = alloc<float>(size_I);
   dE = alloc<float>(size_I);
+  cout << "  done.\n\n";
+
+  cout << "  Starting benchmark...\n" << std::flush;
+  auto start_time = chrono::steady_clock::now();
 
   forall(int i=0; i < rows; i++) {
     iN[i] = i-1;
@@ -180,10 +182,10 @@ int main(int argc, char* argv[])
       }
     }
   }
-
-  double rtime = r.seconds();
-  fprintf(stdout, "runtime: %7.6g\n", rtime);
-
+  auto end_time = chrono::steady_clock::now();
+  double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+  cout << "  Running time: " << elapsed_time << " seconds.\n"
+       << "----\n\n";
   dealloc(I);
   dealloc(J);
   dealloc(c);

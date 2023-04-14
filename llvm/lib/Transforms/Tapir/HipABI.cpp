@@ -333,7 +333,7 @@ static Function *resolveDeviceFunction(Function *Fn, Module &DevMod,
   else if (Fn->getName() == "powf")
     DevFnName = "__ocml_pow_f32";
   else if (Fn->getName() == "sinf")
-    DevFnName = "__ocml_sin_f32";
+    DevFnName = "__ocml_native_sin_f32";
   else if (Fn->getName() == "sincosf")
     // TODO: there are unexplained issues with sincos() to explore...
     report_fatal_error("sorry...sincosf() is not supported.\n");

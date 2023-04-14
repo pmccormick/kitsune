@@ -1,18 +1,13 @@
 #include <iostream>
 #include <fstream>
+#include <chrono>
+#include <iomanip>
 #include <math.h>
-#include <stdio.h>
 #include <stdint.h>
 #include <float.h>
 #include <limits.h>
 #include <stdlib.h>
-#include <time.h>
 #include <cuda_runtime.h>
-#include "kitsune/timer.h"
-
-#define DEFAULT_WIDTH  2048
-#define DEFAULT_HEIGHT 1024
-#define BPP 3
 
 struct Pixel {
   unsigned char r, g, b;
@@ -41,9 +36,9 @@ __forceinline__ __device__
 float BoxTest(const Vec& position, Vec lowerLeft, Vec upperRight) {
   lowerLeft = position + lowerLeft * -1.0f;
   upperRight = upperRight + position * -1.0f;
-  return -fminf(
-      fminf(fminf(lowerLeft.x, upperRight.x), fminf(lowerLeft.y, upperRight.y)),
-      fminf(lowerLeft.z, upperRight.z));
+  return -fminf(fminf(fminf(lowerLeft.x, upperRight.x), 
+                      fminf(lowerLeft.y, upperRight.y)),
+                fminf(lowerLeft.z, upperRight.z));
 }
 
 #define HIT_NONE 0
@@ -57,14 +52,12 @@ float QueryDatabase(const Vec& position, int &hitType) {
   float distance = 1e9;//FLT_MAX;
   Vec f = position; // Flattened position (z=0)
   f.z = 0;
-
-
-  static const float lines[10*4] = {
-    -21.0f,  0.0f, -21.0f, 16.0f,
-    -21.0f,  0.0f, -15.0f,  0.0f,
-    -11.0f,  0.0f,  -7.0f, 16.0f,
+  const float lines[10*4] = {
+    -20.0f,  0.0f, -20.0f, 16.0f,
+    -20.0f,  0.0f, -14.0f,  0.0f,
+    -11.0f,  0.0f,  -7.0f, 16.0f, 
      -3.0f,  0.0f,  -7.0f, 16.0f,
-     -6.5f,  5.0f,  -9.5f,  5.0f,
+     -5.5f,  5.0f,  -9.5f,  5.0f,
       0.0f,  0.0f,   0.0f, 16.0f,
       6.0f,  0.0f,   6.0f, 16.0f,
       0.0f, 16.0f,   6.0f,  0.0f,
@@ -72,7 +65,7 @@ float QueryDatabase(const Vec& position, int &hitType) {
       9.0f,  0.0f,  15.0f,  0.0f
   };
 
-  for (int i = 0; i < sizeof(lines)/sizeof(float); i += sizeof(float)) {
+  for (unsigned i = 0; i < sizeof(lines)/sizeof(float); i += sizeof(float)) {
     Vec begin = Vec(lines[i], lines[i + 1]) * 0.5f;
     Vec e = Vec(lines[i + 2], lines[i + 3]) * 0.5f + begin * -1.0f;
     Vec o = f + (begin + e * fminf(-fminf((((begin + f * -1) % e )/(e % e)), 0),1)) * -1.0f;
@@ -113,15 +106,15 @@ int RayMarching(const Vec& origin, const Vec& direction, Vec& hitPos, Vec& hitNo
   // Signed distance marching
   float d; // distance from closest object in world.
   for (float total_d = 0.0f; total_d < 100.0f; total_d += d) {
-    if ((d = QueryDatabase(hitPos = origin + direction * total_d, hitType)) < .01f || ++noHitCount > 99) {
-      return hitNorm =
-          !Vec(QueryDatabase(hitPos + Vec(0.01f, 0.00f), noHitCount) - d,
-               QueryDatabase(hitPos + Vec(0.00f, 0.01f), noHitCount) - d,
-               QueryDatabase(hitPos + Vec(0.00f, 0.00f, 0.01f), noHitCount) - d),
-          hitType;
+    d = QueryDatabase(hitPos = origin + direction * total_d, hitType);
+    if (d < .01f || ++noHitCount > 99) {
+      hitNorm = !Vec(QueryDatabase(hitPos + Vec(0.01f, 0.00f), noHitCount) - d,
+                     QueryDatabase(hitPos + Vec(0.00f, 0.01f), noHitCount) - d,
+                     QueryDatabase(hitPos + Vec(0.00f, 0.00f, 0.01f), noHitCount) - d);
+      return hitType;
     }
   }
-  return 0;
+  return HIT_NONE;
 }
 
 __forceinline__ __device__
@@ -140,8 +133,7 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
       direction = direction + normal * (normal % direction * -2);
       origin = sampledPosition + direction * 0.1f;
       attenuation = attenuation * 0.2f; // Attenuation via distance traveled.
-    }
-    else if (hitType == HIT_WALL) { // Wall hit uses color yellow?
+    } else if (hitType == HIT_WALL) { // Wall hit uses color yellow?
       float incidence = normal % lightDirection;
       float p = 6.283185f * randomVal(rn);
       float c = randomVal(rn);
@@ -151,8 +143,9 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
       float v = normal.x * normal.y * u;
       float cosp;
       float sinp;
-
-      sincosf(p, &sinp, &cosp);
+      sinp = sinf(p);
+      cosp = cosf(p);
+      //sincosf(p, &sinp, &cosp);
       direction = Vec(v, g + normal.y * normal.y * u, -normal.y) * (cosp * s) +
                   Vec(1 + g * normal.x * normal.x * u, g * v, -g * normal.x) *
                   (sinp * s) + normal * sqrtf(c);
@@ -173,31 +166,30 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
 }
 
 __global__
-void PathTracer(int samplesCount, Pixel *img, int N, 
+void PathTracer(int sampleCount, Pixel *img, int totalPixels, 
                 unsigned imgWidth, unsigned imgHeight) {
-  //int index  = blockIdx.x * blockDim.x + threadIdx.x;
-  int index  = blockIdx.x * blockDim.x + threadIdx.x;
-  if (index < N) {
+  unsigned int index  = blockIdx.x * blockDim.x + threadIdx.x;
+  if (index < totalPixels) {
     int x = index % imgWidth;
     int y = index / imgWidth;
-    unsigned int v = index;
     const Vec position(-12.0f, 5.0f, 25.0f);
     const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
     const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / imgWidth);
     // Cross-product to get the up vector
     const Vec up(goal.y *left.z - goal.z * left.y,
-               goal.z *left.x - goal.x * left.z,
-               goal.x *left.y - goal.y * left.x);
+                 goal.z *left.x - goal.x * left.z,
+                 goal.x *left.y - goal.y * left.x);
     Vec color;
-    for (unsigned int p = samplesCount; p--;) {
+    for (unsigned int p = sampleCount, v = index; p--;) {
       Vec rand_left = Vec(randomVal(v), randomVal(v), randomVal(v))*.001;
-      color = color + Trace(position,
-                          !((goal+rand_left) + left *
-                            ((x+randomVal(v)) - imgWidth / 2.0f + randomVal(v)) + up *
-                            ((y+randomVal(v)) - imgHeight / 2.0f + randomVal(v))), v);
-    }
+      float xf = x + randomVal(v);
+      float yf = y + randomVal(v);
+      color = color + Trace(position, !((goal+rand_left) + left *
+			           ((xf - imgWidth / 2.0f) + randomVal(v)) + up *
+			           ((yf - imgHeight / 2.0f) + randomVal(v))), v);
+    }                                    
     // Reinhard tone mapping
-    color = color * (1.0f / samplesCount) + 14.0f / 241.0f;
+    color = color * (1.0f / sampleCount) + 14.0f / 241.0f;
     Vec o = color + 1.0f;
     color = Vec(color.x / o.x, color.y / o.y, color.z / o.z) * 255.0f;
     img[index].r = (unsigned char)color.x;
@@ -206,26 +198,33 @@ void PathTracer(int samplesCount, Pixel *img, int N,
   }
 }
 
-int main(int argc, char **argv)
-{
-  unsigned int samplesCount = 1 << 7;
-  unsigned imageWidth = DEFAULT_WIDTH;
-  unsigned imageHeight = DEFAULT_HEIGHT;
+int main(int argc, char **argv) {
+  using namespace std;
+
+  unsigned int sampleCount = 1 << 7;
+  unsigned int imageWidth = 1280;
+  unsigned int imageHeight = 1024;
+
   if (argc > 1) {
-    samplesCount = atoi(argv[1]);
-    if (argc == 4) {
+    if (argc == 2)
+      sampleCount = atoi(argv[1]);
+    else if (argc == 4) {
       imageWidth = atoi(argv[2]);
+      sampleCount = atoi(argv[1]);
       imageHeight = atoi(argv[3]);
+    } else {
+      cout << "usage: raytracer [#samples] [img-width img-height]\n";
+      return 1;   
     }
   }
 
-  fprintf(stderr, "image size: %d x %d\n", imageWidth, imageHeight);
-  fprintf(stderr, "sample count %d\n", samplesCount);
+  cout << "\n";
+  cout << "---- Raytracer benchmark (forall) ----\n"
+       << "  Image size    : " << imageWidth << "x" << imageHeight << "\n"
+       << "  Samples/pixel : " << sampleCount << "\n\n";
 
-  cudaEvent_t kstart, kstop;
-  cudaEventCreate(&kstart);
-  cudaEventCreate(&kstop);
 
+  cout << "  Allocating image..." << std::flush;
   cudaError_t err = cudaSuccess;
   Pixel *img;
   size_t totalPixels = imageWidth * imageHeight;
@@ -234,30 +233,33 @@ int main(int argc, char **argv)
     fprintf(stderr, "failed to allocate managed memory!\n");
     return 1;
   }
+  cout << "  done.\n\n";
 
-  cudaEventRecord(kstart);
+  cout << "  Starting benchmark..." << std::flush;
+  auto start_time = chrono::steady_clock::now();
   int threadsPerBlock = 256;
   int blocksPerGrid = (totalPixels + threadsPerBlock - 1) / threadsPerBlock;
-  PathTracer<<<blocksPerGrid, threadsPerBlock>>>(samplesCount, img, totalPixels,
+  PathTracer<<<blocksPerGrid, threadsPerBlock>>>(sampleCount, img, totalPixels,
                                                  imageWidth, imageHeight);
-  cudaEventRecord(kstop);
-  cudaEventSynchronize(kstop);
-
+  cudaDeviceSynchronize();                                                 
   err = cudaGetLastError();
   if (err != cudaSuccess) {
     fprintf(stderr, "Failed to launch vectorAdd kernel (error code %s)!\n", cudaGetErrorString(err));
     exit(EXIT_FAILURE);
   }
+  auto end_time = chrono::steady_clock::now();
+  double elapsed_time = chrono::duration<double>(end_time-start_time).count();
 
-  float msecs = 0;
-  cudaEventElapsedTime(&msecs, kstart, kstop);
-  printf("%.8g\n", msecs / 1000.0);
+  cout << "\n\n  Total time: " << elapsed_time << " seconds.\n";
+  cout << "  Pixels/second: " << totalPixels / elapsed_time << ".\n\n";
 
-  std::ofstream myfile;
-  myfile.open ("raytrace-cuda.ppm");
-  myfile << "P6 " << imageWidth << " " << imageHeight << " 255 ";
-  for(int i = totalPixels-1; i >= 0; i--) {
-    myfile << img[i].r << img[i].g << img[i].b;
-  }
+  cout << "  Saving image..." << std::flush;
+  std::ofstream img_file;
+  img_file.open ("raytrace-cuda.ppm");
+  img_file << "P6 " << imageWidth << " " << imageHeight << " 255 ";
+  for(int i = totalPixels-1; i >= 0; i--)
+    img_file << img[i].r << img[i].g << img[i].b;
+  img_file.close();
+  cout << "  done.\n\n" << "----\n\n";
   return 0;
 }

@@ -1,43 +1,33 @@
+#include "Kokkos_Core.hpp"
+
 #include <iostream>
 #include <fstream>
 #include <chrono>
 #include <cmath>
 #include <iomanip>
-#include "Kokkos_DualView.hpp"
-
-
-template <typename T>
-using View = Kokkos::DualView<T*>;
+#include <kitsune.h>
 
 template <typename T>
-void parallel_copy(View<T> &dst, View<T> &src, int N) {
-  src.sync_device();
-  dst.sync_device();
-  Kokkos::parallel_for("copy", N, KOKKOS_LAMBDA(const int &i) {
-    dst.d_view(i) = src.d_view(i);
-  });
-  Kokkos::fence();
-  dst.modify_device();
+void random_fill(T* data, size_t N) {
+  for(size_t i = 0; i < N; ++i)
+    data[i] = rand() / (T)RAND_MAX;
 }
 
 template <typename T>
-void random_fill(View<T> &data, size_t N) {
-  for(size_t i = 0; i < N; i++)
-    data.h_view(i) = rand() / (T)RAND_MAX;
-  data.modify_host();
-}
-
-template <typename T>
-bool check(View<T> &data0, View<T> &data1, size_t N) {
-  data0.sync_host();
-  data1.sync_host();
+bool check(const T* data0, const T* data1, size_t N) {
   for(size_t i = 0; i < N; ++i) {
-    if (data0.h_view(i) != data1.h_view(i))
+    if (data0[i] != data1[i])
       return false;
   }
   return true;
 }
 
+template <typename T>
+void parallel_copy(T* dst, const T* src, int N) {
+  Kokkos::parallel_for(N, KOKKOS_LAMBDA(const int i) {  
+    dst[i] = src[i];
+  });
+}
 
 int main(int argc, char** argv)
 {
@@ -58,8 +48,8 @@ int main(int argc, char** argv)
   cout << "Allocating arrays and filling with random values..." << std::flush;
   auto start = chrono::steady_clock::now();
   Kokkos::initialize(argc, argv); {
-    View<float> data0("data0", array_size);
-    View<float> data1("data1", array_size);
+    float *data0 = alloc<float>(array_size);
+    float *data1 = alloc<float>(array_size);    
     random_fill(data0, array_size);
     cout << "  done.\n\n";
 

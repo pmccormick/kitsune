@@ -2,15 +2,9 @@
 #include <iostream>
 #include <fstream>
 #include <chrono>
-#include <kitsune.h>
 #include <cmath>
-#include "kitsune/timer.h"
-
-using namespace std;
-using namespace kitsune;
-
-const size_t DEFAULT_ARRAY_SIZE = 1024 * 1024 * 128;
-const unsigned int DEFAULT_ITERATIONS = 10;
+#include <iomanip>
+#include <kitsune.h>
 
 template <typename T>
 void random_fill(T* data, size_t N) {
@@ -33,48 +27,62 @@ void parallel_copy(T* dst, const T* src, int N) {
     dst[i] = src[i];
 }
 
-
 int main(int argc, char** argv) {
-  size_t array_size = DEFAULT_ARRAY_SIZE;
-  unsigned int iterations = DEFAULT_ITERATIONS;
+  using namespace std;
+
+  size_t array_size = 1024 * 1024 * 256;
+  unsigned int iterations = 10;
   if (argc >= 2)
     array_size = atol(argv[1]);
-
   if (argc == 3)
     iterations = atoi(argv[2]);
 
-  fprintf(stdout, "array size: %ld\n", array_size);
-  fprintf(stdout, "iterations = %d\n", iterations);
+  cout << setprecision(5);
+    
+  cout << "\n";
+  cout << "---- Simple copy benchmark (forall) ----\n"
+       << "  Array size: " << array_size << "\n"
+       << "  Iterations: " << iterations << "\n\n";
+  cout << "Allocating arrays and filling with random values..." << std::flush;
   float *data0 = alloc<float>(array_size);
   float *data1 = alloc<float>(array_size);
-
   random_fill(data0, array_size);
+  cout << "  done.\n\n";
 
-  auto start = chrono::steady_clock::now();
+
+  cout << "Starting benchmark...\n";
+  unsigned int mb_size = (sizeof(float) * array_size) / (1024 * 1024);
+  
+  auto start_time = chrono::steady_clock::now();
+  double total_copy_time = 0.0;
   for(int i = 0; i < iterations; i++) {
-    auto copy_start = chrono::steady_clock::now();
+    auto copy_start_time = chrono::steady_clock::now();
     parallel_copy(data1, data0, array_size);
-    auto copy_end = chrono::steady_clock::now();
-    cout  << "Copy time: "
-          << chrono::duration<double>(copy_end-copy_start).count()
-          << endl;
-
-    if (i+1 < iterations)
-      random_fill(data0, array_size);
+    auto copy_end_time = chrono::steady_clock::now();
+    
+    auto elapsed_time =
+      chrono::duration<double>(copy_end_time-copy_start_time).count();
+    cout  << "\t" << i << ". copy time: "
+          << elapsed_time 
+          << " sec., " << mb_size / elapsed_time << " MB/sec.\n";
+    total_copy_time += elapsed_time;
   }
+  auto end_time = chrono::steady_clock::now();
 
-  // This will page fault GPU-side pages back to the
-  // CPU -- page faults should impact our overall
-  // performance.
   if (not check(data0, data1, array_size)) {
-    fprintf(stderr, "final copies not equal!\n");
+    cerr << "error!  copy differs!\n";
     return 1;
+  } else {
+    cout << "pass (copy identical)\n";
   }
 
-  auto end = chrono::steady_clock::now();
   cout << "Total time: "
-       << chrono::duration<double>(end-start).count()
+       << chrono::duration<double>(end_time-start_time).count()
        << endl;
+  cout << "Average copy time: "
+       << total_copy_time / iterations
+       << endl;
+  cout << "----\n\n";
   return 0;
 }
 

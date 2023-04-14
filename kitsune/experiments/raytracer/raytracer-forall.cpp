@@ -1,14 +1,12 @@
 #include <iostream>
 #include <fstream>
-#include <math.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <float.h>
+#include <chrono>
+#include <iomanip>
+#include <cmath>
 #include <limits.h>
 #include <stdlib.h>
-#include <time.h>
 #include <kitsune.h>
-#include "kitsune/timer.h"
+
 
 struct Pixel {
   unsigned char r, g, b;
@@ -53,7 +51,7 @@ float QueryDatabase(const Vec& position, int &hitType) {
   float distance = 1e9;//FLT_MAX;
   Vec f = position; // Flattened position (z=0)
   f.z = 0;
-const float lines[10*4] = {
+  const float lines[10*4] = {
     -20.0f,  0.0f, -20.0f, 16.0f,
     -20.0f,  0.0f, -14.0f,  0.0f,
     -11.0f,  0.0f,  -7.0f, 16.0f, 
@@ -129,7 +127,7 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
   for (int bounceCount = 8; bounceCount--;) {  
     int hitType = RayMarching(origin, direction, sampledPosition, normal);
     if (hitType == HIT_NONE)
-      break;                     // No hit. This is over, return color.
+      break;  // No hit, return color.
     else if (hitType == HIT_LETTER) { // Specular bounce on a letter. No color acc.
       direction = direction + normal * (normal % direction * -2.0f);
       origin = sampledPosition + direction * 0.1f;
@@ -166,11 +164,13 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
 }
 
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
+  using namespace std;
+
   unsigned int sampleCount = 1 << 7;
   unsigned int imageWidth = 1280;
   unsigned int imageHeight = 1024;
+
   if (argc > 1) {
     if (argc == 2)
       sampleCount = atoi(argv[1]);
@@ -179,18 +179,20 @@ int main(int argc, char **argv)
       sampleCount = atoi(argv[1]);
       imageHeight = atoi(argv[3]);
     } else {
-      fprintf(stderr, "usage: raytracer [#samples] [img-width img-height])\n");
+      cout << "usage: raytracer [#samples] [img-width img-height]\n";
       return 1;   
     }
   }
-  
+
+  cout << "\n";
+  cout << "---- Raytracer benchmark (forall) ----\n"
+       << "  Image size    : " << imageWidth << "x" << imageHeight << "\n"
+       << "  Samples/pixel : " << sampleCount << "\n\n";
+
+  cout << "  Allocating image..." << std::flush;
   unsigned int totalPixels = imageWidth * imageHeight;
-
-  std::cout << "image size: " << imageWidth << "x" << imageHeight << std::endl;
-  std::cout << "samples per pixel: " << sampleCount << std::endl;
-  std::cout << "running..." << std::flush;
-
   Pixel *img = alloc<Pixel>(totalPixels);
+  cout << "  done.\n\n";
 
   #ifdef MIMIC_PREFETCH
   forall(unsigned int i = 0; i < totalPixels; ++i) { 
@@ -198,11 +200,12 @@ int main(int argc, char **argv)
   }
   #endif
 
-  kitsune::timer t;
+  cout << "  Starting benchmark..." << std::flush;
+
+  auto start_time = chrono::steady_clock::now();
   forall(unsigned int i = 0; i < totalPixels; ++i) { 
     int x = i % imageWidth;
     int y = i / imageWidth;;
-    unsigned int v = i;
     const Vec position(-12.0f, 5.0f, 25.0f);
     const Vec goal = !(Vec(-3.0f, 4.0f, 0.0f) + position * -1.0f);
     const Vec left = !Vec(goal.z, 0, -goal.x) * (1.0f / imageWidth);
@@ -227,20 +230,21 @@ int main(int argc, char **argv)
     img[i].g = (unsigned char)color.y;
     img[i].b = (unsigned char)color.z;
   }
-  
-  double loop_secs = t.seconds();
-  std::cout << "\n\nfinished: " << loop_secs << "seconds.\n";
+  auto end_time = chrono::steady_clock::now();
+  double elapsed_time = chrono::duration<double>(end_time-start_time).count();
 
+  cout << "\n\n  Total time: " << elapsed_time << " seconds.\n";
+  cout << "  Pixels/second: " << totalPixels / elapsed_time << ".\n\n";
 
-  std::ofstream myfile;
-  myfile.open ("raytrace-forall.ppm");
-  if (myfile.is_open()) {
-    myfile << "P6 " << imageWidth << " " << imageHeight << " 255 ";
-    for(int i = totalPixels-1; i >= 0; i--) {
-      myfile << img[i].r << img[i].g << img[i].b;
-    }
-    myfile.close();
-    fprintf(stderr, "saved image file.\n");
+  cout << "  Saving image...";
+  ofstream img_file;
+  img_file.open ("raytrace-forall.ppm");
+  if (img_file.is_open()) {
+    img_file << "P6 " << imageWidth << " " << imageHeight << " 255 ";
+    for(int i = totalPixels-1; i >= 0; i--)
+      img_file << img[i].r << img[i].g << img[i].b;
+    img_file.close();
+    cout << "  done.\n\n" << "----\n\n";
   }
   dealloc(img);
   return 0;
