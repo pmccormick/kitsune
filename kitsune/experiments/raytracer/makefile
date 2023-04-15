@@ -46,5 +46,5 @@ raytracer.hip.${host_arch}: raytracer-hip.cpp
 
 clean:
 	-rm -f *.${host_arch} *.ll *.o
-	-rm -f *~ core *~ *.ppm 
+	-rm -f *~ core *.ppm 
 

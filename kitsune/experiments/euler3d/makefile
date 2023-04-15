@@ -5,7 +5,6 @@ targets = euler3d-forall.opencilk.${host_arch}
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += euler3d-forall.cuda.${host_arch}
   targets += euler3d-kokkos.nvcc.${host_arch}
-  targets += euler3d.cuda.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
@@ -37,5 +36,5 @@ euler3d-kokkos.hipcc.${host_arch}: euler3d-kokkos.cpp
 
 clean:
 	-rm -f *.${host_arch} *.ll *.o
-	-rm -f *~ core *~ *.ppm 
+	-rm -f *~ core 
 

@@ -37,4 +37,4 @@ copy-kokkos.hipcc.${host_arch}: copy-kokkos.cpp
 
 clean:
 	-rm -f *.${host_arch} *.ll *.o
-	-rm -f *~ core *~
+	-rm -f *~ core

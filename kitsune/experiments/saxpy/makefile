@@ -5,7 +5,6 @@ targets = saxpy-forall.opencilk.${host_arch}
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += saxpy-forall.cuda.${host_arch}
   targets += saxpy-kokkos.nvcc.${host_arch}
-  targets += saxpy.cuda.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
@@ -37,5 +36,5 @@ saxpy-kokkos.hipcc.${host_arch}: saxpy-kokkos.cpp
 
 clean:
 	-rm -f *.${host_arch} *.ll *.o
-	-rm -f *~ core *~ *.ppm 
+	-rm -f *~ core 
 
