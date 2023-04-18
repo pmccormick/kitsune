@@ -1645,7 +1645,7 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
   };
   OptimizationLevel optLevel = OptimizationLevel::O2;
   if (OptLevel <= 3) // unsigned... 
-    optLevel = optLevels[OptfLevel];
+    optLevel = optLevels[OptLevel];
   ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
   mpm.addPass(VerifierPass());
   LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");
@@ -2003,11 +2003,16 @@ void HipABI::registerBundle(GlobalVariable *Bundle) {
 
   Function *CtorFn = createCtor(Bundle, Wrapper);
   if (CtorFn) {
+    LLVM_DEBUG(dbgs() << 
+               "\tadding global ctor for runtime and module initialization.\n");
     FunctionType *CtorFnTy = FunctionType::get(VoidTy, false);
     Type *CtorFnPtrTy =
         PointerType::get(CtorFnTy, M.getDataLayout().getProgramAddressSpace());
     tapir::appendToGlobalCtors(M, ConstantExpr::getBitCast(CtorFn, CtorFnPtrTy),
                                65536, nullptr);
+  } else {
+    LLVM_DEBUG(dbgs() << 
+               "WARNING: received null ctor -- initialization skipped?\n");
   }
 }
 
