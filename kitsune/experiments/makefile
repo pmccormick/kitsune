@@ -17,7 +17,7 @@ $(subdirs):
 	$(MAKE) -C $@ $(MAKECMDGOALS)
 
 run: $(subdirs)
-	$(MAKE) -C $@ $(MAKECMDGOALS)
+	$(MAKE) -C $< $(MAKECMDGOALS)
 	
 
 
