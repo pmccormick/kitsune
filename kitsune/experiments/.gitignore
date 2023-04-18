@@ -5,3 +5,4 @@
 *.ll 
 *.tapir
 *.ptx
+*.log

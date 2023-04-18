@@ -1,16 +1,3 @@
-###########
-#
-# NOTE: You will need at least Python 3.7 for this script.
-#
-# Run the set of benchmarks in the directory and capture the results
-# in a CSV output file.  The file is then read and processed via pandas
-# and matplotlib to provide a plot of the performance across all the
-# benchmarks.
-#
-# The code to gather run time data is dependent upon the output format
-# from the benchmarks.  Any changes to the output format will likely
-# break this script.
-#
 import subprocess
 import platform
 import csv
@@ -19,13 +6,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pylab
 
-
-# Grab the local machine's architecture details and the date+time to
-# create a unique filename for this benchmark run.
 march = platform.machine()
 now = datetime.now()
 date_str = now.strftime("%m-%d-%Y_%H:%M")
 print(date_str)
+
+
+
 
 # Number of times to run each benchmark to get an average
 # execution time.
@@ -40,11 +27,10 @@ sample_counts = []
 for sc in (2**p for p in range(2, 6)):
   sample_counts.append(sc)
 
-img_width = 1920
-img_height = 1080
+img_width = 2560
+img_height = 2048
 
-executables = ["raytrace-cuda.clang."+march,
-               "raytrace-cuda.nvcc."+march,
+executables = ["raytracer-forall.cuda."+march,
                "raytrace-kokkos.clang."+march,
                "raytrace-kokkos.nvcc."+march,
                "raytrace-openmp.clang."+march,

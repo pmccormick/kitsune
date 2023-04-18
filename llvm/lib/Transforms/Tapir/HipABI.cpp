@@ -1645,7 +1645,7 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
   };
   OptimizationLevel optLevel = OptimizationLevel::O2;
   if (OptLevel <= 3) // unsigned... 
-    optLevel = optLevels[OptLevel];
+    optLevel = optLevels[OptfLevel];
   ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
   mpm.addPass(VerifierPass());
   LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");

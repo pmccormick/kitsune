@@ -1,6 +1,8 @@
+SHELL := /bin/bash 
 include ../experiments.mk
 
 targets = copy-forall.opencilk.${host_arch}
+
 
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += copy-forall.cuda.${host_arch}
@@ -13,28 +15,62 @@ ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += copy-kokkos.hipcc.${host_arch}
 endif
 
+
 all: ${targets}
 
 # forall-based tests
 copy-forall.opencilk.${host_arch}: copy-forall.cpp 
-	/usr/bin/time $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@echo $@ 
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@${FILE_SIZE}
 copy-forall.cuda.${host_arch}: copy-forall.cpp 
-	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@echo $@
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@${FILE_SIZE}
 copy-forall.hip.${host_arch}: copy-forall.cpp 
-	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@echo $@
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@${FILE_SIZE}
 
 # kokkos-based tests (w/out views)
 copy-kokkos.cuda.kitsune.${host_arch}: copy-kokkos-no-views.cpp 
-	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@echo $@
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@${FILE_SIZE}
 copy-kokkos.hip.kitsune.${host_arch}: copy-kokkos-no-views.cpp 
-	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@echo $@
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@${FILE_SIZE}
 
 # kokkos-based tests (using views -- currently not compatible w/ kitsune)
 copy-kokkos.nvcc.${host_arch}: copy-kokkos.cpp 
-	/usr/bin/time $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+	@echo $@
+	@${TIME_CMD} $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+	@${FILE_SIZE}
 copy-kokkos.hipcc.${host_arch}: copy-kokkos.cpp 
-	/usr/bin/time $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
+	@echo $@
+	@${TIME_CMD} $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
+	@${FILE_SIZE}
+
+
+#####
+define newline 
+
+
+endef 
+
+define RUN_test
+	$$(./$(1) > $(1).log) $(newline) 
+endef
+
+run: $(targets) 
+	@echo "running generated exeutables..."
+	$(foreach prog,$(targets),$(call RUN_test,$(prog)))
+##### 
+
+.PHONY: all clean run
 
 clean:
 	-rm -f *.${host_arch} *.ll *.o
-	-rm -f *~ core
+	-rm -f *~ core *.log 
+
