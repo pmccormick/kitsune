@@ -7,6 +7,10 @@ ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += raytracer-forall.cuda.${host_arch}
   targets += raytracer-kokkos.nvcc.${host_arch}
   targets += raytracer-kokkos.cuda.kitsune.${host_arch}
+<<<<<<< HEAD
+=======
+  targets += raytracer.cuda.${host_arch}
+>>>>>>> a1255055535c (Stray character removal in hip abi transform.)
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
@@ -14,6 +18,10 @@ ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += raytracer-forall.hip.${host_arch}
   targets += raytracer-kokkos.hipcc.${host_arch}
   targets += raytracer-kokkos.hip.kitsune.${host_arch}
+<<<<<<< HEAD
+=======
+  targets += raytracer.hip.${host_arch}
+>>>>>>> a1255055535c (Stray character removal in hip abi transform.)
 endif
 
 all: ${targets}
@@ -29,7 +37,7 @@ raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp
 	@$(FILE_SIZE)
 raytracer-forall.hip.${host_arch}: raytracer-forall.cpp 
 	@echo $@
-	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -mllvm -debug-only=hipabi -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)
@@ -39,7 +47,11 @@ raytracer-kokkos.cuda.kitsune.${host_arch}: raytracer-kokkos-no-view.cpp
 	@$(FILE_SIZE)
 raytracer-kokkos.hip.kitsune.${host_arch}: raytracer-kokkos-no-view.cpp 
 	@echo $@
+<<<<<<< HEAD
 	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -I$(KOKKOS_HIP_PREFIX)/include/ -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+=======
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+>>>>>>> a1255055535c (Stray character removal in hip abi transform.)
 	@$(FILE_SIZE)
 
 # kokkos-based tests (using views -- currently not compatible w/ kitsune)
