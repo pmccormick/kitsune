@@ -33,6 +33,7 @@ endif
 
 ##################################
 TAPIR_HIP_FLAGS?=-ftapir=hip \
+  -O$(KITSUNE_OPTLEVEL) \
   -ffp-contract=fast \
   -mllvm -hipabi-opt-level=$(KITSUNE_OPTLEVEL) \
   -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
