@@ -24,9 +24,9 @@ vecadd-forall.cuda.${host_arch}: vecadd-forall.cpp
 	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 vecadd-forall.hip.${host_arch}: vecadd-forall.cpp 
-	echo $@
-	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
-	$(FILE_SIZE)
+	@echo $@
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)
 vecadd-kokkos.cuda.kitsune.${host_arch}: vecadd-kokkos-no-views.cpp 

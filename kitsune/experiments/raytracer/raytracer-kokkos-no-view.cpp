@@ -147,8 +147,9 @@ KOKKOS_FORCEINLINE_FUNCTION Vec Trace(Vec origin, Vec direction, unsigned int& r
       float v = normal.x * normal.y * u;
       float cosp;
       float sinp;
-
-      sincosf(p, &sinp, &cosp);
+      cosp = cosf(p);
+      sinp = sinf(p);
+      //sincosf(p, &sinp, &cosp);
       direction = Vec(v, g + normal.y * normal.y * u, -normal.y) * (cosp * s) +
                   Vec(1 + g * normal.x * normal.x * u, g * v, -g * normal.x) *
                   (sinp * s) + normal * sqrtf(c);

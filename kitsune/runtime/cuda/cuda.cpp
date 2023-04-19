@@ -51,7 +51,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-
 // TODO:
 //   * Need to do a better job tracking and freeing resources as necessary.
 //   * Need to ponder a path for better stream usage (probably related to
@@ -66,29 +65,28 @@
 #include <iostream>
 #include <list>
 #include <map>
-#include <unordered_map>
 #include <sstream>
 #include <stdbool.h>
+#include <unordered_map>
 
 #include <cuda.h>
 
-#include "../kitrt.h"
 #include "../debug.h"
 #include "../dlutils.h"
+#include "../kitrt.h"
 #include "../memory_map.h"
 #include "./cuda.h"
 
-//#define _KITRT_VERBOSE_
-// Has the runtime been initialized?
+// #define _KITRT_VERBOSE_
+//  Has the runtime been initialized?
 static bool _kitrt_cuIsInitialized = false;
 
 // Measure internal timing of launched kernels.
 static bool _kitrtEnableTiming = false;
 // Automatically report kernel execution times to stdout.
-static bool   _kitrtReportTiming = false;
+static bool _kitrtReportTiming = false;
 // Last measured kernel execution time.
 static double _kitrtLastEventTime = 0.0f;
-
 
 // Use heuristic-based launch parameters.
 static bool _kitrtUseHeuristicLaunchParameters = false;
@@ -106,7 +104,7 @@ static bool _kitrtUseCustomLaunchParameters = false;
 
 // CUDA device (-1 flags an uninitialized state). At present
 // runtime only supports a single device.
-static CUdevice  _kitrtCUdevice = -1;
+static CUdevice _kitrtCUdevice = -1;
 
 // Default CUDA context (a nullptr flags an uninitialized state).
 // At present the runtime only supports a single context.
@@ -117,7 +115,6 @@ static CUcontext _kitrtCUcontext = nullptr;
 // have limited success.  Note that it can significantly
 // avoid page miss costs.
 static bool _kitrt_cuEnablePrefetch = true;
-
 
 // NOTE: Over a series of CUDA releases it is worthwhile to
 // check in on the header files for replacement versioned
@@ -179,7 +176,7 @@ DECLARE_DLSYM(cuOccupancyMaxPotentialBlockSize);
 //
 // TODO: Is there a faster path here for lookup?  Is a map more
 // complicated than necessary?
-typedef std::unordered_map<const void*, CUmodule>  KitRTModuleMap;
+typedef std::unordered_map<const void *, CUmodule> KitRTModuleMap;
 static KitRTModuleMap _kitrtModuleMap;
 
 // Alongside the module map the runtime also maintains a map from
@@ -188,9 +185,8 @@ static KitRTModuleMap _kitrtModuleMap;
 //
 // TODO: Ditto from above.  Is there a faster path here for lookup?
 // Is a map more complicated than necessary?
-typedef std::unordered_map<const char *, CUfunction>  KitRTKernelMap;
+typedef std::unordered_map<const char *, CUfunction> KitRTKernelMap;
 static KitRTKernelMap _kitrtKernelMap;
-
 
 // When the compiler generates a prefetch-driven series of kernel
 // launches we have multiple prefetch-to-launch streams to
@@ -307,8 +303,8 @@ bool __kitrt_cuInit() {
   CU_SAFE_CALL(cuCtxSetCurrent_p(_kitrtCUcontext));
   _kitrt_cuIsInitialized = true;
 
-   char *envValue;
-   if ((envValue = getenv("KITRT_USE_OCCUPANCY_HEURISTIC"))) {
+  char *envValue;
+  if ((envValue = getenv("KITRT_USE_OCCUPANCY_HEURISTIC"))) {
     _kitrtUseHeuristicLaunchParameters = true;
   } else {
     _kitrtUseHeuristicLaunchParameters = false;
@@ -344,8 +340,7 @@ void __kitrt_cuCheckCtxState() {
 
 // ---- Managed memory allocation, tracking, etc.
 
-__attribute__((malloc))
-void *__kitrt_cuMemAllocManaged(size_t size) {
+__attribute__((malloc)) void *__kitrt_cuMemAllocManaged(size_t size) {
   if (not _kitrt_cuIsInitialized)
     __kitrt_cuInit();
 
@@ -357,18 +352,15 @@ void *__kitrt_cuMemAllocManaged(size_t size) {
   // stream.  Recall that the current practice is for the actual allocation
   // to occur on first touch -- thus our 'prefetch' status here is a bit
   // misleading (technically we are not prefetched to either host nor device).
-  CU_SAFE_CALL(cuMemAdvise_p(devp, size,
-               CU_MEM_ADVISE_SET_ACCESSED_BY,
-               _kitrtCUdevice));
+  CU_SAFE_CALL(
+      cuMemAdvise_p(devp, size, CU_MEM_ADVISE_SET_ACCESSED_BY, _kitrtCUdevice));
 
-  CU_SAFE_CALL(cuMemAdvise_p(devp, size,
-               CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
-               _kitrtCUdevice));
+  CU_SAFE_CALL(cuMemAdvise_p(devp, size, CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
+                             _kitrtCUdevice));
 
   int enable = 1;
-  CU_SAFE_CALL(cuPointerSetAttribute_p(&enable,
-               CU_POINTER_ATTRIBUTE_SYNC_MEMOPS,
-               devp));
+  CU_SAFE_CALL(
+      cuPointerSetAttribute_p(&enable, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, devp));
 
   // Register this allocation so the runtime can help track the
   // locality (and affinity) of data.
@@ -403,25 +395,20 @@ bool __kitrt_cuIsMemManaged(void *vp) {
 
 // ---- Memory/data prefetch and data movement support.
 
-void __kitrt_cuEnablePrefetch() {
-  _kitrt_cuEnablePrefetch = true;
-}
+void __kitrt_cuEnablePrefetch() { _kitrt_cuEnablePrefetch = true; }
 
-void __kitrt_cuDisablePrefetch() {
-  _kitrt_cuEnablePrefetch = false;
-}
+void __kitrt_cuDisablePrefetch() { _kitrt_cuEnablePrefetch = false; }
 
 void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
-  #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: prefetch request for pointer %p on stream %p.\n",
-          vp, stream);
-  #endif
+#ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: prefetch request for pointer %p on stream %p.\n", vp,
+          stream);
+#endif
   if (__kitrt_cuIsMemManaged(vp) && not __kitrt_isMemPrefetched(vp)) {
     size_t size = __kitrt_getMemAllocSize(vp);
     if (size > 0) {
-      CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size,
-                                        _kitrtCUdevice,
+      CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitrtCUdevice,
                                         (CUstream)stream));
       __kitrt_markMemPrefetched(vp);
     }
@@ -433,16 +420,15 @@ void __kitrt_cuMemPrefetch(void *vp) {
   __kitrt_cuMemPrefetchOnStream(vp, NULL);
 }
 
-void* __kitrt_cuStreamMemPrefetch(void *vp) {
+void *__kitrt_cuStreamMemPrefetch(void *vp) {
   CUstream stream;
   CU_SAFE_CALL(cuStreamCreate_p(&stream, CU_STREAM_NON_BLOCKING));
   __kitrt_cuMemPrefetchOnStream(vp, stream);
   _kitrtActiveStreams.push_back(stream);
-  return (void*)stream;
+  return (void *)stream;
 }
 
-void __kitrt_cuMemcpySymbolToDevice(void *hostPtr,
-                                    uint64_t devPtr,
+void __kitrt_cuMemcpySymbolToDevice(void *hostPtr, uint64_t devPtr,
                                     size_t size) {
   assert(devPtr != 0 && "unexpected null device pointer!");
   assert(hostPtr != nullptr && "unexpected null host pointer!");
@@ -467,14 +453,14 @@ static void __kitrt_cuMaxPotentialBlockSize(int &blocksPerGrid,
                                             int &threadsPerBlock, CUfunction F,
                                             size_t numElements) {
 
-  CU_SAFE_CALL(cuOccupancyMaxPotentialBlockSize_p(&blocksPerGrid,
-                                          &threadsPerBlock, F, 0,
-                                          0, // no dynamic shared memory...
-                                          0));
-  #ifdef _KITRT_VERBOSE_
+  CU_SAFE_CALL(
+      cuOccupancyMaxPotentialBlockSize_p(&blocksPerGrid, &threadsPerBlock, F, 0,
+                                         0, // no dynamic shared memory...
+                                         0));
+#ifdef _KITRT_VERBOSE_
   fprintf(stderr, "occupancy returned: %d, %d\n", blocksPerGrid,
           threadsPerBlock);
-  #endif
+#endif
   blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
 }
 
@@ -490,20 +476,23 @@ uint64_t __kitrt_cuGetGlobalSymbol(const char *SN, void *CM) {
   assert(SN && "null symbol name (SN)!");
   assert(CM && "null (opaque) CUDA module");
   CUmodule Module = (CUmodule)CM;
+
   // NOTE: The device pointer and size ('bytes') parameters for
   // cuModuleGetGlobal are optional.  To simplify our code gen
   // work we ignore the size parameter (which is NULL below).
   CUdeviceptr devPtr;
   size_t bytes;
   CUresult result;
-  if ((result = cuModuleGetGlobal_v2_p(&devPtr, &bytes, Module, SN)) != CUDA_SUCCESS) {
+  if ((result = cuModuleGetGlobal_v2_p(&devPtr, &bytes, Module, SN)) !=
+      CUDA_SUCCESS) {
     fprintf(stderr, "kitrt: error finding symbol '%s'.\n", SN);
     const char *msg;
     cuGetErrorName_p(result, &msg);
     fprintf(stderr, "kitrt %s:%d:\n", __FILE__, __LINE__);
-    fprintf(stderr, "  %s failed ('%s')\n", "cuModuleGetGlobal()", msg);
+    fprintf(stderr, "  cuModuleGetGlobal() failed ('%s')\n", msg);
     cuGetErrorString_p(result, &msg);
     fprintf(stderr, "  error: '%s'\n", msg);
+    fprintf(stderr, "symbol name: %s\n", SN);
     exit(1);
   }
   return devPtr;
@@ -550,11 +539,8 @@ void *__kitrt_cuLaunchModuleKernel(void *mod, const char *kernelName,
   fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
 #endif
 
-  CU_SAFE_CALL(cuLaunchKernel_p(kFunc,
-                                blocksPerGrid, 1, 1,
-                                threadsPerBlock, 1, 1,
-                                0, nullptr/*stream*/,
-                                fatBinArgs, NULL));
+  CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
+                                1, 0, nullptr /*stream*/, fatBinArgs, NULL));
 
   if (_kitrtEnableTiming) {
     cuEventRecord_p(stop, 0);
@@ -571,10 +557,8 @@ void *__kitrt_cuLaunchModuleKernel(void *mod, const char *kernelName,
   return nullptr;
 }
 
-void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
-                                     const char *kernelName,
-                                     void **fatBinArgs,
-                                     uint64_t numElements) {
+void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin, const char *kernelName,
+                                     void **fatBinArgs, uint64_t numElements) {
   assert(fatBin && "request to launch null fat binary image!");
   assert(kernelName && "request to launch kernel w/ null name!");
   int threadsPerBlock, blocksPerGrid;
@@ -627,10 +611,8 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
   fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
 #endif
 
-  CU_SAFE_CALL(cuLaunchKernel_p(kFunc,
-                                blocksPerGrid, 1, 1,
-                                threadsPerBlock, 1, 1, 0,
-                                stream, fatBinArgs, NULL));
+  CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
+                                1, 0, stream, fatBinArgs, NULL));
   if (_kitrtEnableTiming) {
     cuEventRecord_p(stop, stream);
     cuEventSynchronize_p(stop);
@@ -647,10 +629,8 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin,
 }
 
 void __kitrt_cuLaunchFBKernelOnStream(const void *fatBin,
-                                      const char *kernelName,
-                                      void **fatBinArgs,
-                                      uint64_t numElements,
-                                      void *stream) {
+                                      const char *kernelName, void **fatBinArgs,
+                                      uint64_t numElements, void *stream) {
   assert(fatBin && "request to launch null fat binary image!");
   assert(kernelName && "request to launch kernel w/ null name!");
   int threadsPerBlock, blocksPerGrid;
@@ -718,10 +698,8 @@ void __kitrt_cuLaunchFBKernelOnStream(const void *fatBin,
 }
 
 // Launch a kernel on the default stream.
-void __kitrt_cuLaunchKernel(const void *fatBin,
-                            const char *kernelName,
-                            void **fatBinArgs,
-                            uint64_t numElements,
+void __kitrt_cuLaunchKernel(const void *fatBin, const char *kernelName,
+                            void **fatBinArgs, uint64_t numElements,
                             void *stream) {
   assert(fatBin && "request to launch with null fat binary image!");
   assert(kernelName && "request to launch kernel w/ null name!");
@@ -746,12 +724,12 @@ void __kitrt_cuLaunchKernel(const void *fatBin,
   }
 
   __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
-  #ifdef _KITRT_VERBOSE_
+#ifdef _KITRT_VERBOSE_
   fprintf(stderr, "launch parameters for %s:\n", kernelName);
   fprintf(stderr, "\tnumber of overall elements: %ld\n", numElements);
   fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
   fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
-  #endif
+#endif
 
   CUevent start, stop;
   if (_kitrtEnableTiming) {
@@ -768,13 +746,10 @@ void __kitrt_cuLaunchKernel(const void *fatBin,
     cuEventRecord_p(start, 0);
   }
 
-  CU_SAFE_CALL(cuLaunchKernel_p(kFunc,
-                                blocksPerGrid, 1, 1,
-                                threadsPerBlock, 1, 1,
+  CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
+                                1,
                                 0, // shared mem size
-                                (CUstream)stream,
-                                fatBinArgs,
-                                NULL));
+                                (CUstream)stream, fatBinArgs, NULL));
 
   if (_kitrtEnableTiming) {
     cuEventRecord_p(stop, 0);
@@ -805,7 +780,7 @@ void *__kitrt_cuLaunchELFKernel(const void *elf, void **args,
   int threadsPerBlock, blocksPerGrid;
   __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
   CU_SAFE_CALL(cuLaunchKernel_p(kernel, blocksPerGrid, 1, 1, // grid dim
-                                threadsPerBlock, 1, 1, // block dim
+                                threadsPerBlock, 1, 1,       // block dim
                                 0, stream,    // shared mem and stream
                                 args, NULL)); // arguments
   return stream;
@@ -833,13 +808,12 @@ void __kitrt_cuSynchronizeStreams() {
   // default stream.  Otherwise, we need to sync on each of the active
   // streams.
   CU_SAFE_CALL(cuCtxSynchronize());
-  while(not _kitrtActiveStreams.empty()) {
+  while (not _kitrtActiveStreams.empty()) {
     CUstream stream = _kitrtActiveStreams.front();
     CU_SAFE_CALL(cuStreamDestroy(stream));
     _kitrtActiveStreams.pop_front();
   }
 }
-
 
 // ---- Event management for timing, etc.
 
@@ -859,14 +833,12 @@ void __kitrt_cuToggleEventTiming() {
   _kitrtLastEventTime = 0.0;
 }
 
-double __kitrt_cuGetLastEventTime() {
-  return _kitrtLastEventTime;
-}
+double __kitrt_cuGetLastEventTime() { return _kitrtLastEventTime; }
 
-void* __kitrt_cuCreateEvent() {
+void *__kitrt_cuCreateEvent() {
   CUevent e;
   CU_SAFE_CALL(cuEventCreate_p(&e, CU_EVENT_DEFAULT));
-  return (void*)e;
+  return (void *)e;
 }
 
 void __kitrt_cuDestroyEvent(void *E) {
@@ -888,8 +860,7 @@ float __kitrt_cuElapsedEventTime(void *start, void *stop) {
   assert(start && "unexpected null start event!");
   float msecs;
   CU_SAFE_CALL(cuEventElapsedTime_p(&msecs, (CUevent)start, (CUevent)stop));
-  return(msecs/1000.0f);
+  return (msecs / 1000.0f);
 }
-
 
 } // extern "C"

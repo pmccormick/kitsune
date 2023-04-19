@@ -18,7 +18,7 @@ TAPIR_CUDA_FLAGS?=-ftapir=cuda \
  -mllvm -cuabi-streams=false \
  -mllvm -cuabi-run-post-opts=false \
  -mllvm -cuabi-arch=$(CUDA_ARCH) \
- $(GPU_STRIPMINE_FLAGS)
+ $(GPU_STRIPMINE_FLAGS)\
 
 TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda,--lto-O${KITSUNE_OPTLEVEL},\
 -mllvm,-cuabi-opt-level=${KITSUNE_OPTLEVEL},-mllvm,-cuabi-arch=$(CUDA_ARCH),\
@@ -26,7 +26,7 @@ TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda,--lto-O${KITSUNE_OPTLEVEL},\
 -mllvm,-stripmine-coarsen-factor=1,-mllvm,-stripmine-count=1
 
 ifneq ($(KITSUNE_VERBOSE),)
-  TAPIR_CUDA_FLAGS+=-mllvm -debug-only=cuabi
+  TAPIR_CUDA_FLAGS+=-mllvm -debug-only=cuabi $(TAPIR_CUDA_DEBUG_FLAGS)
 endif
 ##################################
 
@@ -47,7 +47,7 @@ TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O$(KITSUNE_OPTLEVEL),\
 -mllvm,-stripmine-coarsen-factor=1,-mllvm,-stripmine-count=1
 
 ifneq ($(KITSUNE_VERBOSE),)
-  TAPIR_HIP_FLAGS+=-mllvm -debug-only=hipabi
+  TAPIR_HIP_FLAGS+=-mllvm -debug-only=hipabi $(TAPIR_HIP_DEBUG_FLAGS)
 endif
 ##################################
 

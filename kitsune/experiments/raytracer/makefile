@@ -31,7 +31,7 @@ raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp
 	@$(FILE_SIZE)
 raytracer-forall.hip.${host_arch}: raytracer-forall.cpp 
 	@echo $@
-	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -mllvm -debug-only=hipabi -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)
