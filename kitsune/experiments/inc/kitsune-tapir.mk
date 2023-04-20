@@ -4,6 +4,7 @@
 # 
 KITSUNE_PREFIX?=/projects/kitsune/${host_arch}/15.x
 KITSUNE_OPTLEVEL?=3
+KITSUNE_ABI_OPTLEVEL?=$(KITSUNE_OPTLEVEL)
 KITSUNE_OPTFLAGS?=-O$(KITSUNE_OPTLEVEL)
 
 # For now we disable stripmining on GPUs.
@@ -13,7 +14,7 @@ GPU_STRIPMINE_FLAGS?=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=
 TAPIR_CUDA_FLAGS?=-ftapir=cuda \
  -O$(KITSUNE_OPTLEVEL) \
  -ffp-contract=fast \
- -mllvm -cuabi-opt-level=$(KITSUNE_OPTLEVEL) \
+ -mllvm -cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
  -mllvm -cuabi-prefetch=true \
  -mllvm -cuabi-streams=false \
  -mllvm -cuabi-run-post-opts=false \
@@ -35,7 +36,7 @@ endif
 TAPIR_HIP_FLAGS?=-ftapir=hip \
   -O$(KITSUNE_OPTLEVEL) \
   -ffp-contract=fast \
-  -mllvm -hipabi-opt-level=$(KITSUNE_OPTLEVEL) \
+  -mllvm -hipabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
   -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
   -mllvm -hipabi-xnack=true \
   -mllvm -amdgpu-internalize-symbols \

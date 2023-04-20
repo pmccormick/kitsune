@@ -960,7 +960,7 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
       if (GV->isConstant())
         NewGV = new GlobalVariable(
             KernelModule, GV->getValueType(), /*isConstant*/ true, LinkType,
-            GV->getInitializer(), GV->getName() + ".devvar",
+            GV->getInitializer(), GV->getName() + ".gv_devvar",
             (GlobalVariable *)nullptr, GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
       else {
@@ -973,7 +973,7 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
             KernelModule, GV->getValueType(),
             /*isConstant*/ false, GlobalValue::ExternalLinkage,
             (Constant *)Constant::getNullValue(GV->getValueType()),
-            GV->getName() + ".devvar", (GlobalVariable *)nullptr,
+            GV->getName() + ".gv_devvar", (GlobalVariable *)nullptr,
             GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
         TTarget->pushGlobalVariable(GV);
@@ -1619,13 +1619,13 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
               // to go between the call instruction and the launch.
               assert(NI && "unexpected null instruction!");
               for (auto &HostGV : GlobalVars) {
-                std::string DevVarName = HostGV->getName().str() + ".devvar";
+                std::string DevVarName = HostGV->getName().str() + ".gv_devvar";
                 LLVM_DEBUG(dbgs() << "\t\t* processing global: "
                                   << HostGV->getName() << "\n");
                 Value *SymName =
                     tapir::createConstantStr(DevVarName, M, DevVarName);
                 Value *DevPtr = CallInst::Create(
-                    KitHipGetGlobalSymbolFn, {SymName, CI}, ".gv_devptr", NI);
+                    KitHipGetGlobalSymbolFn, {SymName, CI}, ".gv_devvar", NI);
 
                 Value *VGVPtr =
                     CastInst::CreatePointerCast(HostGV, VoidPtrTy, "", NI);
@@ -1911,7 +1911,7 @@ void HipABI::bindGlobalVariables(Value *Handle, IRBuilder<> &B) {
   for (auto &HostGV : GlobalVars) {
     uint64_t VarSize = DL.getTypeAllocSize(HostGV->getType());
     Value *VarName = tapir::createConstantStr(HostGV->getName().str(), M);
-    std::string DevVarName = HostGV->getName().str() + ".devvar";
+    std::string DevVarName = HostGV->getName().str() + ".gv_devvar";
     Value *DevName = tapir::createConstantStr(DevVarName, M, DevVarName);
     llvm::Value *Args[] = {
         Handle,
