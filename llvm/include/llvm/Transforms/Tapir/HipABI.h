@@ -188,7 +188,7 @@ public:
   /// @param BundleBin -- the fat binary image that contains the kernels.
   void finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin);
 
-  typedef std::list<GlobalVariable *> GlobalVarListTy;
+  typedef std::list<GlobalVariable*> GlobalVarListTy;
   GlobalVarListTy GlobalVars;
   typedef std::set<Value *> SyncRegionListTy;
   SyncRegionListTy SyncRegList;

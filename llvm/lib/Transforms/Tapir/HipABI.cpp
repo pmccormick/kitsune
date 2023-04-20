@@ -945,12 +945,6 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
       // We don't necessarily need a GPU-side clone of a
       // global variable -- instead we need a location where
       // we can copy symbol information over from the host.
-      GlobalValue::LinkageTypes LinkType;
-
-      if (GV->hasInitializer())
-        LinkType = GlobalValue::InternalLinkage;
-      else
-        LinkType = GlobalValue::ExternalWeakLinkage;
       GlobalVariable *NewGV = nullptr;
       // If GV is a constant we can clone the entire
       // variable over, including the initalizer
@@ -959,9 +953,10 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
       // host).  TODO: make sure this is sound!
       if (GV->isConstant())
         NewGV = new GlobalVariable(
-            KernelModule, GV->getValueType(), /*isConstant*/ true, LinkType,
-            GV->getInitializer(), GV->getName() + ".gv_devvar",
-            (GlobalVariable *)nullptr, GlobalValue::NotThreadLocal,
+            KernelModule, GV->getValueType(), /*isConstant*/ true,
+            GlobalValue::InternalLinkage, GV->getInitializer(),
+            GV->getName() + ".dev_gv", (GlobalVariable *)nullptr,
+            GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
       else {
         // If GV is non-constant we will need to
@@ -973,7 +968,7 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
             KernelModule, GV->getValueType(),
             /*isConstant*/ false, GlobalValue::ExternalLinkage,
             (Constant *)Constant::getNullValue(GV->getValueType()),
-            GV->getName() + ".gv_devvar", (GlobalVariable *)nullptr,
+            GV->getName() + ".dev_gv", (GlobalVariable *)nullptr,
             GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
         TTarget->pushGlobalVariable(GV);
@@ -1619,13 +1614,13 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
               // to go between the call instruction and the launch.
               assert(NI && "unexpected null instruction!");
               for (auto &HostGV : GlobalVars) {
-                std::string DevVarName = HostGV->getName().str() + ".gv_devvar";
+                std::string DevVarName = HostGV->getName().str() + ".dev_gv";
                 LLVM_DEBUG(dbgs() << "\t\t* processing global: "
                                   << HostGV->getName() << "\n");
                 Value *SymName =
                     tapir::createConstantStr(DevVarName, M, DevVarName);
-                Value *DevPtr = CallInst::Create(
-                    KitHipGetGlobalSymbolFn, {SymName, CI}, ".gv_devvar", NI);
+                Value *DevPtr = CallInst::Create(KitHipGetGlobalSymbolFn,
+                                                 {SymName, CI}, ".dev_gv", NI);
 
                 Value *VGVPtr =
                     CastInst::CreatePointerCast(HostGV, VoidPtrTy, "", NI);
@@ -1898,33 +1893,42 @@ void HipABI::bindGlobalVariables(Value *Handle, IRBuilder<> &B) {
   LLVMContext &Ctx = M.getContext();
   const DataLayout &DL = M.getDataLayout();
   Type *IntTy = Type::getInt32Ty(Ctx);
-  Type *Int64Ty = Type::getInt64Ty(Ctx);
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
   PointerType *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
-  Type *VarSizeTy = Int64Ty;
+  Type *VarSizeTy = IntTy;
   PointerType *CharPtrTy = Type::getInt8PtrTy(Ctx);
 
   FunctionCallee RegisterVarFn = M.getOrInsertFunction(
-      "__hipRegisterManagedVar", VoidTy, VoidPtrPtrTy, CharPtrTy, CharPtrTy,
-      CharPtrTy, IntTy, VarSizeTy, IntTy, IntTy);
-  for (auto &HostGV : GlobalVars) {
-    uint64_t VarSize = DL.getTypeAllocSize(HostGV->getType());
-    Value *VarName = tapir::createConstantStr(HostGV->getName().str(), M);
-    std::string DevVarName = HostGV->getName().str() + ".gv_devvar";
-    Value *DevName = tapir::createConstantStr(DevVarName, M, DevVarName);
-    llvm::Value *Args[] = {
-        Handle,
-        B.CreateBitCast(HostGV, VoidPtrTy),
-        VarName,
-        DevName,
-        ConstantInt::get(IntTy, 0), // HostGV->isExternalLinkage()),
-        ConstantInt::get(VarSizeTy, VarSize),
-        ConstantInt::get(IntTy, HostGV->isConstant()),
-        ConstantInt::get(IntTy, 0)};
+      "__hipRegisterManagedVar",
+      VoidTy,       // returns nothing...
+      VoidPtrPtrTy, // fatbin handle
+      VoidPtrTy,    // Device side (managed) variable (cast).
+      VoidPtrTy,    // Global (host side) variable (cast).
+      CharPtrTy,    // variable name (same on both device and host side?)
+      VarSizeTy,    // variable size (bytes?)
+      IntTy);       // alignment
 
-    LLVM_DEBUG(dbgs() << "\thost global '" << HostGV->getName().str()
+  for (GlobalVariable *HostGV : GlobalVars) {
+    std::string DevVarName = HostGV->getName().str() + ".dev_gv";
+    GlobalVariable *DevGV = KernelModule.getGlobalVariable(DevVarName);
+    assert(DevGV && "unable to find global variable!");
+    PointerType *VoidDevPtrTy = Type::getInt8PtrTy(Ctx, DevGV->getAddressSpace());
+    Value *DevGVAddrCast = B.CreatePointerBitCastOrAddrSpaceCast(DevGV, VoidPtrTy);
+    Value *VarName = tapir::createConstantStr(DevVarName, M);
+    uint64_t VarSize = DL.getTypeAllocSize(HostGV->getValueType());
+    LLVM_DEBUG(dbgs() << "\t\thost global '" << HostGV->getName().str()
                       << "' to device '" << DevVarName << "'.\n");
+    errs() << *DevGV << "\n"
+           << *DevGV->getValueType() << "\n";
+    errs() << *HostGV << "\n"
+           << *HostGV->getValueType() << "\n";
+    llvm::Value *Args[] = {Handle, // fat binary handle
+                           B.CreateBitOrPointerCast(HostGV, VoidPtrTy),
+                           B.CreateBitOrPointerCast(HostGV, VoidPtrTy),
+                           VarName,
+                           ConstantInt::get(VarSizeTy, VarSize),
+                           ConstantInt::get(IntTy, DevGV->getAlignment())};
     B.CreateCall(RegisterVarFn, Args);
   }
 }
@@ -1984,7 +1988,7 @@ Function *HipABI::createCtor(GlobalVariable *Bundle, GlobalVariable *Wrapper) {
   // if (not KernelFunctions.empty())
   //   registerKernels(HandlePtr, CtorBuilder);
 
-   // TODO: It is not 100% clear what calls we actually need to make
+  // TODO: It is not 100% clear what calls we actually need to make
   // here for kernel, variable, etc. registration with CUDA.  Clang
   // makes these calls but we are targeting CUDA driver API entry
   // points via the Kitsune runtime library so these calls are
