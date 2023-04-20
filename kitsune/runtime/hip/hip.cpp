@@ -207,7 +207,6 @@ static bool __kitrt_hipLoadDLSyms() {
     DLSYM_LOAD(hipPointerGetAttributes);
     DLSYM_LOAD(hipMemcpyHtoD);
     DLSYM_LOAD(hipMemPrefetchAsync);
-    DLSYM_LOAD(hipModuleGetGlobal);
     // ---- Kernel operations, modules, launching, streams, etc.
     DLSYM_LOAD(hipModuleLoadData);
     DLSYM_LOAD(hipModuleGetGlobal);
@@ -491,7 +490,7 @@ void *__kitrt_hipModuleLoadData(const void *image) {
   return (void*)module;
 }
 
-uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod) {
+void *__kitrt_hipGetGlobalSymbol(const char *symName, void *mod) {
   assert(symName && "unexpected null symbol name!");
   assert(mod && "unexpected null module pointer!");
 
@@ -502,11 +501,10 @@ uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod) {
 
   // TODO: Might need to revisit the details here to make sure they
   // fit the HIP API details.
-  hipModule_t *module = (hipModule_t*)mod;
   hipDeviceptr_t devPtr;
   size_t bytes;
-  HIP_SAFE_CALL(hipModuleGetGlobal_p(&devPtr, &bytes, *module, symName));
-  return (uint64_t)devPtr;
+  HIP_SAFE_CALL(hipModuleGetGlobal_p(&devPtr, &bytes, (hipModule_t)mod, symName));
+  return (void*)devPtr;
 }
 
 void __kitrt_hipLaunchModuleKernel(void *module, 

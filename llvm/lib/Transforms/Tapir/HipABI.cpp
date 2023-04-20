@@ -819,7 +819,7 @@ HipLoop::HipLoop(Module &M, Module &KModule, const std::string &Name,
       M.getOrInsertFunction("__kitrt_hipModuleLoadData", VoidPtrTy, VoidPtrTy);
   KitHipGetGlobalSymbolFn =
       M.getOrInsertFunction("__kitrt_hipGetGlobalSymbol",
-                            Int64Ty,    // return the device pointer for symbol.
+                            VoidPtrTy,    // return the device pointer for symbol.
                             CharPtrTy,  // symbol name
                             VoidPtrTy); // HIP module
 
@@ -1572,7 +1572,7 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
   // created from the fat binary.
   FunctionCallee KitHipGetGlobalSymbolFn =
       M.getOrInsertFunction("__kitrt_hipGetGlobalSymbol",
-                            Int64Ty,    // device pointer
+                            VoidPtrTy,   // device pointer
                             CharPtrTy,  // symbol name
                             VoidPtrTy); // HIP "module"
 

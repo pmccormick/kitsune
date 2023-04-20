@@ -132,7 +132,7 @@ void __kitrt_hipMemcpySymbolToDevice(void *hostPtr, void *devPtr, size_t size);
 // ---- Kernel operations, launching, streams, etc.
 void *__kitrt_hipModuleLoadData(const void *image);
 
-uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod);
+void *__kitrt_hipGetGlobalSymbol(const char *symName, void *mod);
 
 void __kitrt_hipLaunchKernel(const void *fatBin,     // fat binary w/ kernel
                              const char *kernelName, // kernel to launch
