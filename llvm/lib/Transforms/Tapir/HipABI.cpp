@@ -819,7 +819,7 @@ HipLoop::HipLoop(Module &M, Module &KModule, const std::string &Name,
       M.getOrInsertFunction("__kitrt_hipModuleLoadData", VoidPtrTy, VoidPtrTy);
   KitHipGetGlobalSymbolFn =
       M.getOrInsertFunction("__kitrt_hipGetGlobalSymbol",
-                            VoidPtrTy,    // return the device pointer for symbol.
+                            VoidPtrTy,  // return the device pointer for symbol.
                             CharPtrTy,  // symbol name
                             VoidPtrTy); // HIP module
 
@@ -1580,7 +1580,7 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
       M.getOrInsertFunction("__kitrt_hipMemcpySymbolToDevice",
                             VoidTy,    // returns
                             VoidPtrTy, // host ptr
-                            Int64Ty,   // device ptr
+                            VoidPtrTy, // device ptr
                             Int64Ty);  // num bytes
 
   // TODO: We need to revisit the handling of global variables here.
