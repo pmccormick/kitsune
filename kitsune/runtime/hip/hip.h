@@ -130,7 +130,7 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream);
 void __kitrt_hipMemcpySymbolToDevice(void *hostPtr, void *devPtr, size_t size);
 
 // ---- Kernel operations, launching, streams, etc.
-void *__kitrt_hipCreateObjectModule(const void *image);
+void *__kitrt_hipModuleLoadData(const void *image);
 
 uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod);
 
@@ -141,11 +141,12 @@ void __kitrt_hipLaunchKernel(const void *fatBin,     // fat binary w/ kernel
                              void *stream,           // stream to run in
                              size_t argSize);        // size in bytes of KernelArgs
 
-void __kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
-                               void **kernelArgs, uint64_t numElements);
-
-void  __kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
-                                   void **args, uint64_t numElements);
+void  __kitrt_hipLaunchModuleKernel(void *module,      // module handle
+                              const char *kernelName,  // kernel to launch
+                              void       *kernelArgs,  // args to kernel
+                              uint64_t    numElements, // trip count
+                              void       *stream,      // stream to run in
+                              size_t     argSize);     // size of kernel args (bytes)
 
 void __kitrt_hipStreamSynchronize(void *vStream);
 

@@ -735,7 +735,6 @@ HipLoop::HipLoop(Module &M, Module &KModule, const std::string &Name,
   Type *Int64Ty = Type::getInt64Ty(Ctx);
   Type *VoidTy = Type::getVoidTy(Ctx);
   PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
-  PointerType *VoidPtrPtrTy = VoidPtrTy->getPointerTo();
   PointerType *CharPtrTy = Type::getInt8PtrTy(Ctx);
 
   // We use ROCm/HSA/HIP entry points for various runtime calls.  These calls
@@ -793,12 +792,13 @@ HipLoop::HipLoop(Module &M, Module &KModule, const std::string &Name,
 
   KitHipModuleLaunchFn =
       M.getOrInsertFunction("__kitrt_hipLaunchModuleKernel",
-                            VoidPtrTy,    // returns an opaque stream
-                            VoidPtrTy,    // module
-                            VoidPtrTy,    // kernel name
-                            VoidPtrPtrTy, // arguments
-                            Int64Ty,      // trip count
-                            VoidPtrTy);   // stream
+                            VoidTy,    // no return
+                            VoidPtrTy, // module ptr
+                            VoidPtrTy, // kernel name
+                            VoidPtrTy, // arguments
+                            Int64Ty,   // trip count
+                            VoidPtrTy, // stream
+                            Int64Ty);  // argument size (in bytes)
 
   KitHipWaitFn =
       M.getOrInsertFunction("__kitrt_hipStreamSynchronize", VoidTy, VoidPtrTy);
@@ -815,8 +815,8 @@ HipLoop::HipLoop(Module &M, Module &KModule, const std::string &Name,
       VoidPtrTy,                        // pointer to prefetch.
       VoidPtrTy);                       // run in this stream.
 
-  KitHipCreateFBModuleFn = M.getOrInsertFunction(
-      "__kitrt_hipCreateObjectModule", VoidPtrTy, VoidPtrTy);
+  KitHipModuleLoadDataFn =
+      M.getOrInsertFunction("__kitrt_hipModuleLoadData", VoidPtrTy, VoidPtrTy);
   KitHipGetGlobalSymbolFn =
       M.getOrInsertFunction("__kitrt_hipGetGlobalSymbol",
                             Int64Ty,    // return the device pointer for symbol.
@@ -1330,9 +1330,9 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   } else {
     LLVM_DEBUG(dbgs() << "\tcreating kernel launch (w/ globals).\n");
     Value *VPKernArgs = B.CreateBitCast(KernelArgs, VoidPtrTy);
-    Value *HipModule = B.CreateCall(KitHipCreateFBModuleFn, {ProxyFBPtr});
-    B.CreateCall(KitHipModuleLaunchFn,
-                 {HipModule, KNameParam, VPKernArgs, TCCI, prefetchStream});
+    Value *HipModule = B.CreateCall(KitHipModuleLoadDataFn, {ProxyFBPtr});
+    B.CreateCall(KitHipModuleLaunchFn, {HipModule, KNameParam, VPKernArgs, TCCI,
+                                        prefetchStream, ArgsSize});
   }
 }
 
@@ -1607,9 +1607,11 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
                   BundleBin, VoidPtrTy, "_hipbin.fatbin", CI);
               LLVM_DEBUG(dbgs() << "\t\t* patching launch: " << *CI << "\n");
               CI->setArgOperand(0, HipFatbin);
-            } else if (CFn->getName().startswith("__kitrt_hipCreateFBModule")) {
+            } else if (CFn->getName().startswith("__kitrt_hipModuleLoadData")) {
               Value *HipFatbin = CastInst::CreateBitOrPointerCast(
                   BundleBin, VoidPtrTy, "_hipbin.fatbin", CI);
+              LLVM_DEBUG(dbgs()
+                         << "\t\t* patching module launch: " << *CI << "\n");
               CI->setArgOperand(0, HipFatbin);
               Instruction *NI = CI->getNextNonDebugInstruction();
               // Unless someting else has monkeyed with our generated code

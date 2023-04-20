@@ -479,9 +479,14 @@ void __kitrt_hipMemcpySymbolToDevice(void *hostPtr,
 
 // ---- Kernel operations, launching, streams, etc.
 
-void *__kitrt_hipCreateObjectModule(const void *image) {
+void *__kitrt_hipModuleLoadData(const void *image) {
   assert(image && "unexpected null binary object pointer!");
   hipModule_t module;
+
+  #ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: creating module from image...\n");
+  #endif
+
   HIP_SAFE_CALL(hipModuleLoadData_p(&module, image));
   return (void*)module;
 }
@@ -503,44 +508,43 @@ uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod) {
   return (uint64_t)devPtr;
 }
 
-void __kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
-                                    void **args, uint64_t numElements) {
-  hipFunction_t function;
-  HIP_SAFE_CALL(hipModuleGetFunction_p(&function,
-                                       (hipModule_t)module,
-                                       kernelName));
+void __kitrt_hipLaunchModuleKernel(void *module, 
+                                   const char *kernelName,
+                                   void  *kernelArgs,
+                                   size_t  numElements,
+                                   void *stream,
+                                   uint64_t argsSize) {
+  assert(module && "request to launch kernel w/ null module!");
+  assert(kernelName && "request to launch kernel w/ null name!");
+  assert(kernelArgs && "request to launch kernel w/ null args!");
+  int threadsPerBlock, blocksPerGrid;
+
+  __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
   #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: module-launch of hip kernel '%s'.\n", kernelName);
+  fprintf(stderr, "launch parameters for %s:\n", kernelName);
+  fprintf(stderr, "\tnumber of overall elements: %ld\n", numElements);
+  fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
+  fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
+  fprintf(stderr, "\targument size = %d\n", argsSize);
   #endif
 
-  int threadsPerBlock, blocksPerGrid;
-  __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
+  hipFunction_t kFunc;
+  HIP_SAFE_CALL(hipModuleGetFunction_p(&kFunc,
+                                       (hipModule_t)module,
+                                       kernelName));
+
+  void *configArgs[] = {
+    HIP_LAUNCH_PARAM_BUFFER_POINTER, kernelArgs,
+    HIP_LAUNCH_PARAM_BUFFER_SIZE, &argsSize,
+    HIP_LAUNCH_PARAM_END};
 
   // Note the discrepancy between hip and cuda here -- for hip the module
-  // lauch is the same as the "standard" cuda launch.
-  HIP_SAFE_CALL(hipModuleLaunchKernel_p(function,
-                                        blocksPerGrid, 1, 1,
-                                        threadsPerBlock, 1, 1,
-                                        0, nullptr, /* default stream */
-                                        args, nullptr));
-}
-
-void __kitrt_hipLaunchFBKernel(const void *fatBin, const char *kernelName,
-                                void **fatBinArgs, uint64_t numElements) {
-  assert(fatBin && "request to launch null fat binary image!");
-  assert(kernelName && "request to launch kernel w/ null name!");
-
-  // TODO: We need a better path here for binding and tracking
-  // allocated resources -- as it stands we will "leak" modules,
-  // streams, functions, etc.
-  static bool module_built = false;
-  static hipModule_t module;
-  if (!module_built) {
-    HIP_SAFE_CALL(hipModuleLoadData_p(&module, fatBin));
-    module_built = true;
-  }
-
-  __kitrt_hipLaunchModuleKernel(module, kernelName, fatBinArgs, numElements);
+  // launch is the same as the "standard" cuda launch.
+  HIP_SAFE_CALL(hipModuleLaunchKernel_p(kFunc,
+                blocksPerGrid, 1, 1,
+                threadsPerBlock, 1, 1,
+                0, (hipStream_t)stream,
+                nullptr, (void**)&configArgs[0]));
 }
 
 // Launch a kernel on the default stream.

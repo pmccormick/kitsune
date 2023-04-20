@@ -318,6 +318,7 @@ private:
 
   // Kitsune runtime entry points.
   FunctionCallee   KitHipLaunchFn = nullptr;
+  FunctionCallee   KitHipModuleLoadDataFn = nullptr;
   FunctionCallee   KitHipModuleLaunchFn = nullptr;
   FunctionCallee   KitHipWaitFn = nullptr;
 
