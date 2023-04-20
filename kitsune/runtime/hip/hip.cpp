@@ -483,11 +483,11 @@ void *__kitrt_hipModuleLoadData(const void *image) {
   assert(image && "unexpected null binary object pointer!");
   hipModule_t module;
 
-  #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: creating module from image...\n");
-  #endif
-
   HIP_SAFE_CALL(hipModuleLoadData_p(&module, image));
+  //#ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: created hip module from fat binary image...\n");
+  fprintf(stderr, "\tmodule loaded (addr %p)\n", (void*)module);
+  //#endif
   return (void*)module;
 }
 
@@ -495,9 +495,10 @@ uint64_t __kitrt_hipGetGlobalSymbol(const char *symName, void *mod) {
   assert(symName && "unexpected null symbol name!");
   assert(mod && "unexpected null module pointer!");
 
-  #ifdef _KITRT_VERBOSE_
+  //#ifdef _KITRT_VERBOSE_
   fprintf(stderr, "kitrt: get hip global symbol (%s).\n", symName);
-  #endif
+  fprintf(stderr, "\tsearch in module (addr %p).\n", mod);
+  //#endif
 
   // TODO: Might need to revisit the details here to make sure they
   // fit the HIP API details.
