@@ -1984,6 +1984,16 @@ Function *HipABI::createCtor(GlobalVariable *Bundle, GlobalVariable *Wrapper) {
   // if (not KernelFunctions.empty())
   //   registerKernels(HandlePtr, CtorBuilder);
 
+   // TODO: It is not 100% clear what calls we actually need to make
+  // here for kernel, variable, etc. registration with CUDA.  Clang
+  // makes these calls but we are targeting CUDA driver API entry
+  // points via the Kitsune runtime library so these calls are
+  // potentially unneeded...
+  if (!GlobalVars.empty()) {
+    LLVM_DEBUG(dbgs() << "\t\tbinding host and device global variables...\n");
+    bindGlobalVariables(HandlePtr, CtorBuilder);
+  }
+
   // Now add a Dtor to help us clean up at program exit...
   if (Function *CleanupFn = createDtor(Handle)) {
     // Hook into 'atexit()'...
