@@ -941,36 +941,34 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
   LLVM_DEBUG(dbgs() << "\tcloning global variables...\n");
   for (GlobalValue *V : UsedGlobalValues) {
     if (GlobalVariable *GV = dyn_cast<GlobalVariable>(V)) {
-      // TODO: Make sure this logic makes sense...
-      // We don't necessarily need a GPU-side clone of a
-      // global variable -- instead we need a location where
-      // we can copy symbol information over from the host.
       GlobalVariable *NewGV = nullptr;
-      // If GV is a constant we can clone the entire
-      // variable over, including the initalizer
-      // details, and deal with it as an internal
-      // variable (i.e., no need to coordinate with
-      // host).  TODO: make sure this is sound!
-      if (GV->isConstant())
+      if (GV->isConstant()) {
+        LLVM_DEBUG(dbgs() << "\t\tglobal is constant...\n");
         NewGV = new GlobalVariable(
             KernelModule, GV->getValueType(), /*isConstant*/ true,
             GlobalValue::InternalLinkage, GV->getInitializer(),
             GV->getName() + ".dev_gv", (GlobalVariable *)nullptr,
             GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
-      else {
-        // If GV is non-constant we will need to
+      } else {
+        LLVM_DEBUG(dbgs() << "\t\tglobal is non-constant...\n");
+        if (GV->hasInitializer())
+          LLVM_DEBUG(dbgs() << "\t\tglobal has an initializer...\n");
+          // If GV is non-constant we will need to
         // create a device-side version that will
         // have the host-side value copied over
         // prior to launching the corresponding
         // kernel...
         NewGV = new GlobalVariable(
             KernelModule, GV->getValueType(),
-            /*isConstant*/ false, GlobalValue::ExternalLinkage,
-            (Constant *)Constant::getNullValue(GV->getValueType()),
+            /*isConstant*/ false, GV->getLinkage(),
+            GV->getInitializer(),
             GV->getName() + ".dev_gv", (GlobalVariable *)nullptr,
             GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
+        NewGV->setDSOLocal(GV->isDSOLocal());
+        NewGV->setVisibility(GV->getVisibility());
+        NewGV->setExternallyInitialized(true);
         TTarget->pushGlobalVariable(GV);
       }
       NewGV->setAlignment(GV->getAlign());
@@ -1913,16 +1911,16 @@ void HipABI::bindGlobalVariables(Value *Handle, IRBuilder<> &B) {
     std::string DevVarName = HostGV->getName().str() + ".dev_gv";
     GlobalVariable *DevGV = KernelModule.getGlobalVariable(DevVarName);
     assert(DevGV && "unable to find global variable!");
-    PointerType *VoidDevPtrTy = Type::getInt8PtrTy(Ctx, DevGV->getAddressSpace());
-    Value *DevGVAddrCast = B.CreatePointerBitCastOrAddrSpaceCast(DevGV, VoidPtrTy);
+    PointerType *VoidDevPtrTy =
+        Type::getInt8PtrTy(Ctx, DevGV->getAddressSpace());
+    Value *DevGVAddrCast =
+        B.CreatePointerBitCastOrAddrSpaceCast(DevGV, VoidPtrTy);
     Value *VarName = tapir::createConstantStr(DevVarName, M);
     uint64_t VarSize = DL.getTypeAllocSize(HostGV->getValueType());
     LLVM_DEBUG(dbgs() << "\t\thost global '" << HostGV->getName().str()
                       << "' to device '" << DevVarName << "'.\n");
-    errs() << *DevGV << "\n"
-           << *DevGV->getValueType() << "\n";
-    errs() << *HostGV << "\n"
-           << *HostGV->getValueType() << "\n";
+    errs() << *DevGV << "\n" << *DevGV->getValueType() << "\n";
+    errs() << *HostGV << "\n" << *HostGV->getValueType() << "\n";
     llvm::Value *Args[] = {Handle, // fat binary handle
                            B.CreateBitOrPointerCast(HostGV, VoidPtrTy),
                            B.CreateBitOrPointerCast(HostGV, VoidPtrTy),
@@ -1993,10 +1991,10 @@ Function *HipABI::createCtor(GlobalVariable *Bundle, GlobalVariable *Wrapper) {
   // makes these calls but we are targeting CUDA driver API entry
   // points via the Kitsune runtime library so these calls are
   // potentially unneeded...
-  if (!GlobalVars.empty()) {
-    LLVM_DEBUG(dbgs() << "\t\tbinding host and device global variables...\n");
-    bindGlobalVariables(HandlePtr, CtorBuilder);
-  }
+  //if (!GlobalVars.empty()) {
+  //  LLVM_DEBUG(dbgs() << "\t\tbinding host and device global variables...\n");
+  //  bindGlobalVariables(HandlePtr, CtorBuilder);
+  //}
 
   // Now add a Dtor to help us clean up at program exit...
   if (Function *CleanupFn = createDtor(Handle)) {
