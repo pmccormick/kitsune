@@ -71,34 +71,4 @@ void __kitrt_CommonInit() {
   }
 }
 
-void __kitrt_setDefaultGPUThreadsPerBlock(unsigned threadsPerBlock) {
-  _kitrtDefaultThreadsPerBlock = threadsPerBlock;
-}
-
-extern "C"
-void __kitrt_overrideLaunchParameters(unsigned threadsPerBlock,
-                                      unsigned blocksPerGrid) {
-  _kitrtUseCustomLaunchParameters = true;
-  _kitrtThreadsPerBlock = threadsPerBlock;
-  _kitrtBlocksPerGrid   = blocksPerGrid;
-}
-
-extern "C"
-void __kitrt_resetLaunchParameters() {
-  _kitrtUseCustomLaunchParameters = false;
-}
-
-void __kitrt_getLaunchParameters(size_t numElements,
-                                 unsigned hwWarpSize,
-                                 int &threadsPerBlock,
-                                 int &blocksPerGrid) {
-  if (not _kitrtUseCustomLaunchParameters) {
-    unsigned blockSize = 4 * hwWarpSize;
-    threadsPerBlock = _kitrtDefaultThreadsPerBlock;
-    blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
-  } else {
-    threadsPerBlock = _kitrtThreadsPerBlock;
-    blocksPerGrid = _kitrtBlocksPerGrid;
-  }
-}
 

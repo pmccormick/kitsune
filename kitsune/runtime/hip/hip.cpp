@@ -58,11 +58,11 @@
 #include <dlfcn.h>
 #include <iostream>
 #include <list>
-#include <vector>
 #include <map>
-#include <unordered_map>
 #include <sstream>
 #include <stdbool.h>
+#include <unordered_map>
+#include <vector>
 
 // NOTE: HIP sprinkles some templated functions into the API and
 // that can trip up our code for handling dynamic symbol handling.
@@ -71,9 +71,9 @@
 #define __HIP_PLATFORM_HCC__ 1
 #include <hip/hip_runtime.h>
 
-#include "../kitrt.h"
 #include "../debug.h"
 #include "../dlutils.h"
+#include "../kitrt.h"
 #include "../memory_map.h"
 
 // === Overall runtime status, state, and details.  For
@@ -84,7 +84,6 @@
 static bool _kitrt_hipIsInitialized = false;
 static int _kitrt_hipDeviceID = -1;
 static hipDeviceProp_t _kitrt_hipDeviceProps;
-
 
 // === Internal timing control.state.
 // Within the HIP component of the runtime we can have an
@@ -97,12 +96,11 @@ static bool _kitrtEnableTiming = false;
 static bool _kitrtReportTiming = false;
 static double _kitrtLastEventTime = 0.0;
 
-
 // === Kernel launch parameters.
-//static bool _kitrtUseHueristicLaunchParameters = false;
-//static unsigned _kitrtDefaultThreadsPerBlock = 256;
-//static unsigned _kitrtDefaultBlocksPerGrid = 0;
-//static bool _kitrtUseCustomLaunchParameters = false;
+// static bool _kitrtUseHueristicLaunchParameters = false;
+// static unsigned _kitrtDefaultThreadsPerBlock = 256;
+// static unsigned _kitrtDefaultBlocksPerGrid = 0;
+// static bool _kitrtUseCustomLaunchParameters = false;
 
 // Enable auto-prefetching of managed memory pointers.
 // This is a very simple approach that likely will
@@ -136,6 +134,7 @@ DECLARE_DLSYM(hipGetErrorString);
 // ---- Managed memory allocation, tracking, etc.
 DECLARE_DLSYM(hipMallocManaged);
 DECLARE_DLSYM(hipFree);
+DECLARE_DLSYM(hipMemAdvise);
 DECLARE_DLSYM(hipPointerGetAttributes);
 DECLARE_DLSYM(hipMemcpyHtoD);
 DECLARE_DLSYM(hipMemPrefetchAsync);
@@ -162,7 +161,7 @@ DECLARE_DLSYM(hipEventElapsedTime);
 //
 // TODO: Is there a faster path here for lookup?  Is a map more
 // complicated than necessary?
-typedef std::unordered_map<const void*, hipModule_t>  KitRTModuleMap;
+typedef std::unordered_map<const void *, hipModule_t> KitRTModuleMap;
 static KitRTModuleMap _kitrtModuleMap;
 
 // Alongside the module map the runtime also maintains a map from
@@ -171,7 +170,7 @@ static KitRTModuleMap _kitrtModuleMap;
 //
 // TODO: Ditto from above.  Is there a faster path here for lookup?
 // Is a map more complicated than necessary?
-typedef std::unordered_map<const char *, hipFunction_t>  KitRTKernelMap;
+typedef std::unordered_map<const char *, hipFunction_t> KitRTKernelMap;
 static KitRTKernelMap _kitrtKernelMap;
 
 // TODO: Should we want to move this into a cmake-level
@@ -204,6 +203,7 @@ static bool __kitrt_hipLoadDLSyms() {
     // ---- Managed memory allocation, tracking, etc.
     DLSYM_LOAD(hipMallocManaged);
     DLSYM_LOAD(hipFree);
+    DLSYM_LOAD(hipMemAdvise);
     DLSYM_LOAD(hipPointerGetAttributes);
     DLSYM_LOAD(hipMemcpyHtoD);
     DLSYM_LOAD(hipMemPrefetchAsync);
@@ -253,10 +253,7 @@ extern "C" {
 
 static bool _kitrt_enableXnack = false;
 
-void __kitrt_hipEnableXnack() {
-  _kitrt_enableXnack = true;
-} 
-
+void __kitrt_hipEnableXnack() { _kitrt_enableXnack = true; }
 
 bool __kitrt_hipInit() {
 
@@ -275,12 +272,20 @@ bool __kitrt_hipInit() {
     abort();
   }
 
+  char *envValue;
+  if ((envValue = getenv("KITRT_THREADS_PER_BLOCK"))) {
+    __kitrt_setDefaultGPUThreadsPerBlock(atoi(envValue));
+    #ifdef _KITRT_VERBOSE_
+    fprintf(stderr, "kitrt: enviornment threads per block setting = %d.\n",
+            _kitrtDefaultThreadsPerBlock);
+    #endif
+  }
+
   // Note: From the HIP docs, "most HIP APIs implicitly initialize the
   // HIP runtime. This [call] provides control over the timing of the
   // initialization.".  Follow the same path as we use for CUDA
   // to keep things consistent.
   HIP_SAFE_CALL(hipInit_p(0));
-
 
   // Make sure we have at least one compute device available.
   int count;
@@ -296,8 +301,8 @@ bool __kitrt_hipInit() {
   // calls to use...
   _kitrt_hipDeviceID = 0;
   HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
-  HIP_SAFE_CALL(hipGetDeviceProperties_p(&_kitrt_hipDeviceProps,
-                                         _kitrt_hipDeviceID));
+  HIP_SAFE_CALL(
+      hipGetDeviceProperties_p(&_kitrt_hipDeviceProps, _kitrt_hipDeviceID));
 
   // Our current code base relies on managed memory to make the
   // portability of code a bit easier (e.g., the programmer does
@@ -326,9 +331,8 @@ bool __kitrt_hipInit() {
   // In a HIP application, it is recommended to do a capability
   // check before calling the managed memory APIs."
   int hasManagedMemory = 0;
-  HIP_SAFE_CALL(hipDeviceGetAttribute(&hasManagedMemory,
-                        hipDeviceAttributeManagedMemory,
-                        _kitrt_hipDeviceID));
+  HIP_SAFE_CALL(hipDeviceGetAttribute(
+      &hasManagedMemory, hipDeviceAttributeManagedMemory, _kitrt_hipDeviceID));
   if (!hasManagedMemory) {
     fprintf(stderr, "kitrt: hip -- device does not support managed memory!\n");
     abort(); // TODO: eventually want to return false so JIT runtime won't fail.
@@ -337,17 +341,17 @@ bool __kitrt_hipInit() {
   // Example code suggests this is a preferred (additional?) check
   // prior to using managed memory...
   int supportsConcurrentManagedAccess = 0;
-  HIP_SAFE_CALL(hipDeviceGetAttribute_p(&supportsConcurrentManagedAccess,
-                               hipDeviceAttributeConcurrentManagedAccess,
-                               _kitrt_hipDeviceID));
+  HIP_SAFE_CALL(hipDeviceGetAttribute_p(
+      &supportsConcurrentManagedAccess,
+      hipDeviceAttributeConcurrentManagedAccess, _kitrt_hipDeviceID));
   if (!supportsConcurrentManagedAccess) {
     fprintf(stderr, "kitrt: hip -- device does not support concurrent "
                     "managed memory accesses!\n");
     abort(); // TODO: eventually want to return false so JIT runtime won't fail.
   } else {
-    #ifdef _KITRT_VERBOSE_
+#ifdef _KITRT_VERBOSE_
     fprintf(stderr, "kitrt: hip runtime componenr successfully initialized.\n");
-    #endif
+#endif
     _kitrt_hipIsInitialized = true;
   }
 
@@ -356,13 +360,13 @@ bool __kitrt_hipInit() {
 
 void __kitrt_hipDestroy() {
   if (_kitrt_hipIsInitialized) {
-    extern void __kitrt_hipFreeManagedMem(void*);
+    extern void __kitrt_hipFreeManagedMem(void *);
     __kitrt_destroyMemoryMap(__kitrt_hipFreeManagedMem);
     HIP_SAFE_CALL(hipDeviceReset_p());
     _kitrt_hipIsInitialized = false;
-    #ifdef _KITRT_VERBOSE_
+#ifdef _KITRT_VERBOSE_
     fprintf(stderr, "kitrt: shutdown hip runtime component.\n");
-    #endif
+#endif
   }
 }
 
@@ -372,18 +376,21 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
   assert(_kitrt_hipIsInitialized && "kitrt: hip has not been initialized!");
   void *memPtr;
   HIP_SAFE_CALL(hipMallocManaged_p(&memPtr, size, hipMemAttachGlobal));
-  #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: allocated hip managed memory (%ld bytes @ %p).\n", size, memPtr);
-  #endif
+  HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetAccessedBy, 
+                _kitrt_hipDeviceID));
+#ifdef _KITRT_VERBOSE_
+  fprintf(stderr, "kitrt: allocated hip managed memory (%ld bytes @ %p).\n",
+          size, memPtr);
+#endif
   __kitrt_registerMemAlloc(memPtr, size);
-  return (void*)memPtr;
+  return (void *)memPtr;
 }
 
 void __kitrt_hipMemFree(void *memPtr) {
   assert(memPtr != nullptr && "unexpected null pointer!");
-  #ifdef _KITRT_VERBOSE_
+#ifdef _KITRT_VERBOSE_
   fprintf(stderr, "kitrt: freed hip managed memory @ %p.\n", memPtr);
-  #endif
+#endif
   __kitrt_unregisterMemAlloc(memPtr);
   HIP_SAFE_CALL(hipFree_p(memPtr));
 }
@@ -396,30 +403,22 @@ bool __kitrt_hipIsMemManaged(void *vp) {
   assert(vp && "unexpected null pointer!");
   hipPointerAttribute_t attrib;
   HIP_SAFE_CALL(hipPointerGetAttributes_p(&attrib, vp));
-  return(attrib.isManaged != 0);
+  return (attrib.isManaged != 0);
 }
 
-void __kitrt_hipEnablePrefetch() {
-  _kitrt_hipEnablePrefetch = true;
-}
+void __kitrt_hipEnablePrefetch() { _kitrt_hipEnablePrefetch = true; }
 
-void __kitrt_hipDisablePrefetch() {
-  _kitrt_hipEnablePrefetch = false;
-}
+void __kitrt_hipDisablePrefetch() { _kitrt_hipEnablePrefetch = false; }
 
 void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
-  #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: prefetch request for pointer %p on stream %p.\n", vp,
-          stream);
-  #endif
   if (__kitrt_hipIsMemManaged(vp) && not __kitrt_isMemPrefetched(vp)) {
     size_t size = __kitrt_getMemAllocSize(vp);
     if (size > 0) {
       HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
-                                         (hipStream_t)stream));
+                                          (hipStream_t)stream));
       __kitrt_markMemPrefetched(vp);
-      //HIP_SAFE_CALL(hipDeviceSynchronize());
+      // HIP_SAFE_CALL(hipDeviceSynchronize());
     }
   }
 }
@@ -436,7 +435,7 @@ void __kitrt_hipMemPrefetchAsync(void *vp, size_t size) {
   assert(vp && "unexpected null pointer!");
   HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
   HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID, NULL));
-  //HIP_SAFE_CALL(hipDeviceSynchronize());
+  // HIP_SAFE_CALL(hipDeviceSynchronize());
   __kitrt_markMemPrefetched(vp);
 }
 
@@ -454,25 +453,24 @@ void __kitrt_hipMemPrefetch(void *vp) {
       size_t size = __kitrt_getMemAllocSize(vp);
       if (size > 0) {
         #ifdef _KITRT_VERBOSE_
-        fprintf(stderr, "kitrt: prefetch managed memory @ %p, %ld bytes.\n",
-                vp, size);
+        fprintf(stderr, "kitrt: prefetch managed memory @ %p, %ld bytes.\n", vp,
+                size);
         #endif
         __kitrt_hipMemPrefetchAsync(vp, size);
+        __kitrt_markMemPrefetched(vp);
       }
     }
   }
 }
 
-void __kitrt_hipMemcpySymbolToDevice(void *hostPtr,
-                                     void *devPtr,
-                                     size_t size) {
+void __kitrt_hipMemcpySymbolToDevice(void *hostPtr, void *devPtr, size_t size) {
   assert(devPtr != 0 && "unexpected null device pointer!");
   assert(hostPtr != nullptr && "unexpected null host pointer!");
   assert(size != 0 && "requested a 0 byte copy!");
-  #ifdef _KITRT_VERBOSE_
+#ifdef _KITRT_VERBOSE_
   fprintf(stderr, "kitrt: hip copy symbol (%ld bytes) to device (%p --> %p).\n",
           size, hostPtr, devPtr);
-  #endif
+#endif
   HIP_SAFE_CALL(hipMemcpyHtoD_p((hipDeviceptr_t)devPtr, hostPtr, size));
 }
 
@@ -483,75 +481,66 @@ void *__kitrt_hipModuleLoadData(const void *image) {
   hipModule_t module;
 
   HIP_SAFE_CALL(hipModuleLoadData_p(&module, image));
-  #ifdef _KITRT_VERBOSE_
+#ifdef _KITRT_VERBOSE_
   fprintf(stderr, "kitrt: created hip module from fat binary image...\n");
-  fprintf(stderr, "\tmodule loaded (addr %p)\n", (void*)module);
-  #endif
-  return (void*)module;
+  fprintf(stderr, "\tmodule loaded (addr %p)\n", (void *)module);
+#endif
+  return (void *)module;
 }
 
 void *__kitrt_hipGetGlobalSymbol(const char *symName, void *mod) {
   assert(symName && "unexpected null symbol name!");
   assert(mod && "unexpected null module pointer!");
 
-  #ifdef _KITRT_VERBOSE_
+#ifdef _KITRT_VERBOSE_
   fprintf(stderr, "kitrt: get hip global symbol (%s).\n", symName);
   fprintf(stderr, "\tsearch in module (addr %p).\n", mod);
-  #endif
+#endif
 
   // TODO: Might need to revisit the details here to make sure they
   // fit the HIP API details.
   hipDeviceptr_t devPtr;
   size_t bytes;
-  HIP_SAFE_CALL(hipModuleGetGlobal_p(&devPtr, &bytes, (hipModule_t)mod, symName));
-  return (void*)devPtr;
+  HIP_SAFE_CALL(
+      hipModuleGetGlobal_p(&devPtr, &bytes, (hipModule_t)mod, symName));
+  return (void *)devPtr;
 }
 
-void __kitrt_hipLaunchModuleKernel(void *module, 
-                                   const char *kernelName,
-                                   void  *kernelArgs,
-                                   size_t  numElements,
-                                   void *stream,
-                                   uint64_t argsSize) {
+void __kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
+                                   void *kernelArgs, size_t numElements,
+                                   void *stream, uint64_t argsSize) {
   assert(module && "request to launch kernel w/ null module!");
   assert(kernelName && "request to launch kernel w/ null name!");
   assert(kernelArgs && "request to launch kernel w/ null args!");
   int threadsPerBlock, blocksPerGrid;
 
   __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
-  #ifdef _KITRT_VERBOSE_
+#ifdef _KITRT_VERBOSE_
   fprintf(stderr, "launch parameters for %s:\n", kernelName);
   fprintf(stderr, "\tnumber of overall elements: %ld\n", numElements);
   fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
   fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
   fprintf(stderr, "\targument size = %d\n", argsSize);
-  #endif
+#endif
 
   hipFunction_t kFunc;
-  HIP_SAFE_CALL(hipModuleGetFunction_p(&kFunc,
-                                       (hipModule_t)module,
-                                       kernelName));
+  HIP_SAFE_CALL(
+      hipModuleGetFunction_p(&kFunc, (hipModule_t)module, kernelName));
 
-  void *configArgs[] = {
-    HIP_LAUNCH_PARAM_BUFFER_POINTER, kernelArgs,
-    HIP_LAUNCH_PARAM_BUFFER_SIZE, &argsSize,
-    HIP_LAUNCH_PARAM_END};
+  void *configArgs[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, kernelArgs,
+                        HIP_LAUNCH_PARAM_BUFFER_SIZE, &argsSize,
+                        HIP_LAUNCH_PARAM_END};
 
   // Note the discrepancy between hip and cuda here -- for hip the module
   // launch is the same as the "standard" cuda launch.
-  HIP_SAFE_CALL(hipModuleLaunchKernel_p(kFunc,
-                blocksPerGrid, 1, 1,
-                threadsPerBlock, 1, 1,
-                0, (hipStream_t)stream,
-                nullptr, (void**)&configArgs[0]));
+  HIP_SAFE_CALL(hipModuleLaunchKernel_p(
+      kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1, 1, 0, (hipStream_t)stream,
+      nullptr, (void **)&configArgs[0]));
 }
 
 // Launch a kernel on the default stream.
-void __kitrt_hipLaunchKernel(const void *fatBin,
-                             const char *kernelName,
-                             void *kernelArgs,
-                             size_t numElements,
-                             void *stream,
+void __kitrt_hipLaunchKernel(const void *fatBin, const char *kernelName,
+                             void *kernelArgs, size_t numElements, void *stream,
                              size_t argsSize) {
   assert(fatBin && "request to launch with null fat binary image!");
   assert(kernelName && "request to launch kernel w/ null name!");
@@ -585,28 +574,24 @@ void __kitrt_hipLaunchKernel(const void *fatBin,
   }
 
   __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
-  #ifdef _KITRT_VERBOSE_
+#ifdef _KITRT_VERBOSE_
   fprintf(stderr, "launch parameters for %s:\n", kernelName);
   fprintf(stderr, "\tnumber of overall elements: %ld\n", numElements);
   fprintf(stderr, "\tthreads/block = %d\n", threadsPerBlock);
   fprintf(stderr, "\tblocks/grid = %d\n", blocksPerGrid);
   fprintf(stderr, "\targument size = %d\n", argsSize);
-  #endif
+#endif
 
-  void *configArgs[] = {
-    HIP_LAUNCH_PARAM_BUFFER_POINTER, kernelArgs,
-    HIP_LAUNCH_PARAM_BUFFER_SIZE, &argsSize,
-    HIP_LAUNCH_PARAM_END};
+  void *configArgs[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, kernelArgs,
+                        HIP_LAUNCH_PARAM_BUFFER_SIZE, &argsSize,
+                        HIP_LAUNCH_PARAM_END};
 
   // Note the discrepancy between hip and cuda here -- for hip the module
   // launch is the same as the "standard" cuda launch.
-  HIP_SAFE_CALL(hipModuleLaunchKernel_p(kFunc,
-                blocksPerGrid, 1, 1,
-                threadsPerBlock, 1, 1,
-                0, (hipStream_t)stream,
-                nullptr, (void**)&configArgs[0]));
+  HIP_SAFE_CALL(hipModuleLaunchKernel_p(
+      kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1, 1, 0, (hipStream_t)stream,
+      nullptr, (void **)&configArgs[0]));
 }
-
 
 void __kitrt_hipStreamSynchronize(void *vStream) {
   HIP_SAFE_CALL(hipStreamSynchronize_p((hipStream_t)vStream));
@@ -640,7 +625,7 @@ void __kitrt_hipDestroyEvent(void *E) {
 
 void __kitrt_hipEventRecord(void *E) {
   assert(E && "unexpected null event!");
- // TODO: The HIP documentation is not entirely clear about the
+  // TODO: The HIP documentation is not entirely clear about the
   // existence of a default stream... This could break...
   HIP_SAFE_CALL(hipEventRecord_p((hipEvent_t)E, nullptr));
 }
@@ -654,9 +639,8 @@ float __kitrt_hipElapsedEventTime(void *start, void *stop) {
   assert(start && "unexpected null start event!");
   assert(stop && "unexpected null stop event!");
   float msecs;
-  HIP_SAFE_CALL(hipEventElapsedTime_p(&msecs,
-                           (hipEvent_t)start,
-                           (hipEvent_t)stop));
+  HIP_SAFE_CALL(
+      hipEventElapsedTime_p(&msecs, (hipEvent_t)start, (hipEvent_t)stop));
   return msecs;
 }
 
