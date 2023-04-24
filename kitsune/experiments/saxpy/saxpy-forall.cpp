@@ -47,14 +47,13 @@ int main(int argc, char *argv[]) {
   for (unsigned int t = 0; t < iterations; t++) {
 
     auto start_time = chrono::steady_clock::now();
-
     forall(size_t i = 0; i < size; i++) {
       x[i] = DEFAULT_X_VALUE;
       y[i] = DEFAULT_Y_VALUE;
     }
 
-    forall(size_t i = 0; i < size; i++) y[i] = DEFAULT_A_VALUE * x[i] + y[i];
-
+    forall(size_t i = 0; i < size; i++) 
+      y[i] = DEFAULT_A_VALUE * x[i] + y[i];
     auto end_time = chrono::steady_clock::now();
     double elapsed_time =
         chrono::duration<double>(end_time - start_time).count();

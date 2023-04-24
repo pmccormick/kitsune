@@ -36,14 +36,19 @@ endif
 ##################################
 TAPIR_HIP_FLAGS?=-ftapir=hip \
   -O$(KITSUNE_OPTLEVEL) \
+  -ffast-math \
   -ffp-contract=fast \
   -mllvm -hipabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
   -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
-  -mllvm -hipabi-xnack=true \
   -mllvm -amdgpu-internalize-symbols \
   -mllvm -amdgpu-function-calls=false \
+  -mllvm -amdgpu-early-inline-all=true \
+  -mllvm -vectorize-loops \
+  -mllvm -vectorize-slp \
   $(GPU_STRIPMINE_FLAGS) \
   $(TAPIR_HIP_EXTRA_FLAGS)
+  #-mllvm -hipabi-xnack=true \
+>>>>>>> 6009b347eef0 (debugging help)
 
 TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O$(KITSUNE_OPTLEVEL),\
 -mllvm,-hipabi-opt-level=$(KITSUNE_OPTLEVEL),-mllvm,-chipabi-arch=$(AMDGPU_ARCH),\

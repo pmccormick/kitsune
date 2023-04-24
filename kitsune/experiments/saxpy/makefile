@@ -25,7 +25,7 @@ saxpy-forall.cuda.${host_arch}: saxpy-forall.cpp
 	@$(FILE_SIZE)
 saxpy-forall.hip.${host_arch}: saxpy-forall.cpp 
 	@echo $@
-	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) -v $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 # kokkos-based tests (w/out views)
 #saxpy-kokkos.cuda.kitsune.${host_arch}: saxpy-kokkos-no-view.cpp 
@@ -40,7 +40,7 @@ saxpy-kokkos.nvcc.${host_arch}: saxpy-kokkos.cpp
 	@$(FILE_SIZE)
 saxpy-kokkos.hipcc.${host_arch}: saxpy-kokkos.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
+	@$(TIME_CMD) $(KOKKOS_HIPCC) -v $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 	@$(FILE_SIZE)
 #####
 define newline 

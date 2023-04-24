@@ -46,11 +46,9 @@ int main(int argc, char *argv[]) {
   cout << "  Allocating arrays..." 
        << std::flush;
 
-  DEFAULT_X_VALUE = rand() % 1000000;
-  DEFAULT_Y_VALUE = rand() % 1000000;
-  DEFAULT_A_VALUE = rand() % 1000000;
-
   Kokkos::initialize(argc, argv); {
+
+
     SaxpyDualView x = SaxpyDualView("x", size);
     SaxpyDualView y = SaxpyDualView("y", size);
     cout << "  done.\n\n";
@@ -58,6 +56,11 @@ int main(int argc, char *argv[]) {
     cout << "  Starting benchmark...\n" << std::flush;
     auto start_total_time = chrono::steady_clock::now();
     double iteration_total_time = 0;
+
+    DEFAULT_X_VALUE = rand() % 1000000;
+    DEFAULT_Y_VALUE = rand() % 1000000;
+    DEFAULT_A_VALUE = rand() % 1000000;
+
     for(unsigned int t = 0; t < iterations; t++) {
       auto start_time = chrono::steady_clock::now();
       x.modify_device();
