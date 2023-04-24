@@ -943,35 +943,36 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
     if (GlobalVariable *GV = dyn_cast<GlobalVariable>(V)) {
       GlobalVariable *NewGV = nullptr;
       if (GV->isConstant()) {
-        LLVM_DEBUG(dbgs() << "\t\tglobal is constant...\n");
         NewGV = new GlobalVariable(
-            KernelModule, GV->getValueType(), /*isConstant*/ true,
+            KernelModule, GV->getValueType(), true /*isConstant*/,
             GlobalValue::InternalLinkage, GV->getInitializer(),
             GV->getName() + ".dev_gv", (GlobalVariable *)nullptr,
             GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
       } else {
         LLVM_DEBUG(dbgs() << "\t\tglobal is non-constant...\n");
-        if (GV->hasInitializer())
-          LLVM_DEBUG(dbgs() << "\t\tglobal has an initializer...\n");
-          // If GV is non-constant we will need to
+        // If GV is non-constant we will need to
         // create a device-side version that will
         // have the host-side value copied over
         // prior to launching the corresponding
-        // kernel...
+        // kernel.  
         NewGV = new GlobalVariable(
             KernelModule, GV->getValueType(),
-            /*isConstant*/ false,
-            GlobalValue::LinkageTypes::ExternalLinkage, // GV->getLinkage(),
+            false /*isConstant*/,
+            GlobalValue::LinkageTypes::ExternalLinkage,
             GV->getInitializer(),
             GV->getName() + ".dev_gv", (GlobalVariable *)nullptr,
             GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
         NewGV->setDSOLocal(GV->isDSOLocal());
-	// device-side variables in HIP appear to require protected
-	// visibility... 
-        NewGV->setVisibility(GlobalValue::ProtectedVisibility);
         NewGV->setExternallyInitialized(true);
+        // HIP (appears) to require protected visibility!  Without
+        // this the runtime won't be able to find GV for 
+        // host <-> device transfers. 
+        NewGV->setVisibility(GlobalValue::ProtectedVisibility);
+
+        // Flag the GV for post-processing (e.g., insert copy calls).
+        // TODO: rename for clarity...
         TTarget->pushGlobalVariable(GV);
       }
       NewGV->setAlignment(GV->getAlign());
