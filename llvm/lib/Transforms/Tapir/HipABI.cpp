@@ -961,13 +961,16 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
         // kernel...
         NewGV = new GlobalVariable(
             KernelModule, GV->getValueType(),
-            /*isConstant*/ false, GV->getLinkage(),
+            /*isConstant*/ false,
+            GlobalValue::LinkageTypes::ExternalLinkage, // GV->getLinkage(),
             GV->getInitializer(),
             GV->getName() + ".dev_gv", (GlobalVariable *)nullptr,
             GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
         NewGV->setDSOLocal(GV->isDSOLocal());
-        NewGV->setVisibility(GV->getVisibility());
+	// device-side variables in HIP appear to require protected
+	// visibility... 
+        NewGV->setVisibility(GlobalValue::ProtectedVisibility);
         NewGV->setExternallyInitialized(true);
         TTarget->pushGlobalVariable(GV);
       }
@@ -1583,11 +1586,6 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
                             VoidPtrTy, // device ptr
                             Int64Ty);  // num bytes
 
-  // TODO: We need to revisit the handling of global variables here.
-  // Specifically, if a kernel is dependent upon the value of a host-side
-  // global do we need to issue a copy from host-to-device for the
-  // correspdoning data (just like we do in the cuda abi).  We have set
-  // up the calls above but need to handle the code gen.
   auto &FnList = M.getFunctionList();
   for (auto &Fn : FnList) {
     for (auto &BB : Fn) {
@@ -1610,16 +1608,22 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
               // Unless someting else has monkeyed with our generated code
               // NI should be the launch call.  We need the following code
               // to go between the call instruction and the launch.
+	      // 
+	      // TODO: assert here that NI indeed points to the launch.
+	      //
               assert(NI && "unexpected null instruction!");
               for (auto &HostGV : GlobalVars) {
+
+		// Lookup the matching device-side global... 
                 std::string DevVarName = HostGV->getName().str() + ".dev_gv";
                 LLVM_DEBUG(dbgs() << "\t\t* processing global: "
                                   << HostGV->getName() << "\n");
                 Value *SymName =
                     tapir::createConstantStr(DevVarName, M, DevVarName);
                 Value *DevPtr = CallInst::Create(KitHipGetGlobalSymbolFn,
-                                                 {SymName, CI}, ".dev_gv", NI);
-
+                                                 {SymName, CI}, "", NI);
+		
+		// Copy the value from host to device...  
                 Value *VGVPtr =
                     CastInst::CreatePointerCast(HostGV, VoidPtrTy, "", NI);
                 uint64_t NumBytes = DL.getTypeAllocSize(HostGV->getValueType());
