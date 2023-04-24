@@ -378,6 +378,8 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
   HIP_SAFE_CALL(hipMallocManaged_p(&memPtr, size, hipMemAttachGlobal));
   HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetAccessedBy, 
                 _kitrt_hipDeviceID));
+  HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetCoarseGrain, 
+                _kitrt_hipDeviceID));                
 #ifdef _KITRT_VERBOSE_
   fprintf(stderr, "kitrt: allocated hip managed memory (%ld bytes @ %p).\n",
           size, memPtr);
