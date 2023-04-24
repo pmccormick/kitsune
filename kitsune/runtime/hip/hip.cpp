@@ -135,6 +135,7 @@ DECLARE_DLSYM(hipGetErrorString);
 DECLARE_DLSYM(hipMallocManaged);
 DECLARE_DLSYM(hipFree);
 DECLARE_DLSYM(hipMemAdvise);
+DECLARE_DLSYM(hipMemRangeGetAttribute);
 DECLARE_DLSYM(hipPointerGetAttributes);
 DECLARE_DLSYM(hipMemcpyHtoD);
 DECLARE_DLSYM(hipMemPrefetchAsync);
@@ -204,6 +205,7 @@ static bool __kitrt_hipLoadDLSyms() {
     DLSYM_LOAD(hipMallocManaged);
     DLSYM_LOAD(hipFree);
     DLSYM_LOAD(hipMemAdvise);
+    DLSYM_LOAD(hipMemRangeGetAttribute);
     DLSYM_LOAD(hipPointerGetAttributes);
     DLSYM_LOAD(hipMemcpyHtoD);
     DLSYM_LOAD(hipMemPrefetchAsync);
@@ -234,6 +236,8 @@ static bool __kitrt_hipLoadDLSyms() {
 
 extern "C" {
 
+#ifdef KITRT_ENABLE_DEBUG
+
 #define HIP_SAFE_CALL(x)                                                       \
   {                                                                            \
     hipError_t hip_result = x;                                                 \
@@ -247,6 +251,10 @@ extern "C" {
       abort();                                                                 \
     }                                                                          \
   }
+
+#else 
+#define HIP_SAFE_CALL(x) x
+#endif
 
 // ---- Initialization, properties, clean up, etc.
 //
@@ -414,13 +422,19 @@ void __kitrt_hipDisablePrefetch() { _kitrt_hipEnablePrefetch = false; }
 
 void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
+
   if (__kitrt_hipIsMemManaged(vp) && not __kitrt_isMemPrefetched(vp)) {
     size_t size = __kitrt_getMemAllocSize(vp);
     if (size > 0) {
-      HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
+      hipDevice_t device;
+      HIP_SAFE_CALL(hipMemRangeGetAttribute(&device, sizeof(device),
+               hipMemRangeAttributeLastPrefetchLocation, vp, size));
+      if (device != _kitrt_hipDeviceID) {
+        HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
                                           (hipStream_t)stream));
-      __kitrt_markMemPrefetched(vp);
-      // HIP_SAFE_CALL(hipDeviceSynchronize());
+        __kitrt_markMemPrefetched(vp);
+        HIP_SAFE_CALL(hipDeviceSynchronize());
+      }
     }
   }
 }
