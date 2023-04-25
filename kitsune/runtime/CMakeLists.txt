@@ -97,6 +97,7 @@ target_link_libraries(kitrt
   PUBLIC
     ${KITRT_LINK_LIBS}
     LLVM -lpthread -lrt -ldl)
+set_property(TARGET kitrt PROPERTY CXX_STANDARD 17)
 
 install(TARGETS kitrt
   LIBRARY DESTINATION lib COMPONENT kitrt

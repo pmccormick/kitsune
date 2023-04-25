@@ -1,5 +1,5 @@
 //
-//===- kitrt.h - Kitsune ABI runtime debug support    -----------------------===//
+//===- kitrt.h - Kitsune ABI runtime debug support -----------------------===//
 //
 // TODO: Need to update LANL/Triad Copyright notice.
 //
@@ -54,106 +54,77 @@
 #include "kitrt.h"
 #include "debug.h"
 #include <stdlib.h>
+#include <type_traits>
 
-
-// Overall runtime configuration settings.
-static bool _kitrtVerboseMode          = false;
-static bool _kitrtReportKernelRuntimes = false;
-static bool _kitrtEnableStackTraces    = false;
-
-// Shared GPU parameter settings/interface.
+static bool _kitrtVerboseMode = false;
 static unsigned _kitrtDefaultThreadsPerBlock = 256;
 static bool _kitrtUseCustomLaunchParameters = false;
 static unsigned _kitrtThreadsPerBlock = 0;
-static unsigned _kitrtBlocksPerGrid = 0;
 
+template <typename RetType>
+static bool __kitrt_getEnvValue(const char *VarName, RetType &Value) {
+  bool Ret = false;
+  char *ValueStr;
+  if ((ValueStr = getenv(VarName))) {
+    if constexpr (std::is_same_v<RetType, int>) {
+      Value = atoi(ValueStr);
+      Ret = true;
+    } else if constexpr (std::is_same_v<RetType, bool>) {
+      Value = true;
+      Ret = true;
+    } else 
+      fprintf(stderr, "kitrt: warning unhandled type in __kitrt_getEnvValue!\n");
+  }
+  return Ret;
+}
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-  void __kitrt_setVerboseMode(bool Enable) {
-    KITRT_DEBUG( kitrt::kitdbgs() << "kitrt: verbose mode "
-                                  << Enable : "on.\n" ? "off.\n");
-    _kitrtVerboseMode = Enable;
-  }
+void __kitrt_CommonInit() {
 
-  bool __kitrt_verboseMode() {
-    return _kitrtVerboseMode;
-  }
-
-  void __kitrt_setReportRuntimes(bool Enable) {
-    KITRT_DEBUG( kitrt::kitdbgs() << "kitrt: execution time reporting "
-                                  << Enable : "on.\n" ? "off.\n");
-    _kitrtReportKernelRuntimes = Enable;
-  }
-
-  bool __kitrt_reportRuntimes() {
-    return _kitrtReportKernelRuntimes;
-  }
-
-  void __kitrt_setReportStackTraces(bool Enable) {
-    KITRT_DEBUG( kitrt::kitdbgs() << "kitrt: stack trace reporting "
-                                  << Enable : "on.\n" ? "off.\n");
-    _kitrtEnableStackTraces = Enable;
-  }
-
-  bool __kitrt_ReportStackTraces() {
-    return _kitrtEnableStackTraces;
-  }
-
-  bool __kitrt_init() {
-    // Check for environment variables that impact the runtime
-    // behavior...
-    char *envValue;
-    if ((envValue = getenv("KITRT_VERBOSE")))
-      __kitrt_enableVerboseMode();
-    else
-      __kitrt_disableVerboseMode();
-
-    if ((envValue = getenv("KITRT_TIMING_REPORTS")))
-      __kitrt_enableRuntimeReports();
-    else
-      __kitrt_disableRuntimeReports();
-
-    if ((envValue = getenv("KITRT_STACK_TRACES")))
-      __kitrt_enableStackTraces();
-    else
-      __kitrt_disableStackTraces();
-
-    // Initialize the supported runtime layer(s).
-    return __kitrt_runtimesInit();
-  }
-
-  void __kitrt_getLaunchParameters(size_t numElements,
-                                   int &threadsPerBlock,
-                                   int &blocksPerGrid) {
-    if (not _kitrtUseCustomLaunchParameters) {
-      threadsPerBlock = _kitrtDefaultThreadsPerBlock;
-      blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
-    } else {
-      threadsPerBlock = _kitrtThreadsPerBlock;
-      blocksPerGrid = _kitrtBlocksPerGrid;
-    }
-  }
-
-  void __kitrt_setDefaultGPUThreadsPerBlock(unsigned threadsPerBlock) {
-    _kitrtDefaultThreadsPerBlock = threadsPerBlock;
-  }
-
-  void __kitrt_overrideLaunchParameters(unsigned threadsPerBlock,
-                                        unsigned blocksPerGrid) {
+  if (__kitrt_getEnvValue("KITRT_THREADS_PER_BLOCK", _kitrtThreadsPerBlock))
     _kitrtUseCustomLaunchParameters = true;
-    _kitrtThreadsPerBlock = threadsPerBlock;
-    _kitrtBlocksPerGrid = blocksPerGrid;
-  }
+  __kitrt_getEnvValue("KITRT_VERBOSE", _kitrtVerboseMode);
+}
 
-  void __kitrt_resetLaunchParameters() {
-    _kitrtUseCustomLaunchParameters = false;
-  }
+void __kitrt_setVerboseMode(bool Enable) {
+    _kitrtVerboseMode = Enable;
+}
+
+bool __kitrt_verboseMode() {
+  return _kitrtVerboseMode; 
+}
+
+bool __kitrt_init() {
+    __kitrt_CommonInit();
+
+     // Initialize the supported runtime layer(s).
+    return __kitrt_runtimesInit();
+}
+
+void __kitrt_getLaunchParameters(size_t numElements, 
+                                 int &threadsPerBlock,
+                                 int &blocksPerGrid) {
+  if (_kitrtUseCustomLaunchParameters)
+    threadsPerBlock = _kitrtThreadsPerBlock;
+  else 
+    threadsPerBlock = _kitrtDefaultThreadsPerBlock;
+
+  blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+}
+
+void __kitrt_setDefaultThreadsPerBlock(unsigned threadsPerBlock) {
+  _kitrtDefaultThreadsPerBlock = threadsPerBlock;
+}
+
+void __kitrt_resetLaunchParameters() {
+  _kitrtThreadsPerBlock = _kitrtDefaultThreadsPerBlock;
+  _kitrtUseCustomLaunchParameters = false;
+}
+
 
 #ifdef __cplusplus
 } // extern "C"
 #endif
-
-

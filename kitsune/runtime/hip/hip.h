@@ -51,8 +51,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __KITRT_HIP_H__
-#define __KITRT_HIP_H__
+#ifndef KitRT_HIP_H_
+#define KitRT_HIP_H_
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -103,11 +103,6 @@ void __kitrt_hipDisablePrefetch();
 /// @param vp: The starting address to prefetch.
 /// @param size: The number of bytes to prefetch.
 void __kitrt_hipMemPrefetchAsync(void *vp, size_t size);
-
-/// @brief Prefetch data to the GPU if it managed memory.
-/// @param vp: The starting address to prefetch.
-/// @param size: The number of bytes to prefetch.
-void __kitrt_hipMemPrefetchIfManaged(void *vp, size_t size);
 
 /// @brief  Prefetch the specified data to the GPU.
 /// @param vp: Pointer to kitsune runtime managed memory.
@@ -167,4 +162,4 @@ float __kitrt_hipElapsedEventTime(void *start, void *stop);
 } // extern "C"
 #endif
 
-#endif // __KITRT_CUDA_H__
+#endif

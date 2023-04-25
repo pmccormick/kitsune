@@ -20,6 +20,7 @@ TAPIR_CUDA_FLAGS?=-ftapir=cuda \
  -mllvm -cuabi-run-post-opts=false \
  -mllvm -cuabi-arch=$(CUDA_ARCH) \
  $(GPU_STRIPMINE_FLAGS)\
+ $(TAPIR_CUDA_EXTRA_FLAGS)
 
 TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda,--lto-O${KITSUNE_OPTLEVEL},\
 -mllvm,-cuabi-opt-level=${KITSUNE_OPTLEVEL},-mllvm,-cuabi-arch=$(CUDA_ARCH),\
@@ -41,7 +42,8 @@ TAPIR_HIP_FLAGS?=-ftapir=hip \
   -mllvm -hipabi-xnack=true \
   -mllvm -amdgpu-internalize-symbols \
   -mllvm -amdgpu-function-calls=false \
-  $(GPU_STRIPMINE_FLAGS)
+  $(GPU_STRIPMINE_FLAGS) \
+  $(TAPIR_HIP_EXTRA_FLAGS)
 
 TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O$(KITSUNE_OPTLEVEL),\
 -mllvm,-hipabi-opt-level=$(KITSUNE_OPTLEVEL),-mllvm,-chipabi-arch=$(AMDGPU_ARCH),\

@@ -25,7 +25,7 @@ saxpy-forall.cuda.${host_arch}: saxpy-forall.cpp
 	@$(FILE_SIZE)
 saxpy-forall.hip.${host_arch}: saxpy-forall.cpp 
 	@echo $@
-	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -mllvm -debug-only=hipabi -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 # kokkos-based tests (w/out views)
 #saxpy-kokkos.cuda.kitsune.${host_arch}: saxpy-kokkos-no-view.cpp 

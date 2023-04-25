@@ -73,8 +73,13 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
-  /// Initialize the shared portion of the runtime.
-  extern bool __kitrt_CommonInit();
+  /// Initialize the shared portion of the runtime.  
+  /// NOTE: The target-specific (non-JIT) transforms 
+  /// currently make explicit calls into the associated 
+  /// runtime for initialization; those calls in turn 
+  /// will call this entry point.  This path is taken 
+  /// to avoid overhead for compile-time targets.
+  extern void __kitrt_CommonInit();
 
   /// Initialize the supported runtimes.
   extern bool __kitrt_runtimesInit();
@@ -104,57 +109,13 @@ extern "C" {
   /// mode.
   extern bool __kitrt_verboseMode();
 
-
-  /// Enable/Disable the runtime's execution time reports.  This will
-  /// provide execution time reports to stderr for various runtime
-  /// operations.
-  ///
-  /// This mode may be *enabled* by setting the environment variable
-  /// KITRT_TIMING_REPORTS.  When set on program startup it is
-  /// equivalent to calling __kitrtReportRuntimes(true).
-  extern void __kitrt_setReportRuntimes(bool Enable);
-
-  /// Enable the runtime's execution time reports.
-  inline void __kitrt_enableRuntimeReports() {
-    __kitrt_setReportRuntimes(true);
-  }
-
-  /// Disable the runtime's execution time reports.
-  inline void __kitrt_disableRuntimeReports() {
-    __kitrt_setReportRuntimes(false);
-  }
-
-  /// Return the internal status of the runtime's execution time
-  /// reporting mode.
-  extern bool __kitrt_reportRuntimes();
-
-  /// Enable/Disable stack trace reports for any internal runtime
-  /// failures.
-  ///
-  /// This mode may be *enabled* by setting the environment variable
-  /// KITRT_STACK_TRACES.  When set on program startup it is
-  /// equivalent to calling __kitrtEnableStackTraces(true).
-  extern void __kitrt_setReportStackTraces(bool Enable);
-
-  inline void __kitrt_enableStackTraces() {
-    __kitrt_setReportStackTraces(true);
-  }
-
-  inline void __kitrt_disableStackTraces() {
-    __kitrt_setReportStackTraces(false);
-  }
-
-  /// Return the internal status of the runtime's stack
-  /// trace reporting.
-  extern bool __kitrt_reportStackTraces();
-
   // Get info about supported runtime targets.
   extern bool __kitrt_isCudaSupported();
   extern bool __kitrt_isHipSupported();
   extern bool __kitrt_isCheetahSupported();
   extern bool __kitrt_isRealmSuported();
 
-  extern void __kitrt_setDefaultGPUThreadsPerBlock(unsigned threadsPerBlock);
+  extern void __kitrt_setDefaultThreadsPerBlock(unsigned threadsPerBlock);
   extern void __kitrt_getLaunchParameters(size_t numElements,
                                           int &threadsPerBlock,
                                           int &blocksPerGrid);
