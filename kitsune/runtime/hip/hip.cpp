@@ -494,9 +494,6 @@ void *__kitrt_hipGetGlobalSymbol(const char *symName, void *mod) {
   assert(symName && "unexpected null symbol name!");
   assert(mod && "unexpected null module pointer!");
 
-  fprintf(stderr, "kitrt: get hip global symbol (%s).\n", symName);
-  fprintf(stderr, "\tsearch in module (addr %p).\n", mod);
-
   // TODO: Might need to revisit the details here to make sure they
   // fit the HIP API details.
   hipDeviceptr_t devPtr;
