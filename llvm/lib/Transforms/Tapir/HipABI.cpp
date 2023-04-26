@@ -964,17 +964,16 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
             GV->getName() + ".dev_gv", (GlobalVariable *)nullptr,
             GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
-        NewGV->setDSOLocal(GV->isDSOLocal());
         NewGV->setExternallyInitialized(true);
-        // HIP (appears) to require protected visibility!  Without
-        // this the runtime won't be able to find GV for 
-        // host <-> device transfers. 
-        NewGV->setVisibility(GlobalValue::ProtectedVisibility);
-
         // Flag the GV for post-processing (e.g., insert copy calls).
         // TODO: rename for clarity...
         TTarget->pushGlobalVariable(GV);
       }
+      // HIP (appears) to require protected visibility!  Without
+      // this the runtime won't be able to find GV for 
+      // host <-> device transfers. 
+      NewGV->setVisibility(GlobalValue::ProtectedVisibility);
+      NewGV->setDSOLocal(GV->isDSOLocal());
       NewGV->setAlignment(GV->getAlign());
       VMap[GV] = NewGV;
       LLVM_DEBUG(dbgs() << "\t\tcreated device-side global variable '"
@@ -1988,18 +1987,20 @@ Function *HipABI::createCtor(GlobalVariable *Bundle, GlobalVariable *Wrapper) {
   LoadInst *HandlePtr = CtorBuilder.CreateLoad(VoidPtrPtrTy, Handle,
                                                HIPABI_PREFIX + "__hip_fatbin");
   HandlePtr->setAlignment(DL.getPointerPrefAlignment());
-  // if (not KernelFunctions.empty())
-  //   registerKernels(HandlePtr, CtorBuilder);
 
   // TODO: It is not 100% clear what calls we actually need to make
-  // here for kernel, variable, etc. registration with CUDA.  Clang
-  // makes these calls but we are targeting CUDA driver API entry
-  // points via the Kitsune runtime library so these calls are
-  // potentially unneeded...
-  //if (!GlobalVars.empty()) {
-  //  LLVM_DEBUG(dbgs() << "\t\tbinding host and device global variables...\n");
-  //  bindGlobalVariables(HandlePtr, CtorBuilder);
+  // here for kernel, variable, etc. registration with HIP/ROCm.  Clang
+  // makes these calls but it is unclear what (and when) this is actually
+  // necessary...
+
+  //if (not KernelFunctions.empty()) {
+  //  LLVM_DEBUG(dbgs() << "\t\tregistering kernels...\n");
+  //  registerKernels(HandlePtr, CtorBuilder);
   //}
+  if (not GlobalVars.empty()) {
+    LLVM_DEBUG(dbgs() << "\t\tbinding host and device global variables...\n");
+    bindGlobalVariables(HandlePtr, CtorBuilder);
+  }
 
   // Now add a Dtor to help us clean up at program exit...
   if (Function *CleanupFn = createDtor(Handle)) {
