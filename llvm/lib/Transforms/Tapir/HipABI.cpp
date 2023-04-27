@@ -965,6 +965,7 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
             GlobalValue::NotThreadLocal,
             llvm::Optional<unsigned>(ConstAddrSpace));
         NewGV->setExternallyInitialized(true);
+        NewGV->setVisibility(GlobalValue::ProtectedVisibility);
         // Flag the GV for post-processing (e.g., insert copy calls).
         // TODO: rename for clarity...
         TTarget->pushGlobalVariable(GV);
@@ -972,7 +973,6 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
       // HIP (appears) to require protected visibility!  Without
       // this the runtime won't be able to find GV for 
       // host <-> device transfers. 
-      NewGV->setVisibility(GlobalValue::ProtectedVisibility);
       NewGV->setDSOLocal(GV->isDSOLocal());
       NewGV->setAlignment(GV->getAlign());
       VMap[GV] = NewGV;
@@ -1923,8 +1923,6 @@ void HipABI::bindGlobalVariables(Value *Handle, IRBuilder<> &B) {
     uint64_t VarSize = DL.getTypeAllocSize(HostGV->getValueType());
     LLVM_DEBUG(dbgs() << "\t\thost global '" << HostGV->getName().str()
                       << "' to device '" << DevVarName << "'.\n");
-    errs() << *DevGV << "\n" << *DevGV->getValueType() << "\n";
-    errs() << *HostGV << "\n" << *HostGV->getValueType() << "\n";
     llvm::Value *Args[] = {Handle, // fat binary handle
                            B.CreateBitOrPointerCast(HostGV, VoidPtrTy),
                            B.CreateBitOrPointerCast(HostGV, VoidPtrTy),
@@ -1997,10 +1995,10 @@ Function *HipABI::createCtor(GlobalVariable *Bundle, GlobalVariable *Wrapper) {
   //  LLVM_DEBUG(dbgs() << "\t\tregistering kernels...\n");
   //  registerKernels(HandlePtr, CtorBuilder);
   //}
-  if (not GlobalVars.empty()) {
-    LLVM_DEBUG(dbgs() << "\t\tbinding host and device global variables...\n");
-    bindGlobalVariables(HandlePtr, CtorBuilder);
-  }
+  //if (not GlobalVars.empty()) {
+  //  LLVM_DEBUG(dbgs() << "\t\tbinding host and device global variables...\n");
+  //  bindGlobalVariables(HandlePtr, CtorBuilder);
+  //}
 
   // Now add a Dtor to help us clean up at program exit...
   if (Function *CleanupFn = createDtor(Handle)) {
