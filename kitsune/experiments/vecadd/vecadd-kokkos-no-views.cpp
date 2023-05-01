@@ -17,8 +17,11 @@ void random_fill(T *data, size_t N) {
 int main (int argc, char* argv[]) {
   using namespace std;
   size_t size = 1024 * 1024 * 256;
-  if (argc > 1)
+  unsigned int iterations = 10;  
+  if (argc >= 2)
     size = atol(argv[1]);
+  if (argc == 3)
+    iterations = atoi(argv[2]);  
 
   cout << setprecision(5);
   cout << "\n";
@@ -35,13 +38,23 @@ int main (int argc, char* argv[]) {
     cout << "  done.\n\n";
 
     cout << "  Starting benchmark..." << std::flush;
-    auto start_time = chrono::steady_clock::now();
-    Kokkos::parallel_for(size, KOKKOS_LAMBDA(const int i) {
-      C[i] = A[i] + B[i];
-    });
-    auto end_time = chrono::steady_clock::now();
-    double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+    double elapsed_time;
+    double min_time = 100000.0;
+    double max_time = 0.0;        
 
+    for(int t = 0; t < iterations; t++) {    
+      auto start_time = chrono::steady_clock::now();
+      Kokkos::parallel_for(size, KOKKOS_LAMBDA(const int i) {
+        C[i] = A[i] + B[i];
+      });
+      auto end_time = chrono::steady_clock::now();
+      elapsed_time = chrono::duration<double>(end_time-start_time).count();
+      if (elapsed_time < min_time)
+	min_time = elapsed_time;
+      if (elapsed_time > max_time)
+	max_time = elapsed_time;
+      cout << "\t" << t << ". iteration time: " << elapsed_time << ".\n";            
+    }
     cout << "\n  Checking final result..." << std::flush;
     size_t error_count = 0;
     for (size_t i = 0; i < size; i++) {
@@ -58,6 +71,7 @@ int main (int argc, char* argv[]) {
      cout << "  pass (answers match).\n\n"
           << "  Total time: " << elapsed_time
           << " seconds. (" << size / elapsed_time << " elements/sec.)\n"
+	  << "*** " << min_time << ", " << max_time << "\n"
           << "----\n\n";
     }
   } Kokkos::finalize();

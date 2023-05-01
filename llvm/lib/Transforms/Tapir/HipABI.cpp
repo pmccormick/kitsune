@@ -1312,9 +1312,11 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   Value *ProxyFBPtr = B.CreateLoad(VoidPtrTy, ProxyFBGV);
 
   Value *TCCI = nullptr;
-  if (TripCount->getType() != Int64Ty)
-    TCCI = B.CreateBitCast(TripCount, Int64Ty);
-  else
+  if (TripCount->getType() != Int64Ty) {
+    LLVM_DEBUG(dbgs() << "\t\ttweak trip count to 64-bit value...\n");
+    TCCI = CastInst::CreateIntegerCast(TripCount, Int64Ty, false);
+    B.Insert(TCCI, "tcci");
+  } else
     TCCI = TripCount; // Simplify cases in launch code gen below...
 
   if (not TTarget->hasGlobalVariables()) {

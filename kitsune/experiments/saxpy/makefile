@@ -48,10 +48,6 @@ define newline
 
 endef 
 
-define RUN_test
-	$$(./$(1) > $(1).log) $(newline) 
-endef
-
 run: $(targets) 
 	@echo "running generated exeutables..."
 	$(foreach prog,$(targets),$(call RUN_test,$(prog)))

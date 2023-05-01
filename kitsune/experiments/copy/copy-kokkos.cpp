@@ -70,6 +70,8 @@ int main(int argc, char** argv)
 
     auto start_time = chrono::steady_clock::now();
     double total_copy_time = 0.0;
+    double min_time = 100000.0;
+    double max_time = 0.0;
     for(int i = 0; i < iterations; i++) {
       auto copy_start_time = chrono::steady_clock::now();
       parallel_copy(data1, data0, array_size);
@@ -80,6 +82,10 @@ int main(int argc, char** argv)
       cout  << "\t" << i << ". copy time: "
 	    << elapsed_time 
 	    << " sec., " << mb_size / elapsed_time << " MB/sec.\n";
+    if (elapsed_time < min_time)
+      min_time = elapsed_time;
+    if (elapsed_time > max_time)
+      max_time = elapsed_time;
       total_copy_time += elapsed_time;      
     }
 
@@ -98,6 +104,7 @@ int main(int argc, char** argv)
     cout << "Average copy time: "
 	 << total_copy_time / iterations
 	 << endl;
+    cout << "*** " << min_time << ", " << max_time << "\n";    
     cout << "----\n\n";
 
   }  Kokkos::finalize();

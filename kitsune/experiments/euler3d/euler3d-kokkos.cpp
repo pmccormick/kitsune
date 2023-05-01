@@ -616,6 +616,7 @@ int main(int argc, char** argv)
          << "            copy : " << copy_total << " seconds.\n"
          << "              sf : " << sf_total << " seconds.\n"
          << "              rk : " << rk_total << " seconds.\n"
+	 << "*** " << total_time << ", " << total_time << "\n"                      
          << "----\n\n";
 
   } Kokkos::finalize();

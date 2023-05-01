@@ -26,7 +26,6 @@ bool check_saxpy(const SaxpyDualView &v, size_t N) {
 
 int main(int argc, char *argv[]) {
   using namespace std;
-
   size_t size = 1 << 28;
   unsigned int iterations = 10;
   if (argc > 1) {
@@ -48,18 +47,20 @@ int main(int argc, char *argv[]) {
 
   Kokkos::initialize(argc, argv); {
 
-
     SaxpyDualView x = SaxpyDualView("x", size);
     SaxpyDualView y = SaxpyDualView("y", size);
     cout << "  done.\n\n";
 
     cout << "  Starting benchmark...\n" << std::flush;
-    auto start_total_time = chrono::steady_clock::now();
     double iteration_total_time = 0;
 
     DEFAULT_X_VALUE = rand() % 1000000;
     DEFAULT_Y_VALUE = rand() % 1000000;
     DEFAULT_A_VALUE = rand() % 1000000;
+
+    double min_time = 100000.0;
+    double max_time = 0.0;
+    auto start_total_time = chrono::steady_clock::now();
 
     for(unsigned int t = 0; t < iterations; t++) {
       auto start_time = chrono::steady_clock::now();
@@ -78,6 +79,10 @@ int main(int argc, char *argv[]) {
       Kokkos::fence();
       auto end_time = chrono::steady_clock::now();
       double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+      if (elapsed_time < min_time)
+	min_time = elapsed_time;
+      if (elapsed_time > max_time)
+	max_time = elapsed_time;    
       cout << "\t" << t << ". iteration time: " << elapsed_time << " seconds.\n";
       iteration_total_time += elapsed_time;
     }
@@ -95,6 +100,7 @@ int main(int argc, char *argv[]) {
       cout << "  pass (answers match).\n\n"
            << "  Total time: " << elapsed_total_time << " seconds.\n"
            << "  Average iteration time: " << iteration_total_time / iterations << " seconds.\n"
+	   << "*** " << min_time << ", " << max_time << "\n"      	
            << "----\n\n";
     }
   } Kokkos::finalize();

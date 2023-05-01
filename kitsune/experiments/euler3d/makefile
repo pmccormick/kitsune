@@ -5,11 +5,13 @@ targets = euler3d-forall.opencilk.${host_arch}
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += euler3d-forall.cuda.${host_arch}
   targets += euler3d-kokkos.nvcc.${host_arch}
+  targets += euler3d-kokkos.kitsune.cuda.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += euler3d-forall.hip.${host_arch}
   targets += euler3d-kokkos.hipcc.${host_arch}
+  targets += euler3d-kokkos.kitsune.hip.${host_arch}
 endif
 
 all: ${targets}
@@ -29,13 +31,13 @@ euler3d-forall.hip.${host_arch}: euler3d-forall.cpp
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)
-euler3d-kokkos.cuda.kitsune.${host_arch}: euler3d-kokkos-no-view.cpp 
+euler3d-kokkos.kitsune.cuda.${host_arch}: euler3d-kokkos-no-view.cpp 
 	@echo $@
 	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
-euler3d-kokkos.hip.kitsune.${host_arch}: euler3d-kokkos-no-view.cpp 
+euler3d-kokkos.kitsune.hip.${host_arch}: euler3d-kokkos-no-view.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
 # kokkos-based tests (using views -- currently not compatible w/ kitsune)
@@ -49,18 +51,16 @@ euler3d-kokkos.hipcc.${host_arch}: euler3d-kokkos.cpp
 	@$(FILE_SIZE)
 
 #####
-define newline 
 
-
-endef 
-
-define RUN_test
-	$$(./$(1) fvcorr.domn.193K > $(1).log) $(newline) 
+define RUN_euler_test
+	@echo "tapir cuda flags: $(TAPIR_CUDA_FLAGS)" > $(1).log 
+	@echo "tapir hip flags: $(TAPIR_HIP_FLAGS)" >> $(1).log
+	$$(./$(1) fvcorr.domn.193K >> $(1).log) $(newline) 
 endef
 
 run: $(targets) 
 	@echo "running generated exeutables..."
-	$(foreach prog,$(targets),$(call RUN_test,$(prog)))
+	$(foreach prog,$(targets),$(call RUN_euler_test,$(prog)))
 #####
 
 .PHONY: all clean run

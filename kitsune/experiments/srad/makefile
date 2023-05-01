@@ -44,14 +44,6 @@ srad-kokkos.hipcc.${host_arch}: srad-kokkos.cpp
 	@$(TIME_CMD) $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 	@$(FILE_SIZE)
 #####
-define newline 
-
-
-endef 
-
-define RUN_test
-	$$(./$(1) > $(1).log) $(newline) 
-endef
 
 run: $(targets) 
 	@echo "running generated exeutables..."

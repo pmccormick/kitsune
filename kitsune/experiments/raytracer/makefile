@@ -3,19 +3,17 @@ include ../experiments.mk
 targets = raytracer-forall.opencilk.${host_arch}
 
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
-  targets += raytracer.cuda.${host_arch}
   targets += raytracer-forall.cuda.${host_arch}
   targets += raytracer-kokkos.nvcc.${host_arch}
   targets += raytracer-kokkos.cuda.kitsune.${host_arch}
-  targets += raytracer.cuda.${host_arch}
+  targets += raytracer-cuda.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
-  targets += raytracer.hip.${host_arch}
   targets += raytracer-forall.hip.${host_arch}
   targets += raytracer-kokkos.hipcc.${host_arch}
   targets += raytracer-kokkos.hip.kitsune.${host_arch}
-  targets += raytracer.hip.${host_arch}
+  targets += raytracer-hip.${host_arch}
 endif
 
 all: ${targets}
@@ -55,13 +53,13 @@ raytracer-kokkos.hipcc.${host_arch}: raytracer-kokkos.cpp
 	@$(FILE_SIZE)
 
 # cuda version 
-raytracer.cuda.${host_arch}: raytracer.cu
+raytracer-cuda.${host_arch}: raytracer.cu
 	@echo $@
 	@$(TIME_CMD) $(NVCC) $(NVCC_CXX_FLAGS) -o $@ $<
 	@$(FILE_SIZE)
 
 # hip version 
-raytracer.hip.${host_arch}: raytracer-hip.cpp
+raytracer-hip.${host_arch}: raytracer-hip.cpp
 	@echo $@
 	@$(TIME_CMD) $(HIPCC) $(HIPCC_CXX_FLAGS) -o $@ $<
 	@$(FILE_SIZE)
@@ -70,10 +68,6 @@ define newline
 
 
 endef 
-
-define RUN_test
-	$$(./$(1) > $(1).log) $(newline) 
-endef
 
 run: $(targets) 
 	@echo "running generated exeutables..."

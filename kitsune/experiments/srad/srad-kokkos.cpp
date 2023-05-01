@@ -223,6 +223,7 @@ int main(int argc, char* argv[])
     auto end_time = chrono::steady_clock::now();
     double elapsed_time = chrono::duration<double>(end_time-start_time).count();
     cout << "  Running time: " << elapsed_time << " seconds.\n"
+	 << "*** " << elapsed_time << ", " << elapsed_time << "\n"            
          << "----\n\n";
 
     /*

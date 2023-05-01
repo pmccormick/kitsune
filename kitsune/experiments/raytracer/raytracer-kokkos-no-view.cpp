@@ -246,6 +246,9 @@ int main(int argc, char **argv) {
     for(int i = totalPixels-1; i >= 0; i--)
       img_file << img[i].r << img[i].g << img[i].b;
     img_file.close();
+    cout << "  done.\n\n"
+	 << "*** " << elapsed_time << ", " << elapsed_time << "\n"            
+	 << "----\n\n";
     dealloc(img);
   } Kokkos::finalize();
   return 0;

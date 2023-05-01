@@ -219,10 +219,9 @@ int main(int argc, char **argv) {
   }
 
   cout << "\n";
-  cout << "---- Raytracer benchmark (forall) ----\n"
+  cout << "---- Raytracer benchmark (cuda) ----\n"
        << "  Image size    : " << imageWidth << "x" << imageHeight << "\n"
        << "  Samples/pixel : " << sampleCount << "\n\n";
-
 
   cout << "  Allocating image..." << std::flush;
   cudaError_t err = cudaSuccess;
@@ -260,6 +259,8 @@ int main(int argc, char **argv) {
   for(int i = totalPixels-1; i >= 0; i--)
     img_file << img[i].r << img[i].g << img[i].b;
   img_file.close();
-  cout << "  done.\n\n" << "----\n\n";
+  cout << "  done.\n\n"
+       << "*** " << elapsed_time << ", " << elapsed_time << "\n"            
+       << "----\n\n";
   return 0;
 }

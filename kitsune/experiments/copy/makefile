@@ -13,6 +13,7 @@ endif
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += copy-forall.hip.${host_arch}
   targets += copy-kokkos.hipcc.${host_arch}
+  targets += copy-kokkos.hip.kitsune.${host_arch}
 endif
 
 
@@ -39,7 +40,7 @@ copy-kokkos.cuda.kitsune.${host_arch}: copy-kokkos-no-views.cpp
 	@${FILE_SIZE}
 copy-kokkos.hip.kitsune.${host_arch}: copy-kokkos-no-views.cpp 
 	@echo $@
-	@${TIME_CMD} $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_HIP_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@${FILE_SIZE}
 
 # kokkos-based tests (using views -- currently not compatible w/ kitsune)
@@ -58,10 +59,6 @@ define newline
 
 
 endef 
-
-define RUN_test
-	$$(./$(1) > $(1).log) $(newline) 
-endef
 
 run: $(targets) 
 	@echo "running generated exeutables..."

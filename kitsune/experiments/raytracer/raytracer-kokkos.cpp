@@ -248,7 +248,9 @@ int main(int argc, char **argv) {
       }
     }
     img_file.close();
-    cout << "  done.\n\n" << "----\n\n";
+    cout << "  done.\n\n"
+	 << "*** " << elapsed_time << ", " << elapsed_time << "\n"            
+	 << "----\n\n";
   }  Kokkos::finalize();
   return 0;
 }
