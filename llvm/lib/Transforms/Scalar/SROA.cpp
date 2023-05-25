@@ -1584,15 +1584,17 @@ static void rewriteMemOpOfSelect(SelectInst &SI, T &I,
     bool IsThen = SuccBB == HeadBI->getSuccessor(0);
     int SuccIdx = IsThen ? 0 : 1;
     auto *NewMemOpBB = SuccBB == Tail ? Head : SuccBB;
+    auto &CondMemOp = cast<T>(*I.clone());
     if (NewMemOpBB != Head) {
       NewMemOpBB->setName(Head->getName() + (IsThen ? ".then" : ".else"));
       if (isa<LoadInst>(I))
         ++NumLoadsPredicated;
       else
         ++NumStoresPredicated;
-    } else
+    } else {
+      CondMemOp.dropUndefImplyingAttrsAndUnknownMetadata();
       ++NumLoadsSpeculated;
-    auto &CondMemOp = cast<T>(*I.clone());
+    }
     CondMemOp.insertBefore(NewMemOpBB->getTerminator());
     Value *Ptr = SI.getOperand(1 + SuccIdx);
     if (auto *PtrTy = Ptr->getType();
@@ -2929,11 +2931,11 @@ private:
     if (AATags)
       Store->setAAMetadata(AATags.shift(NewBeginOffset - BeginOffset));
 
-    migrateDebugInfo(&OldAI, RelativeOffset * 8, SliceSize * 8, &SI, Store,
-                     Store->getPointerOperand(), Store->getValueOperand(), DL);
-
     if (SI.isAtomic())
       Store->setAtomic(SI.getOrdering(), SI.getSyncScopeID());
+
+    migrateDebugInfo(&OldAI, RelativeOffset * 8, SliceSize * 8, &SI, Store,
+                     Store->getPointerOperand(), Store->getValueOperand(), DL);
 
     Pass.DeadInsts.push_back(&SI);
     LLVM_DEBUG(dbgs() << "          to: " << *Store << "\n");
@@ -5134,7 +5136,7 @@ bool SROAPass::promoteAllocas(Function &F) {
 }
 
 PreservedAnalyses SROAPass::runImpl(Function &F, DomTreeUpdater &RunDTU,
-                                    AssumptionCache &RunAC, TaskInfo& RunTI) {
+                                    AssumptionCache &RunAC, TaskInfo &RunTI) {
   LLVM_DEBUG(dbgs() << "SROA function: " << F.getName() << "\n");
   C = &F.getContext();
   DTU = &RunDTU;
@@ -5190,6 +5192,13 @@ PreservedAnalyses SROAPass::runImpl(Function &F, DomTreeUpdater &RunDTU,
         llvm::erase_if(PromotableAllocas, IsInSet);
         DeletedAllocas.clear();
       }
+
+      // Preserve TaskInfo by manually updating it based on the updated DT.
+      if (IterationCFGChanged && TI) {
+        // FIXME: Recalculating TaskInfo for the whole function is wasteful.
+        // Optimize this routine in the future.
+        TI->recalculate(F, DTU->getDomTree());
+      }
     }
 
     Changed |= promoteAllocas(F);
@@ -5209,6 +5218,7 @@ PreservedAnalyses SROAPass::runImpl(Function &F, DomTreeUpdater &RunDTU,
   if (!CFGChanged)
     PA.preserveSet<CFGAnalyses>();
   PA.preserve<DominatorTreeAnalysis>();
+  PA.preserve<TaskAnalysis>();
   return PA;
 }
 
@@ -5268,6 +5278,7 @@ public:
     AU.addRequired<TaskInfoWrapperPass>();
     AU.addPreserved<GlobalsAAWrapperPass>();
     AU.addPreserved<DominatorTreeWrapperPass>();
+    AU.addPreserved<TaskInfoWrapperPass>();
   }
 
   StringRef getPassName() const override { return "SROA"; }

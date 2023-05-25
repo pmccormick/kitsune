@@ -6873,7 +6873,7 @@ memory operations within the same strand.
   }];
 }
 
-def TapirDocs : DocumentationCategory<"Tapir Attributes"> {
+def KitsuneDocs : DocumentationCategory<"Kitsune Attributes"> {
   let Content = [{
 Tapir and Kitsune introduce custom C++ attributres that let developer
 control behaviors at the source code level vs. only through command line
@@ -6882,7 +6882,7 @@ arguments.
 }
 
 def TapirRTDocs : Documentation {
-  let Category = TapirDocs;
+  let Category = KitsuneDocs;
   let Content = [{
 
 **Experimental**
@@ -6910,7 +6910,7 @@ Example:
 }
 
 def TapirStrategyDocs : Documentation {
-  let Category = TapirDocs;
+  let Category = KitsuneDocs;
   let Content = [{
 
 **Experimental**
@@ -6932,7 +6932,7 @@ strategies are:
 }
 
 def KitsuneMemAccessDocs : Documentation {
-  let Category = TapirDocs;
+  let Category = KitsuneDocs;
   let Content = [{
 
 The kitsune memory access attributes lets programmers inform the compiler of
@@ -6953,5 +6953,31 @@ inaccurate).
                   _readonly float *B,
                   _writeonly float *C) {
     ...
+  }];
+}
+
+
+def KitsuneLaunchDocs : Documentation {
+  let Category = KitsuneDocs;
+  let Content = [{
+
+The kitsune launch attributes lets programmers inform the compiler how
+to tweak the code generation aspects for launching the GPU kernels for
+parallel constructs in the code.  This information is not verified in
+only a minor fashion at compile time and then again at runtime.  In
+general, it is up to the programmer to communicate the details
+correctly in terms of the semantics of the underlying GPU programming
+mechanisms. In general, this is intended more for kitsune development
+and testing vs. an end-user feature. 
+
+- threads_per_block : the number of threads per block to launch the kernel.
+
+.. code-block:: c++
+
+   [[kitsune:launch:threads_per_block(N)]]
+   forall(...) {
+     // loop body goes here. 
+   } 
+...
   }];
 }

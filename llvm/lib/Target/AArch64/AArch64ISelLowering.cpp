@@ -2814,14 +2814,6 @@ MachineBasicBlock *AArch64TargetLowering::EmitInstrWithCustomInserter(
     return EmitFill(MI, BB);
   case AArch64::ZERO_M_PSEUDO:
     return EmitZero(MI, BB);
-  case AArch64::ADDHA_MPPZ_PSEUDO_S:
-    return EmitAddVectorToTile(AArch64::ADDHA_MPPZ_S, AArch64::ZAS0, MI, BB);
-  case AArch64::ADDVA_MPPZ_PSEUDO_S:
-    return EmitAddVectorToTile(AArch64::ADDVA_MPPZ_S, AArch64::ZAS0, MI, BB);
-  case AArch64::ADDHA_MPPZ_PSEUDO_D:
-    return EmitAddVectorToTile(AArch64::ADDHA_MPPZ_D, AArch64::ZAD0, MI, BB);
-  case AArch64::ADDVA_MPPZ_PSEUDO_D:
-    return EmitAddVectorToTile(AArch64::ADDVA_MPPZ_D, AArch64::ZAD0, MI, BB);
   case AArch64::AArch64_setjmp_instr:
     return EmitSetjmp(MI, BB);
   case AArch64::AArch64_longjmp_instr:
@@ -24132,7 +24124,7 @@ AArch64TargetLowering::EmitSetjmp(MachineInstr &MI,
   MF->insert(I, mainMBB);
   MF->insert(I, sinkMBB);
   MF->push_back(restoreMBB);
-  restoreMBB->setHasAddressTaken();
+  restoreMBB->setMachineBlockAddressTaken();
 
   MachineInstrBuilder MIB;
 

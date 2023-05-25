@@ -5011,7 +5011,14 @@ RValue CodeGenFunction::EmitCallExpr(const CallExpr *E,
       std::string qname = fdecl->getQualifiedNameAsString();
       if (qname == "Kokkos::parallel_for" ||
           qname == "Kokkos::parallel_reduce") {
-        if (EmitKokkosConstruct(E))
+	// We handle the special case of Tapir target attributes on a
+	// Kokkos "statement" elsewhere (as the attribute is not
+	// really attached to the CallExpr but instead the C++ goop
+	// around the call -- implicit and clean up stuff).  If we
+	// have seen such an attribute it was saved and we can simply
+	// pass TapirAttrs on from here for the Kokkos code
+	// transformation/generation.
+        if (EmitKokkosConstruct(E, TapirAttrs))
           return RValue::get(nullptr);
       } else if (getLangOpts().KokkosNoInit &&
                  (qname == "Kokkos::initialize" ||

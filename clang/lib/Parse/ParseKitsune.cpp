@@ -11,11 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/Parse/RAIIObjectsForParser.h"
 #include "clang/Parse/Parser.h"
+#include "clang/Parse/RAIIObjectsForParser.h"
 
 using namespace clang;
-
 
 /// ParseSyncStatement
 ///       sync-statement:
@@ -27,7 +26,8 @@ StmtResult Parser::ParseSyncStatement() {
          "Not an identifier!");
   Token IdentTok = Tok;
   ConsumeToken();
-  return Actions.ActOnSyncStmt(SyncLoc, IdentTok.getIdentifierInfo()->getName());
+  return Actions.ActOnSyncStmt(SyncLoc,
+                               IdentTok.getIdentifierInfo()->getName());
 }
 
 /// ParseSpawnStatement
@@ -35,7 +35,7 @@ StmtResult Parser::ParseSyncStatement() {
 ///         'spawn' identifier statement
 StmtResult Parser::ParseSpawnStatement() {
   assert(Tok.is(tok::kw__kitsune_spawn) && "Not a spawn stmt!");
-  SourceLocation SpawnLoc = ConsumeToken();  // eat the '_kitsune_spawn'.
+  SourceLocation SpawnLoc = ConsumeToken(); // eat the '_kitsune_spawn'.
 
   assert(Tok.is(tok::identifier) && Tok.getIdentifierInfo() &&
          "Not an identifier!");
@@ -48,17 +48,18 @@ StmtResult Parser::ParseSpawnStatement() {
     SkipUntil(tok::semi);
     return StmtError();
   }
-  return Actions.ActOnSpawnStmt(SpawnLoc, IdentTok.getIdentifierInfo()->getName(), SubStmt.get());
+  return Actions.ActOnSpawnStmt(
+      SpawnLoc, IdentTok.getIdentifierInfo()->getName(), SubStmt.get());
 }
-
 
 /// ParseForallStatement
 ///       _kitsune_forall-statement:
 ///         '_kitsune_forall' '(' expr ';' expr ';' expr ')' statement
-///         '_kitsune_forall' '(' declaration expr ';' expr ';' expr ')' statement
+///         '_kitsune_forall' '(' declaration expr ';' expr ';' expr ')'
+///         statement
 StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
   assert(Tok.is(tok::kw__kitsune_forall) && "Not a forall stmt!");
-  SourceLocation ForLoc = ConsumeToken();  // eat the 'for'.
+  SourceLocation ForLoc = ConsumeToken(); // eat the 'for'.
 
   SourceLocation CoawaitLoc;
   if (Tok.is(tok::kw_co_await))
@@ -70,8 +71,8 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
     return StmtError();
   }
 
-  bool C99orCXXorObjC = getLangOpts().C99 || getLangOpts().CPlusPlus ||
-    getLangOpts().ObjC;
+  bool C99orCXXorObjC =
+      getLangOpts().C99 || getLangOpts().CPlusPlus || getLangOpts().ObjC;
 
   // C99 6.8.5p5 - In C99, the for statement is a block.  This is not
   // the case for C90.  Start the loop scope.
@@ -107,9 +108,9 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
   FullExprArg ThirdPart(Actions);
 
   if (Tok.is(tok::code_completion)) {
-    Actions.CodeCompleteOrdinaryName(getCurScope(),
-                                     C99orCXXorObjC? Sema::PCC_ForInit
-                                                   : Sema::PCC_Expression);
+    Actions.CodeCompleteOrdinaryName(getCurScope(), C99orCXXorObjC
+                                                        ? Sema::PCC_ForInit
+                                                        : Sema::PCC_Expression);
     cutOffParsing();
     return StmtError();
   }
@@ -120,7 +121,7 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
   SourceLocation EmptyInitStmtSemiLoc;
 
   // Parse the first part of the for specifier.
-  if (Tok.is(tok::semi)) {  // for (;
+  if (Tok.is(tok::semi)) { // for (;
     ProhibitAttributes(attrs);
     // no first part, eat the ';'.
     SourceLocation SemiLoc = Tok.getLocation();
@@ -141,17 +142,17 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
       ForRangeInfo.RangeExpr = ParseExpression();
 
     Diag(Loc, diag::err_for_range_identifier)
-      << ((getLangOpts().CPlusPlus11 && !getLangOpts().CPlusPlus17)
-              ? FixItHint::CreateInsertion(Loc, "auto &&")
-              : FixItHint());
+        << ((getLangOpts().CPlusPlus11 && !getLangOpts().CPlusPlus17)
+                ? FixItHint::CreateInsertion(Loc, "auto &&")
+                : FixItHint());
 
-    ForRangeInfo.LoopVar = Actions.ActOnCXXForRangeIdentifier(
-        getCurScope(), Loc, Name, attrs);
-  } else if (isForInitDeclaration()) {  // for (int X = 4;
+    ForRangeInfo.LoopVar =
+        Actions.ActOnCXXForRangeIdentifier(getCurScope(), Loc, Name, attrs);
+  } else if (isForInitDeclaration()) { // for (int X = 4;
     ParenBraceBracketBalancer BalancerRAIIObj(*this);
 
     // Parse declaration, which eats the ';'.
-    if (!C99orCXXorObjC) {   // Use of C99-style for loops in C90 mode?
+    if (!C99orCXXorObjC) { // Use of C99-style for loops in C90 mode?
       Diag(Tok, diag::ext_c99_variable_decl_in_for_loop);
       Diag(Tok, diag::warn_gcc_variable_decl_in_for_loop);
     }
@@ -226,11 +227,12 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
         return StmtError();
       }
       Collection = ParseExpression();
-    } else if (getLangOpts().CPlusPlus11 && Tok.is(tok::colon) && FirstPart.get()) {
+    } else if (getLangOpts().CPlusPlus11 && Tok.is(tok::colon) &&
+               FirstPart.get()) {
       // User tried to write the reasonable, but ill-formed, for-range-statement
       //   for (expr : expr) { ... }
       Diag(Tok, diag::err_for_range_expected_decl)
-        << FirstPart.get()->getSourceRange();
+          << FirstPart.get()->getSourceRange();
       SkipUntil(tok::r_paren, StopBeforeMatch);
       SecondPart = Sema::ConditionError();
     } else {
@@ -249,7 +251,7 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
   if (!ForEach && !ForRangeInfo.ParsedForRangeDecl() &&
       !SecondPart.isInvalid()) {
     // Parse the second part of the for specifier.
-    if (Tok.is(tok::semi)) {  // for (...;;
+    if (Tok.is(tok::semi)) { // for (...;;
       // no second part.
     } else if (Tok.is(tok::r_paren)) {
       // missing both semicolons.
@@ -313,7 +315,7 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
       ConsumeToken();
     }
 
-    if (Tok.isNot(tok::r_paren)) {   // for (...;...;)
+    if (Tok.isNot(tok::r_paren)) { // for (...;...;)
       ExprResult Third = ParseExpression();
       // FIXME: The C++11 standard doesn't actually say that this is a
       // discarded-value expression, but it clearly should be.
@@ -334,7 +336,7 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
     Diag(CoawaitLoc, diag::warn_deprecated_for_co_await);
 
   // We need to perform most of the semantic analysis for a C++0x for-range
-  // statememt before parsing the body, in order to be able to deduce the type
+  // statement before parsing the body, in order to be able to deduce the type
   // of an auto-typed loop variable.
   StmtResult ForallRangeStmt;
   StmtResult ForEachStmt;
@@ -347,13 +349,11 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
         ForRangeInfo.LoopVar.get(), ForRangeInfo.ColonLoc, CorrectedRange.get(),
         T.getCloseLocation(), Sema::BFRK_Build);
 
-  // Similarly, we need to do the semantic analysis for a for-range
-  // statement immediately in order to close over temporaries correctly.
+    // Similarly, we need to do the semantic analysis for a for-range
+    // statement immediately in order to close over temporaries correctly.
   } else if (ForEach) {
-    ForEachStmt = Actions.ActOnObjCForCollectionStmt(ForLoc,
-                                                     FirstPart.get(),
-                                                     Collection.get(),
-                                                     T.getCloseLocation());
+    ForEachStmt = Actions.ActOnObjCForCollectionStmt(
+        ForLoc, FirstPart.get(), Collection.get(), T.getCloseLocation());
   } else {
     // In OpenMP loop region loop control variable must be captured and be
     // private. Perform analysis of first part (if any).
@@ -396,13 +396,12 @@ StmtResult Parser::ParseForallStatement(SourceLocation *TrailingElseLoc) {
     return StmtError();
 
   if (ForEach)
-   return Actions.FinishObjCForCollectionStmt(ForEachStmt.get(),
-                                              Body.get());
+    return Actions.FinishObjCForCollectionStmt(ForEachStmt.get(), Body.get());
 
   if (ForRangeInfo.ParsedForRangeDecl())
     return Actions.FinishCXXForallRangeStmt(ForallRangeStmt.get(), Body.get());
 
   return Actions.ActOnForallStmt(ForLoc, T.getOpenLocation(), FirstPart.get(),
-                              SecondPart, ThirdPart, T.getCloseLocation(),
-                              Body.get());
+                                 SecondPart, ThirdPart, T.getCloseLocation(),
+                                 Body.get());
 }

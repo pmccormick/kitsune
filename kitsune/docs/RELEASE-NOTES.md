@@ -43,7 +43,7 @@ set of LLVM release notes.
 
   * Added features for correct registration of generated executables with the
     CUDA toolchain.  This allows common tools such as the compute sanitizer and
-    cuobjdump to work correctly with Kitsune generated exeutables.
+    cuobjdump to work correctly with Kitsune generated executables.
   * Restructuring of the runtime system for more flexible targeting of both
     just-in-time and static compilation targets.  This incldues a bit more
     separation of targets (e.g., AMD and NVIDIA).  

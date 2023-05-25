@@ -2903,11 +2903,17 @@ struct InvalidateOnErrorScope {
 }
 
 /// BuildCXXForallRangeStmt - Build or instantiate a C++11 for-range statement.
-StmtResult Sema::BuildCXXForallRangeStmt(
-    SourceLocation ForLoc, SourceLocation CoawaitLoc, Stmt *InitStmt,
-    SourceLocation ColonLoc, Stmt *RangeDecl, Stmt *Begin, Stmt *End,
-    Stmt *Index, Stmt *IndexEnd, Expr *Cond, Expr *Inc, Stmt *LoopVarDecl,
-    SourceLocation RParenLoc, BuildForRangeKind Kind) {
+StmtResult Sema::BuildCXXForallRangeStmt(SourceLocation ForLoc, 
+                                         SourceLocation CoawaitLoc, 
+                                         Stmt *InitStmt,
+                                         SourceLocation ColonLoc, 
+                                         Stmt *RangeDecl, 
+                                         Stmt *Begin, Stmt *End, 
+                                         Stmt *Index, Stmt *IndexEnd, 
+                                         Expr *Cond, Expr *Inc, 
+                                         Stmt *LoopVarDecl,
+                                         SourceLocation RParenLoc, 
+                                         BuildForRangeKind Kind) {
   // FIXME: This should not be used during template instantiation. We should
   // pick up the set of unqualified lookup results for the != and + operators
   // in the initial parse.
@@ -2926,15 +2932,8 @@ StmtResult Sema::BuildCXXForallRangeStmt(
   DeclStmt *LoopVarDS = cast<DeclStmt>(LoopVarDecl);
   VarDecl *LoopVar = cast<VarDecl>(LoopVarDS->getSingleDecl());
 
-  // If we hit any errors, mark the loop variable as invalid if its type
-  // contains 'auto'.
-  InvalidateOnErrorScope Invalidate(*this, LoopVar,
-                                    LoopVar->getType()->isUndeducedType());
-
   StmtResult BeginDeclStmt = Begin;
   StmtResult EndDeclStmt = End;
-  StmtResult IndexDeclStmt = Index;
-  StmtResult IndexEndDeclStmt = IndexEnd;
   ExprResult NotEqExpr = Cond, IncrExpr = Inc;
 
   if (RangeVarType->isDependentType()) {
@@ -2947,7 +2946,7 @@ StmtResult Sema::BuildCXXForallRangeStmt(
       if (auto *DD = dyn_cast<DecompositionDecl>(LoopVar))
         for (auto *Binding : DD->bindings())
           Binding->setType(Context.DependentTy);
-      LoopVar->setType(SubstAutoType(LoopVar->getType(), Context.DependentTy));
+      LoopVar->setType(SubstAutoTypeDependent(LoopVar->getType()));
     }
   } else if (!BeginDeclStmt.get()) {
     SourceLocation RangeLoc = RangeVar->getLocation();
@@ -3156,84 +3155,11 @@ StmtResult Sema::BuildCXXForallRangeStmt(
     ExprResult EndRef = BuildDeclRefExpr(EndVar, EndType.getNonReferenceType(),
                                          VK_LValue, ColonLoc);
     if (EndRef.isInvalid())
-      return StmtError();
+      return StmtError(); 
 
-    // Create a variable __index of the iterator's difference type
-    // that starts at (__begin - __begin) and ends at (__end -
-    // __begin).  Make the LoopVar equal to *(__begin + __index), and
-    // use __index as the IV of the loop.
-
-    // Build and check __end - __begin expression.
-    ExprResult DiffExpr =
-        ActOnBinOp(S, ColonLoc, tok::minus, EndRef.get(), BeginRef.get());
-    // if (!DiffExpr.isInvalid())
-    //   DiffExpr = CheckBooleanCondition(ColonLoc, DiffExpr.get());
-    if (!DiffExpr.isInvalid())
-      DiffExpr = ActOnFinishFullExpr(DiffExpr.get(), /*DiscardedValue*/ false);
-    if (DiffExpr.isInvalid()) {
-      Diag(RangeLoc, diag::note_for_range_invalid_iterator)
-        << RangeLoc << 0 << BeginRangeRef.get()->getType();
-      NoteForRangeBeginEndFunction(*this, BeginExpr.get(), BEF_begin);
-      if (!Context.hasSameType(BeginType, EndType))
-        NoteForRangeBeginEndFunction(*this, EndExpr.get(), BEF_end);
-      return StmtError();
-    }
-
-    // Build and check __begin - __begin expression to initialize
-    // IndexVar.  We compute __begin - __begin because it's not clear
-    // that an arbirary difference_type for an arbitrary
-    // RandomAccessIterator has a way to statically construct a zero
-    // difference.
-    ExprResult InitExpr =
-        ActOnBinOp(S, ColonLoc, tok::minus, BeginRef.get(), BeginRef.get());
-    // if (!InitExpr.isInvalid())
-    //   InitExpr = CheckBooleanCondition(ColonLoc, InitExpr.get());
-    if (!InitExpr.isInvalid())
-      InitExpr = ActOnFinishFullExpr(InitExpr.get(), /*DiscardedValue*/ false);
-    if (InitExpr.isInvalid()) {
-      Diag(RangeLoc, diag::note_for_range_invalid_iterator)
-          << RangeLoc << 0 << BeginRangeRef.get()->getType();
-      NoteForRangeBeginEndFunction(*this, BeginExpr.get(), BEF_begin);
-      // if (!Context.hasSameType(BeginType, EndType))
-      //   NoteForRangeBeginEndFunction(*this, EndExpr.get(), BEF_end);
-      return StmtError();
-    }
-
-    QualType IndexType = DiffExpr.get()->getType();
-    VarDecl *IndexVar = BuildForRangeVarDecl(*this, ColonLoc, IndexType,
-                                             std::string("__index") + DepthStr);
-    VarDecl *IndexEndVar = BuildForRangeVarDecl(
-        *this, ColonLoc, IndexType, std::string("__index_end") + DepthStr);
-
-    AddInitializerToDecl(IndexVar, InitExpr.get(), /*DirectInit=*/false);
-    FinalizeDeclaration(IndexVar);
-    CurContext->addHiddenDecl(IndexVar);
-
-    AddInitializerToDecl(IndexEndVar, DiffExpr.get(), /*DirectInit=*/false);
-    FinalizeDeclaration(IndexEndVar);
-    CurContext->addHiddenDecl(IndexEndVar);
-
-    IndexDeclStmt =
-        ActOnDeclStmt(ConvertDeclToDeclGroup(IndexVar), ColonLoc, ColonLoc);
-    IndexEndDeclStmt =
-        ActOnDeclStmt(ConvertDeclToDeclGroup(IndexEndVar), ColonLoc, ColonLoc);
-
-    const QualType IndexRefNonRefType =
-        IndexVar->getType().getNonReferenceType();
-    ExprResult IndexRef =
-        BuildDeclRefExpr(IndexVar, IndexRefNonRefType, VK_LValue, ColonLoc);
-    if (IndexRef.isInvalid())
-      return StmtError();
-
-    ExprResult IndexEndRef = BuildDeclRefExpr(
-        IndexEndVar, IndexEndVar->getType().getNonReferenceType(), VK_LValue,
-        ColonLoc);
-    if (IndexEndRef.isInvalid())
-      return StmtError();
-
-    // Build and check __index <= __index_end expression.
-    NotEqExpr = ActOnBinOp(S, ColonLoc, tok::exclaimequal, IndexRef.get(),
-                           IndexEndRef.get());
+    // Build and check __begin != __end expression.
+    NotEqExpr = ActOnBinOp(S, ColonLoc, tok::exclaimequal,
+                           BeginRef.get(), EndRef.get());
     if (!NotEqExpr.isInvalid())
       NotEqExpr = CheckBooleanCondition(ColonLoc, NotEqExpr.get());
     if (!NotEqExpr.isInvalid())
@@ -3247,14 +3173,13 @@ StmtResult Sema::BuildCXXForallRangeStmt(
         NoteForRangeBeginEndFunction(*this, EndExpr.get(), BEF_end);
       return StmtError();
     }
-
-    // Build and check ++__index expression.
-    IndexRef =
-        BuildDeclRefExpr(IndexVar, IndexRefNonRefType, VK_LValue, ColonLoc);
-    if (IndexRef.isInvalid())
+    // Build and check ++__begin expression.
+    BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
+                                VK_LValue, ColonLoc);
+    if (BeginRef.isInvalid())
       return StmtError();
 
-    IncrExpr = ActOnUnaryOp(S, ColonLoc, tok::plusplus, IndexRef.get());
+    IncrExpr = ActOnUnaryOp(S, ColonLoc, tok::plusplus, BeginRef.get());
     if (!IncrExpr.isInvalid() && CoawaitLoc.isValid())
       // FIXME: getCurScope() should not be used during template instantiation.
       // We should pick up the set of unqualified lookup results for operator
@@ -3264,33 +3189,18 @@ StmtResult Sema::BuildCXXForallRangeStmt(
       IncrExpr = ActOnFinishFullExpr(IncrExpr.get(), /*DiscardedValue*/ false);
     if (IncrExpr.isInvalid()) {
       Diag(RangeLoc, diag::note_for_range_invalid_iterator)
-        << RangeLoc << 2 << IndexRef.get()->getType() ;
-      // NoteForRangeBeginEndFunction(*this, BeginExpr.get(), BEF_begin);
-      return StmtError();
-    }
-
-    // Build and check *(__begin + __index)  expression.
-    BeginRef =
-        BuildDeclRefExpr(BeginVar, BeginRefNonRefType, VK_LValue, ColonLoc);
-    if (BeginRef.isInvalid())
-      return StmtError();
-
-    IndexRef =
-        BuildDeclRefExpr(IndexVar, IndexRefNonRefType, VK_LValue, ColonLoc);
-    if (IndexRef.isInvalid())
-      return StmtError();
-
-    ExprResult PtrAddExpr =
-        ActOnBinOp(S, ColonLoc, tok::plus, BeginRef.get(), IndexRef.get());
-    if (PtrAddExpr.isInvalid()) {
-      Diag(RangeLoc, diag::note_for_range_invalid_iterator)
-        << RangeLoc << 1 << BeginRangeRef.get()->getType();
+        << RangeLoc << 2 << BeginRangeRef.get()->getType() ;
       NoteForRangeBeginEndFunction(*this, BeginExpr.get(), BEF_begin);
       return StmtError();
     }
 
-    ExprResult DerefExpr =
-        ActOnUnaryOp(S, ColonLoc, tok::star, PtrAddExpr.get());
+    // Build and check *__begin  expression.
+    BeginRef = BuildDeclRefExpr(BeginVar, BeginRefNonRefType,
+                                VK_LValue, ColonLoc);
+    if (BeginRef.isInvalid())
+      return StmtError();
+
+    ExprResult DerefExpr = ActOnUnaryOp(S, ColonLoc, tok::star, BeginRef.get());
     if (DerefExpr.isInvalid()) {
       Diag(RangeLoc, diag::note_for_range_invalid_iterator)
         << RangeLoc << 1 << BeginRangeRef.get()->getType();
@@ -3298,11 +3208,12 @@ StmtResult Sema::BuildCXXForallRangeStmt(
       return StmtError();
     }
 
-    // Attach  *(__begin + __index)  as initializer for VD. Don't touch it if
-    // we're just trying to determine whether this would be a valid range.
+    // Attach  *__begin  as initializer for VD. Don't touch it if we're just
+    // trying to determine whether this would be a valid range.
     if (!LoopVar->isInvalidDecl() && Kind != BFRK_Check) {
       AddInitializerToDecl(LoopVar, DerefExpr.get(), /*DirectInit=*/false);
-      if (LoopVar->isInvalidDecl())
+      if (LoopVar->isInvalidDecl() ||
+          (LoopVar->getInit() && LoopVar->getInit()->containsErrors()))
         NoteForRangeBeginEndFunction(*this, BeginExpr.get(), BEF_begin);
     }
   }
@@ -3312,13 +3223,16 @@ StmtResult Sema::BuildCXXForallRangeStmt(
   if (Kind == BFRK_Check)
     return StmtResult();
 
-  return new (Context) CXXForallRangeStmt(
+  // In OpenMP loop region loop control variable must be private. Perform
+  // analysis of first part (if any).
+  if (getLangOpts().OpenMP >= 50 && BeginDeclStmt.isUsable())
+    ActOnOpenMPLoopInitialization(ForLoc, BeginDeclStmt.get());
+
+  return new (Context) CXXForRangeStmt(
       InitStmt, RangeDS, cast_or_null<DeclStmt>(BeginDeclStmt.get()),
-      cast_or_null<DeclStmt>(EndDeclStmt.get()),
-      cast_or_null<DeclStmt>(IndexDeclStmt.get()),
-      cast_or_null<DeclStmt>(IndexEndDeclStmt.get()), NotEqExpr.get(),
-      IncrExpr.get(), LoopVarDS, /*Body=*/nullptr, ForLoc, CoawaitLoc, ColonLoc,
-      RParenLoc);
+      cast_or_null<DeclStmt>(EndDeclStmt.get()), NotEqExpr.get(),
+      IncrExpr.get(), LoopVarDS, /*Body=*/nullptr, ForLoc, CoawaitLoc,
+      ColonLoc, RParenLoc);
 }
 
 /// BuildCXXForRangeStmt - Build or instantiate a C++11 for-range statement.

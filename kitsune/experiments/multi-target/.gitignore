@@ -1,0 +1,9 @@
+*.ncu-rep
+*.nsys-rep
+*.sqlite
+*.o
+*.kitsune
+*.nvcc
+*.cfg 
+.vscode
+multi-target

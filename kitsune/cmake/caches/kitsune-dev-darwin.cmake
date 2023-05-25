@@ -12,7 +12,7 @@
 #      $ cmake ...  --log-level=DEBUG ...
 #
 
-message(DEBUG "KITSUNE-DEV - loading developer's cache file...")
+message(DEBUG "KITSUNE-DEV - loading developer's cache file for darwin X86...")
 cmake_policy(SET CMP0057 NEW)
 
 # Pick a path for the install location -- note you can use the
@@ -26,18 +26,14 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/local CACHE STRING "")
 # link stages below to make sure all is within the capabilities of
 # the system you are developing on (see compile+link thread count
 # settings below).
-#set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
 set(CMAKE_BUILD_TYPE Release CACHE STRING "")
 
 # You'll want to tweak this to reduce build times based on what
 # you are working on.  By default we provide the full suite of
 # clang+tools, openmp, lld, and a debugger via lldb.
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;lld;compiler-rt 
+  clang;clang-tools-extra;lld;compiler-rt;mlir
   CACHE STRING "")
-
-set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 80 CACHE STRING "")
-set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_80 CACHE STRING "")
 
 # CUDA/NVCC is really only happy with older host compilers.  You
 # may need to tweak this to make things happy but we typically
@@ -81,14 +77,12 @@ set(CLANG_TOOL_CLANG_CHECK_BUILD ON CACHE BOOL "")
 set(CLANG_PLUGIN_SUPPORT ON CACHE BOOL "")
 set(CLANG_VENDOR "kitsune+tapir" CACHE STRING "")
 set(CLANG_VENDOR_UTI "gov.lanl.kitsune" CACHE STRING "")
-
-#set(LLVM_TARGETS_TO_BUILD X86;AArch64;AMDGPU;NVPTX;RISCV CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD "X86;NVPTX;AMDGPU" CACHE STRING "")
 
 # Enable Kitsune mode within the toolchain.
 set(CLANG_ENABLE_KITSUNE ON CACHE BOOL
   "Enable Kitsune features in Clang.")
-set(KITSUNE_ENABLE_GPU_ABI_TARGET ON CACHE BOOL "")
+set(KITSUNE_ENABLE_GPU_ABI_TARGET OFF CACHE BOOL "")
 set(KITSUNE_ENABLE_CUDA_ABI_TARGET ON CACHE BOOL "")
 set(KITSUNE_ENABLE_HIP_ABI_TARGET ON CACHE BOOL "")
 set(KITSUNE_ENABLE_OPENMP_ABI_TARGET OFF CACHE BOOL "")

@@ -54,83 +54,85 @@ extern "C" {
 
 #if defined(_tapir_cuda_target)
   #ifdef __cplusplus
-    extern "C" __attribute__((malloc)) void* __kitrt_cuMemAllocManaged(size_t);
+    extern "C" __attribute__((malloc))
+    void* __kitcuda_mem_alloc_managed(size_t);
     template <typename T>
     inline __attribute__((always_inline))
       T* alloc(size_t N) {
-      return (T*)__kitrt_cuMemAllocManaged(sizeof(T) * N);
+      return (T*)__kitcuda_mem_alloc_managed(sizeof(T) * N);
     }
 
-    extern "C" void __kitrt_cuMemFree(void*);
+    extern "C" void __kitcuda_mem_free(void*);
     template <typename T>
     void dealloc(T* array) {
-      __kitrt_cuMemFree((void*)array);
+      __kitcuda_mem_free((void*)array);
     }
   #else
-    void* __attribute__((malloc)) __kitrt_cuMemAllocManaged(size_t);
+    void* __attribute__((malloc)) __kitcuda_mem_alloc_managed(size_t);
     inline __attribute__((always_inline))
     void *alloc(size_t total_bytes) {
-      return __kitrt_cuMemAllocManaged(total_bytes);
+      return __kitcuda_mem_alloc_managed(total_bytes);
     }
 
-    void __kitrt_cuMemFree(void*);
+    void __kitcuda_mem_free(void*);
     inline __attribute__((always_inline))
     void dealloc(void *array) {
-      __kitrt_cuMemFree(array);
+      __kitcuda_mem_free(array);
     }
   #endif
 #elif defined(_tapir_hip_target)
   #ifdef __cplusplus
-    extern "C" __attribute__((malloc)) void* __kitrt_hipMemAllocManaged(size_t);
+    extern "C" __attribute__((malloc)) void* __kithip_mem_alloc_managed(size_t);
     template <typename T>
     inline __attribute__((always_inline))
       T* alloc(size_t N) {
-      return (T*)__kitrt_hipMemAllocManaged(sizeof(T) * N);
+      return (T*)__kithip_mem_alloc_managed(sizeof(T) * N);
     }
 
-    extern "C" void __kitrt_hipMemFree(void*);
+    extern "C" void __kithip_mem_free(void*);
     template <typename T>
     void dealloc(T* array) {
-      __kitrt_hipMemFree((void*)array);
+      __kithip_mem_free((void*)array);
     }
   #else
-    void* __attribute__((malloc)) __kitrt_hipMemAllocManaged(size_t);
+    void* __attribute__((malloc)) __kithip_mem_alloc_managed(size_t);
     inline __attribute__((always_inline))
     void *alloc(size_t total_bytes) {
-      return __kitrt_hipMemAllocManaged(total_bytes);
+      return __kithip_mem_alloc_managed(total_bytes);
     }
 
-    void __kitrt_hipMemFree(void*);
+    void __kithip_mem_free(void*);
     inline __attribute__((always_inline))
     void dealloc(void *array) {
-       __kitrt_hipMemFree(array);
+       __kithip_mem_free(array);
     }
   #endif
 #else
   #ifdef __cplusplus
-    extern "C" __attribute__((malloc)) void* __kitrt_defaultMemAlloc(size_t);
+    extern "C" __attribute__((malloc))
+    void* __kitrt_default_mem_alloc(size_t);
     template <typename T>
     inline __attribute__((always_inline))
     T* alloc(size_t N) {
-      return (T*)__kitrt_defaultMemAlloc(sizeof(T) * N);
+      return (T*)__kitrt_default_mem_alloc(sizeof(T) * N);
     }
 
-    extern "C" void __kitrt_defaultMemFree(void*);
+    extern "C" void __kitrt_default_mem_free(void*);
     template <typename T>
     void dealloc(T* array) {
-      __kitrt_defaultMemFree(array);
+      __kitrt_default_mem_free(array);
     }
   #else
-    void* __attribute__((malloc)) __kitrt_defaultMemAlloc(size_t);
+    void* __attribute__((malloc)) __kitrt_default_mem_alloc(size_t);
     inline __attribute__((always_inline))
     void *alloc(size_t total_bytes) {
-      return __kitrt_defaultMemAlloc(total_bytes);
+      return __kitrt_default_mem_alloc(total_bytes);
     }
 
-    void __kitrt_defaultMemFree(void*);
+    void __kitrt_default_mem_free(void*);
     inline __attribute__((always_inline))
     void dealloc(void* array) {
-       __kitrt_defaultMemFree(array);
+       __kitrt_default_mem_free(array);
     }
   #endif // __cplusplus
 #endif // cpu targets

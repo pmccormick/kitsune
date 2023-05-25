@@ -476,43 +476,80 @@ static Attr *handleOpenCLUnrollHint(Sema &S, Stmt *St, const ParsedAttr &A,
   return ::new (S.Context) OpenCLUnrollHintAttr(S.Context, A, UnrollFactor);
 }
 
-static Attr *handleTapirTargetAttr(Sema &S, Stmt *St, const ParsedAttr &A,
-				   SourceRange Range)
+static Attr *handleTapirTargetAttr(Sema &S, Stmt *St, const ParsedAttr &A, 
+                                   SourceRange Range)
 {
-  // We only support a limited range of statement classes.
-  // TODO: Add support for spawn and sync statements. 
-  if (St->getStmtClass() == Stmt::ForallStmtClass || 
-      St->getStmtClass() == Stmt::CXXForallRangeStmtClass) {
-
-    if (A.getNumArgs() != 1) {
-      S.Diag(A.getLoc(), diag::err_tapir_target_attr_wrong_nargs);
-      return nullptr;
-    }
-
-    StringRef      targetStr;
-    SourceLocation argLoc;
-    if (!S.checkStringLiteralArgumentAttr(A, 0, targetStr, &argLoc)) {
-      S.Diag(A.getLoc(), diag::err_tapir_target_unknown);
-      return nullptr;
-    } 
-
-    TapirTargetAttr::TapirTargetAttrTy  tapirTK;
-    if (!TapirTargetAttr::ConvertStrToTapirTargetAttrTy(targetStr, tapirTK)) {
-       S.Diag(A.getLoc(), diag::err_tapir_target_unknown)
-	 << targetStr << argLoc;
-       return nullptr;
-    }
-
-    return ::new(S.Context)TapirTargetAttr(S.Context, A, tapirTK);
-  } else {
-    // Unsupported statement class encountered... 
-    S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);
+  // Check the details of the attribute syntax... 
+  if (A.getNumArgs() != 1) {
+    S.Diag(A.getLoc(), diag::err_tapir_target_attr_wrong_nargs);
     return nullptr;
   }
+
+  StringRef      targetStr;
+  SourceLocation argLoc;
+  if (!S.checkStringLiteralArgumentAttr(A, 0, targetStr, &argLoc)) {
+    S.Diag(A.getLoc(), diag::err_tapir_target_unknown);
+    return nullptr;
+  } 
+
+  TapirTargetAttr::TapirTargetAttrTy  tapirTK;
+  if (!TapirTargetAttr::ConvertStrToTapirTargetAttrTy(targetStr, tapirTK)) {
+    S.Diag(A.getLoc(), diag::err_tapir_target_unknown) << targetStr << argLoc;
+    return nullptr;
+  }
+
+  // We only support a limited range of statements.  Make sure we are dealing 
+  // with one of them -- if not return an error.  
+  // 
+  // TODO: Should spawn and sync statements have special cases here? 
+  //
+  if (St->getStmtClass() == Stmt::ForallStmtClass || 
+      St->getStmtClass() == Stmt::CXXForallRangeStmtClass) {
+    return ::new(S.Context)TapirTargetAttr(S.Context, A, tapirTK);
+
+  } else if (Expr *E = dyn_cast<Expr>(St)) {
+
+    if (S.getLangOpts().Kokkos) {
+      // See if this is an attributed Kokkos parallel statement (if
+      // so, there is a CallExpr lurking further down in the AST).  
+      // To find this CallExpr we need to work past implicit details 
+      // (including clean up). We need to "un-obfuscating" a bunch of 
+      // C++ mechanisms to really find what sort of expression we have.
+      // The most important detail here is that the attribute is really 
+      // not attached to the Kokkos statement (even though it might 
+      // appear to be so from the program syntax and thus the programmer's 
+      // perspective).  How lovely... 
+      //
+      // TODO: If we do more of this we should probably pull this code 
+      // block out into a function for easier use. 
+      const Expr *ClarifiedE = E->IgnoreImplicit();
+      const Expr *Last = nullptr;
+      while(ClarifiedE != Last) {
+        Last = ClarifiedE;
+        if (const auto *CE = dyn_cast<ExprWithCleanups>(ClarifiedE))
+          ClarifiedE = CE->getSubExpr()->IgnoreImplicit();
+      }
+
+      // With all the extra "stuff" removed check to see if we have a
+      // CallExpr -- if so, see if we can recognize it as a Kokkos 
+      // construct... 
+      if (const CallExpr *CE = dyn_cast<CallExpr>(ClarifiedE)) {
+        const FunctionDecl *Fdecl = CE->getDirectCallee();
+        std::string QName = Fdecl->getQualifiedNameAsString();
+        if (QName == "Kokkos::parallel_for" ||
+            QName == "Kokkos::parallel_reduce")
+          return ::new(S.Context)TapirTargetAttr(S.Context, A, tapirTK);
+      }
+    }
+  }
+  
+  // Unsupported statement class encountered... 
+  S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);
+  return nullptr;
 }
 
 static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,
-				                      SourceRange Range) 
+				                             SourceRange Range) 
 {
   bool errState = false;
 
@@ -546,9 +583,38 @@ static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,
 
   if (errState) 
     return nullptr;
-  else  
-    return ::new (S.Context) TapirStrategyAttr(S.Context, A, strategyKind);
+
+  return ::new (S.Context) TapirStrategyAttr(S.Context, A, strategyKind);
 }
+
+static Attr *handleKitsuneLaunchAttr(Sema &S, Stmt *St, const ParsedAttr &A,
+				     SourceRange Range) {
+  unsigned ThreadsPerBlock = 0;
+  bool Autotune = false;
+  if (A.getNumArgs() == 2) {
+    Expr *E = A.getArgAsExpr(0);
+    std::optional<llvm::APSInt> ArgVal;
+    if (!(ArgVal = E->getIntegerConstantExpr(S.Context))) {
+      S.Diag(A.getLoc(), diag::err_attribute_argument_type)
+	<< A << AANT_ArgumentIntegerConstant << E->getSourceRange();
+      return nullptr;
+    }
+
+    int Val = ArgVal->getSExtValue();
+    if (Val <= 0) {
+      S.Diag(A.getRange().getBegin(),
+	     diag::err_attribute_requires_positive_integer)
+	<< A << /* positive */ 0;
+      return nullptr;
+    }
+
+    ThreadsPerBlock = static_cast<unsigned>(Val);
+  }
+
+  return ::new (S.Context) KitsuneLaunchAttr(S.Context, A,
+					     ThreadsPerBlock, false);
+}
+
 
 // =====+
 
@@ -598,7 +664,9 @@ static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const ParsedAttr &A,
   case ParsedAttr::AT_Unlikely:
     return handleUnlikely(S, St, A, Range);
   case ParsedAttr::AT_TapirTarget:
-    return handleTapirTargetAttr(S, St, A, Range);    
+    return handleTapirTargetAttr(S, St, A, Range);
+  case ParsedAttr::AT_KitsuneLaunch:
+    return handleKitsuneLaunchAttr(S, St, A, Range);        
   default:
     // N.B., ClangAttrEmitter.cpp emits a diagnostic helper that ensures a
     // declaration attribute is not written on a statement, but this code is

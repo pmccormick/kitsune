@@ -1,3 +1,3 @@
-kitclang=${kitsune_prefix}/bin/clang
-kitclangxx=${kitsune_prefix}/bin/clang++
-kitopt=${kitsune_prefix}/bin/opt
+kitclang=$(KITSUNE_PREFIX)/bin/clang
+kitclangxx=$(KITSUNE_PREFIX)/bin/clang++
+kitopt=$(KITSUNE_PREFIX)/bin/opt

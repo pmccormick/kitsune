@@ -1135,10 +1135,20 @@ static void InitializePredefinedMacros(const TargetInfo &TI,
   if (!LangOpts.MathErrno)
     Builder.defineMacro("__NO_MATH_ERRNO__");
 
+  // TODO: For Kitsune we need to decide how to best handle 
+  // this case -- this macro definition will actually end up
+  // using different functions across targets and that could
+  // require us to deal with an inconsistent set of math 
+  // operators (function calls) to transform in the Tapir ABI
+  // code...  It is error prone on a good day... 
+  //
+  //if (LangOpts.Tapir != TapirTargetID::Cuda) {
   if (LangOpts.FastMath || LangOpts.FiniteMathOnly)
     Builder.defineMacro("__FINITE_MATH_ONLY__", "1");
   else
     Builder.defineMacro("__FINITE_MATH_ONLY__", "0");
+  // TODO: For Kitsune code gen path????
+  //}
 
   if (LangOpts.GNUCVersion) {
     if (LangOpts.GNUInline || LangOpts.CPlusPlus)

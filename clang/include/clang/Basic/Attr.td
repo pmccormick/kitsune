@@ -4189,19 +4189,19 @@ def ReducerUnregister : InheritableAttr {
 // +===== kitsune-/tapir-centric attributes
 def TapirTarget : StmtAttr {
   let Spellings = [CXX11<"tapir","target">];
-  let Subjects = SubjectList<[ForallStmt, CXXForallRangeStmt],
-      	       	 ErrorDiag, "'forall' statement">;
+  let Subjects = SubjectList<[ForallStmt, CXXForallRangeStmt, Stmt],
+      	       	 ErrorDiag, "'parallel' statements">;
   let Args = [
     EnumArgument<"TapirTargetAttrType", "TapirTargetAttrTy",
     // TODO: Is there a difference between "serial" and "none"?
-    ["cheetah",    "cilk",   "cuda",
-     "hip",        "libomp", "none",
-     "qthreads",   "realm",  "rocm",
-     "serial",     "zero",   "opencl"],
+    ["cheetah",    "cilk",    "cuda",
+     "hip",        "libomp",  "qthreads",   
+     "realm",      "rocm",    "serial",     
+     "zero",       "opencl",  "default"],
     ["CheetahRT",  "CilkRT",  "CudaRT",
      "HipRT",      "OmpRT",   "QthreadsRT",
 	     "RealmRT",    "RocmRT",  "SequentialRT",
-     "ZeroRT",     "OpenCLRT"], 0>
+     "ZeroRT",     "OpenCLRT", "DefaultRT"], 0>
   ];
   let Documentation = [TapirRTDocs];
 }
@@ -4232,4 +4232,15 @@ def KitsuneMemAccess : InheritableAttr {
 
     let Documentation = [KitsuneMemAccessDocs];
 }
+
+def KitsuneLaunch : StmtAttr {
+    let Spellings = [CXX11<"kitsune","launch">];
+    let Subjects = SubjectList<[ForallStmt,CXXForallRangeStmt],
+    		   ErrorDiag, "'parallel' statements">;
+    let Args = [IntArgument<"ThreadsPerBlock">,
+    	        BoolArgument<"AutoTune">
+    ];
+   let Documentation = [KitsuneLaunchDocs];    
+}
+
 // =====+

@@ -2275,21 +2275,24 @@ void llvm::TapirLoopHints::getHintsFromMetadata() {
 void llvm::TapirLoopHints::setHint(StringRef Name, Metadata *Arg) {
   if (!Name.startswith(Prefix()))
     return;
+
   Name = Name.substr(Prefix().size(), StringRef::npos);
 
   const ConstantInt *C = mdconst::dyn_extract<ConstantInt>(Arg);
   if (!C)
     return;
+
   unsigned Val = C->getZExtValue();
 
-  Hint *Hints[] = {&Strategy, &Grainsize};
+  Hint *Hints[] = {&Strategy, &Grainsize, &LoopTarget,
+		   &ThreadsPerBlock, &AutoTune};
   for (auto H : Hints) {
     if (Name == H->Name) {
       if (H->validate(Val))
         H->Value = Val;
       else
-        LLVM_DEBUG(dbgs() << "Tapir: ignoring invalid hint '" <<
-                   Name << "'\n");
+	errs() << "waring. tapir ignoring invalid hint '" <<
+	        Name << "'\n";	
       break;
     }
   }
@@ -2399,7 +2402,11 @@ void llvm::TapirLoopHints::writeHintsToClonedMetadata(ArrayRef<Hint> HintTypes,
 /// Sets current hints into loop metadata, keeping other values intact.
 void llvm::TapirLoopHints::clearHintsMetadata() {
   Hint Hints[] = {Hint("spawn.strategy", ST_SEQ, HK_STRATEGY),
-                  Hint("grainsize", 0, HK_GRAINSIZE)};
+                  Hint("grainsize", 0, HK_GRAINSIZE),
+                  Hint("target", static_cast<unsigned int>(TapirTargetID::Serial),
+		       HK_LOOPTARGET),
+		  Hint("threads.per.block", 0, HK_THREADS_PER_BLOCK),
+		  Hint("launch.auto.tune", false, HK_AUTO_TUNE)};
   LLVMContext &Context = TheLoop->getHeader()->getContext();
   SmallVector<Metadata *, 4> MDs;
 
@@ -2477,6 +2484,9 @@ Task *llvm::getTaskIfTapirLoop(const Loop *L, TaskInfo *TI) {
   LLVM_DEBUG(dbgs() << "Loop hints:"
              << " strategy = " << Hints.printStrategy(Hints.getStrategy())
              << " grainsize = " << Hints.getGrainsize()
+             << " loop target = " << Hints.getLoopTarget()
+             << " threads per block = " << Hints.getThreadsPerBlock()
+             << " auto tune = " << Hints.getAutoTune()
              << "\n");
 
   // Check that this loop has the structure of a Tapir loop.

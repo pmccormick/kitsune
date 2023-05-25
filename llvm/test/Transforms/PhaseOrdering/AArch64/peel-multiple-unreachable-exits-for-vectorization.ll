@@ -66,14 +66,14 @@ define i64 @sum_2_at_with_int_conversion(ptr %A, ptr %B, i64 %N) {
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    [[BIN_RDX:%.*]] = add <2 x i64> [[TMP13]], [[TMP12]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = tail call i64 @llvm.vector.reduce.add.v2i64(<2 x i64> [[BIN_RDX]])
-; CHECK-NEXT:    br label [[LOOP_PREHEADER20]]
-; CHECK:       loop.preheader20:
+; CHECK-NEXT:    br label %[[LOOP_PREHEADER20:.+]]
+; CHECK:       [[LOOP_PREHEADER20]]:
 ; CHECK-NEXT:    [[IV_PH:%.*]] = phi i64 [ 1, [[LOOP_PREHEADER]] ], [ [[IND_END]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[SUM_PH:%.*]] = phi i64 [ [[SUM_NEXT_PEEL]], [[LOOP_PREHEADER]] ], [ [[TMP15]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], [[AT_WITH_INT_CONVERSION_EXIT11:%.*]] ], [ [[IV_PH]], [[LOOP_PREHEADER20]] ]
-; CHECK-NEXT:    [[SUM:%.*]] = phi i64 [ [[SUM_NEXT:%.*]], [[AT_WITH_INT_CONVERSION_EXIT11]] ], [ [[SUM_PH]], [[LOOP_PREHEADER20]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], [[AT_WITH_INT_CONVERSION_EXIT11:%.*]] ], [ [[IV_PH]], %[[LOOP_PREHEADER20]] ]
+; CHECK-NEXT:    [[SUM:%.*]] = phi i64 [ [[SUM_NEXT:%.*]], [[AT_WITH_INT_CONVERSION_EXIT11]] ], [ [[SUM_PH]], %[[LOOP_PREHEADER20]] ]
 ; CHECK-NEXT:    [[INRANGE_I:%.*]] = icmp ult i64 [[SUB_I]], [[IV]]
 ; CHECK-NEXT:    br i1 [[INRANGE_I]], label [[ERROR_I:%.*]], label [[AT_WITH_INT_CONVERSION_EXIT:%.*]]
 ; CHECK:       error.i:
@@ -192,14 +192,14 @@ define i64 @sum_3_at_with_int_conversion(ptr %A, ptr %B, ptr %C, i64 %N) {
 ; CHECK:       middle.block:
 ; CHECK-NEXT:    [[BIN_RDX:%.*]] = add <2 x i64> [[TMP17]], [[TMP16]]
 ; CHECK-NEXT:    [[TMP19:%.*]] = tail call i64 @llvm.vector.reduce.add.v2i64(<2 x i64> [[BIN_RDX]])
-; CHECK-NEXT:    br label [[LOOP_PREHEADER34]]
-; CHECK:       loop.preheader34:
+; CHECK-NEXT:    br label %[[LOOP_PREHEADER34:.+]]
+; CHECK:       [[LOOP_PREHEADER34]]:
 ; CHECK-NEXT:    [[IV_PH:%.*]] = phi i64 [ 1, [[LOOP_PREHEADER]] ], [ [[IND_END]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    [[SUM_PH:%.*]] = phi i64 [ [[SUM_NEXT_PEEL]], [[LOOP_PREHEADER]] ], [ [[TMP19]], [[MIDDLE_BLOCK]] ]
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], [[AT_WITH_INT_CONVERSION_EXIT22:%.*]] ], [ [[IV_PH]], [[LOOP_PREHEADER34]] ]
-; CHECK-NEXT:    [[SUM:%.*]] = phi i64 [ [[SUM_NEXT:%.*]], [[AT_WITH_INT_CONVERSION_EXIT22]] ], [ [[SUM_PH]], [[LOOP_PREHEADER34]] ]
+; CHECK-NEXT:    [[IV:%.*]] = phi i64 [ [[IV_NEXT:%.*]], [[AT_WITH_INT_CONVERSION_EXIT22:%.*]] ], [ [[IV_PH]], %[[LOOP_PREHEADER34]] ]
+; CHECK-NEXT:    [[SUM:%.*]] = phi i64 [ [[SUM_NEXT:%.*]], [[AT_WITH_INT_CONVERSION_EXIT22]] ], [ [[SUM_PH]], %[[LOOP_PREHEADER34]] ]
 ; CHECK-NEXT:    [[INRANGE_I:%.*]] = icmp ult i64 [[SUB_I]], [[IV]]
 ; CHECK-NEXT:    br i1 [[INRANGE_I]], label [[ERROR_I:%.*]], label [[AT_WITH_INT_CONVERSION_EXIT:%.*]]
 ; CHECK:       error.i:

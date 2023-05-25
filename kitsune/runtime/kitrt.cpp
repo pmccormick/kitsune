@@ -1,7 +1,6 @@
 //
-//===- kitrt.h - Kitsune ABI runtime debug support -----------------------===//
-//
-// TODO: Need to update LANL/Triad Copyright notice.
+//===- kitrt.cpp - Kitsune runtime high-level support
+//-----------------------===//
 //
 // Copyright (c) 2021, Los Alamos National Security, LLC.
 // All rights reserved.
@@ -52,78 +51,36 @@
 //===----------------------------------------------------------------------===//
 
 #include "kitrt.h"
-#include "debug.h"
-#include <stdlib.h>
-#include <type_traits>
+#include <cassert>
 
-static bool _kitrtVerboseMode = false;
-static unsigned _kitrtDefaultThreadsPerBlock = 256;
-static bool _kitrtUseCustomLaunchParameters = false;
-static unsigned _kitrtThreadsPerBlock = 0;
-
-template <typename RetType>
-static bool __kitrt_getEnvValue(const char *VarName, RetType &Value) {
-  bool Ret = false;
-  char *ValueStr;
-  if ((ValueStr = getenv(VarName))) {
-    if constexpr (std::is_same_v<RetType, int>) {
-      Value = atoi(ValueStr);
-      Ret = true;
-    } else if constexpr (std::is_same_v<RetType, bool>) {
-      Value = true;
-      Ret = true;
-    } else 
-      fprintf(stderr, "kitrt: warning unhandled type in __kitrt_getEnvValue!\n");
-  }
-  return Ret;
-}
+bool _kitrt_verbose_mode = false;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void __kitrt_CommonInit() {
-
-  if (__kitrt_getEnvValue("KITRT_THREADS_PER_BLOCK", _kitrtThreadsPerBlock))
-    _kitrtUseCustomLaunchParameters = true;
-  __kitrt_getEnvValue("KITRT_VERBOSE", _kitrtVerboseMode);
+void __kitrt_initialize() {
+  // Call will auto-set the verbose state.
+  (void)__kitrt_get_env_value("KITRT_VERBOSE", _kitrt_verbose_mode);
+  if (__kitrt_verbose_mode()) {
+    fprintf(stderr, "kitrt: verbose mode enabled by environment.\n");
+    fprintf(stderr, "  kitsune runtime built-in feature set:\n");
+  }
 }
 
-void __kitrt_setVerboseMode(bool Enable) {
-    _kitrtVerboseMode = Enable;
+void __kitrt_print_stack_trace(void) {
+  const unsigned int _kitrt_backtrace_depth = 10;
+  void *trace[_kitrt_backtrace_depth];
+  int size = backtrace(trace, _kitrt_backtrace_depth);
+  char **strings = backtrace_symbols(trace, size);
+  if (strings != NULL) {
+    fprintf(stderr, "  kitrt: call stack trace (%d frames).\n", size);
+    for (int i = 0; i < size; i++)
+      fprintf(stderr, "    %s\n", strings[i]);
+    fprintf(stderr, "  ---- end trace ----\n");
+  }
+  free(strings);
 }
-
-bool __kitrt_verboseMode() {
-  return _kitrtVerboseMode; 
-}
-
-bool __kitrt_init() {
-    __kitrt_CommonInit();
-
-     // Initialize the supported runtime layer(s).
-    return __kitrt_runtimesInit();
-}
-
-void __kitrt_getLaunchParameters(size_t numElements, 
-                                 int &threadsPerBlock,
-                                 int &blocksPerGrid) {
-  if (_kitrtUseCustomLaunchParameters)
-    threadsPerBlock = _kitrtThreadsPerBlock;
-  else 
-    threadsPerBlock = _kitrtDefaultThreadsPerBlock;
-
-  blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
-}
-
-void __kitrt_setDefaultThreadsPerBlock(unsigned threadsPerBlock) {
-  _kitrtDefaultThreadsPerBlock = threadsPerBlock;
-}
-
-void __kitrt_resetLaunchParameters() {
-  _kitrtThreadsPerBlock = _kitrtDefaultThreadsPerBlock;
-  _kitrtUseCustomLaunchParameters = false;
-}
-
 
 #ifdef __cplusplus
 } // extern "C"

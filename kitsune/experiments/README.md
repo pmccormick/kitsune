@@ -6,7 +6,7 @@ relies on a set of environment variables.  We have explicitly done
 this to test the toolchain outside of the confines of LLVM's CMake 
 mechanisms. 
 
-The most basic enviornment vriable is the install prefix for 
+The most basic environment variable is the install prefix for 
 the kitsune build.  It should be set via the `KITSUNE_PREFIX`
 variable: 
 

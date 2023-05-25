@@ -539,6 +539,7 @@ CodeGenFunction::EmitCompoundStmtWithoutScope(const CompoundStmt &S,
         } else if (const auto *AS = dyn_cast<AttributedStmt>(ExprResult)) {
           // FIXME: Update this if we ever have attributes that affect the
           // semantics of an expression.
+          llvm::errs() << "we are here with an attributed expression...\n";
           ExprResult = AS->getSubStmt();
         } else {
           llvm_unreachable("unknown value statement");
@@ -728,6 +729,7 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
   bool noinline = false;
   bool alwaysinline = false;
   const CallExpr *musttail = nullptr;
+  ArrayRef<const Attr *> tapir_attr_set;
 
   for (const auto *A : S.getAttrs()) {
     switch (A->getKind()) {
@@ -742,10 +744,19 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
     case attr::AlwaysInline:
       alwaysinline = true;
       break;
-    case attr::MustTail:
+    case attr::MustTail: {
       const Stmt *Sub = S.getSubStmt();
       const ReturnStmt *R = cast<ReturnStmt>(Sub);
       musttail = cast<CallExpr>(R->getRetValue()->IgnoreParens());
+      break;
+    }
+    case attr::TapirTarget:
+      // In the case of a Tapir target attribute, we need to save the attribute
+      // set so we can use it when we reach code gen of the underlying
+      // CallExpr for Kokkos parallel "statements".  This is necessary given 
+      // the additional layers of details in the AST for C++ mechanisms Kokkos 
+      // uses to implement their feature set (e.g., implicit and cleanup goop). 
+      tapir_attr_set = S.getAttrs();
       break;
     }
   }
@@ -753,6 +764,7 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
   SaveAndRestore save_noinline(InNoInlineAttributedStmt, noinline);
   SaveAndRestore save_alwaysinline(InAlwaysInlineAttributedStmt, alwaysinline);
   SaveAndRestore save_musttail(MustTailCall, musttail);
+  SaveAndRestore save_tapir_addrs(TapirAttrs, tapir_attr_set);  
   EmitStmt(S.getSubStmt(), S.getAttrs());
 }
 

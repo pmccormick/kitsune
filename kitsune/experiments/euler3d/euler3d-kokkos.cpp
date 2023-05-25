@@ -23,7 +23,6 @@ struct Float3 {
  *
  */
 #define GAMMA 1.4
-#define ITERATIONS 2000
 #define NDIM 3
 #define NNB 4
 #define RK 3	// 3rd order RK
@@ -45,8 +44,7 @@ struct Float3 {
 #define __restrict
 #endif
 
-template <typename T>
-void cpy(View<T> &dst, View<T> &src, int N) {
+void cpy(View<float> &dst, View<float> &src, int N) {
   src.sync_device();
   dst.sync_device();
   Kokkos::parallel_for("copy", N, KOKKOS_LAMBDA(const int &i) {
@@ -60,7 +58,6 @@ void dump(View<float> &variables, int nel, int nelr)
 {
   using namespace std;
   variables.sync_host();
-
   {
     std::ofstream file("density-kokkos.dat");
     file << nel << " " << nelr << endl;
@@ -172,14 +169,13 @@ void compute_step_factor(int nelr,
   variables.sync_device();
   areas.sync_device();
   step_factors.sync_device();
-  step_factors.modify_device();
 
   Kokkos::parallel_for("compute_step_factor", nelr/block_length,
         KOKKOS_LAMBDA(const int &blk) {
     int b_start = blk*block_length;
     int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
 
-    for(int i = b_start; i < b_end; i++) {
+    for(unsigned int i = b_start; i < b_end; i++) {
       float density = variables.d_view(i + VAR_DENSITY*nelr);
 
       Float3 momentum;
@@ -201,6 +197,7 @@ void compute_step_factor(int nelr,
         (sqrtf(speed_sqd) + speed_of_sound));
     }
   });
+  step_factors.modify_device();
   Kokkos::fence();
 }
 
@@ -446,7 +443,7 @@ int main(int argc, char** argv)
     return 0;
   }
 
-  int iterations = 2000;
+  int iterations = 200000;
   if (argc > 2)
     iterations = atoi(argv[2]);
 
@@ -457,9 +454,6 @@ int main(int argc, char** argv)
   cout << "---- euler3d benchmark (kokkos) ----\n\n"
        << "  Input file : " << data_file_name << "\n" 
        << "  Iterations : " << iterations << ".\n\n"; 
-
-
-      
   cout << "  Reading input data, allocating arrays, initializing data, etc..." 
        << std::flush;
   auto total_start_time = chrono::steady_clock::now();
@@ -468,19 +462,19 @@ int main(int argc, char** argv)
   Kokkos::initialize(argc, argv); {
     View<float> ff_variable("ff_variable", NVAR);
     Float3 ff_flux_contribution_momentum_x,
-           ff_flux_contribution_momentum_y,
-           ff_flux_contribution_momentum_z;
+      ff_flux_contribution_momentum_y,
+      ff_flux_contribution_momentum_z;
     Float3 ff_flux_contribution_density_energy;
 
     // set far field conditions
     const float angle_of_attack =
-          float(3.1415926535897931 / 180.0f) * float(deg_angle_of_attack);
+      float(3.1415926535897931 / 180.0f) * float(deg_angle_of_attack);
 
     ff_variable.h_view(VAR_DENSITY) = float(1.4);
 
     float ff_pressure = float(1.0f);
     float ff_speed_of_sound =
-          sqrtf(GAMMA * ff_pressure / ff_variable.h_view(VAR_DENSITY));
+      sqrtf(GAMMA * ff_pressure / ff_variable.h_view(VAR_DENSITY));
     float ff_speed = float(ff_mach) * ff_speed_of_sound;
 
     Float3 ff_velocity;
@@ -489,16 +483,16 @@ int main(int argc, char** argv)
     ff_velocity.z = 0.0f;
 
     ff_variable.h_view(VAR_MOMENTUM + 0) =
-        ff_variable.h_view(VAR_DENSITY) * ff_velocity.x;
+      ff_variable.h_view(VAR_DENSITY) * ff_velocity.x;
     ff_variable.h_view(VAR_MOMENTUM + 1) =
-        ff_variable.h_view(VAR_DENSITY) * ff_velocity.y;
+      ff_variable.h_view(VAR_DENSITY) * ff_velocity.y;
     ff_variable.h_view(VAR_MOMENTUM + 2) =
-        ff_variable.h_view(VAR_DENSITY) * ff_velocity.z;
+      ff_variable.h_view(VAR_DENSITY) * ff_velocity.z;
 
     ff_variable.h_view(VAR_DENSITY_ENERGY) =
-        ff_variable.h_view(VAR_DENSITY) *
-            (float(0.5f) * (ff_speed * ff_speed)) +
-        (ff_pressure / float(GAMMA - 1.0f));
+      ff_variable.h_view(VAR_DENSITY) *
+      (float(0.5f) * (ff_speed * ff_speed)) +
+      (ff_pressure / float(GAMMA - 1.0f));
 
     ff_variable.modify_host();
 
@@ -507,9 +501,9 @@ int main(int argc, char** argv)
     ff_momentum.y = ff_variable.h_view(VAR_MOMENTUM + 1);
     ff_momentum.z = ff_variable.h_view(VAR_MOMENTUM + 2);
     compute_flux_contribution(ff_variable.h_view(VAR_DENSITY), ff_momentum,
-          ff_variable.h_view(VAR_DENSITY_ENERGY), ff_pressure, ff_velocity,
-          ff_flux_contribution_momentum_x, ff_flux_contribution_momentum_y,
-          ff_flux_contribution_momentum_z, ff_flux_contribution_density_energy);
+			      ff_variable.h_view(VAR_DENSITY_ENERGY), ff_pressure, ff_velocity,
+			      ff_flux_contribution_momentum_x, ff_flux_contribution_momentum_y,
+			      ff_flux_contribution_momentum_z, ff_flux_contribution_density_energy);
 
     int nel;
     int nelr;
@@ -536,7 +530,7 @@ int main(int argc, char** argv)
         for (int k = 0; k < NDIM; k++) {
           file >> normals.h_view(i + (j + k * NNB) * nelr);
           normals.h_view(i + (j + k*NNB)*nelr) =
-                      -normals.h_view(i + (j + k*NNB)*nelr);
+	    -normals.h_view(i + (j + k*NNB)*nelr);
         }
       }
     }
@@ -551,11 +545,11 @@ int main(int argc, char** argv)
       for(int j = 0; j < NNB; j++) {
         // duplicate the last element
         elements_surrounding_elements.h_view(i + j*nelr) =
-                elements_surrounding_elements.h_view(last + j*nelr);
+	  elements_surrounding_elements.h_view(last + j*nelr);
 
         for(int k = 0; k < NDIM; k++)
           normals.h_view(i + (j + k*NNB)*nelr) =
-                normals.h_view(last + (j + k*NNB)*nelr);
+	    normals.h_view(last + (j + k*NNB)*nelr);
       }
     }
     normals.modify_host();
@@ -572,6 +566,8 @@ int main(int argc, char** argv)
     View<float> old_variables = View<float>("old_variables", nelr*NVAR);
     View<float> fluxes = View<float>("fluxes", nelr*NVAR);
     View<float> step_factors = View<float>("step_factors", nelr);
+    double *rk_times = new double[iterations];    
+
     // Begin iterations
     double copy_total = 0.0;
     double sf_total = 0.0;
@@ -581,27 +577,31 @@ int main(int argc, char** argv)
       auto copy_start = chrono::steady_clock::now();
       cpy(old_variables, variables, nelr*NVAR);
       auto copy_end = chrono::steady_clock::now();
-      double time = chrono::duration<double>(copy_end-copy_start).count();      
+      double time = chrono::duration<double>(copy_end-copy_start).count();
       copy_total += time;
     
       // for the first iteration we compute the time step
       auto sf_start = chrono::steady_clock::now();
       compute_step_factor(nelr, variables, areas, step_factors);
       auto sf_end = chrono::steady_clock::now();
-      sf_total += chrono::duration<double>(sf_end-sf_start).count();
+      time = chrono::duration<double>(sf_end-sf_start).count();
+      sf_total += time;
 
       auto rk_start = chrono::steady_clock::now();
       for(int j = 0; j < RK; j++) {
         compute_flux(nelr, elements_surrounding_elements, normals, variables,
-                    fluxes, ff_variable,
-                    ff_flux_contribution_momentum_x,
-                    ff_flux_contribution_momentum_y,
-                    ff_flux_contribution_momentum_z,
-                    ff_flux_contribution_density_energy);
+		     fluxes, ff_variable,
+		     ff_flux_contribution_momentum_x,
+		     ff_flux_contribution_momentum_y,
+		     ff_flux_contribution_momentum_z,
+		     ff_flux_contribution_density_energy);
         time_step(j, nelr, old_variables, variables, step_factors, fluxes);
       }
+
       auto rk_end = chrono::steady_clock::now();
-      rk_total += chrono::duration<double>(rk_end-rk_start).count();
+      time = chrono::duration<double>(rk_end-rk_start).count();
+      rk_times[i] = time;      
+      rk_total += time;
     }
 
     dump(variables, nel, nelr);
@@ -609,14 +609,21 @@ int main(int argc, char** argv)
     auto end_time = chrono::steady_clock::now();
     double elapsed_time = chrono::duration<double>(end_time-start_time).count();
     double total_time = chrono::duration<double>(end_time-total_start_time).count();
+    double rk_mean = rk_total / iterations;
+    double sum = 0.0;
+    for(int i = 0; i < iterations; i++) {
+      double dist = rk_times[i] - rk_mean;
+      sum += dist * dist; 
+    }
+    double rk_std_dev = sqrt(sum / iterations);
 
     cout << "\n"
          << "      Total time : " << total_time << " seconds.\n"
          << "    Compute time : " << elapsed_time << " seconds.\n"
-         << "            copy : " << copy_total << " seconds.\n"
-         << "              sf : " << sf_total << " seconds.\n"
-         << "              rk : " << rk_total << " seconds.\n"
-         << "*** " << total_time << ", " << total_time << "\n"
+	 << "            copy : " << copy_total << " seconds (average: " << copy_total / iterations << " seconds).\n"
+	 << "              sf : " << sf_total << " seconds (average: " << sf_total / iterations << " seconds).\n"
+	 << "              rk : " << rk_total << " seconds (average: " << rk_mean << " seconds / std dev: " << rk_std_dev << ").\n"      
+         << "*** " << elapsed_time << ", " << elapsed_time << "\n"
          << "----\n\n";
 
   } Kokkos::finalize();

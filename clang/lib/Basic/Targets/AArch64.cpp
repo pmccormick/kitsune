@@ -1291,6 +1291,8 @@ int AArch64TargetInfo::getEHDataRegisterNumber(unsigned RegNo) const {
   return -1;
 }
 
+bool AArch64TargetInfo::hasSjLjLowering() const { return true; }
+
 bool AArch64TargetInfo::hasInt128Type() const { return true; }
 
 AArch64leTargetInfo::AArch64leTargetInfo(const llvm::Triple &Triple,

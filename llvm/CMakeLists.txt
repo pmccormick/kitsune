@@ -156,6 +156,7 @@ include(FetchContent)
 FetchContent_Declare(cheetahrt
   GIT_REPOSITORY    https://github.com/pmccormick/cheetah.git
   GIT_TAG           kitsune
+  CMAKE_ARGS        -DCHEETAH_DEFAULT_TARGET_ARCH=aarch64
   SOURCE_DIR        ${CMAKE_CURRENT_SOURCE_DIR}/../cheetah)
 
 FetchContent_Declare(cilktools

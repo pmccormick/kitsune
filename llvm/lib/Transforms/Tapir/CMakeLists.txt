@@ -45,15 +45,19 @@ add_llvm_component_library(LLVMTapirOpts
   Support
   TransformUtils
   Vectorize
-
   )
 
 if (CUDAToolkit_FOUND)
-  message(STATUS "Tapir ABI has CUDA version info: ${CudaToolkit_VERSION}")
+  message(STATUS "Tapir ABI has CUDA version info: ${CUDAToolkit_VERSION}")
   add_compile_definitions(
     CUDATOOLKIT_VERSION=${CUDAToolkit_VERSION}
     CUDATOOLKIT_VERSION_MAJOR=${CUDAToolkit_VERSION_MAJOR}
     CUDATOOLKIT_VERSION_MINOR=${CUDAToolkit_VERSION_MINOR}
+  )
+  set(TAPIR_CUDAABI_DEFAULT_TARGET "sm_80" CACHE STRING 
+	 "The default CUDA device target for Tapir-transformed code")
+  add_compile_definitions(
+    _CUDAABI_DEFAULT_TARGET_ARCH="${TAPIR_CUDAABI_DEFAULT_TARGET}"
   )
 endif()
 

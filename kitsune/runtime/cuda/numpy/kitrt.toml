@@ -1,0 +1,16 @@
+# numpy_hijack.toml
+[build-system]
+requires = ["setuptools", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kitrt - kitsune runtime module"  # as it would appear on PyPI
+authors = [
+    {name = "Kitsune Project", email = "kitsune@lanl.gov"},
+]
+description = "Module for Kitsune hijack of NumPy memory allocation entry points.",
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+]
+dynamic = ["version"]

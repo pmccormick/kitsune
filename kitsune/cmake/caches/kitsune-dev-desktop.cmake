@@ -92,6 +92,9 @@ if (LLVM_INCLUDE_TESTS)
   set(KITSUNE_INCLUDE_TESTS ON CACHE BOOL "")
 endif()
 
+#set(KITRT_ENABLE_NVTX OFF CACHE BOOL "")
+set(KITRT_ENABLE_NVTX ON CACHE BOOL "")
+
 message(DEBUG "  --> KITSUNE-DEV: fixing gcc prefix path.")
 execute_process(COMMAND /bin/bash --norc --noprofile -c "dirname \$(dirname `which gcc`)"
   OUTPUT_VARIABLE _gcc_prefix

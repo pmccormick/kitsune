@@ -1,5 +1,8 @@
 # Flags for the HIP runtime ABI target.
+#-ffp-contract=fast-honor-pragmas
 -D_tapir_hip_target
+-mllvm -stripmine-count=1
+-mllvm -stripmine-coarsen-factor=1
 -L${CMAKE_INSTALL_PREFIX}/lib
 ${KITSUNE_HIP_TARGET_EXTRA_LINK_FLAGS} 
 -lkitrt

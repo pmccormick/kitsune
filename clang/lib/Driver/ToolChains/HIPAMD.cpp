@@ -145,6 +145,8 @@ void AMDGCN::Linker::constructLldCommand(Compilation &C, const JobAction &JA,
   for (const Arg *A : Args.filtered(options::OPT_mllvm)) {
     LldArgs.push_back(
         Args.MakeArgString(Twine("-plugin-opt=") + A->getValue(0)));
+    llvm::errs() << "arg: " << Args.MakeArgString(Twine("-plugin-opt=") + A->getValue(0))
+    << "\n";
   }
 
   if (C.getDriver().isSaveTempsEnabled())

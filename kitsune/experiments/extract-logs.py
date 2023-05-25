@@ -44,6 +44,10 @@ with open('build.log', 'r') as fp:
             executable = line.strip()
             dirname = (executable.split("-"))[0]
             print(executable, end=", ")      
+        elif ".aarch64" in line:
+            executable = line.strip()
+            dirname = (executable.split("-"))[0]
+            print(executable, end=", ")      
         elif "compile time" in line:
             process_time_string(line.strip())
         elif "executable size" in line:

@@ -54,18 +54,12 @@
 #ifndef __KITRT_H__
 #define __KITRT_H__
 
+#include <cstdio>
+#include <cassert>
 #include <stdint.h>
 #include <stdlib.h>
-
-#include "llvm/kitrt-llvm.h"
-
-#ifdef KITRT_CUDA_ENABLED
-#include "cuda/cuda.h"
-#endif
-
-#ifdef KITRT_HIP_ENABLED
-#include "hip/hip.h"
-#endif
+#include <execinfo.h>
+#include <type_traits>
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,57 +67,106 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
-  /// Initialize the shared portion of the runtime.  
-  /// NOTE: The target-specific (non-JIT) transforms 
-  /// currently make explicit calls into the associated 
-  /// runtime for initialization; those calls in turn 
-  /// will call this entry point.  This path is taken 
-  /// to avoid overhead for compile-time targets.
-  extern void __kitrt_CommonInit();
-
-  /// Initialize the supported runtimes.
-  extern bool __kitrt_runtimesInit();
-
-  /// Enable/Disable the runtime's verbose operating mode.  This will
-  /// provide runtime status reports to stderr during program
-  /// execution.
-  ///
-  /// This mode may be *enabled* by setting the environment variable
-  /// KITRT_VERBOSE.  When set on program startup is equivalent to
-  /// calling __kitrtSetVerboseMode(true).
-  extern void __kitrt_setVerboseMode(bool Enable);
-
-  /// Enable the runtime's verbose operating mode.  This will provide
-  /// runtime status reports to stderr during program execution.
-  inline void __kitrt_enableVerboseMode() {
-    __kitrt_setVerboseMode(true);
+ /**
+   * Initialize the core kitsune runtime components that are shared
+   * across all the target runtimes.  Note that this call is typically
+   * invoked by each specific runtime target (e.g., CUDA) vs. having
+   * this call initialization each target runtime.  It can be called
+   * multiple times as it is guarded to avoid repeated initialization.
+   */
+  extern void __kitrt_initialize();
+  
+  /**
+   * Set the runtime system to operate in verbose mode.
+   */
+  inline void __kitrt_enable_verbose_mode() {
+    extern bool _kitrt_verbose_mode;
+    _kitrt_verbose_mode = true;
   }
 
-  /// Disable the runtime's verbose operating mode.  This will provide
-  /// runtime status reports to stderr during program execution.
-  inline void __kitrt_disableVerboseMode() {
-    __kitrt_setVerboseMode(false);
+  /**
+   * Disable the runtime system's verbose reporting mode.
+   */
+  inline void __kitrt_disable_verbose_mode() {
+    extern bool _kitrt_verbose_mode;
+    _kitrt_verbose_mode = false;
   }
 
-  /// Return the internal status of the runtime's verbose operating
-  /// mode.
-  extern bool __kitrt_verboseMode();
+  /**
+   * Enable/Disable the runtime's verbose mode.  Note that this can
+   * also be enabled at runtime by setting the KITRT_VERBOSE
+   * environment variable.
+   *
+   * @param enable - if `true` enable verbose mode, disable if `false`.
+   */
+  inline void __kitrt_set_verbose_mode(bool enable) {
+    extern bool _kitrt_verbose_mode;
+    _kitrt_verbose_mode = enable;
+  }
 
-  // Get info about supported runtime targets.
-  extern bool __kitrt_isCudaSupported();
-  extern bool __kitrt_isHipSupported();
-  extern bool __kitrt_isCheetahSupported();
-  extern bool __kitrt_isRealmSuported();
+  /**
+   * Return the runtime's verbose operating mode.  If `true` the
+   * runtime should provide status details on stderr during execution,
+   * otherwise it is quiet.
+   */
+  inline bool __kitrt_verbose_mode() {
+    extern bool _kitrt_verbose_mode;
+    return _kitrt_verbose_mode;
+  }
 
-  extern void __kitrt_setDefaultThreadsPerBlock(unsigned threadsPerBlock);
-  extern void __kitrt_getLaunchParameters(size_t numElements,
-                                          int &threadsPerBlock,
-                                          int &blocksPerGrid);
-  extern void __kitrt_resetLaunchParameters();
+  /**
+   * Provide a backtrace to stderr to help track down runtime crashes.
+   */
+  extern void __kitrt_print_stack_trace();
 
 #ifdef __cplusplus
 } // extern "C"
 #endif
+  
+/**
+ * Return the value of the given environment variable. If the
+ * variable does not exist in the environment return `false`.
+ * Otherwise, `true` is returned and the value is returned in
+ * the caller provided parameter.
+ */
+template <typename ValueType>
+bool __kitrt_get_env_value(const char *var_name,
+			   ValueType &value) {
+  assert(var_name && "unexpected null variable name!");
+  bool found = false;
+  char *value_string;
+  if ((value_string = getenv(var_name))) {
+
+    if constexpr (std::is_same_v<ValueType, int>) {
+      value = atoi(value_string);
+      found = true;
+    } else if constexpr (std::is_same_v<ValueType, unsigned>) {
+      value = atoi(value_string);
+      found = true;
+    } else if constexpr (std::is_same_v<ValueType, bool>) {
+      value = true;
+      found = true;					       		  
+    } else if constexpr (std::is_same_v<ValueType, long>) {
+      value = atol(value_string);
+      found = true;
+    } else if constexpr (std::is_same_v<ValueType, unsigned long>) {
+      value = atol(value_string);
+      found = true;	  	
+    } else if constexpr (std::is_same_v<ValueType, float>) {
+      value = (float)atof(value_string);
+      found = true;
+    } else if constexpr (std::is_same_v<ValueType, double>) {
+      value = atof(value_string);
+      found = true;
+    } else {
+      fprintf(stderr, "kitrt: warning unhandled type encountered.\n");
+      fprintf(stderr, "       location %s:%d\n", __FILE__, __LINE__);
+      __kitrt_print_stack_trace();
+    }
+  }
+    
+  return found;
+}
 
 #endif // __KITRT_H__
 

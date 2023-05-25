@@ -1,14 +1,11 @@
 ifneq ($(ROCM_PATH),)
   AMDGPU_ARCH?=gfx90a
-
   HIPCC=$(ROCM_PATH)/bin/hipcc
-  HIPCC_CXX_FLAGS?=--offload-arch=$(AMDGPU_ARCH)\
+  HIPCC_CXX_FLAGS?=--offload-arch=$(AMDGPU_ARCH) \
     -fno-exceptions \
     -O$(KITSUNE_OPTLEVEL)
 
-  CLANG_HIP=$(KITSUNE_PREFIX)/bin/clang 
-  CLANG_HIP_FLAGS=-xhip --offload-arch=${AMDGPU_ARCH} \
-    -O$(KITSUNE_OPTLEVEL)
+  KITSUNE_HIPCC=$(KITSUNE_PREFIX)/bin/clang++ -x hip 
 
   HIP_LIBS=-L$(ROCM_PATH)/lib -lamdhip64
 

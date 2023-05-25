@@ -69,6 +69,6 @@ int main (int argc, char* argv[]) {
   dealloc(A);
   dealloc(B);
   dealloc(C);
-  return 0;
+  return error_count;
 }
 

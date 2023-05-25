@@ -2,28 +2,27 @@
 # Kitsune+Tapir specific flags used by all the experiments.
 #
 # 
-KITSUNE_PREFIX?=/projects/kitsune/${host_arch}/15.x
+KITSUNE_PREFIX?=/projects/kitsune/${host_arch}/16.x
 KITSUNE_OPTLEVEL?=3
-KITSUNE_ABI_OPTLEVEL?=$(KITSUNE_OPTLEVEL)
+KITSUNE_ABI_OPTLEVEL?=3
 KITSUNE_OPTFLAGS?=-O$(KITSUNE_OPTLEVEL)
+KITSUNE_FAST_MATH=-ffp-contract=fast
 
 # For now we disable stripmining on GPUs.
-GPU_STRIPMINE_FLAGS?=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=1
+GPU_STRIPMINE_FLAGS?=
 
 ##################################
-TAPIR_CUDA_FLAGS?=-ftapir=cuda \
- -O$(KITSUNE_OPTLEVEL) \
- -ffp-contract=fast \
+TAPIR_CUDA_TARGET=-ftapir=cuda 
+TAPIR_CUDA_TARGET_FLAGS?= -O$(KITSUNE_OPTLEVEL) \
  -mllvm -cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
- -mllvm -cuabi-prefetch=true \
- -mllvm -cuabi-streams=false \
  -mllvm -cuabi-arch=$(CUDA_ARCH) \
- $(GPU_STRIPMINE_FLAGS)\
+ $(GPU_STRIPMINE_FLAGS) \
  $(TAPIR_CUDA_EXTRA_FLAGS)
+TAPIR_CUDA_FLAGS= $(TAPIR_CUDA_TARGET) $(TAPIR_CUDA_TARGET_FLAGS)
 
 TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda,--lto-O${KITSUNE_OPTLEVEL},\
 -mllvm,-cuabi-opt-level=${KITSUNE_OPTLEVEL},-mllvm,-cuabi-arch=$(CUDA_ARCH),\
--mllvm,-cuabi-prefetch=true,-mllvm,-cuabi-streams=false,\
+-mllvm,-cuabi-prefetch=true,\
 -mllvm,-stripmine-coarsen-factor=1,-mllvm,-stripmine-count=1
 
 ifneq ($(KITSUNE_VERBOSE),)
@@ -33,19 +32,15 @@ endif
 
 
 ##################################
-TAPIR_HIP_FLAGS?=-ftapir=hip \
-  -O$(KITSUNE_OPTLEVEL) \
-  -ffp-contract=fast \
+TAPIR_HIP_TARGET=-ftapir=hip 
+TAPIR_HIP_TARGET_FLAGS?= -O$(KITSUNE_OPTLEVEL) \
   -mllvm -hipabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
+  -mllvm -hipabi-host-opt-level=0 \
   -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
-  -mllvm -amdgpu-internalize-symbols \
-  -mllvm -amdgpu-function-calls=false \
-  -mllvm -amdgpu-early-inline-all=true \
-  -mllvm -vectorize-loops \
-  -mllvm -vectorize-slp \
-  $(GPU_STRIPMINE_FLAGS) \
-  $(TAPIR_HIP_EXTRA_FLAGS)
-  #-mllvm -hipabi-xnack=true \
+  $(TAPIR_HIP_EXTRA_FLAGS) \
+  $(GPU_STRIPMINE_FLAGS)
+TAPIR_HIP_FLAGS= $(TAPIR_HIP_TARGET) $(TAPIR_HIP_TARGET_FLAGS)
+
 
 TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O$(KITSUNE_OPTLEVEL),\
 -mllvm,-hipabi-opt-level=$(KITSUNE_OPTLEVEL),-mllvm,-chipabi-arch=$(AMDGPU_ARCH),\
@@ -57,6 +52,7 @@ endif
 ##################################
 
 ##################################
+TAPIR_OPENCILK_TARGET=-ftapir=opencilk
 TAPIR_OPENCILK_FLAGS?=-ftapir=opencilk -O$(KITSUNE_OPTLEVEL)
 ##################################
 
@@ -76,3 +72,18 @@ endif
 
 CLANG=$(KITSUNE_PREFIX}/bin/clang
 CLANGXX=$(KITSUNE_PREFIX}/bin/clang++
+
+##################################
+KITSUNE_MULTI_TARGET_FLAGS?= \
+ -mllvm -cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
+ -mllvm -cuabi-prefetch=true \
+ -mllvm -cuabi-arch=$(CUDA_ARCH) \
+ $(GPU_STRIPMINE_FLAGS) \
+ $(TAPIR_CUDA_EXTRA_FLAGS)
+
+ KITSUNE_MULTI_TARGET_LINK_FLAGS?= \
+  -L${CUDA_ROOT}/lib64 \
+  -L$(KITSUNE_PREFIX)/lib \
+  -L${KITSUNE_PREFIX}/lib/clang/16/lib/x86_64-unknown-linux-gnu \
+  -lcudart -lkitrt -lcuda -lLLVM -lopencilk  -lnvToolsExt
+

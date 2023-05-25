@@ -192,6 +192,8 @@ public:
     return Expression;
   }
 
+  bool hasSjLjLowering() const override; 
+
   int getEHDataRegisterNumber(unsigned RegNo) const override;
 
   const char *getBFloat16Mangling() const override { return "u6__bf16"; };
