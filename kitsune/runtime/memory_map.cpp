@@ -63,11 +63,13 @@
 typedef std::unordered_map<void *, KitRTAllocMapEntry> KitRTAllocMap;
 static KitRTAllocMap _kitrtAllocMap;
 
-void __kitrt_registerMemAlloc(void *addr, size_t size, bool prefetched) {
+void __kitrt_registerMemAlloc(void *addr, size_t size) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMapEntry entry;
   entry.size = size;
   entry.prefetched = false;
+  entry.read_only = false;
+  entry.write_only = false;
   _kitrtAllocMap[addr] = entry;
   #ifdef _KITRT_VERBOSE_
   fprintf(stderr, "kitrt: registered memory allocation (%p) "
@@ -95,6 +97,24 @@ void __kitrt_setMemPrefetch(void *addr, bool prefetched) {
   }
 }
 
+bool __kitrt_isMemReadyOnly(void *addr) {
+  assert(addr != nullptr && "unexpected null pointer!");
+  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
+  if (ait != _kitrtAllocMap.end())
+    return ait->second.read_only;
+  else 
+    return false;
+}
+
+bool __kitrt_isMemWriteOnly(void *addr) {
+  assert(addr != nullptr && "unexpected null pointer!");
+  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
+  if (ait != _kitrtAllocMap.end())
+    return ait->second.write_only;
+  else 
+    return false;
+}
+
 bool __kitrt_isMemPrefetched(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMap::const_iterator cit = _kitrtAllocMap.find(addr);
@@ -112,21 +132,27 @@ bool __kitrt_isMemPrefetched(void *addr) {
   }
 }
 
-size_t __kitrt_getMemAllocSize(void *addr) {
-  assert(addr != nullptr && "unexpected null pointer!");
+size_t __kitrt_getMemAllocSize(void *addr, bool *read_only, bool *write_only) {
+  assert(addr != nullptr && "unexpected null addr pointer!");
+  assert(read_only != nullptr && "unexpected null read_only pointer!");
+  assert(write_only != nullptr && "unexpected null write_only pointer!");
+
   KitRTAllocMap::const_iterator cit = _kitrtAllocMap.find(addr);
   if (cit != _kitrtAllocMap.end()) {
+    *read_only = cit->second.read_only;
+    *write_only = cit->second.write_only;
     return cit->second.size;
-  } else {
-    #ifdef _KITRT_VERBOSE_
+  } 
+  #ifdef _KITRT_VERBOSE_
     fprintf(stderr,
             "kitrt: __kitrt_getMemAllocSize() -- "
             "warning, address %p not found in address map. "
             "returning zero size.\n",
             addr);
-    #endif
-    return 0;
-  }
+  #endif            
+  *read_only = false;
+  *write_only = false;
+  return 0;
 }
 
 void __kitrt_unregisterMemAlloc(void *addr) {

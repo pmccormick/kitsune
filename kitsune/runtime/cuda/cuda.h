@@ -111,6 +111,7 @@ extern "C" {
   __attribute__((malloc)) void *__kitrt_cuMemAllocManaged(size_t size);
   void __kitrt_cuMemFree(void *vp);
   void __kitrt_cuMemPrefetch(void *vp);
+  void __kitrt_cuMemHostPrefetch(void *vp);
   void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream);
   void *__kitrt_cuStreamMemPrefetch(void *vp);
   void  __kitrt_cuAdviseRead(void *vp, size_t size);

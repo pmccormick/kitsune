@@ -56,12 +56,13 @@
 
 extern "C" __attribute__((malloc)) void *__kitrt_defaultMemAlloc(size_t bytes) {
   void *ptr = malloc(bytes); 
-  __kitrt_registerMemAlloc(ptr, bytes, false);
+  __kitrt_registerMemAlloc(ptr, bytes);
   return ptr;
 }
 
-extern "C" void __kitrt_defaultMemFree(void *ptr) { 
-  if (__kitrt_getMemAllocSize(ptr) > 0)
+extern "C" void __kitrt_defaultMemFree(void *ptr) {
+  bool ro, wo;
+  if (__kitrt_getMemAllocSize(ptr, &ro, &wo) > 0)
     __kitrt_unregisterMemAlloc(ptr); 
   free(ptr);  
 }

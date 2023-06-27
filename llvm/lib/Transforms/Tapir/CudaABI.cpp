@@ -1414,7 +1414,6 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
       break;
     case 3:
       PTXASArgList.push_back("3");
-      PTXASArgList.push_back("-v");
       break;
     default:
       llvm_unreachable_internal("unhandled/unexpected optimization level",

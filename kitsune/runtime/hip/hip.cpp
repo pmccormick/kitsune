@@ -440,7 +440,8 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   }
 
   if (__kitrt_hipIsMemManaged(vp)) {
-    size_t size = __kitrt_getMemAllocSize(vp);
+    bool is_read_only, is_write_only;
+    size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
     if (size > 0) {
       hipDevice_t device;
       HIP_SAFE_CALL(hipMemRangeGetAttribute(

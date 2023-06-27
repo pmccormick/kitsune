@@ -67,20 +67,21 @@
 /// Prefetching suggests a hint to the runtime/driver/OS to migrate
 /// all pages to the corresponding device's memory.
 ///
-/// TODO: Prefetch is probably better tracked as a location vs. a
-/// one-sided boolean relationship...  Better tracking will require
-/// this change.
+/// TODO: Is prefetch better tracked as a location vs. a boolean? 
+/// (Adding support for multiple devices will force this change but
+/// for now it is likely more complex than necessary.)
 struct KitRTAllocMapEntry {
   size_t     size;       // size of the allocated buffer in bytes.
   bool       prefetched; // has the data been prefetched?
+  bool       read_only;  // upcoming data usage is ("mostly") read only.
+  bool       write_only; // upcoming data usage is ("mostly") write only.
 };
 
 /// Register a memory allocation with the runtime.  The allocation
 /// is assumed be successful at this point and pointed to by the
 /// supplied pointer (addr) and be 'numBytes' in size.
 extern void __kitrt_registerMemAlloc(void *addr,
-                                     size_t numBytes,
-                                     bool prefetched = false);
+                                     size_t numBytes);
 
 /// Set the prefetch status of the given memory allocation entry.
 extern void __kitrt_setMemPrefetch(void *addr, bool prefetched);
@@ -96,12 +97,24 @@ inline void __kitrt_markMemNeedsPrefetch(void *addr) {
   __kitrt_setMemPrefetch(addr, false);
 }
 
-/// Return the prefetch status of the given allocation entry.
-/// (true == prefetched, false == not prefetched)
+/// @brief  Mark the given managed memory allocation to need prefetching.
+/// @param addr: The pointer to the managed memory allocation.
+extern void __kitrt_memNeedsPrefetch(void *addr);
+
+/// @brief Return the prefetch status of the given allocation.
+/// @param addr: The pointer to the managed allocation.
 bool __kitrt_isMemPrefetched(void *addr);
 
-/// Return the size of the given memory allocation.
-size_t __kitrt_getMemAllocSize(void *addr);
+/// @brief Is the given managed allocation marked as ready-only?
+/// @param addr: The pointer to the managed allocation. 
+bool __kitrt_isMemReadyOnly(void *addr);
+
+/// @brief Is the given managed allocation marked as write-only?
+/// @param addr: The pointer to the managed allocation. 
+bool __kitrt_isMemWriteOnly(void *addr);
+
+/// Get the size of the allocation for a given pointer address.
+size_t __kitrt_getMemAllocSize(void *addr, bool *read_only, bool *write_only);
 
 /// Unregister a memory allocation.  If the supplied pointer is not
 /// found in the allocation map the runtime will throw an assertion
@@ -109,9 +122,7 @@ size_t __kitrt_getMemAllocSize(void *addr);
 /// that management is assumed to be managed elsewhere.
 extern void __kitrt_unregisterMemAlloc(void *addr);
 
-/// @brief  Mark the given managed memory allocation to need prefetching.
-/// @param addr: The pointer to the managed memory allocation.
-extern void __kitrt_memNeedsPrefetch(void *addr);
+
 
 /// Destroy the memory map and call the function pointed to by
 /// 'freeFP' to free the actual memory allocation (runtime target
