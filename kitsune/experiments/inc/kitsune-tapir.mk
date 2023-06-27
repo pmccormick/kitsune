@@ -42,12 +42,11 @@ TAPIR_HIP_FLAGS?=-ftapir=hip \
   -mllvm -amdgpu-early-inline-all=true \
   -mllvm -vectorize-loops \
   -mllvm -vectorize-slp \
-  -mllvm -hipabi-no-prefetch \
   -ffp-contract=fast \
+  -mllvm -hipabi-xnack=true \
   $(GPU_STRIPMINE_FLAGS) \
   $(TAPIR_HIP_EXTRA_FLAGS)
-  #-mllvm -hipabi-xnack=true \
-  #-mllvm -hipabi-xnack=true \
+  #-mllvm -hipabi-no-prefetch \
 
 TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O$(KITSUNE_OPTLEVEL),\
 -mllvm,-hipabi-opt-level=$(KITSUNE_OPTLEVEL),-mllvm,-chipabi-arch=$(AMDGPU_ARCH),\
