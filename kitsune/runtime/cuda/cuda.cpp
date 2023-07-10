@@ -278,8 +278,14 @@ extern "C" {
 
 bool __kitrt_cuInit() {
 
-  if (_kitrt_cuIsInitialized)
+  if (_kitrt_cuIsInitialized) {
+    fprintf(stderr,
+        "kitrt: warning, multiple cuda initialization paths!\n");
     return true;
+  }
+
+  if (__kitrt_verboseMode())
+    fprintf(stderr, "kitrt: initializing cuda.\n");
 
   if (!__kitrt_cuLoadDLSyms()) {
     fprintf(stderr, "kitrt: unable to resolve dynamic symbols for CUDA.\n");
@@ -296,6 +302,10 @@ bool __kitrt_cuInit() {
     fprintf(stderr, "kitrt: warning -- no CUDA devices found!\n");
     abort();
   }
+
+  if (__kitrt_verboseMode())
+    fprintf(stderr, "\tdevice count: %d\n", deviceCount);
+
   CU_SAFE_CALL(cuDeviceGet_p(&_kitrtCUdevice, 0));
   CU_SAFE_CALL(cuDevicePrimaryCtxRetain_p(&_kitrtCUcontext, _kitrtCUdevice));
   // NOTE: It seems we have to explicitly set the context but that seems
@@ -513,7 +523,7 @@ void __kitrt_cuMemHostPrefetch(void *vp) {
                                  CU_DEVICE_CPU));
 
       CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, CU_DEVICE_CPU,
-                                        (CUstream)nullptr));
+                                        (CUstream) nullptr));
       __kitrt_setMemPrefetch(vp, false);
     }
   }

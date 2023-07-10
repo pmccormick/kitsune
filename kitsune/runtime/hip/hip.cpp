@@ -253,7 +253,7 @@ bool __kitrt_hipInit() {
     (void)setenv("HSA_XNACK", "1", 1);
     if (__kitrt_verboseMode())
       fprintf(stderr, "kitrt: hip -- enabling xnack.\n");
-    fprintf(stderr, "       HSA_XNACK has been automatically set.\n");
+    fprintf(stderr, "kitsune: HSA_XNACK automatically set in environment.\n");
   }
 
   if (!__kitrt_hipLoadDLSyms()) {
