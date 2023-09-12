@@ -2088,6 +2088,16 @@ void HipABI::registerBundle(GlobalVariable *Bundle) {
 }
 
 void HipABI::postProcessModule() {
+  // The postprocessing of the target module is "blind" to the actual details
+  // of what has happened previously (e.g., loops identified and transformed).
+  // For this reason, we check to see if the kernel module contains any code
+  // before actually starting the postprocessing phase.
+  if (KernelModule.getFunctionList().empty()) {
+    LLVM_DEBUG(dbgs() << "\n\n"
+             << "hipabi: kernel module is empty, nothing to postprocess.\n");
+    return;
+  }
+
   // At this point, all tapir constructs in the input module (M) have been
   // transformed (i.e., outlined) into the kernel module. We can now wrap up
   // module-wide changes for both modules.

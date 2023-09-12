@@ -1575,8 +1575,12 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
     LLVM_DEBUG(dbgs() << "\tcleaning up dummy fatbin global.\n");
     ProxyFB->replaceAllUsesWith(CFB);
     ProxyFB->eraseFromParent();
-  } else
+  } else {
+    // FIXME: If we haven't found the proxy for a fat binary the odds are we have not
+    // found any parallel loops in the code...  Technically, this should not be 
+    // seen as a compiler error... 
     report_fatal_error("internal error! unable to find proxy fatbin pointer!");
+  }
 }
 
 CudaABIOutputFile CudaABI::createFatbinaryFile(CudaABIOutputFile &AsmFile) {
@@ -2002,6 +2006,15 @@ CudaABIOutputFile CudaABI::generatePTX() {
 }
 
 void CudaABI::postProcessModule() {
+  // The postprocessing of the target module is "blind" to the actual details
+  // of what has happened previously (e.g., loops identified and transformed).
+  // For this reason, we check to see if the kernel module contains any code
+  // before actually starting the postprocessing phase.
+  if (KernelModule.getFunctionList().empty()) {
+    LLVM_DEBUG(dbgs() << "\n\n"
+             << "cuabi: kernel module is empty, nothing to postprocess.\n");
+    return;
+  }
   // At this point, all tapir constructs in the input module (M) have been
   // transformed (i.e., outlined) into the kernel module. We can now wrap up
   // module-wide changes for both modules and generate the GPU binary...

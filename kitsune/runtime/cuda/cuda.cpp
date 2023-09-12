@@ -279,8 +279,7 @@ extern "C" {
 bool __kitrt_cuInit() {
 
   if (_kitrt_cuIsInitialized) {
-    fprintf(stderr,
-        "kitrt: warning, multiple cuda initialization paths!\n");
+    fprintf(stderr, "kitrt: warning, multiple cuda initialization paths!\n");
     return true;
   }
 

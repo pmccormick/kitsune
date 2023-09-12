@@ -80,8 +80,7 @@ struct KitRTAllocMapEntry {
 /// Register a memory allocation with the runtime.  The allocation
 /// is assumed be successful at this point and pointed to by the
 /// supplied pointer (addr) and be 'numBytes' in size.
-extern void __kitrt_registerMemAlloc(void *addr,
-                                     size_t numBytes);
+extern void __kitrt_registerMemAlloc(void *addr, size_t numBytes);
 
 /// Set the prefetch status of the given memory allocation entry.
 extern void __kitrt_setMemPrefetch(void *addr, bool prefetched);
@@ -96,6 +95,14 @@ inline void __kitrt_markMemPrefetched(void *addr) {
 inline void __kitrt_markMemNeedsPrefetch(void *addr) {
   __kitrt_setMemPrefetch(addr, false);
 }
+
+/// @brief Flag the given memory allocation as read only. 
+/// @param addr: the pointer to the managed allocation. 
+extern void __kitrt_markMemAsReadOnly(void *addr);
+
+/// @brief Flag the given memory allocation as write only.
+/// @param addr: the pointer to the managed memory allocation. 
+extern void __kitrt_markMemAsWriteOnly(void *addr);
 
 /// @brief  Mark the given managed memory allocation to need prefetching.
 /// @param addr: The pointer to the managed memory allocation.
@@ -112,6 +119,10 @@ bool __kitrt_isMemReadyOnly(void *addr);
 /// @brief Is the given managed allocation marked as write-only?
 /// @param addr: The pointer to the managed allocation. 
 bool __kitrt_isMemWriteOnly(void *addr);
+
+/// @brief Clean memory allocation "advice" (e.g., read-only, write-only).
+/// @param addr: The pointer to the managed allocation.
+void __kitrt_clearMemAdvice(void *addr);
 
 /// Get the size of the allocation for a given pointer address.
 size_t __kitrt_getMemAllocSize(void *addr, bool *read_only, bool *write_only);

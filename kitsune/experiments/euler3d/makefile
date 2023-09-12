@@ -25,7 +25,7 @@ euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
 	@$(FILE_SIZE)
 euler3d-forall.hip.${host_arch}: euler3d-forall.cpp 
 	@echo $@
-	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)

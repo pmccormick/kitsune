@@ -567,7 +567,7 @@ public:
 
   // FIXME: need a better solution but also too difficult to re-outline 
   // everything w/ tapir for GPU targets (AMD in particular)... 
-  #warning "FIXME: need better solution than mutateType()."
+  //#warning "FIXME: need better solution than mutateType()."
   void mutateValueType(Type *Ty) {
     ValueType = Ty;
   }

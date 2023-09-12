@@ -14,7 +14,7 @@ GPU_STRIPMINE_FLAGS?=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=
 TAPIR_CUDA_FLAGS?=-ftapir=cuda \
  -O$(KITSUNE_OPTLEVEL) \
  -mllvm -cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
- -mllvm -cuabi-prefetch=false \
+ -mllvm -cuabi-prefetch=true \
  -mllvm -cuabi-streams=false \
  -mllvm -cuabi-arch=$(CUDA_ARCH) \
  $(GPU_STRIPMINE_FLAGS) \

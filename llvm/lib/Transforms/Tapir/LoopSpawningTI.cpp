@@ -1664,9 +1664,12 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
 
   SmallVector<Function *, 8> WorkList;
   bool Changed = false;
+  int  FuncCount = 0;
   for (Function &F : M)
-    if (!F.empty())
+    if (!F.empty()) {
       WorkList.push_back(&F);
+      FuncCount++;
+    }
 
   Function *SavedF = nullptr;
   // Transform all loops into simplified, LCSSA form before we process them.
@@ -1694,8 +1697,8 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
                                 GetAC(*F), GetTTI(*F), Target.get(), GetORE(*F))
                    .run();
   }
-
-  Target->postProcessModule();
+  if (FuncCount > 0)
+    Target->postProcessModule();
 
   if (Changed)
     return PreservedAnalyses::none();

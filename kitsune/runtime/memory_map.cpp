@@ -97,6 +97,14 @@ void __kitrt_setMemPrefetch(void *addr, bool prefetched) {
   }
 }
 
+void __kitrt_markMemAsReadOnly(void *addr) {
+  assert(addr != nullptr && "unexpected null pointer!");
+  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
+  if (ait != _kitrtAllocMap.end()) {
+    ait->second.read_only = true;
+  }
+}
+
 bool __kitrt_isMemReadyOnly(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
@@ -106,6 +114,17 @@ bool __kitrt_isMemReadyOnly(void *addr) {
     return false;
 }
 
+/// @brief Flag the given memory allocation as write only.
+/// @param addr: the pointer to the managed memory allocation. 
+extern void __kitrt_markMemAsWriteOnly(void *addr) {
+  assert(addr != nullptr && "unexpected null pointer!");
+  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
+  if (ait != _kitrtAllocMap.end()) {
+    ait->second.write_only = true;
+  }
+}
+
+
 bool __kitrt_isMemWriteOnly(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
@@ -113,6 +132,15 @@ bool __kitrt_isMemWriteOnly(void *addr) {
     return ait->second.write_only;
   else 
     return false;
+}
+
+void __kitrt_clearMemAdvice(void *addr) {
+  assert(addr != nullptr && "unexpected null pointer!");
+  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
+  if (ait != _kitrtAllocMap.end()) {
+    ait->second.read_only = false;
+    ait->second.write_only = false;
+  }
 }
 
 bool __kitrt_isMemPrefetched(void *addr) {

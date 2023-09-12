@@ -1,8 +1,6 @@
-SHELL := /bin/bash 
 include ../experiments.mk
 
 targets = copy-forall.opencilk.${host_arch}
-
 
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += copy-forall.cuda.${host_arch}
@@ -14,7 +12,6 @@ ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += copy-kokkos.hip.kitsune.${host_arch}
   targets += copy-hip.${host_arch}
 endif
-
 
 all: ${targets}
 

@@ -1,6 +1,7 @@
 
 
 subdirs := \
+  noforall \
   copy \
   vecadd \
   saxpy \
