@@ -1664,12 +1664,9 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
 
   SmallVector<Function *, 8> WorkList;
   bool Changed = false;
-  int  FuncCount = 0;
   for (Function &F : M)
-    if (!F.empty()) {
+    if (!F.empty())
       WorkList.push_back(&F);
-      FuncCount++;
-    }
 
   Function *SavedF = nullptr;
   // Transform all loops into simplified, LCSSA form before we process them.
@@ -1692,12 +1689,16 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
   TapirTargetID TargetID = GetTLI(*SavedF).getTapirTarget();
   std::unique_ptr<TapirTarget> Target(getTapirTargetFromID(M, TargetID));
   // Now process each loop.
+  bool HasParallelism = false;
   for (Function *F : WorkList) {
-    Changed |= LoopSpawningImpl(*F, GetDT(*F), GetLI(*F), GetTI(*F), GetSE(*F),
+    HasParallelism = LoopSpawningImpl(*F, GetDT(*F), GetLI(*F), GetTI(*F), GetSE(*F),
                                 GetAC(*F), GetTTI(*F), Target.get(), GetORE(*F))
                    .run();
+    Changed |= HasParallelism;
   }
-  if (FuncCount > 0)
+
+  // Only post-process if parallelism was discovered during loop spawning.
+  if (HasParallelism) 
     Target->postProcessModule();
 
   if (Changed)

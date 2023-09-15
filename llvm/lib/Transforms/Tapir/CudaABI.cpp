@@ -2006,18 +2006,12 @@ CudaABIOutputFile CudaABI::generatePTX() {
 }
 
 void CudaABI::postProcessModule() {
-  // The postprocessing of the target module is "blind" to the actual details
-  // of what has happened previously (e.g., loops identified and transformed).
-  // For this reason, we check to see if the kernel module contains any code
-  // before actually starting the postprocessing phase.
-  if (KernelModule.getFunctionList().empty()) {
-    LLVM_DEBUG(dbgs() << "\n\n"
-             << "cuabi: kernel module is empty, nothing to postprocess.\n");
-    return;
-  }
   // At this point, all tapir constructs in the input module (M) have been
   // transformed (i.e., outlined) into the kernel module. We can now wrap up
-  // module-wide changes for both modules and generate the GPU binary...
+  // module-wide changes for both modules and generate a GPU binary.
+  //
+  // NOTE: postProcessModule() will not be called in cases where parallelism 
+  // was not discovered during loop spawning.
   LLVM_DEBUG(dbgs() << "\n\n"
                     << "cuabi: postprocessing the kernel '"
                     << KernelModule.getName() << "' and input '" << M.getName()
