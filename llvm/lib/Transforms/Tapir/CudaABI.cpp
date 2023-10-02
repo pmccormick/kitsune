@@ -2009,7 +2009,6 @@ void CudaABI::postProcessModule() {
   // At this point, all tapir constructs in the input module (M) have been
   // transformed (i.e., outlined) into the kernel module. We can now wrap up
   // module-wide changes for both modules and generate a GPU binary.
-  //
   // NOTE: postProcessModule() will not be called in cases where parallelism 
   // was not discovered during loop spawning.
   LLVM_DEBUG(dbgs() << "\n\n"

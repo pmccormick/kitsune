@@ -1987,9 +1987,11 @@ Function *HipABI::createCtor(GlobalVariable *Bundle, GlobalVariable *Wrapper) {
 
   // TODO: It is not 100% clear what calls we actually need to make
   // here for kernel, variable, etc. registration with HIP/ROCm.  Clang
-  // makes these calls but it is unclear what (and when) this is actually
+  // makes these calls but it is unclear when this is actually 
   // necessary...
-
+  //
+  // *** CURRENTLY DISABLED W/OUT ISSUES... 
+  // 
   // if (not KernelFunctions.empty()) {
   //   LLVM_DEBUG(dbgs() << "\t\tregistering kernels...\n");
   //   registerKernels(HandlePtr, CtorBuilder);
@@ -2091,7 +2093,6 @@ void HipABI::postProcessModule() {
   // At this point, all tapir constructs in the input module (M) have been
   // transformed (i.e., outlined) into the kernel module. We can now wrap up
   // module-wide changes for both modules and generate a GPU binary. 
-  //
   // NOTE: postProcessModule() will not be called in cases where parallelism 
   // was not discovered during loop spawning.
   LLVM_DEBUG(dbgs() << "\n\n"

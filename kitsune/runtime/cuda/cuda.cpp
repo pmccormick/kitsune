@@ -384,16 +384,22 @@ void __kitrt_cuMemFree(void *vp) {
   // Note that the versioned free calls are important
   // here -- a non-v2 version will actually result in
   // crashes...
+  if (not _kitrt_cuIsInitialized)
+    __kitrt_cuInit();
   __kitrt_unregisterMemAlloc(vp);
   CU_SAFE_CALL(cuMemFree_v2_p((CUdeviceptr)vp));
 }
 
 void __kitrt_cuFreeManagedMem(void *vp) {
+  if (not _kitrt_cuIsInitialized)
+    __kitrt_cuInit();
   CU_SAFE_CALL(cuMemFree_v2_p((CUdeviceptr)vp));
 }
 
 bool __kitrt_cuIsMemManaged(void *vp) {
   assert(vp && "unexpected null pointer!");
+  if (not _kitrt_cuIsInitialized)
+    __kitrt_cuInit();
   CUdeviceptr devp = (CUdeviceptr)vp;
   unsigned int is_managed;
   CUresult r = cuPointerGetAttribute_p(&is_managed,
@@ -566,6 +572,8 @@ static void __kitrt_cuMaxPotentialBlockSize(int &blocksPerGrid,
 
 void *__kitrt_cuCreateFBModule(const void *fatBin) {
   assert(fatBin && "unexpected null fatbinary image!");
+  if (not _kitrt_cuIsInitialized)
+    __kitrt_cuInit();
   CUmodule module;
   CU_SAFE_CALL(cuModuleLoadData_p(&module, fatBin));
   // CU_SAFE_CALL(cuModuleLoadFatBinary_p(&module, fatBin));
