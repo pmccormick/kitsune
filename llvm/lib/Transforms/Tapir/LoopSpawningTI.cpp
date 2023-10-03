@@ -1691,16 +1691,17 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
   // Now process each loop.
   bool HasParallelism = false;
   for (Function *F : WorkList) {
-    HasParallelism = LoopSpawningImpl(*F, GetDT(*F), GetLI(*F), GetTI(*F), GetSE(*F),
+    HasParallelism |= LoopSpawningImpl(*F, GetDT(*F), GetLI(*F), GetTI(*F), GetSE(*F),
                                 GetAC(*F), GetTTI(*F), Target.get(), GetORE(*F))
                    .run();
-    Changed |= HasParallelism;
   }
 
   // Only post-process if parallelism was discovered during loop spawning.
   if (HasParallelism) 
     Target->postProcessModule();
 
+  Changed |= HasParallelism;
+  
   if (Changed)
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
