@@ -1695,12 +1695,11 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
                                 GetAC(*F), GetTTI(*F), Target.get(), GetORE(*F))
                    .run();
   }
+  Changed |= HasParallelism;
 
   // Only post-process if parallelism was discovered during loop spawning.
   if (HasParallelism) 
     Target->postProcessModule();
-
-  Changed |= HasParallelism;
   
   if (Changed)
     return PreservedAnalyses::none();

@@ -1205,6 +1205,16 @@ CudaABI::CudaABI(Module &M)
       KernelModule(Twine(CUABI_PREFIX + sys::path::filename(M.getName())).str(),
                    M.getContext()) {
 
+  // A helping hand for invocation of the transform from a JIT-driven 
+  // environment where it can be a bit painful to get to 
+  std::optional<std::string> envTarget = sys::Process::GetEnv("CUDAABI_TARGET");
+  if (envTarget) {
+    LLVM_DEBUG(dbgs() << "cuabi: target set via environment '" 
+                      << envTarget.value() << "'.\n");
+    GPUArch.setInitialValue(envTarget.value());
+  } else
+    GPUArch.setInitialValue(_CUDAABI_DEFAULT_ARCH);
+
   LLVM_DEBUG(dbgs() << "cuabi: creating tapir target for module '"
                     << M.getName() << "' (w/ kernel module: '"
                     << KernelModule.getName() << "')\n");
