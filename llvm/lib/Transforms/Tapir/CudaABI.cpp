@@ -1212,8 +1212,7 @@ CudaABI::CudaABI(Module &M)
     LLVM_DEBUG(dbgs() << "cuabi: target set via environment '" 
                       << envTarget.value() << "'.\n");
     GPUArch.setInitialValue(envTarget.value());
-  } else
-    GPUArch.setInitialValue(_CUDAABI_DEFAULT_ARCH);
+  }
 
   LLVM_DEBUG(dbgs() << "cuabi: creating tapir target for module '"
                     << M.getName() << "' (w/ kernel module: '"

@@ -286,7 +286,7 @@ bool __kitrt_cuInit() {
   if (__kitrt_verboseMode())
     fprintf(stderr, "kitrt: initializing cuda.\n");
 
-  if (!__kitrt_cuLoadDLSyms()) {
+  if (not __kitrt_cuLoadDLSyms()) {
     fprintf(stderr, "kitrt: unable to resolve dynamic symbols for CUDA.\n");
     fprintf(stderr, "       check enviornment settings and installation.\n");
     fprintf(stderr, "kitrt: aborting...\n");
