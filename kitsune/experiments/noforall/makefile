@@ -26,7 +26,7 @@ noforall.hip.${host_arch}: noforall.cpp
 	@${FILE_SIZE}
 
 run: $(targets) 
-	@echo "running generated exeutables..."
+	@echo "running generated executables..."
 	@$(foreach prog,$(targets),$(call RUN_test,$(prog)))
 
 .PHONY: all clean run
