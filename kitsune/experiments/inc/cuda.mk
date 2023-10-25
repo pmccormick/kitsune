@@ -5,6 +5,7 @@ ifneq ($(CUDA_PATH),)
   NVCC_C_FLAGS?=-arch=$(CUDA_ARCH)
   NVCC_CXX_FLAGS?=-arch=$(CUDA_ARCH) \
     --no-exceptions \
+    --relocatable-device-code=false \
     --expt-extended-lambda \
     --expt-relaxed-constexpr \
     -O$(KITSUNE_OPTLEVEL)

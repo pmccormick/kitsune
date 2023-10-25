@@ -158,6 +158,7 @@ DECLARE_DLSYM(cuModuleGetFunction);
 DECLARE_DLSYM(cuModuleUnload);
 
 DECLARE_DLSYM(cuMemAllocManaged);
+DECLARE_DLSYM(cuMemsetD8Async);
 DECLARE_DLSYM(cuMemFree_v2);
 DECLARE_DLSYM(cuMemPrefetchAsync);
 DECLARE_DLSYM(cuMemAdvise);
@@ -219,6 +220,7 @@ static bool __kitrt_cuLoadDLSyms() {
     DLSYM_LOAD(cuCtxGetCurrent);
 
     DLSYM_LOAD(cuMemAllocManaged);
+    DLSYM_LOAD(cuMemsetD8Async);
     DLSYM_LOAD(cuMemFree_v2);
     DLSYM_LOAD(cuMemPrefetchAsync);
     DLSYM_LOAD(cuMemAdvise);
@@ -349,7 +351,8 @@ void __kitrt_cuCheckCtxState() {
 
 // ---- Managed memory allocation, tracking, etc.
 
-__attribute__((malloc)) void *__kitrt_cuMemAllocManaged(size_t size) {
+__attribute__((malloc)) 
+void *__kitrt_cuMemAllocManaged(size_t size) {
   if (not _kitrt_cuIsInitialized)
     __kitrt_cuInit();
 
@@ -375,6 +378,59 @@ __attribute__((malloc)) void *__kitrt_cuMemAllocManaged(size_t size) {
   __kitrt_registerMemAlloc((void *)devp, size);
 
   return (void *)devp;
+}
+
+__attribute__((malloc)) 
+void *__kitrt_cuMemCallocManaged(size_t count, size_t element_size) {
+  assert(count != 0 && "zero-valued item count!");
+  assert(element_size != 0 && "zero-valued element size!");
+  size_t nbytes = count * element_size;
+  CUdeviceptr memp = (CUdeviceptr)__kitrt_cuMemAllocManaged(nbytes);
+
+  // TODO: Is there a risk of a race here?  From the driver API docs:
+  //
+  //   The cudaMemset functions are asynchronous with respect to the host 
+  //   except when the target memory is pinned host memory. The Async 
+  //   versions are always asynchronous with respect to the host.
+  // 
+  // Given our use of UVM we might also be able to use a straight memset() 
+  // call... which would, of course, place all pages on the host... 
+  //
+  // TODO: We're not set to run on anything but the default stream... 
+  CU_SAFE_CALL(cuMemsetD8Async_p(memp, 0, nbytes, NULL));
+  return (void*)memp;
+}
+
+__attribute__((malloc))
+void *__kitrt_cuMemRealloc(void *ptr, size_t size) {
+  assert(size != 0 && "zero-valued size!");
+  void *memptr = nullptr;
+  if (ptr == nullptr) 
+    memptr = __kitrt_cuMemAllocManaged(size);
+  else {
+    // Check to make sure this is a pointer we're actually managing.
+    bool read_only, write_only;
+    size_t nbytes = __kitrt_getMemAllocSize(ptr, &read_only, &write_only);
+    if (nbytes == 0) {
+      fprintf(stderr, "kitrt: warning, realloc() request on untracked allocation!\n");
+      return nullptr;
+    }
+    
+    if (size > nbytes) {
+      // requested size is larger than currently tracked allocation.  Replace it.
+      memptr = __kitrt_cuMemAllocManaged(size);
+      cuMemcpy_p(/* dest */(CUdeviceptr)memptr, /* source */(CUdeviceptr)ptr, nbytes);
+      // note: realloc does not guarantee initialized memory outside of existing data... 
+      __kitrt_cuMemFree(ptr);
+    } else if (size < nbytes) {
+      memptr = __kitrt_cuMemAllocManaged(size);
+      cuMemcpy_p(/* dest */(CUdeviceptr)memptr, /* source */(CUdeviceptr)ptr, size);
+      __kitrt_cuMemFree(ptr);
+    } else
+      // same size, just return it. 
+      memptr = ptr;
+  }
+  return memptr;
 }
 
 void __kitrt_cuMemFree(void *vp) {

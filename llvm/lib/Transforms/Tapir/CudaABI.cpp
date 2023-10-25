@@ -1423,6 +1423,7 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
       break;
     case 3:
       PTXASArgList.push_back("3");
+      PTXASArgList.push_back("--extensible-whole-program");
       break;
     default:
       llvm_unreachable_internal("unhandled/unexpected optimization level",
@@ -1804,7 +1805,7 @@ Function *CudaABI::createCtor(GlobalVariable *Fatbinary,
   CtorBuilder.CreateAlignedStore(RegFatbin, Handle,
                                  DL.getPointerABIAlignment(0));
   Handle->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
-
+  
   Value *HandlePtr = CtorBuilder.CreateLoad(VoidPtrPtrTy, Handle,
                                             CUABI_PREFIX + ".fbhand.ptr");
 

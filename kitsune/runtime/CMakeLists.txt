@@ -7,6 +7,7 @@
 #
 
 set(KITRT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(KITRT_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(KITRT_INCLUDE_DIR ${KITSUNE_RUNTIME_DIR})
 
 # There is support for two different levels of debugging.  The general
@@ -64,6 +65,7 @@ if (KITRT_ENABLE_CUDA)
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
   list(APPEND KITRT_LINK_LIBS
     "-lnvptxcompiler_static -lcudart -lcuda")
+  #add_subdirectory(cuda/numpy)
 endif()
 
 if (KITRT_ENABLE_HIP)
@@ -94,7 +96,6 @@ target_include_directories(kitrt
     ${LLVM_INCLUDE_DIR}
     ${KITSUNE_SOURCE_DIR}/include
     ${KITSUNE_RUNTIME_INCLUDE_DIR})
-
 target_link_libraries(kitrt
   PUBLIC
     ${KITRT_LINK_LIBS}

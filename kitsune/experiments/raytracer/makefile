@@ -6,6 +6,7 @@ ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += raytracer-forall.cuda.${host_arch}
   targets += raytracer-kokkos.cuda.kitsune.${host_arch}
   targets += raytracer-cuda.${host_arch}
+  targets += raytracer-kokkos.nvcc.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)

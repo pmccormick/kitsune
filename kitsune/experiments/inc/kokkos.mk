@@ -1,7 +1,7 @@
 
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   KOKKOS_CUDA_PREFIX?=$(KITSUNE_PREFIX)/opt/kokkos/cuda
-  KOKKOS_CUDA_LIBS=-L$(KOKKOS_CUDA_PREFIX)/lib64 -L$(CUDA_PATH)/lib64 -lkokkoscore -lcudart -ldl
+  KOKKOS_CUDA_LIBS=-L$(KOKKOS_CUDA_PREFIX)/lib -L$(CUDA_PATH)/lib64 -lkokkoscore -lcudart -ldl
   KOKKOS_NVCC=$(KOKKOS_CUDA_PREFIX)/bin/nvcc_wrapper
   KOKKOS_NVCC_FLAGS?= $(NVCC_CXX_FLAGS) -I$(KOKKOS_CUDA_PREFIX)/include/
   KOKKOS_CLANG_CUDA_FLAGS?= $(CLANG_CUDA_FLAGS) -std=c++17 -I$(KOKKOS_CUDA_PREFIX)/include/

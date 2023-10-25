@@ -1,5 +1,5 @@
 //
-//===- kitrt-debug.h - Kitsune ABI runtime debug support    --------------===//
+//===- cuda.h - Kitsune runtime cuda support    --------------===//
 //
 // TODO: Need to update LANL/Triad Copyright notice.
 //
@@ -64,8 +64,8 @@ extern "C" {
 #endif
 
 
-  /// Initialize the runtime.  This call may be made mulitple
-  /// times -- only the intial call will initialize CUDA and
+  /// Initialize the runtime.  This call may be made multiple
+  /// times -- only the initial call will initialize CUDA and
   /// subsequent calls are essentially no-ops.
   bool __kitrt_cuInit();
 
@@ -108,8 +108,9 @@ extern "C" {
   void  __kitrt_cuEnablePrefetch();
   void  __kitrt_cuDisablePrefetch();
   bool __kitrt_cuIsMemManaged(void *vp);
-  __attribute__((malloc)) void *__kitrt_cuMemAllocManaged(size_t size);
-  void __kitrt_cuMemFree(void *vp);
+  extern __attribute__((malloc)) void *__kitrt_cuMemAllocManaged(size_t size);
+  extern __attribute__((malloc)) void *__kitrt_cuMemCallocManaged(size_t count, size_t elemsize);
+  extern void __kitrt_cuMemFree(void *vp);
   void __kitrt_cuMemPrefetch(void *vp);
   void __kitrt_cuMemHostPrefetch(void *vp);
   void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream);
