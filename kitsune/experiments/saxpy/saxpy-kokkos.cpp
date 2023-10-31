@@ -12,11 +12,22 @@ typedef Kokkos::DualView<float*, Kokkos::LayoutRight,
 // global constants with a dynamic allocation/assignment.  As a result,
 // we have to explicitly use gpu-centric declarations.
 // Kokkos probably has some equivalent to this... 
-__managed__ __device__ float DEFAULT_X_VALUE;
-__managed__ __device__ float DEFAULT_Y_VALUE;
-__managed__ __device__ float DEFAULT_A_VALUE;
+#ifdef __clang__ 
+  __device__ float DEFAULT_X_VALUE = 23114.0;
+  __device__ float DEFAULT_Y_VALUE = 81109.0;
+  __device__ float DEFAULT_A_VALUE = 65231.0;
+#else 
+  __managed__ __device__ float DEFAULT_X_VALUE;
+  __managed__ __device__ float DEFAULT_Y_VALUE;
+  __managed__ __device__ float DEFAULT_A_VALUE;
+#endif 
 
 bool check_saxpy(const SaxpyDualView &v, size_t N) {
+#ifdef __clang__
+  float DEFAULT_X_VALUE = 23114.0;
+  float DEFAULT_Y_VALUE = 81109.0;
+  float DEFAULT_A_VALUE = 65231.0;
+#endif 
   float err = 0.0f;
   for(size_t i = 0; i < N; i++) {
     err = err + fabs(v.h_view(i) - (DEFAULT_A_VALUE * DEFAULT_X_VALUE + DEFAULT_Y_VALUE));
@@ -54,16 +65,19 @@ int main(int argc, char *argv[]) {
     cout << "  Starting benchmark...\n" << std::flush;
     double iteration_total_time = 0;
 
+#ifndef __clang__ 
     DEFAULT_X_VALUE = rand() % 1000000;
     DEFAULT_Y_VALUE = rand() % 1000000;
     DEFAULT_A_VALUE = rand() % 1000000;
-
+#endif 
     double min_time = 100000.0;
     double max_time = 0.0;
     auto start_total_time = chrono::steady_clock::now();
 
+
     for(unsigned int t = 0; t < iterations; t++) {
       auto start_time = chrono::steady_clock::now();
+
       x.modify_device();
       y.modify_device();
       Kokkos::parallel_for("init", size, KOKKOS_LAMBDA(const int i) {
@@ -77,6 +91,7 @@ int main(int argc, char *argv[]) {
         y.d_view(i) = DEFAULT_A_VALUE * x.d_view(i) + y.d_view(i);
       });
       Kokkos::fence();
+
       auto end_time = chrono::steady_clock::now();
       double elapsed_time = chrono::duration<double>(end_time-start_time).count();
       if (elapsed_time < min_time)
@@ -87,7 +102,6 @@ int main(int argc, char *argv[]) {
       iteration_total_time += elapsed_time;
     }
     y.sync_host();   // can't just leave the data in place to check so we add the cost.
- 
 
     cout << "\n  Checking final result..." << std::flush;
 

@@ -42,7 +42,7 @@ saxpy-kokkos.nvcc.${host_arch}: saxpy-kokkos.cpp
 
 saxpy-kokkos.clang.${host_arch}: saxpy-kokkos.cpp 
 	@echo $@
-	$(TIME_CMD) $(CLANG_CUDA) $(KOKKOS_CLANG_CUDA_FLAGS) -ftime-trace=. -fno-exceptions -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64
+	$(TIME_CMD) $(CLANG_CUDA) $(KOKKOS_CLANG_CUDA_FLAGS) -ftime-trace=. -fno-exceptions -o $@ $< $(KOKKOS_CLANG_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64
 	@$(FILE_SIZE)
 
 saxpy-kokkos.hipcc.${host_arch}: saxpy-kokkos.cpp 
@@ -63,6 +63,6 @@ run: $(targets)
 .PHONY: all clean run
 
 clean:
-	-rm -f *.${host_arch} *.ll *.o
+	-rm -f *.${host_arch} *.ll *.o *.json
 	-rm -f *~ core *.log  
 
