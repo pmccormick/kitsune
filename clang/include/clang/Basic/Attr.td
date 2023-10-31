@@ -4189,8 +4189,8 @@ def ReducerUnregister : InheritableAttr {
 // +===== kitsune-/tapir-centric attributes
 def TapirTarget : StmtAttr {
   let Spellings = [CXX11<"tapir","target">];
-  let Subjects = SubjectList<[ForallStmt, CXXForallRangeStmt],
-      	       	 ErrorDiag, "'forall' statement">;
+  let Subjects = SubjectList<[ForallStmt, CXXForallRangeStmt, Stmt],
+      	       	 ErrorDiag, "'parallel' statements">;
   let Args = [
     EnumArgument<"TapirTargetAttrType", "TapirTargetAttrTy",
     // TODO: Is there a difference between "serial" and "none"?

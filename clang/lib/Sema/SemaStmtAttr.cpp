@@ -476,39 +476,69 @@ static Attr *handleOpenCLUnrollHint(Sema &S, Stmt *St, const ParsedAttr &A,
   return ::new (S.Context) OpenCLUnrollHintAttr(S.Context, A, UnrollFactor);
 }
 
-static Attr *handleTapirTargetAttr(Sema &S, Stmt *St, const ParsedAttr &A,
-				   SourceRange Range)
+static Attr *handleTapirTargetAttr(Sema &S, Stmt *St, const ParsedAttr &A, 
+                                    SourceRange Range)
 {
+  // Check the details of the attribute syntax... 
+  if (A.getNumArgs() != 1) {
+    S.Diag(A.getLoc(), diag::err_tapir_target_attr_wrong_nargs);
+    return nullptr;
+  }
+
+  StringRef      targetStr;
+  SourceLocation argLoc;
+  if (!S.checkStringLiteralArgumentAttr(A, 0, targetStr, &argLoc)) {
+    S.Diag(A.getLoc(), diag::err_tapir_target_unknown);
+    return nullptr;
+  } 
+
+  TapirTargetAttr::TapirTargetAttrTy  tapirTK;
+  if (!TapirTargetAttr::ConvertStrToTapirTargetAttrTy(targetStr, tapirTK)) {
+    S.Diag(A.getLoc(), diag::err_tapir_target_unknown) << targetStr << argLoc;
+    return nullptr;
+  }
+
   // We only support a limited range of statement classes.
   // TODO: Add support for spawn and sync statements. 
   if (St->getStmtClass() == Stmt::ForallStmtClass || 
       St->getStmtClass() == Stmt::CXXForallRangeStmtClass) {
-
-    if (A.getNumArgs() != 1) {
-      S.Diag(A.getLoc(), diag::err_tapir_target_attr_wrong_nargs);
-      return nullptr;
-    }
-
-    StringRef      targetStr;
-    SourceLocation argLoc;
-    if (!S.checkStringLiteralArgumentAttr(A, 0, targetStr, &argLoc)) {
-      S.Diag(A.getLoc(), diag::err_tapir_target_unknown);
-      return nullptr;
-    } 
-
-    TapirTargetAttr::TapirTargetAttrTy  tapirTK;
-    if (!TapirTargetAttr::ConvertStrToTapirTargetAttrTy(targetStr, tapirTK)) {
-       S.Diag(A.getLoc(), diag::err_tapir_target_unknown)
-	 << targetStr << argLoc;
-       return nullptr;
-    }
-
     return ::new(S.Context)TapirTargetAttr(S.Context, A, tapirTK);
-  } else {
-    // Unsupported statement class encountered... 
-    S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);
-    return nullptr;
+
+  } else if (Expr *E = dyn_cast<Expr>(St)) {
+    if (S.getLangOpts().Kokkos) {
+      // See if this is an attributed Kokkos parallel statement (if
+      // so, there is a CallExpr lurking here).  To find this CallExpr
+      // we need to "unwind" implicit details (including clean up).
+      // In essence we are simply "un-obfuscating" a bunch of C++
+      // constructs...  The most important detail here is that the
+      // attribute is really not attached to the Kokkos statement
+      // (even though it might appear to be from the programmer's
+      // perspective).
+      const Expr *ClarifiedE = E->IgnoreImplicit();
+      const Expr *Last = nullptr;
+      while(ClarifiedE != Last) {
+        Last = ClarifiedE;
+        if (const auto *CE = dyn_cast<ExprWithCleanups>(ClarifiedE))
+          ClarifiedE = CE->getSubExpr()->IgnoreImplicit();
+      }
+      
+      if (const CallExpr *CE = dyn_cast<CallExpr>(ClarifiedE)) {
+        const FunctionDecl *Fdecl = CE->getDirectCallee();
+        std::string QName = Fdecl->getQualifiedNameAsString();
+        if (QName == "Kokkos::parallel_for" ||
+            QName == "Kokkos::parallel_reduce") {
+          return ::new(S.Context)TapirTargetAttr(S.Context, A, tapirTK);
+        } else {
+          S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);
+          return nullptr;
+        }
+      }
+    }
   }
+  
+  // Unsupported statement class encountered... 
+  S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);
+  return nullptr;
 }
 
 static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,

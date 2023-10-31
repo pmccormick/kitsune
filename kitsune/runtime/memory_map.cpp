@@ -211,6 +211,32 @@ void __kitrt_memNeedsPrefetch(void *addr) {
   }
 }
 
+extern "C" void __kitrt_printMemoryMap() {
+  fprintf(stdout, "kitsune runtime memory allocation map:\n");
+
+  if (_kitrtAllocMap.empty()) 
+    fprintf(stdout, "\t[... empty ...]\n");
+  else {
+    const size_t MBYTE = 1024 * 1024;
+    size_t total_allocated = 0;
+    unsigned int num_allocations = 0;
+    for(auto &mapEntry : _kitrtAllocMap) {
+      void *addr = mapEntry.first;
+      const KitRTAllocMapEntry *entry = &mapEntry.second;
+      total_allocated += entry->size;
+      num_allocations++;
+      fprintf(stdout, "\tAddress: %p --> [Size: %6.2f MBytes, prefetched: %8s, "
+              "Read Only: %8s, Write Only: %8s]\n",
+              addr, entry->size / (double)MBYTE, entry->prefetched ? "True" : "False", 
+              entry->read_only ? "True" : "False", 
+              entry->write_only ? "True": "False");
+    }
+    fprintf(stdout, "\n\tTotal Memory Allocation: %6.2f MBytes\n", total_allocated / (double)MBYTE);
+    fprintf(stderr, "\n\tAverage Size per Allocation: %6.2f MBytes\n", 
+            (total_allocated / (double)MBYTE)/ num_allocations);
+  }
+}
+
 extern "C" void __kitrt_destroyMemoryMap(void (*freeMem)(void *)) {
   for (auto &mapEntry : _kitrtAllocMap)
     freeMem(mapEntry.first);

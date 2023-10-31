@@ -19,6 +19,7 @@ def main():
                            runtime_library_dirs=[kitsune_lib_dir])],
               platforms=['Linux'],
               install_requires=['numpy>=1.22.0'],
+              zip_safe = False,
               python_requires='>=3.8')
         
 if __name__ == "__main__":

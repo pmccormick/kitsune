@@ -402,7 +402,7 @@ void *__kitrt_cuMemCallocManaged(size_t count, size_t element_size) {
 }
 
 __attribute__((malloc))
-void *__kitrt_cuMemRealloc(void *ptr, size_t size) {
+void *__kitrt_cuMemReallocManaged(void *ptr, size_t size) {
   assert(size != 0 && "zero-valued size!");
   void *memptr = nullptr;
   if (ptr == nullptr) 

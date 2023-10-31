@@ -110,6 +110,7 @@ extern "C" {
   bool __kitrt_cuIsMemManaged(void *vp);
   extern __attribute__((malloc)) void *__kitrt_cuMemAllocManaged(size_t size);
   extern __attribute__((malloc)) void *__kitrt_cuMemCallocManaged(size_t count, size_t elemsize);
+  extern __attribute__((malloc)) void *__kitrt_cuMemReallocManaged(void *ptr, size_t size);
   extern void __kitrt_cuMemFree(void *vp);
   void __kitrt_cuMemPrefetch(void *vp);
   void __kitrt_cuMemHostPrefetch(void *vp);

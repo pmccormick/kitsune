@@ -50,11 +50,6 @@
 //  SUCH DAMAGE.
 //
 //===----------------------------------------------------------------------===//
-// TODO:
-//   * Need to do a better job tracking and freeing resources as necessary.
-//   * Need to ponder a path for better stream usage (probably related to
-//     more complex code generation on the compiler side).
-//
 //
 // From the NumPy documentation:
 //
@@ -81,10 +76,9 @@ static void *__kitrt_NumPyMalloc(void *ctx, size_t size) {
   assert(ctx != NULL && 
          "kitrt: unexpected null context pointer in numpy allocator!");
   assert(size == 0 && "kitrt: zero-sized allocation request!");
-  fprintf(stderr, "kitrt: malloc() called.\n");
   KitRTAllocatorFuncs *funcs = (KitRTAllocatorFuncs *)ctx;
-  return __kitrt_cuMemAllocManaged(size);
-  //return funcs->malloc(size);
+  assert(funcs != NULL && "kitrt: unexpected null function block pointer!");
+  return funcs->malloc(size);
 }
 
 __attribute__((malloc))
@@ -93,10 +87,9 @@ static void *__kitrt_NumPyCalloc(void *ctx, size_t nelem, size_t elsize) {
          "kitrt: unexpected null context pointer in numpy allocator!");
   assert(nelem == 0 && "kitrt: zero-sized allocation request!");
   assert(elsize == 0 && "kitrt: zero-sized element request!");
-  fprintf(stderr, "kitrt: calloc() called.\n");
   KitRTAllocatorFuncs *funcs = (KitRTAllocatorFuncs *)ctx;
-  return __kitrt_cuMemCallocManaged(nelem, elsize);
-  //return funcs->calloc(nelem, elsize);
+  assert(funcs != NULL && "kitrt: unexpected null function block pointer!");
+  return funcs->calloc(nelem, elsize);
 }
 
 __attribute__((malloc))
@@ -106,8 +99,8 @@ static void *__kitrt_NumPyRealloc(void *ctx, void *ptr, size_t new_size) {
   assert(ptr != NULL &&
          "kitrt: unexpected null data pointer!");
   assert(size == 0 && "kitrt: zero-sized reallocation request!");
-  fprintf(stderr, "kitrt: realloc() called.\n");
   KitRTAllocatorFuncs *funcs = (KitRTAllocatorFuncs *)ctx;
+  assert(funcs != NULL && "kitrt: unexpected null function block pointer!");
   return funcs->realloc(ptr, new_size);
 }
 
@@ -115,10 +108,9 @@ static void __kitrt_NumPyFree(void *ctx, void *ptr, size_t size) {
   assert(ctx != NULL &&  
          "kitrt: unexpected null context pointer in numpy free");
   assert(ptr != NULL && "kitrt: unexpected null data pointer!");
-  fprintf(stderr, "kitrt: free() called.\n");
   KitRTAllocatorFuncs *funcs = (KitRTAllocatorFuncs *)ctx;
-  __kitrt_cuMemFree(ptr);
-  //funcs->free(ptr);
+  assert(funcs != NULL && "kitrt: unexpected null function block pointer!");
+  funcs->free(ptr);
 }
 
 static KitRTAllocatorFuncs __kitrt_sys_allocators_ctx = {
@@ -128,7 +120,26 @@ static KitRTAllocatorFuncs __kitrt_sys_allocators_ctx = {
   free
 };
 
+static KitRTAllocatorFuncs __kitrt_cuda_allocators_ctx = {
+  __kitrt_cuMemAllocManaged,
+  __kitrt_cuMemCallocManaged,
+  __kitrt_cuMemReallocManaged,
+  __kitrt_cuMemFree
+};
+
 static PyDataMem_Handler __kitrt_data_handler = {
+  "kit_rt_data_allocator",
+  1,
+  {
+    &__kitrt_cuda_allocators_ctx,
+    __kitrt_NumPyMalloc,
+    __kitrt_NumPyCalloc,
+    __kitrt_NumPyRealloc,
+    __kitrt_NumPyFree
+  }
+};
+
+static PyDataMem_Handler __sys_data_handler = {
   "kit_rt_data_allocator",
   1,
   {
@@ -140,7 +151,24 @@ static PyDataMem_Handler __kitrt_data_handler = {
   }
 };
 
+static PyObject *kitrt_InfoMethod() {
+  __kitrt_printMemoryMap();
+  Py_RETURN_NONE;
+}
+
+static PyObject *kitrt_DisableMemHandler() {
+  PyObject *kitrt_handler = PyCapsule_New(&__kitrt_data_handler, "mem_handler", NULL);
+  if (kitrt_handler != NULL) {
+    (void)PyDataMem_SetHandler(kitrt_handler);
+    Py_DECREF(kitrt_handler);
+  }
+}
+
+
 static PyMethodDef m_methods[] = {
+  {"info", kitrt_InfoMethod, METH_NOARGS, "Python interface for kitsune runtime memory map information."},
+  {"disable", kirt_DisableMemHandler, METH_NOARGS, "Disable the Kitsune runtime memory handler."},
+  {"enable", kitrt_EnableMemHandler, METH_NO_ARGS, "Enable the Kitsune runtime memory handler."},
   {NULL, NULL, 0, NULL},
 };
 
@@ -157,7 +185,6 @@ static PyModuleDef def = {
 
 
 PyMODINIT_FUNC PyInit_kitrt(void) {
-  fprintf(stderr, "note: enabling kitsune runtime memory allocator.\n");
   import_array();
   
   PyObject *kitrt_handler = PyCapsule_New(&__kitrt_data_handler, "mem_handler", NULL);

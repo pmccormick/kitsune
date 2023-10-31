@@ -63,18 +63,18 @@
 ///
 ///    * The size in bytes of the allocation.
 ///    * If the allocated region has been 'prefetched'.
-///
+/// 
 /// Prefetching suggests a hint to the runtime/driver/OS to migrate
 /// all pages to the corresponding device's memory.
-///
+
 /// TODO: Is prefetch better tracked as a location vs. a boolean? 
 /// (Adding support for multiple devices will force this change but
 /// for now it is likely more complex than necessary.)
 struct KitRTAllocMapEntry {
-  size_t     size;       // size of the allocated buffer in bytes.
-  bool       prefetched; // has the data been prefetched?
-  bool       read_only;  // upcoming data usage is ("mostly") read only.
-  bool       write_only; // upcoming data usage is ("mostly") write only.
+  bool    prefetched;   // has the data been prefetched?
+  bool    read_only;    // upcoming data usage is ("mostly") read only.
+  bool    write_only;   // upcoming data usage is ("mostly") write only.
+  size_t size;          // size of the allocated buffer in bytes.
 };
 
 /// Register a memory allocation with the runtime.  The allocation
@@ -133,7 +133,8 @@ size_t __kitrt_getMemAllocSize(void *addr, bool *read_only, bool *write_only);
 /// that management is assumed to be managed elsewhere.
 extern void __kitrt_unregisterMemAlloc(void *addr);
 
-
+/// Print details about the memory allocation map to standard out.
+extern "C" void __kitrt_printMemoryMap();
 
 /// Destroy the memory map and call the function pointed to by
 /// 'freeFP' to free the actual memory allocation (runtime target
