@@ -549,7 +549,7 @@ static Attr *handleTapirTargetAttr(Sema &S, Stmt *St, const ParsedAttr &A,
 }
 
 static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,
-				                      SourceRange Range) 
+				                             SourceRange Range) 
 {
   bool errState = false;
 
