@@ -477,7 +477,7 @@ static Attr *handleOpenCLUnrollHint(Sema &S, Stmt *St, const ParsedAttr &A,
 }
 
 static Attr *handleTapirTargetAttr(Sema &S, Stmt *St, const ParsedAttr &A, 
-                                    SourceRange Range)
+                                   SourceRange Range)
 {
   // Check the details of the attribute syntax... 
   if (A.getNumArgs() != 1) {
@@ -583,8 +583,8 @@ static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,
 
   if (errState) 
     return nullptr;
-  else  
-    return ::new (S.Context) TapirStrategyAttr(S.Context, A, strategyKind);
+
+  return ::new (S.Context) TapirStrategyAttr(S.Context, A, strategyKind);
 }
 
 // =====+

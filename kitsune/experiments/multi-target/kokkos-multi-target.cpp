@@ -10,8 +10,9 @@
 
 template<typename T>
 void random_fill(T *data, size_t N) {
-  for(size_t i = 0; i < N; ++i)
-    data[i] = rand() / (T)RAND_MAX;
+  Kokkos::parallel_for(N, KOKKOS_LAMBDA(const int i) {
+    data[i] = T(i) / 1000.0;
+  });
 }
 
 int main (int argc, char* argv[]) {
@@ -25,10 +26,11 @@ int main (int argc, char* argv[]) {
 
   cout << setprecision(5);
   cout << "\n";
-    cout << "---- vector addition benchmark (forall) ----\n"
-         << "  Vector size: " << size << " elements.\n\n";
+  cout << "---- multi-target vector addition benchmark (kokkos) ----\n"
+       << "  Vector size: " << size << " elements.\n\n";
   cout << "  Allocating arrays and filling with random values..." 
        << std::flush;
+
   Kokkos::initialize(argc, argv); {
     float *A = alloc<float>(size);
     float *B = alloc<float>(size);
