@@ -751,10 +751,11 @@ void CodeGenFunction::EmitAttributedStmt(const AttributedStmt &S) {
       break;
     }
     case attr::TapirTarget:
-      // In the case of a Tapir target attribute we need to save the attribute
-      // set so we can use it when we finally reach code gen of the underlying
-      // CallExpr.  We leverage this saved attribute set in CGExpr when we handle
-      // the special case for Kokkos parallel "statements".
+      // In the case of a Tapir target attribute, we need to save the attribute
+      // set so we can use it when we reach code gen of the underlying
+      // CallExpr for Kokkos parallel "statements".  This is necessary given 
+      // the additional layers of details in the AST for C++ mechanisms Kokkos 
+      // uses to implement their feature set (e.g., implicit and cleanup goop). 
       tapir_attr_set = S.getAttrs();
       break;
     }
