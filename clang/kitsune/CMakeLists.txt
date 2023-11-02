@@ -138,7 +138,7 @@ endif()
 option(KITSUNE_ENABLE_CUDA_ABI_TARGET
     "Enable the Kitsune+Tapir CUDA Toolkit target and codegen library." OFF)
 if (KITSUNE_ENABLE_CUDA_ABI_TARGET)
-  find_package(CUDAToolkit 10...12 REQUIRED)  # We may need to be a bit more specifc on minor versions here.
+  find_package(CUDAToolkit 12.0 REQUIRED)  
   set(TAPIR_CUDA_ABI_TARGET_CFG_FILENAME
       "cuda.cfg"
       CACHE
