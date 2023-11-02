@@ -285,10 +285,17 @@ bool __kitrt_hipInit() {
   }
 
   _kitrt_hipDeviceID = 0;
-  HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
+  //HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
   HIP_SAFE_CALL(
       hipGetDeviceProperties_p(&_kitrt_hipDeviceProps, _kitrt_hipDeviceID));
 
+
+  fprintf(stderr, "hip device details:\n");
+  fprintf(stderr, "\tpci domain: %d\n", _kitrt_hipDeviceProps.pciDomainID);
+  fprintf(stderr, "\tpci bus: %d\n", _kitrt_hipDeviceProps.pciBusID);
+  fprintf(stderr, "\tpci device: %d\n", _kitrt_hipDeviceProps.pciDeviceID);
+
+  
   // For both ease of code generation on part of the compiler and
   // humans we require managed memory support.  This can introduce
   // performance problems but significantly reduces some aspects

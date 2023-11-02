@@ -43,7 +43,8 @@ TAPIR_HIP_FLAGS?=-ftapir=hip \
   -mllvm -vectorize-loops \
   -mllvm -vectorize-slp \
   -ffp-contract=fast \
-  -mllvm -hipabi-xnack=true \
+  -mllvm -hipabi-xnack=false \
+  #-mllvm -hipabi-no-prefetch\
   $(GPU_STRIPMINE_FLAGS) \
   $(TAPIR_HIP_EXTRA_FLAGS)
   #-mllvm -hipabi-no-prefetch \

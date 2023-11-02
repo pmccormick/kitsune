@@ -1775,6 +1775,7 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
                                      &ErrMsg, &ExecFailed);
   if (ExecFailed)
     report_fatal_error("hipabi: 'ldd' execution failed!");
+
   if (ExecStat != 0)
     report_fatal_error("hipabi: 'ldd' failure - " + StringRef(ErrMsg));
 
