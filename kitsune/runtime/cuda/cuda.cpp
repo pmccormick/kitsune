@@ -470,6 +470,7 @@ void __kitrt_cuEnablePrefetch() { _kitrt_cuEnablePrefetch = true; }
 void __kitrt_cuDisablePrefetch() { _kitrt_cuEnablePrefetch = false; }
 
 void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
+
   assert(vp && "unexpected null pointer!");
   if (not __kitrt_isMemPrefetched(vp)) {
     bool is_read_only, is_write_only;
