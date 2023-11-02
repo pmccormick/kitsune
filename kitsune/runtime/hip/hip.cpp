@@ -357,6 +357,9 @@ void __kitrt_hipDestroy() {
 void *__kitrt_hipMemAllocManaged(size_t size) {
   assert(_kitrt_hipIsInitialized && "kitrt: hip has not been initialized!");
   void *memPtr;
+
+  HIP_SAFE_CALL(hipSetDevice(_kitrt_hipDeviceID));
+
   HIP_SAFE_CALL(hipMallocManaged_p(&memPtr, size, hipMemAttachGlobal));
   // Per AMD docs: Set the preferred location for the data as the specified device.
   HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetPreferredLocation,
@@ -433,7 +436,7 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   // memory, the impact is performance vs. correctness but more
   // work needs to be done on the runtime's tracking and
   // possibly stronger connections with the compiler analysis.
-  if (not _kitrt_hipEnablePrefetch || __kitrt_isMemPrefetched(vp)) {
+  if (not _kitrt_hipEnablePrefetch) { //  || __kitrt_isMemPrefetched(vp)) {
     if (__kitrt_verboseMode())
       fprintf(stderr, "kitrt: hip -- no-op prefetch for pointer %p", vp);
     return;
@@ -443,21 +446,21 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
     bool is_read_only, is_write_only;
     size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
     if (size > 0) {
-      hipDevice_t device;
-      HIP_SAFE_CALL(hipMemRangeGetAttribute(
-          &device, sizeof(device), hipMemRangeAttributeLastPrefetchLocation, vp,
-          size));
-      if (device != _kitrt_hipDeviceID) {
-        HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
-                                            (hipStream_t)stream));
-        __kitrt_markMemPrefetched(vp);
-        if (__kitrt_verboseMode())
-          fprintf(stderr,
-                  "kitrt: hip -- issued prefetch for %p (bytes = %ld), "
-                  "sync'ing device",
-                  vp, size);
-        //HIP_SAFE_CALL(hipDeviceSynchronize());
-      }
+      //hipDevice_t device;
+      //HIP_SAFE_CALL(hipMemRangeGetAttribute(
+      //    &device, sizeof(device), hipMemRangeAttributeLastPrefetchLocation, vp,
+      //    size));
+      //if (device != _kitrt_hipDeviceID) {
+      HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
+                                          (hipStream_t)stream));
+      __kitrt_markMemPrefetched(vp);
+      if (__kitrt_verboseMode())
+        fprintf(stderr,
+                "kitrt: hip -- issued prefetch for %p (bytes = %ld), "
+                "sync'ing device",
+                vp, size);
+      HIP_SAFE_CALL(hipDeviceSynchronize());
+      //}
     }
   }
 }
