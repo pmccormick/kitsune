@@ -113,6 +113,10 @@ void __kitrt_hipMemPrefetch(void *vp);
 /// @param vp: starting address to prefetch.
 void* __kitrt_hipStreamMemPrefetch(void *vp);
 
+/// @brief Prefetch the specified data on the internal stream set.
+/// @param vp: starting address to prefetch.  
+void kitrt_hipStreamSetMemPrefetch(void *vp);
+  
 /// @brief Prefetch the specified data on the given stream.
 /// @param vp: starting address to prefetch.
 /// @param stream: the stream to issue the prefetch on.

@@ -26,6 +26,7 @@
 //       target transforms to use.  (e.g. save module/function).
 // TODO: poke at host-side post transform passes (likely not all that helpful
 //       and could be removed).
+//
 //===----------------------------------------------------------------------===//
 #include "llvm/Transforms/Tapir/HipABI.h"
 #include "llvm/ADT/Twine.h"
@@ -804,6 +805,8 @@ HipLoop::HipLoop(Module &M, Module &KModule, const std::string &Name,
   KitHipWaitFn =
       M.getOrInsertFunction("__kitrt_hipStreamSynchronize", VoidTy, VoidPtrTy);
 
+  KitHipStreamSetMemPrefetchFn =
+      M.getOrInsertFunction("__kitrt_hipStreamSetMemPrefetch", VoidTy, VoidPtrTy);  
   KitHipMemPrefetchFn =
       M.getOrInsertFunction("__kitrt_hipMemPrefetch", VoidTy, VoidPtrTy);
   KitHipStreamMemPrefetchFn = M.getOrInsertFunction(
@@ -1281,6 +1284,9 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
           assert(KitHipStreamMemPrefetchFn &&
                  "no kitsune hip stream mem prefetch function!");
           prefetchStream = B.CreateCall(KitHipStreamMemPrefetchFn, {VoidPP});
+	} else if (CodeGenStreams) {
+          LLVM_DEBUG(dbgs() << "\t\t*issue stream set prefetch for arg #" << i << "\n");
+          B.CreateCall(KitHipStreamSetMemPrefetchFn, {VoidPP});	  
         } else {
           assert(KitHipMemPrefetchOnStreamFn &&
                  "no kitsune hip mem prefetch on stream function!");
@@ -1728,13 +1734,18 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   }
   LinkedObjFile->keep();
 
-  auto LLD = sys::findProgramByName("ld.lld");
+  // TODO: The lld invocation below is unix-specific... 
+  auto LLD = sys::findProgramByName("lld");
   if ((EC = LLD.getError()))
-    report_fatal_error("executable 'ld.lld' not found! "
+    report_fatal_error("executable 'lld' not found! "
                        "check your path?");
   opt::ArgStringList LDDArgList;
   LDDArgList.push_back(LLD->c_str());
-  // LDDArgList.push_back("--no-undefined");
+  LDDArgList.push_back("-flavor");
+  LDDArgList.push_back("gnu");
+  LDDArgList.push_back("-m");
+  LDDArgList.push_back("elf64_amdgpu");
+  LDDArgList.push_back("--no-undefined");
   LDDArgList.push_back("-shared");
   LDDArgList.push_back("--eh-frame-hdr");
   LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");

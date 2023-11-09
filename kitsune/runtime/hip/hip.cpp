@@ -236,6 +236,10 @@ extern "C" {
 
 // ---- Initialization, properties, clean up, etc.
 //
+unsigned _kitrt_MaxPrefetchStreams = 4;
+unsigned _kitrt_CurPrefetchStream = 0;
+std::vector<hipStream_t> _kitrt_PrefetchStreams;
+
 
 static bool _kitrt_enableXnack = false;
 
@@ -338,6 +342,10 @@ bool __kitrt_hipInit() {
     _kitrt_hipIsInitialized = true;
   }
 
+  for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
+    HIP_SAFE_CALL(hipStreamCreate_p(&_kitrt_PrefetchStreams[si]));
+  }
+
   return _kitrt_hipIsInitialized;
 }
 
@@ -345,7 +353,12 @@ void __kitrt_hipDestroy() {
   if (_kitrt_hipIsInitialized) {
     extern void __kitrt_hipFreeManagedMem(void *);
     __kitrt_destroyMemoryMap(__kitrt_hipFreeManagedMem);
+
+    for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
+      HIP_SAFE_CALL(hipStreamDestroy_p(_kitrt_PrefetchStreams[si]));
+    }
     HIP_SAFE_CALL(hipDeviceReset_p());
+
     _kitrt_hipIsInitialized = false;
     if (__kitrt_verboseMode())
       fprintf(stderr, "kitrt: shutting down hip runtime component.\n");
@@ -426,6 +439,14 @@ void __kitrt_hipDisablePrefetch() {
     fprintf(stderr, "kitrt: hip -- disable prefetching.\n");
 }
 
+void __kitrt_hipStreamSetMemPrefetch(void *vp) {
+  __kitrt_hipMemPrefetchOnStream(vp, 
+          _kitrt_PrefetchStreams[_kitrt_CurPrefetchStream]);
+  _kitrt_CurPrefetchStream++;
+  if (_kitrt_CurPrefetchStream == _kitrt_MaxPrefetchStreams)
+    _kitrt_CurPrefetchStream = 0;
+};
+
 void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
   // If prefetching is disabled or the allocation has already
@@ -436,9 +457,7 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   // memory, the impact is performance vs. correctness but more
   // work needs to be done on the runtime's tracking and
   // possibly stronger connections with the compiler analysis.
-  if (not _kitrt_hipEnablePrefetch) { //  || __kitrt_isMemPrefetched(vp)) {
-    if (__kitrt_verboseMode())
-      fprintf(stderr, "kitrt: hip -- no-op prefetch for pointer %p", vp);
+  if (not _kitrt_hipEnablePrefetch || __kitrt_isMemPrefetched(vp)) {
     return;
   }
 

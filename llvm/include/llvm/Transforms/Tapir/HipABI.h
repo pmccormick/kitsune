@@ -323,6 +323,7 @@ private:
   FunctionCallee   KitHipWaitFn = nullptr;
 
   // Runtime prefetch support entry points.
+  FunctionCallee   KitHipStreamSetMemPrefetchFn =  nullptr;  
   FunctionCallee   KitHipMemPrefetchFn =  nullptr;
   FunctionCallee   KitHipMemPrefetchOnStreamFn = nullptr;
   FunctionCallee   KitHipStreamMemPrefetchFn = nullptr;
