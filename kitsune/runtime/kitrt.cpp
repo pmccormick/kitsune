@@ -69,11 +69,16 @@ static bool __kitrt_getEnvValue(const char *VarName, RetType &Value) {
     if constexpr (std::is_same_v<RetType, int>) {
       Value = atoi(ValueStr);
       Ret = true;
+    } else if constexpr (std::is_same_v<RetType, unsigned>) {
+      Value = atoi(ValueStr);
+      Ret = true;
     } else if constexpr (std::is_same_v<RetType, bool>) {
       Value = true;
       Ret = true;
-    } else 
+    } else {
       fprintf(stderr, "kitrt: warning unhandled type in __kitrt_getEnvValue!\n");
+      fprintf(stderr, "       variable name: '%s'.\n", VarName);
+    }
   }
   return Ret;
 }

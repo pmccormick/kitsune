@@ -37,17 +37,13 @@ TAPIR_HIP_FLAGS?=-ftapir=hip \
   -O$(KITSUNE_OPTLEVEL) \
   -mllvm -hipabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
   -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
-  -mllvm -amdgpu-internalize-symbols \
-  -mllvm -amdgpu-function-calls=false \
-  -mllvm -amdgpu-early-inline-all=true \
-  -mllvm -vectorize-loops \
-  -mllvm -vectorize-slp \
   -ffp-contract=fast \
-  -mllvm -hipabi-xnack=false \
-  #-mllvm -hipabi-no-prefetch\
-  $(GPU_STRIPMINE_FLAGS) \
-  $(TAPIR_HIP_EXTRA_FLAGS)
-  #-mllvm -hipabi-no-prefetch \
+  -fno-rounding-math \
+  $(TAPIR_HIP_EXTRA_FLAGS) \
+  $(GPU_STRIPMINE_FLAGS)
+#  -mllvm -hipabi-xnack=true \
+#  -mllvm -vectorize-loops \
+#  -mllvm -vectorize-slp \
 
 TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O$(KITSUNE_OPTLEVEL),\
 -mllvm,-hipabi-opt-level=$(KITSUNE_OPTLEVEL),-mllvm,-chipabi-arch=$(AMDGPU_ARCH),\

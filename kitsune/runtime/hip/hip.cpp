@@ -285,16 +285,9 @@ bool __kitrt_hipInit() {
   }
 
   _kitrt_hipDeviceID = 0;
-  //HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
+  HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
   HIP_SAFE_CALL(
       hipGetDeviceProperties_p(&_kitrt_hipDeviceProps, _kitrt_hipDeviceID));
-
-
-  fprintf(stderr, "hip device details:\n");
-  fprintf(stderr, "\tpci domain: %d\n", _kitrt_hipDeviceProps.pciDomainID);
-  fprintf(stderr, "\tpci bus: %d\n", _kitrt_hipDeviceProps.pciBusID);
-  fprintf(stderr, "\tpci device: %d\n", _kitrt_hipDeviceProps.pciDeviceID);
-
   
   // For both ease of code generation on part of the compiler and
   // humans we require managed memory support.  This can introduce
@@ -392,8 +385,8 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
   // operations between host and device, while executing kernels. The coarse-grain 
   // can be used for data that only needs to be coherent at dispatch boundaries 
   // for better performance.
-  HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetCoarseGrain,
-                               _kitrt_hipDeviceID));
+  //HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetCoarseGrain,
+  //                            _kitrt_hipDeviceID));
   __kitrt_registerMemAlloc(memPtr, size);
 
   if (__kitrt_verboseMode())
@@ -464,30 +457,16 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   // memory, the impact is performance vs. correctness but more
   // work needs to be done on the runtime's tracking and
   // possibly stronger connections with the compiler analysis.
-  if (not _kitrt_hipEnablePrefetch || __kitrt_isMemPrefetched(vp)) {
+  if (not __kitrt_hipEnablePrefetch || __kitrt_isMemPrefetched(vp))
     return;
-  }
 
   if (__kitrt_hipIsMemManaged(vp)) {
     bool is_read_only, is_write_only;
     size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
-    if (size > 0) {
-      //hipDevice_t device;
-      //HIP_SAFE_CALL(hipMemRangeGetAttribute(
-      //    &device, sizeof(device), hipMemRangeAttributeLastPrefetchLocation, vp,
-      //    size));
-      //if (device != _kitrt_hipDeviceID) {
-      HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
-                                          (hipStream_t)stream));
-      __kitrt_markMemPrefetched(vp);
-      if (__kitrt_verboseMode())
-        fprintf(stderr,
-                "kitrt: hip -- issued prefetch for %p (bytes = %ld), "
-                "sync'ing device",
-                vp, size);
-      HIP_SAFE_CALL(hipDeviceSynchronize());
-      //}
-    }
+    HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
+                                        (hipStream_t)stream));
+    __kitrt_markMemPrefetched(vp);
+    //HIP_SAFE_CALL(hipDeviceSynchronize());
   }
 }
 
@@ -586,6 +565,8 @@ void __kitrt_hipLaunchKernel(const void *fatBin, const char *kernelName,
   assert(kernelArgs && "request to launch kernel w/ null fatbin args!");
   int threadsPerBlock, blocksPerGrid;
   hipFunction_t kFunc;
+
+  HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
 
   // TODO: Not sure of the actual advantages from the kernel and module
   // maps here. Needs some work to determine if it is really worthwhile...

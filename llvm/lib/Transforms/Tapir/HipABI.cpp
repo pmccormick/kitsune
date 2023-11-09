@@ -1675,7 +1675,7 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
   if (OptLevel > 0) {
     if (OptLevel > 3)
       OptLevel = 3;
-    LLVM_DEBUG(dbgs() << "\trunning module optimization passes.\n");
+    LLVM_DEBUG(dbgs() << "\trunning kernel module optimization passes.\n");
     PipelineTuningOptions pto;
     pto.LoopVectorization = OptLevel > 2;
     pto.SLPVectorization = OptLevel > 2;
@@ -1686,7 +1686,6 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;
     ModuleAnalysisManager mam;
-
     PassBuilder pb(AMDTargetMachine, pto);
     pb.registerModuleAnalyses(mam);
     pb.registerCGSCCAnalyses(cgam);
@@ -1705,6 +1704,7 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
     mpm.addPass(VerifierPass());
     LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");
     mpm.run(KernelModule, mam);
+    LLVM_DEBUG(dbgs() << "\t\tpasses complete.\n");
   }
 
   legacy::PassManager PassMgr;
@@ -1714,7 +1714,7 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
     report_fatal_error("hipabi: AMDGPU target failed!");
 
   PassMgr.run(KernelModule);
-  LLVM_DEBUG(dbgs() << "\toptimizations and code gen complete.\n\n");
+  LLVM_DEBUG(dbgs() << "\tkernel optimizations and code gen complete.\n\n");
   LLVM_DEBUG(dbgs() << "\t\tobject file: " << ObjFile->getFilename() << "\n");
   return std::move(ObjFile);
 }
@@ -1749,6 +1749,8 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("-shared");
   LDDArgList.push_back("--eh-frame-hdr");
   LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
+  LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
+  LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=false");
   std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch;
   LDDArgList.push_back(mcpu_arg.c_str());
   std::string optlevel_arg = "--plugin-opt=O" + std::to_string(OptLevel);
@@ -2186,17 +2188,15 @@ void HipABI::postProcessModule() {
                       << "host-side (re)optimization passes.\n");
 
     PipelineTuningOptions pto;
-    pto.LoopVectorization = OptLevel > 2;
-    pto.SLPVectorization = OptLevel > 2;
+    pto.LoopVectorization = true; // OptLevel > 2;
+    pto.SLPVectorization = true; // OptLevel > 2;
     pto.LoopUnrolling = true;
     pto.LoopInterleaving = true;
     pto.LoopStripmine = false;
-
     LoopAnalysisManager lam;
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;
     ModuleAnalysisManager mam;
-
     PassBuilder pb(AMDTargetMachine, pto);
     pb.registerModuleAnalyses(mam);
     pb.registerCGSCCAnalyses(cgam);

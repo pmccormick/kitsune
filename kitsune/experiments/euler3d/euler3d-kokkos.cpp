@@ -23,7 +23,6 @@ struct Float3 {
  *
  */
 #define GAMMA 1.4
-#define ITERATIONS 2000
 #define NDIM 3
 #define NNB 4
 #define RK 3	// 3rd order RK
@@ -446,7 +445,7 @@ int main(int argc, char** argv)
     return 0;
   }
 
-  int iterations = 200000;
+  int iterations = 60000;
   if (argc > 2)
     iterations = atoi(argv[2]);
 

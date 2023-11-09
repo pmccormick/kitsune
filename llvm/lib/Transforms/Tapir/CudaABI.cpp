@@ -2012,6 +2012,8 @@ CudaABIOutputFile CudaABI::generatePTX() {
                                             false))
     report_fatal_error("Cuda ABI transform -- PTX generation failed!");
   PassMgr.run(KernelModule);
+  LLVM_DEBUG(dbgs() << "\tkernel optimizations and code gen complete.\n\n");
+  LLVM_DEBUG(dbgs() << "\t\tPTX file: " << PTXFile->getFilename() << "\n");
   return std::move(PTXFile);
 }
 
