@@ -20,7 +20,7 @@ list(INSERT CMAKE_MODULE_PATH 0
   "${CMAKE_CURRENT_SOURCE_DIR}/../llvm/cmake/modules"
 )
 
-set(LLVM_DEFAULT_TARGET_TRIPLE aarch64-unknown-linux-gnu)
+#set(LLVM_DEFAULT_TARGET_TRIPLE aarch64-unknown-linux-gnu)
 
 # We order libraries to mirror roughly how they are layered, except that compiler-rt can depend
 # on libc++, so we put it after.

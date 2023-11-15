@@ -236,10 +236,9 @@ extern "C" {
 
 // ---- Initialization, properties, clean up, etc.
 //
-unsigned _kitrt_MaxPrefetchStreams = 4;
+extern unsigned _kitrt_MaxPrefetchStreams;
 unsigned _kitrt_CurPrefetchStream = 0;
-std::vector<hipStream_t> _kitrt_PrefetchStreams;
-
+std::vector<hipStream_t*> _kitrt_PrefetchStreams;
 
 static bool _kitrt_enableXnack = false;
 
@@ -269,6 +268,8 @@ bool __kitrt_hipInit() {
 
   __kitrt_CommonInit();
 
+
+
   // Note: From the HIP docs, "most HIP APIs implicitly initialize the
   // HIP runtime. This [call] provides control over the timing of the
   // initialization.".  The compiler will insert this call into a global
@@ -284,7 +285,11 @@ bool __kitrt_hipInit() {
     return false;
   }
 
-  _kitrt_hipDeviceID = 0;
+  extern int _kitrt_DefaultDeviceID;
+  if (_kitrt_DefaultDeviceID == -1)
+    _kitrt_hipDeviceID = 0;
+  else 
+    _kitrt_hipDeviceID = _kitrt_DefaultDeviceID;
   HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
   HIP_SAFE_CALL(
       hipGetDeviceProperties_p(&_kitrt_hipDeviceProps, _kitrt_hipDeviceID));
@@ -343,7 +348,10 @@ bool __kitrt_hipInit() {
   }
 
   for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
-    HIP_SAFE_CALL(hipStreamCreate_p(&_kitrt_PrefetchStreams[si]));
+    hipStream_t stream; 
+    //HIP_SAFE_CALL(hipStreamCreateWithFlags_p(&stream, hipStreamNonBlocking));
+    HIP_SAFE_CALL(hipStreamCreate_p(&stream));
+    _kitrt_PrefetchStreams.push_back(&stream);
   }
 
   return _kitrt_hipIsInitialized;
@@ -354,9 +362,11 @@ void __kitrt_hipDestroy() {
     extern void __kitrt_hipFreeManagedMem(void *);
     __kitrt_destroyMemoryMap(__kitrt_hipFreeManagedMem);
 
-    for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
-      HIP_SAFE_CALL(hipStreamDestroy_p(_kitrt_PrefetchStreams[si]));
+    /*for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
+      hipStream_t stream = *(_kitrt_PrefetchStreams[si]);
+      HIP_SAFE_CALL(hipStreamDestroy_p(stream));
     }
+    */
     HIP_SAFE_CALL(hipDeviceReset_p());
 
     _kitrt_hipIsInitialized = false;
@@ -375,12 +385,12 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
 
   HIP_SAFE_CALL(hipMallocManaged_p(&memPtr, size, hipMemAttachGlobal));
   // Per AMD docs: Set the preferred location for the data as the specified device.
-  HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetPreferredLocation,
-                              _kitrt_hipDeviceID));
+  //HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetPreferredLocation,
+  //                            _kitrt_hipDeviceID));
   // Per AMD docs: Data will be accessed by the specified device, so 
   // prevent page faults as much as possible.
-  HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetAccessedBy,
-                              _kitrt_hipDeviceID));
+  //HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetAccessedBy,
+  //                            _kitrt_hipDeviceID));
   // Per AMD docs: The default memory model is fine-grain. That allows coherent 
   // operations between host and device, while executing kernels. The coarse-grain 
   // can be used for data that only needs to be coherent at dispatch boundaries 
@@ -440,8 +450,10 @@ void __kitrt_hipDisablePrefetch() {
 }
 
 void __kitrt_hipStreamSetMemPrefetch(void *vp) {
-  __kitrt_hipMemPrefetchOnStream(vp, 
-          _kitrt_PrefetchStreams[_kitrt_CurPrefetchStream]);
+  hipStream_t *stream = _kitrt_PrefetchStreams[_kitrt_CurPrefetchStream];
+  assert(stream != nullptr && "null stream pointer!");
+
+  __kitrt_hipMemPrefetchOnStream(vp, (void*)*stream);
   _kitrt_CurPrefetchStream++;
   if (_kitrt_CurPrefetchStream == _kitrt_MaxPrefetchStreams)
     _kitrt_CurPrefetchStream = 0;
@@ -457,16 +469,15 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   // memory, the impact is performance vs. correctness but more
   // work needs to be done on the runtime's tracking and
   // possibly stronger connections with the compiler analysis.
-  if (not __kitrt_hipEnablePrefetch || __kitrt_isMemPrefetched(vp))
+  if (__kitrt_isMemPrefetched(vp))
     return;
 
-  if (__kitrt_hipIsMemManaged(vp)) {
-    bool is_read_only, is_write_only;
-    size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
+  bool is_read_only, is_write_only;
+  size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
+  if (size > 0) {
     HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
                                         (hipStream_t)stream));
     __kitrt_markMemPrefetched(vp);
-    //HIP_SAFE_CALL(hipDeviceSynchronize());
   }
 }
 
@@ -545,15 +556,22 @@ void __kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
   HIP_SAFE_CALL(
       hipModuleGetFunction_p(&kFunc, (hipModule_t)module, kernelName));
 
+
   void *configArgs[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, kernelArgs,
                         HIP_LAUNCH_PARAM_BUFFER_SIZE, &argsSize,
                         HIP_LAUNCH_PARAM_END};
 
-  // Note the discrepancy between hip and cuda here -- for hip the module
-  // launch is the same as the "standard" cuda launch.
+  // TODO: Should we sync here for prefetch calls that were issued before
+  // the launch?  In *theory* the kernel launch should wait for all streams
+  // to complete -- i.e., this is just overhead...  However, it is not at all
+  // clear that this is actually working well with managed memory... 
+  //HIP_SAFE_CALL(hipDeviceSynchronize_p());
+
+  // Note the discrepancy between hip and cuda here. 
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(
       kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1, 1, 0, (hipStream_t)stream,
       nullptr, (void **)&configArgs[0]));
+  _kitrt_CurPrefetchStream = 0;
 }
 
 // Launch a kernel on the default stream.
@@ -566,7 +584,7 @@ void __kitrt_hipLaunchKernel(const void *fatBin, const char *kernelName,
   int threadsPerBlock, blocksPerGrid;
   hipFunction_t kFunc;
 
-  HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
+  //HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
 
   // TODO: Not sure of the actual advantages from the kernel and module
   // maps here. Needs some work to determine if it is really worthwhile...
@@ -597,6 +615,9 @@ void __kitrt_hipLaunchKernel(const void *fatBin, const char *kernelName,
     fprintf(stderr, "\targument size = %ld\n", argsSize);
   }
 
+  //if (_kitrt_CurPrefetchStream > 0)
+  //  HIP_SAFE_CALL(hipDeviceSynchronize_p());
+
   void *configArgs[] = {HIP_LAUNCH_PARAM_BUFFER_POINTER, kernelArgs,
                         HIP_LAUNCH_PARAM_BUFFER_SIZE, &argsSize,
                         HIP_LAUNCH_PARAM_END};
@@ -606,6 +627,8 @@ void __kitrt_hipLaunchKernel(const void *fatBin, const char *kernelName,
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(
       kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1, 1, 0, (hipStream_t)stream,
       nullptr, (void **)&configArgs[0]));
+
+  _kitrt_CurPrefetchStream = 0;
 }
 
 void __kitrt_hipStreamSynchronize(void *vStream) {
@@ -618,11 +641,6 @@ void __kitrt_hipSynchronizeStreams() {
   // streams.
   HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
   HIP_SAFE_CALL(hipDeviceSynchronize_p());
-  while (not _kitrtActiveStreams.empty()) {
-    hipStream_t stream = _kitrtActiveStreams.front();
-    HIP_SAFE_CALL(hipStreamDestroy(stream));
-    _kitrtActiveStreams.pop_front();
-  }
 }
 
 // ---- Event management and handling.
@@ -635,7 +653,7 @@ void *__kitrt_hipCreateEvent() {
 
 void __kitrt_hipDestroyEvent(void *E) {
   assert(E && "unexpected null event!");
-  HIP_SAFE_CALL(hipEventDestroy_p((hipEvent_t)E));
+  HIP_SAFE_CALL(hipEventDestroy((hipEvent_t)E));
 }
 
 void __kitrt_hipEventRecord(void *E) {

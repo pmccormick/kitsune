@@ -60,6 +60,8 @@ static bool _kitrtVerboseMode = false;
 static unsigned _kitrtDefaultThreadsPerBlock = 256;
 static bool _kitrtUseCustomLaunchParameters = false;
 static unsigned _kitrtThreadsPerBlock = 0;
+unsigned _kitrt_MaxPrefetchStreams = 8;
+int _kitrt_DefaultDeviceID = -1;
 
 template <typename RetType>
 static bool __kitrt_getEnvValue(const char *VarName, RetType &Value) {
@@ -92,6 +94,8 @@ void __kitrt_CommonInit() {
   if (__kitrt_getEnvValue("KITRT_THREADS_PER_BLOCK", _kitrtThreadsPerBlock))
     _kitrtUseCustomLaunchParameters = true;
   __kitrt_getEnvValue("KITRT_VERBOSE", _kitrtVerboseMode);
+  __kitrt_getEnvValue("KITRT_MAX_NUM_PREFETCH_STREAMS", _kitrt_MaxPrefetchStreams);
+  __kitrt_getEnvValue("KITRT_DEVICE_ID", _kitrt_DefaultDeviceID);
 }
 
 void __kitrt_setVerboseMode(bool Enable) {

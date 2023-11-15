@@ -160,8 +160,8 @@ static cl::opt<bool> DisablePrefetch(
 // Enable generation of stream-based prefetching and kernel launches.
 static cl::opt<bool>
     CodeGenStreams("hipabi-streams", cl::init(false), cl::Hidden,
-                   cl::desc("Generate prefetch and kernel launches "
-                            "as a combined set of stream operations."));
+                   cl::desc("Generate multiple prefetch streams "
+                            "prior to kernel launches."));
 
 /// Set the HIP ABI's default grain size value.  This is used internally
 /// by the transform.
@@ -1048,10 +1048,11 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
             DeviceF->addFnAttr(Attribute::AlwaysInline);
             LLVM_DEBUG(dbgs() << "\t\t\tset always inline attribute.\n");
           }
+
           DeviceF->addFnAttr("target-cpu", GPUArch);
           const std::string target_feature_str =
               "+16-bit-insts,+ci-insts,+dl-insts,+dot1-insts,+dot2-insts,+dot3-"
-              "insts,+dot4-insts,+dot5-insts,+dot6-insts,+dot7-insts,+dpp,+"
+              "insts,+dot4-insts,+dot5-insts,+dot6-insts,+dot7-insts,+dpp,"
               "flat-address-space,+gfx8-insts,+gfx9-insts,+gfx90a-insts,+mai-"
               "insts,+s-memrealtime,+s-memtime-inst";
           DeviceF->addFnAttr("target-features", target_feature_str.c_str());
@@ -1102,6 +1103,42 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   KernelF->removeFnAttr(Attribute::UWTable);
   KernelF->addFnAttr(Attribute::NoUnwind);
 
+
+  // Look for environment variables to help guide some of our kernel 
+  // attributes... 
+  // 
+  // These parameters can be tricky...  Given that the GPU shares 
+  // resources (e.g., registers and shared memory) across warps 
+  // fine-tuning things can get quite challenging: using more 
+  // resources can improve the performance of a single warp but reduce 
+  // the number of warps that can be simulaneously running...  There's 
+  // currently not a great approach to optimize for these aspects so 
+  // searching for a relationship between resource usage and performance is 
+  // important for tuning (i.e., we don't expect to do this automatically...).
+  int MaxThreadsPerBlock = 256;
+  
+  std::optional<std::string> ThreadsPBVar =
+          sys::Process::GetEnv("KITRT_THREADS_PER_BLOCK");
+  if (ThreadsPBVar) {
+    MaxThreadsPerBlock = std::stoi(ThreadsPBVar.value());
+    if (MaxThreadsPerBlock > 1024 || MaxThreadsPerBlock < 1)
+      report_fatal_error("KITRT_THREADS_PER_BLOCK must be less than 1024 and greater than 0!");
+  }
+  LLVM_DEBUG(dbgs() << "hipabi: setting kernel's max threads per block: " 
+                    << MaxThreadsPerBlock << "\n");
+
+  int MinWarpsPerExecUnit = 1;
+  std::optional<std::string> MinWarpsPerExecUnitVar =
+          sys::Process::GetEnv("KITRT_MIN_WARPS_PER_EXEC_UNIT");
+  if (MinWarpsPerExecUnitVar) {
+    MinWarpsPerExecUnit = std::stoi(MinWarpsPerExecUnitVar.value());
+    if (MinWarpsPerExecUnit < 1 || MinWarpsPerExecUnit >= MaxThreadsPerBlock)
+      report_fatal_error("KITRT_MIN_WARPS_PER_EXEC_UNIT must be greater than and "
+                         "less than the maximum number of threads-per-block!");
+  }
+  LLVM_DEBUG(dbgs() << "hipabi: setting kernel's minimum warps per execution unit to: " 
+                    << MinWarpsPerExecUnit << "\n");
+
   // TODO: Need to build target-specific string... and decide if we
   // really need this...
   const std::string target_feature_str =
@@ -1111,8 +1148,9 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
       "insts,+s-memrealtime,+s-memtime-inst";
   KernelF->addFnAttr("target-cpu", GPUArch);
   KernelF->addFnAttr("uniform-work-group-size", "true");
-  std::string AttrVal = std::string("1,") + llvm::utostr(1024);
+  std::string AttrVal = llvm::utostr(MinWarpsPerExecUnit) + std::string(",") + llvm::utostr(MaxThreadsPerBlock);
   KernelF->addFnAttr("amdgpu-flat-work-group-size", AttrVal);
+  KernelF->addFnAttr("amdgpu-waves-per-eu", AttrVal);
   KernelF->addFnAttr("target-features", target_feature_str.c_str());
   KernelF->addFnAttr("no-trapping-math", "true");
   KernelF->setVisibility(GlobalValue::VisibilityTypes::ProtectedVisibility);
@@ -1250,14 +1288,7 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   IRBuilder<> EB(&EBB.front());
 
   Value *prefetchStream = nullptr;
-  if (not CodeGenStreams) {
-    LLVM_DEBUG(dbgs() << "\tstream code generation is off.\n");
-    // If we are going to use the default stream we
-    // set the main prefetch stream to null and it
-    // will propagate through all prefetch and launch
-    // calls.
-    prefetchStream = ConstantPointerNull::get(VoidPtrTy);
-  }
+  prefetchStream = ConstantPointerNull::get(VoidPtrTy);
 
   Type *Int64Ty = Type::getInt64Ty(Ctx);
   const DataLayout &DL = M.getDataLayout();
@@ -1280,18 +1311,14 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     if (not DisablePrefetch) {
       if (VTy->isPointerTy()) {
         Value *VoidPP = B.CreateBitCast(V, VoidPtrTy);
-        if (prefetchStream == nullptr) { // stream codegen enabled.
-          assert(KitHipStreamMemPrefetchFn &&
-                 "no kitsune hip stream mem prefetch function!");
-          prefetchStream = B.CreateCall(KitHipStreamMemPrefetchFn, {VoidPP});
-	} else if (CodeGenStreams) {
+        if (CodeGenStreams) {
           LLVM_DEBUG(dbgs() << "\t\t*issue stream set prefetch for arg #" << i << "\n");
           B.CreateCall(KitHipStreamSetMemPrefetchFn, {VoidPP});	  
         } else {
           assert(KitHipMemPrefetchOnStreamFn &&
                  "no kitsune hip mem prefetch on stream function!");
           LLVM_DEBUG(dbgs() << "\t\t*issue prefetch for arg #" << i << "\n");
-          B.CreateCall(KitHipMemPrefetchOnStreamFn, {VoidPP, prefetchStream});
+          B.CreateCall(KitHipMemPrefetchOnStreamFn, {VoidPP, ConstantPointerNull::get(VoidPtrTy)});
         }
       }
     }
@@ -1371,7 +1398,6 @@ HipABI::HipABI(Module &InputModule)
   SmallString<255> NewModuleName(ArchString + KernelModule.getName().str());
   sys::path::replace_extension(NewModuleName, ".amdgcn");
   KernelModule.setSourceFileName(NewModuleName.c_str());
-
   llvm::CodeGenOpt::Level TMOptLevel;
   llvm::CodeModel::Model TMCodeModel = CodeModel::Model::Large;
 
@@ -1679,9 +1705,9 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
     PipelineTuningOptions pto;
     pto.LoopVectorization = OptLevel > 2;
     pto.SLPVectorization = OptLevel > 2;
-    pto.LoopUnrolling = true;
-    pto.LoopInterleaving = true;
-    pto.LoopStripmine = true;
+    pto.LoopUnrolling = OptLevel >= 2; // TODO: too much register pressure?
+    pto.LoopInterleaving = OptLevel > 2;
+    pto.LoopStripmine = OptLevel > 2;
     LoopAnalysisManager lam;
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;
@@ -1747,8 +1773,8 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("elf64_amdgpu");
   LDDArgList.push_back("--no-undefined");
   LDDArgList.push_back("-shared");
-  LDDArgList.push_back("--eh-frame-hdr");
-  LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
+  //LDDArgList.push_back("--eh-frame-hdr");
+  //LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
   LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
   LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=false");
   std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch;

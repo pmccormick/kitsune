@@ -50,6 +50,10 @@ raytracer-kokkos.hipcc.${host_arch}: raytracer-kokkos.cpp
 	@echo $@
 	@$(TIME_CMD) $(KOKKOS_HIPCC) -v $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 	@$(FILE_SIZE)
+raytracer-kokkos.hip.${host_arch}: raytracer-kokkos.cpp 
+	@echo $@
+	@$(TIME_CMD) $(KIT_CXX) -x hip -v $(KOKKOS_HIP_FLAGS) -I$(ROCM_PATH)/include -o $@ $< -L$(ROCM_PATH)/lib $(KOKKOS_HIP_LIBS) -lamdhip64 -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
+	@$(FILE_SIZE)
 
 # cuda version 
 raytracer-cuda.${host_arch}: raytracer.cu

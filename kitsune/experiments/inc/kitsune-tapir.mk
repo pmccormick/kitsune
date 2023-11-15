@@ -34,16 +34,19 @@ endif
 
 ##################################
 TAPIR_HIP_FLAGS?=-ftapir=hip \
-  -O$(KITSUNE_OPTLEVEL) \
-  -mllvm -hipabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
-  -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
+  -O3 \
   -ffp-contract=fast \
-  -fno-rounding-math \
+  -mllvm -hipabi-opt-level=3 \
+  -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
   $(TAPIR_HIP_EXTRA_FLAGS) \
   $(GPU_STRIPMINE_FLAGS)
-#  -mllvm -hipabi-xnack=true \
+
+# $(KITSUNE_ABI_OPTLEVEL) \
+#  -mllvm -hipabi-streams \
 #  -mllvm -vectorize-loops \
 #  -mllvm -vectorize-slp \
+
+#  -mllvm -hipabi-xnack=true \
 
 TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O$(KITSUNE_OPTLEVEL),\
 -mllvm,-hipabi-opt-level=$(KITSUNE_OPTLEVEL),-mllvm,-chipabi-arch=$(AMDGPU_ARCH),\

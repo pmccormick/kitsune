@@ -27,6 +27,7 @@ euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
 	@$(FILE_SIZE)
 euler3d-forall.hip.${host_arch}: euler3d-forall.cpp 
 	@echo $@
+	@echo $(KIT_CXX) $(TAPIR_HIP_FLAGS)  -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
@@ -51,7 +52,12 @@ euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp
 euler3d-kokkos.hipcc.${host_arch}: euler3d-kokkos.cpp 
 	@echo $@
 	@echo $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64
-	@$(TIME_CMD) $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -v -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
+	@$(TIME_CMD) $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
+	@$(FILE_SIZE)
+euler3d-kokkos.hip.${host_arch}: euler3d-kokkos.cpp 
+	@echo $@
+	@echo $(KIT_CXX) -x hip $(KOKKOS_HIP_FLAGS) -I$(ROCM_PATH)/include -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64
+	@$(TIME_CMD) $(KIT_CXX) -x hip $(KOKKOS_HIP_FLAGS) -I$(ROCM_PATH)/include -o $@ $< -L$(ROCM_PATH)/lib $(KOKKOS_HIP_LIBS) -lamdhip64 -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 	@$(FILE_SIZE)
 
 #####

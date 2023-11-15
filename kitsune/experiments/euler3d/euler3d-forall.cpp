@@ -404,7 +404,7 @@ int main(int argc, char** argv)
     return 0;
   }
 
-  int iterations = 50000;
+  int iterations = 200000;  
   if (argc > 2)
     iterations = atoi(argv[2]);
 
@@ -522,12 +522,12 @@ int main(int argc, char** argv)
   float* old_variables = alloc<float>(nelr*NVAR);
   float* fluxes = alloc<float>(nelr*NVAR);
   float* step_factors = alloc<float>(nelr);
+  double *rk_times = new double[iterations];
 
+  // Begin iterations
   double copy_total = 0.0;
   double sf_total = 0.0;
   double rk_total = 0.0;
-
-  // Begin iterations
   for(int i = 0; i < iterations; i++) {
     
     auto copy_start = chrono::steady_clock::now();
@@ -540,7 +540,8 @@ int main(int argc, char** argv)
     auto sf_start = chrono::steady_clock::now();
     compute_step_factor(nelr, variables, areas, step_factors);
     auto sf_end = chrono::steady_clock::now();
-    sf_total += chrono::duration<double>(sf_end-sf_start).count();
+    time = chrono::duration<double>(sf_end-sf_start).count();    
+    sf_total += time;
 
     auto rk_start = chrono::steady_clock::now();
     for(int j = 0; j < RK; j++) {
@@ -553,21 +554,31 @@ int main(int argc, char** argv)
       time_step(j, nelr, old_variables, variables, step_factors, fluxes);
     }
     auto rk_end = chrono::steady_clock::now();
-    rk_total += chrono::duration<double>(rk_end-rk_start).count();
+    time = chrono::duration<double>(rk_end-rk_start).count();
+    rk_times[i] = time;
+    rk_total += time;
   }
+  
   dump(variables, nel, nelr);
 
   auto end_time = chrono::steady_clock::now();
   double elapsed_time = chrono::duration<double>(end_time-start_time).count();
   double total_time = chrono::duration<double>(end_time-total_start_time).count();
+  double rk_mean = rk_total / iterations;
+  double sum = 0.0;
+  for(int i = 0; i < iterations; i++) {
+    double dist = rk_times[i] - rk_mean;
+    sum += dist * dist; 
+  }
+  double rk_std_dev = sqrt(sum / iterations);
 
   cout << "\n"
        << "      Total time : " << total_time << " seconds.\n"
        << "    Compute time : " << elapsed_time << " seconds.\n"
-       << "            copy : " << copy_total << " seconds.\n"
-       << "              sf : " << sf_total << " seconds.\n"
-       << "              rk : " << rk_total << " seconds.\n"
-       << "*** " << total_time << ", " << total_time << "\n"                
+       << "            copy : " << copy_total << " seconds (average: " << copy_total / iterations << " seconds).\n"
+       << "              sf : " << sf_total << " seconds (average: " << sf_total / iterations << " seconds).\n"
+       << "              rk : " << rk_total << " seconds (average: " << rk_mean << " seconds / std dev: " << rk_std_dev << ").\n"
+       << "*** " << elapsed_time << ", " << elapsed_time << "\n"                
        << "----\n\n";
 
   dealloc(ff_variable);
