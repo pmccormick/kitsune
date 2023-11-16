@@ -58,11 +58,10 @@
 
 static bool _kitrtVerboseMode = false;
 static unsigned _kitrtDefaultThreadsPerBlock = 256;
-static unsigned _kitrtDefaultNumPrefetchStreams = 4;
 static bool _kitrtUseCustomLaunchParameters = false;
 
 static unsigned _kitrtThreadsPerBlock = 0;
-unsigned _kitrt_MaxPrefetchStreams = 8;
+unsigned _kitrt_MaxPrefetchStreams = 4;
 int _kitrt_DefaultDeviceID = -1;
 
 template <typename RetType>
@@ -97,10 +96,6 @@ void __kitrt_CommonInit() {
                           _kitrtThreadsPerBlock))
     _kitrtUseCustomLaunchParameters = true;
 
-  if (__kitrt_getEnvValue("KITRT_N_PREFETCH_STREAMS", _
-                          kirtNumPrefetchStreams))
-    _kitrtUseCustomPrefetchStreams = true;
-
   __kitrt_getEnvValue("KITRT_VERBOSE", _kitrtVerboseMode);
   __kitrt_getEnvValue("KITRT_MAX_NUM_PREFETCH_STREAMS", _kitrt_MaxPrefetchStreams);
   __kitrt_getEnvValue("KITRT_DEVICE_ID", _kitrt_DefaultDeviceID);
@@ -133,10 +128,10 @@ void __kitrt_getLaunchParameters(size_t numElements,
 }
 
 unsigned __kitrt_getNumPrefetchStreams(void) {
-  if (_kitrtNumPrefetchStreams == 0)
-    return _kitrt_DefaultNumPrefetchStreams;
+  if (_kitrt_MaxPrefetchStreams == 0)
+    return 4;
   else 
-    return _kitrtNumPrefetchStreams;
+    return _kitrt_MaxPrefetchStreams;
 }
 
 void __kitrt_setDefaultThreadsPerBlock(unsigned threadsPerBlock) {

@@ -62,8 +62,6 @@ extern "C" {
 #else
 #include <stdbool.h>
 #endif
-
-
   /// Initialize the runtime.  This call may be made multiple
   /// times -- only the initial call will initialize CUDA and
   /// subsequent calls are essentially no-ops.
@@ -93,7 +91,6 @@ extern "C" {
   void  __kitrt_cuDestroyEvent(void*);
   float __kitrt_cuElapsedEventTime(void *start, void *stop);
 
-
   // Location of the most recently updated UVM allocated memory.
   // This can be either host or device, or host AND device meaning
   // there is valid data in both locations (e.g., computed on host
@@ -116,6 +113,7 @@ extern "C" {
   void __kitrt_cuMemHostPrefetch(void *vp);
   void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream);
   void *__kitrt_cuStreamMemPrefetch(void *vp);
+  void __kitrt_cuStreamSetMemPrefetch(void *vp);
   void  __kitrt_cuAdviseRead(void *vp, size_t size);
 
   bool  __kitrt_cuMemHasHostAffinity(const void *vp);

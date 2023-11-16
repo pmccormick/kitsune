@@ -80,6 +80,7 @@
 // #define _KITRT_VERBOSE_
 //  Has the runtime been initialized?
 static bool _kitrt_cuIsInitialized = false;
+static int _kitrt_cuDeviceID = -1;
 
 // Measure internal timing of launched kernels.
 static bool _kitrtEnableTiming = false;
@@ -109,6 +110,17 @@ static CUdevice _kitrtCUdevice = -1;
 // Default CUDA context (a nullptr flags an uninitialized state).
 // At present the runtime only supports a single context.
 static CUcontext _kitrtCUcontext = nullptr;
+
+// When the compiler generates a prefetch-driven series of kernel
+// launches we have multiple prefetch-to-launch streams to
+// synchronize -- we keep these streams in an active list that
+// will be synchronized and then destroyed post the outter prefetch
+// loop construct.
+typedef std::list<CUstream> KitRTActiveStreamsList;
+static KitRTActiveStreamsList _kitrtActiveStreams;
+extern unsigned _kitrt_MaxPrefetchStreams;
+static unsigned _kitrt_CurPrefetchStream = 0;
+std::vector<CUstream> _kitrt_PrefetchStreams;
 
 // Enable auto-prefetching of managed memory pointers.
 // This is a very simple approach that likely will
@@ -188,14 +200,6 @@ static KitRTModuleMap _kitrtModuleMap;
 // Is a map more complicated than necessary?
 typedef std::unordered_map<const char *, CUfunction> KitRTKernelMap;
 static KitRTKernelMap _kitrtKernelMap;
-
-// When the compiler generates a prefetch-driven series of kernel
-// launches we have multiple prefetch-to-launch streams to
-// synchronize -- we keep these streams in an active list that
-// will be synchronized and then destroyed post the outter prefetch
-// loop construct.
-typedef std::list<CUstream> KitRTActiveStreamsList;
-static KitRTActiveStreamsList _kitrtActiveStreams;
 
 static bool __kitrt_cuLoadDLSyms() {
 
@@ -277,9 +281,6 @@ extern "C" {
   }
 
 // ---- Initialization, properties, clean up, etc.
-static unsigned _kitrt_MaxPrefetchStreams = 4;
-static unsigned _kitrt_CurPrefetchStream = 0;
-std::vector<CUstream> _kitrt_PrefetchStreams;
 
 bool __kitrt_cuInit() {
 
@@ -299,7 +300,6 @@ bool __kitrt_cuInit() {
   }
 
   int deviceCount = 0;
-
   CU_SAFE_CALL(cuInit_p(0 /*, __CUDA_API_VERSION*/));
   CU_SAFE_CALL(cuDeviceGetCount_p(&deviceCount));
   if (deviceCount == 0) {
@@ -307,10 +307,16 @@ bool __kitrt_cuInit() {
     abort();
   }
 
+  extern int _kitrt_DefaultDeviceID;
+  if (_kitrt_DefaultDeviceID == -1)
+    _kitrt_cuDeviceID = 0;
+  else 
+    _kitrt_cuDeviceID = _kitrt_DefaultDeviceID;
+
   if (__kitrt_verboseMode())
     fprintf(stderr, "\tdevice count: %d\n", deviceCount);
 
-  CU_SAFE_CALL(cuDeviceGet_p(&_kitrtCUdevice, 0));
+  CU_SAFE_CALL(cuDeviceGet_p(&_kitrtCUdevice, _kitrt_cuDeviceID));
   CU_SAFE_CALL(cuDevicePrimaryCtxRetain_p(&_kitrtCUcontext, _kitrtCUdevice));
   // NOTE: It seems we have to explicitly set the context but that seems
   // to be different than what the driver API docs suggest...
@@ -324,6 +330,13 @@ bool __kitrt_cuInit() {
     _kitrtUseHeuristicLaunchParameters = false;
   }
 
+  for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
+    CUstream stream; 
+    CU_SAFE_CALL(cuStreamCreate_p(&stream, CU_STREAM_DEFAULT));
+    fprintf(stderr, "kitrt: create cuda prefetch stream %d\n", si);
+    _kitrt_PrefetchStreams.push_back(stream);
+  }
+
   return _kitrt_cuIsInitialized;
 }
 
@@ -332,6 +345,13 @@ void __kitrt_cuDestroy() {
   if (_kitrt_cuIsInitialized) {
     void __kitrt_cuFreeManagedMem(void *vp);
     __kitrt_destroyMemoryMap(__kitrt_cuFreeManagedMem);
+
+    /*for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
+      CUstream stream = _kitrt_PrefetchStreams[si];
+      CU_SAFE_CALL(hipStreamDestroy_p(stream));
+    }
+    */
+
     // Note that all resources associated with the context will be destroyed.
     CU_SAFE_CALL(cuDevicePrimaryCtxRelease_v2_p(_kitrtCUdevice));
     CU_SAFE_CALL(cuDevicePrimaryCtxReset_v2_p(_kitrtCUdevice));
@@ -473,7 +493,6 @@ void __kitrt_cuEnablePrefetch() { _kitrt_cuEnablePrefetch = true; }
 void __kitrt_cuDisablePrefetch() { _kitrt_cuEnablePrefetch = false; }
 
 void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
-
   assert(vp && "unexpected null pointer!");
   if (not __kitrt_isMemPrefetched(vp)) {
     bool is_read_only, is_write_only;
@@ -524,6 +543,15 @@ void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
 void __kitrt_cuMemPrefetch(void *vp) {
   assert(vp && "unexpected null pointer!");
   __kitrt_cuMemPrefetchOnStream(vp, NULL);
+}
+
+void __kitrt_cuStreamSetMemPrefetch(void *vp) {
+  assert(vp && "unexpected null pointer!");
+  CUstream stream = _kitrt_PrefetchStreams[_kitrt_CurPrefetchStream];
+  __kitrt_cuMemPrefetchOnStream(vp, (void*)stream);
+  _kitrt_CurPrefetchStream++;
+  if (_kitrt_CurPrefetchStream == _kitrt_MaxPrefetchStreams)
+    _kitrt_CurPrefetchStream = 0; // wrap for round-robin... 
 }
 
 void *__kitrt_cuStreamMemPrefetch(void *vp) {

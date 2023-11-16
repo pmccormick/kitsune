@@ -158,6 +158,7 @@ private:
   FunctionCallee KitCudaMemPrefetchFn = nullptr;
   FunctionCallee KitCudaMemPrefetchOnStreamFn = nullptr;
   FunctionCallee KitCudaStreamMemPrefetchFn = nullptr;
+  FunctionCallee KitCudaStreamSetMemPrefetchFn = nullptr;
 
   FunctionCallee KitCudaCreateFBModuleFn = nullptr;
   FunctionCallee KitCudaGetGlobalSymbolFn = nullptr;

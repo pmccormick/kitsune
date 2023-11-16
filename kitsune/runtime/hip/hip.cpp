@@ -237,8 +237,8 @@ extern "C" {
 // ---- Initialization, properties, clean up, etc.
 //
 extern unsigned _kitrt_MaxPrefetchStreams;
-unsigned _kitrt_CurPrefetchStream = 0;
-std::vector<hipStream_t*> _kitrt_PrefetchStreams;
+static unsigned _kitrt_CurPrefetchStream = 0;
+static std::vector<hipStream_t*> _kitrt_PrefetchStreams;
 
 static bool _kitrt_enableXnack = false;
 
@@ -455,7 +455,7 @@ void __kitrt_hipStreamSetMemPrefetch(void *vp) {
   __kitrt_hipMemPrefetchOnStream(vp, (void*)*stream);
   _kitrt_CurPrefetchStream++;
   if (_kitrt_CurPrefetchStream == _kitrt_MaxPrefetchStreams)
-    _kitrt_CurPrefetchStream = 0;
+    _kitrt_CurPrefetchStream = 0; // wrap for round-robin... 
 }
 
 void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {

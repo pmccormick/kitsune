@@ -178,13 +178,11 @@ static cl::opt<bool>
                     cl::desc("Enable generation of calls to do data "
                              "prefetching for UVM-based kernel  "
                              "parameters."));
-
-/// Generate prefetch and kernel launch code as a combined stream of
-/// operations.
+// Enable generation of stream-based prefetching and kernel launches.
 static cl::opt<bool>
     CodeGenStreams("cuabi-streams", cl::init(false), cl::Hidden,
-                   cl::desc("Generate prefetch and kernel launches "
-                            "as a combined set of stream operations."));
+                   cl::desc("Generate multiple prefetch streams "
+                            "prior to kernel launches."));
 
 /// Should PTX files be included in the fat binary images produced by the
 /// transform?
@@ -492,6 +490,10 @@ CudaLoop::CudaLoop(Module &M, Module &KernelModule, const std::string &KN,
                                         VoidTy); // no return & no parameters
 
   // Interface to runtime's prefetching support.
+  KitCudaStreamSetMemPrefetchFn = 
+      M.getOrInsertFunction("__kitrt_cuStreamSetMemPrefetch",
+                            VoidTy, // no return
+                            VoidPtrTy); // pointer to prefetch
   KitCudaMemPrefetchFn =
       M.getOrInsertFunction("__kitrt_cuMemPrefetch", // on default stream
                             VoidTy,                  // no return.
@@ -1127,12 +1129,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   Value *ArgArray = EB.CreateAlloca(ArrayTy);
   unsigned int i = 0;
   Value *prefetchStream = nullptr;
-  if (not CodeGenStreams) {
-    // If we are going to use the default stream we set the main prefetch stream
-    // to null and it will propagate through all prefetch and the final launch
-    // call.
-    prefetchStream = ConstantPointerNull::get(VoidPtrTy);
-  }
+  prefetchStream = ConstantPointerNull::get(VoidPtrTy);
 
   for (Value *V : OrderedInputs) {
     Value *VP = EB.CreateAlloca(V->getType());
@@ -1146,10 +1143,8 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
       Type *VT = V->getType();
       if (VT->isPointerTy()) {
         Value *VoidPP = B.CreateBitCast(V, VoidPtrTy);
-        if (prefetchStream == nullptr) { // stream codegen enabled...
-          LLVM_DEBUG(dbgs() << "creating initial prefetch stream.\n");
-          prefetchStream = B.CreateCall(KitCudaMemPrefetchFn, {VoidPP},
-                                        "_cuabi.prefetch_stream");
+        if (CodeGenStreams) {
+          B.CreateCall(KitCudaStreamSetMemPrefetchFn, {VoidPP});
         } else {
           LLVM_DEBUG(dbgs() << "code gen prefetch.\n");
           B.CreateCall(KitCudaMemPrefetchOnStreamFn, {VoidPP, prefetchStream});
