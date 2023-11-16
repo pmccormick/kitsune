@@ -122,12 +122,6 @@ extern unsigned _kitrt_MaxPrefetchStreams;
 static unsigned _kitrt_CurPrefetchStream = 0;
 std::vector<CUstream> _kitrt_PrefetchStreams;
 
-// Enable auto-prefetching of managed memory pointers.
-// This is a very simple approach that likely will
-// have limited success.  Note that it can significantly
-// avoid page miss costs.
-static bool _kitrt_cuEnablePrefetch = true;
-
 // NOTE: Over a series of CUDA releases it is worthwhile to
 // check in on the header files for replacement versioned
 // entry points into the driver API.  These are typically
@@ -332,11 +326,18 @@ bool __kitrt_cuInit() {
     _kitrtUseHeuristicLaunchParameters = false;
   }
 
-  for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
-    CUstream stream; 
-    CU_SAFE_CALL(cuStreamCreate_p(&stream, CU_STREAM_DEFAULT));
-    fprintf(stderr, "kitrt: create cuda prefetch stream %d\n", si);
-    _kitrt_PrefetchStreams.push_back(stream);
+  if (__kitrt_prefetchEnabled()) {
+    fprintf(stderr, "kitrt: prefetching enabled.\n");
+  }
+
+  if (__kitrt_prefetchStreamsEnabled()) {
+    fprintf(stderr, "kitrt: prefetch streams enabled.\n");
+    fprintf(stderr, "\t\tprefetch stream set size: %d", _kitrt_MaxPrefetchStreams);
+    for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
+      CUstream stream; 
+      CU_SAFE_CALL(cuStreamCreate_p(&stream, CU_STREAM_DEFAULT));
+      _kitrt_PrefetchStreams.push_back(stream);
+    }
   }
 
   return _kitrt_cuIsInitialized;
@@ -489,10 +490,6 @@ bool __kitrt_cuIsMemManaged(void *vp) {
 }
 
 // ---- Memory/data prefetch and data movement support.
-
-void __kitrt_cuEnablePrefetch() { _kitrt_cuEnablePrefetch = true; }
-
-void __kitrt_cuDisablePrefetch() { _kitrt_cuEnablePrefetch = false; }
 
 void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");

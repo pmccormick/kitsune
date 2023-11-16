@@ -347,12 +347,14 @@ bool __kitrt_hipInit() {
     _kitrt_hipIsInitialized = true;
   }
 
-  for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
-    hipStream_t stream; 
-    //HIP_SAFE_CALL(hipStreamCreateWithFlags_p(&stream, hipStreamNonBlocking));
-    HIP_SAFE_CALL(hipStreamCreate_p(&stream));
-    fprintf(stderr, "kitrt: create cuda prefetch stream %d\n", si);
-    _kitrt_PrefetchStreams.push_back(&stream);
+  if (__kitrt_prefetchStreamsEnabled()) {
+    fprintf(stderr, "kitrt: prefetch streams enabled.\n");
+    for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
+      hipStream_t stream; 
+      //HIP_SAFE_CALL(hipStreamCreateWithFlags_p(&stream, hipStreamNonBlocking));
+      HIP_SAFE_CALL(hipStreamCreate_p(&stream));
+      _kitrt_PrefetchStreams.push_back(&stream);
+    }
   }
 
   return _kitrt_hipIsInitialized;

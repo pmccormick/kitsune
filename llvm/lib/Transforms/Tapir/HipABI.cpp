@@ -1995,7 +1995,25 @@ Function *HipABI::createCtor(GlobalVariable *Bundle, GlobalVariable *Wrapper) {
 
   // Tuck some calls in that initialize the Kitsune runtime.  This includes
   // enabling xnack and explicitly initializing HIP (even though documentation
-  // suggests it is optional).
+  // sugges
+
+  if (CodeGenStreams && not CodeGenPrefetch) 
+    report_fatal_error("kitsune: prefetching must be enabled to generate prefetch streams!");
+
+  // Tuck the call to initialize the Kitsune runtime into the constructor;
+  // this in turn will initialized CUDA...
+  if (CodeGenPrefetch) {
+    FunctionCallee KitRTEnablePrefetchFn = 
+          M.getOrInsertFunction("__kitrt_enablePrefetching", VoidTy);
+    CtorBuilder.CreateCall(KitRTEnablePrefetchFn, {});
+  }
+
+  if (CodeGenStreams) {
+    FunctionCallee KitRTEnablePrefetchStreamsFn = 
+          M.getOrInsertFunction("__kitrt_enablePrefetchStreams", VoidTy);
+    CtorBuilder.CreateCall(KitRTEnablePrefetchStreamsFn, {});
+  }
+
   if (EnableXnack) {
     FunctionCallee KitRTEnableXnackFn =
         M.getOrInsertFunction("__kitrt_hipEnableXnack", VoidTy);

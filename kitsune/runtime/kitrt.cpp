@@ -60,6 +60,9 @@ static bool _kitrtVerboseMode = false;
 static unsigned _kitrtDefaultThreadsPerBlock = 256;
 static bool _kitrtUseCustomLaunchParameters = false;
 
+static bool _kitrtEnablePrefetch = false;
+static bool _kitrtEnablePrefetchStreams = false;
+
 static unsigned _kitrtThreadsPerBlock = 0;
 unsigned _kitrt_MaxPrefetchStreams = 4;
 int _kitrt_DefaultDeviceID = -1;
@@ -99,6 +102,11 @@ void __kitrt_CommonInit() {
   __kitrt_getEnvValue("KITRT_VERBOSE", _kitrtVerboseMode);
   __kitrt_getEnvValue("KITRT_MAX_NUM_PREFETCH_STREAMS", _kitrt_MaxPrefetchStreams);
   __kitrt_getEnvValue("KITRT_DEVICE_ID", _kitrt_DefaultDeviceID);
+
+  if (__kitrt_prefetchEnabled())
+    fprintf(stderr, "kitrt: prefetch enabled.\n");
+  if (__kitrt_prefetchStreamsEnabled())
+    fprintf(stderr, "kitrt: maximum prefetch streams: %d\n", _kitrt_MaxPrefetchStreams);
 }
 
 void __kitrt_setVerboseMode(bool Enable) {
@@ -143,6 +151,21 @@ void __kitrt_resetLaunchParameters() {
   _kitrtUseCustomLaunchParameters = false;
 }
 
+bool __kitrt_prefetchEnabled() {
+  return _kitrtEnablePrefetch;
+}
+
+void __kitrt_enablePrefetching() {
+  _kitrtEnablePrefetch = true;
+}
+
+bool __kitrt_prefetchStreamsEnabled() {
+  return _kitrtEnablePrefetchStreams;
+}
+
+void __kitrt_enablePrefetchStreams() {
+  _kitrtEnablePrefetchStreams = true;
+}
 
 #ifdef __cplusplus
 } // extern "C"
