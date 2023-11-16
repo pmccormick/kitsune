@@ -39,9 +39,8 @@ struct Float3 {
 #define __restrict
 #endif
 
-template <typename T>
 inline __attribute__((always_inline))
-void cpy(T* dst, T* src, int N) {
+void cpy(float* dst, const float* src, int N) {
   forall(unsigned int i = 0; i < N; i++) {
     dst[i] = src[i];
   }
@@ -184,9 +183,9 @@ void compute_step_factor(int nelr,
 }
 
 void compute_flux(int nelr,
-                  const int* elements_surrounding_elements,
-                  const float* normals,
-                  const float* variables,
+                  int* elements_surrounding_elements,
+                  float* normals,
+                  float* variables,
                   float* fluxes,
                   const float* ff_variable,
                   const Float3 ff_flux_contribution_momentum_x,
@@ -544,14 +543,24 @@ int main(int argc, char** argv)
     sf_total += time;
 
     auto rk_start = chrono::steady_clock::now();
+    #pragma nounroll 
     for(int j = 0; j < RK; j++) {
+      //auto cf_start_time = chrono::steady_clock::now();      
       compute_flux(nelr, elements_surrounding_elements, normals, variables,
                    fluxes, ff_variable,
                    ff_flux_contribution_momentum_x,
                    ff_flux_contribution_momentum_y,
                    ff_flux_contribution_momentum_z,
                    ff_flux_contribution_density_energy);
+      //auto cf_end_time = chrono::steady_clock::now();
+      //time = chrono::duration<double>(cf_end_time-cf_start_time).count();
+      //cout << "\t\tcompute_flux runtime: " << time << " sec.\n";
+
+      //auto ts_start_time = chrono::steady_clock::now();            
       time_step(j, nelr, old_variables, variables, step_factors, fluxes);
+      //auto ts_end_time = chrono::steady_clock::now();
+      //time = chrono::duration<double>(ts_end_time-ts_start_time).count();
+      //cout << "\t\ttime_step runtime: " << time << " sec.\n";      
     }
     auto rk_end = chrono::steady_clock::now();
     time = chrono::duration<double>(rk_end-rk_start).count();

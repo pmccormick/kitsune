@@ -1705,9 +1705,11 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
     PipelineTuningOptions pto;
     pto.LoopVectorization = OptLevel > 2;
     pto.SLPVectorization = OptLevel > 2;
-    pto.LoopUnrolling = OptLevel >= 2; // TODO: too much register pressure?
+    pto.LoopUnrolling = OptLevel >= 2; 
     pto.LoopInterleaving = OptLevel > 2;
     pto.LoopStripmine = OptLevel > 2;
+    pto.ForgetAllSCEVInLoopUnroll = OptLevel > 2;
+    pto.EagerlyInvalidateAnalyses = false;  // this is experimental!!!! 
     LoopAnalysisManager lam;
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;

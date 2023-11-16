@@ -643,7 +643,7 @@ void __kitrt_hipSynchronizeStreams() {
   // If the active stream is empty, our launch path went through the
   // default stream.  Otherwise, we need to sync on each of the active
   // streams.
-  HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
+  //HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
   HIP_SAFE_CALL(hipDeviceSynchronize_p());
 }
 

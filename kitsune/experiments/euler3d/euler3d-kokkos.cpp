@@ -567,6 +567,7 @@ int main(int argc, char** argv)
     View<float> old_variables = View<float>("old_variables", nelr*NVAR);
     View<float> fluxes = View<float>("fluxes", nelr*NVAR);
     View<float> step_factors = View<float>("step_factors", nelr);
+    double *rk_times = new double[iterations];    
 
     // Begin iterations
     double copy_total = 0.0;
@@ -600,6 +601,7 @@ int main(int argc, char** argv)
 
       auto rk_end = chrono::steady_clock::now();
       time = chrono::duration<double>(rk_end-rk_start).count();
+      rk_times[i] = time;      
       rk_total += time;
     }
 
@@ -608,13 +610,20 @@ int main(int argc, char** argv)
     auto end_time = chrono::steady_clock::now();
     double elapsed_time = chrono::duration<double>(end_time-start_time).count();
     double total_time = chrono::duration<double>(end_time-total_start_time).count();
+    double rk_mean = rk_total / iterations;
+    double sum = 0.0;
+    for(int i = 0; i < iterations; i++) {
+      double dist = rk_times[i] - rk_mean;
+      sum += dist * dist; 
+    }
+    double rk_std_dev = sqrt(sum / iterations);
 
     cout << "\n"
          << "      Total time : " << total_time << " seconds.\n"
          << "    Compute time : " << elapsed_time << " seconds.\n"
 	 << "            copy : " << copy_total << " seconds (average: " << copy_total / iterations << " seconds).\n"
 	 << "              sf : " << sf_total << " seconds (average: " << sf_total / iterations << " seconds).\n"
-	 << "              rk : " << rk_total << " seconds (average: " << rk_total / iterations << " seconds).\n"      
+	 << "              rk : " << rk_total << " seconds (average: " << rk_mean << " seconds / std dev: " << rk_std_dev << ").\n"      
          << "*** " << elapsed_time << ", " << elapsed_time << "\n"
          << "----\n\n";
 
