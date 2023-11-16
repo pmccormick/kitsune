@@ -351,6 +351,7 @@ bool __kitrt_hipInit() {
     hipStream_t stream; 
     //HIP_SAFE_CALL(hipStreamCreateWithFlags_p(&stream, hipStreamNonBlocking));
     HIP_SAFE_CALL(hipStreamCreate_p(&stream));
+    fprintf(stderr, "kitrt: create cuda prefetch stream %d\n", si);
     _kitrt_PrefetchStreams.push_back(&stream);
   }
 

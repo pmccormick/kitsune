@@ -14,9 +14,11 @@ GPU_STRIPMINE_FLAGS?=-mllvm -stripmine-count=1 -mllvm -stripmine-coarsen-factor=
 TAPIR_CUDA_FLAGS?=-ftapir=cuda \
  -O$(KITSUNE_OPTLEVEL) \
  -mllvm -cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
- -mllvm -cuabi-prefetch=true \
- -mllvm -cuabi-streams=false \
+ -ffp-contract=fast \
+ -fno-unroll-loops \
  -mllvm -cuabi-arch=$(CUDA_ARCH) \
+ -mllvm -cuabi-prefetch=true \
+ -mllvm -cuabi-streams=true \
  $(GPU_STRIPMINE_FLAGS) \
  $(TAPIR_CUDA_EXTRA_FLAGS)
  #-mllvm -cuabi-run-post-opts \
@@ -35,11 +37,12 @@ endif
 ##################################
 TAPIR_HIP_FLAGS?=-ftapir=hip \
   -O$(KITSUNE_OPTLEVEL) \
+  -mllvm -hipabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
   -ffp-contract=fast \
   -fno-unroll-loops \
-  -mllvm -hipabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
   -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
-  -mllvm -hipabi-streams \
+  -mllvm -hipabi-prefetch=true \
+  -mllvm -hipabi-streams=false \
   $(TAPIR_HIP_EXTRA_FLAGS) \
   $(GPU_STRIPMINE_FLAGS)
 

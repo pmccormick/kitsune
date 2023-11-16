@@ -299,6 +299,8 @@ bool __kitrt_cuInit() {
     abort();
   }
 
+  __kitrt_CommonInit();
+
   int deviceCount = 0;
   CU_SAFE_CALL(cuInit_p(0 /*, __CUDA_API_VERSION*/));
   CU_SAFE_CALL(cuDeviceGetCount_p(&deviceCount));

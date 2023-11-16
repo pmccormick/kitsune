@@ -151,11 +151,12 @@ static cl::opt<bool>
                           cl::desc("Keep/create intermediate files during the "
                                    "various stages of the transform."));
 
-// Disable generation of prefetch calls prior to kernel launches.
-static cl::opt<bool> DisablePrefetch(
-    "hipabi-no-prefetch", cl::init(false), cl::Hidden,
-    cl::desc("Enable/disable generation of calls to do data "
-             "prefetching for memory managed kernel parameters."));
+// Generate code to prefetch data prior to kernel launches.  This is literally
+/// in the few lines right before a launch so obviously less than ideal.
+static cl::opt<bool> 
+    CodeGenPrefetch("hipabi-prefetch", cl::init(true), cl::Hidden,
+                    cl::desc("Enable generation of calls to do data "
+                             "prefetching for managed memory."));    
 
 // Enable generation of stream-based prefetching and kernel launches.
 static cl::opt<bool>
@@ -1308,7 +1309,7 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     B.CreateStore(V, ArgPtr);
     i++;
 
-    if (not DisablePrefetch) {
+    if (CodeGenPrefetch) {
       if (VTy->isPointerTy()) {
         Value *VoidPP = B.CreateBitCast(V, VoidPtrTy);
         if (CodeGenStreams) {

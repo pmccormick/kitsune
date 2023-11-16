@@ -176,8 +176,7 @@ static cl::opt<bool> KeepIntermediateFiles(
 static cl::opt<bool>
     CodeGenPrefetch("cuabi-prefetch", cl::init(true), cl::Hidden,
                     cl::desc("Enable generation of calls to do data "
-                             "prefetching for UVM-based kernel  "
-                             "parameters."));
+                             "prefetching for managed memory."));
 // Enable generation of stream-based prefetching and kernel launches.
 static cl::opt<bool>
     CodeGenStreams("cuabi-streams", cl::init(false), cl::Hidden,
