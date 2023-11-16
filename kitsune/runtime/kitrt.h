@@ -121,6 +121,8 @@ extern "C" {
                                           int &blocksPerGrid);
   extern void __kitrt_resetLaunchParameters();
 
+  extern unsigned __kitrt_getNumPrefetchStreams(void);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

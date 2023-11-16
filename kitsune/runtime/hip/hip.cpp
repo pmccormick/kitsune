@@ -452,12 +452,11 @@ void __kitrt_hipDisablePrefetch() {
 void __kitrt_hipStreamSetMemPrefetch(void *vp) {
   hipStream_t *stream = _kitrt_PrefetchStreams[_kitrt_CurPrefetchStream];
   assert(stream != nullptr && "null stream pointer!");
-
   __kitrt_hipMemPrefetchOnStream(vp, (void*)*stream);
   _kitrt_CurPrefetchStream++;
   if (_kitrt_CurPrefetchStream == _kitrt_MaxPrefetchStreams)
     _kitrt_CurPrefetchStream = 0;
-};
+}
 
 void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
@@ -471,19 +470,24 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   // possibly stronger connections with the compiler analysis.
   if (__kitrt_isMemPrefetched(vp))
     return;
-
   bool is_read_only, is_write_only;
   size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
   if (size > 0) {
     HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
                                         (hipStream_t)stream));
     __kitrt_markMemPrefetched(vp);
+    if (__kitrt_verboseMode())
+      fprintf(stderr,
+              "kitrt: hip -- issued prefetch for %p (bytes = %ld), "
+              "sync'ing device",
+              vp, size);
   }
 }
-
+    
 void *__kitrt_hipStreamMemPrefetch(void *vp) {
   hipStream_t stream;
-  HIP_SAFE_CALL(hipStreamCreateWithFlags_p(&stream, hipStreamNonBlocking));
+  HIP_SAFE_CALL(hipStreamCreate_p(&stream));
+  //HIP_SAFE_CALL(hipStreamCreateWithFlags_p(&stream, hipStreamNonBlocking));  
   __kitrt_hipMemPrefetchOnStream(vp, stream);
   _kitrtActiveStreams.push_back(stream);
   return (void *)stream;

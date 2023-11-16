@@ -28,7 +28,7 @@ raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp
 	@$(FILE_SIZE)
 raytracer-forall.hip.${host_arch}: raytracer-forall.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) -v $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)
@@ -65,6 +65,11 @@ raytracer-cuda.${host_arch}: raytracer.cu
 raytracer-hip.${host_arch}: raytracer-hip.cpp
 	@echo $@
 	@$(TIME_CMD) $(HIPCC) $(HIPCC_CXX_FLAGS) -o $@ $<
+	@$(FILE_SIZE)
+
+raytracer-hip.clang.${host_arch}: raytracer-hip.cpp
+	@echo $@
+	$(KIT_CXX) -x hip -v $(HIPCC_CXX_FLAGS) -o $@ $< -L$(ROCM_PATH)/lib -lamdhip64
 	@$(FILE_SIZE)
 #####
 define newline 

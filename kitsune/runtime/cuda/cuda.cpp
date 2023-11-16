@@ -277,6 +277,9 @@ extern "C" {
   }
 
 // ---- Initialization, properties, clean up, etc.
+static unsigned _kitrt_MaxPrefetchStreams = 4;
+static unsigned _kitrt_CurPrefetchStream = 0;
+std::vector<CUstream> _kitrt_PrefetchStreams;
 
 bool __kitrt_cuInit() {
 

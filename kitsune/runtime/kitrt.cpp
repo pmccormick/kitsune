@@ -58,7 +58,9 @@
 
 static bool _kitrtVerboseMode = false;
 static unsigned _kitrtDefaultThreadsPerBlock = 256;
+static unsigned _kitrtDefaultNumPrefetchStreams = 4;
 static bool _kitrtUseCustomLaunchParameters = false;
+
 static unsigned _kitrtThreadsPerBlock = 0;
 unsigned _kitrt_MaxPrefetchStreams = 8;
 int _kitrt_DefaultDeviceID = -1;
@@ -91,8 +93,14 @@ extern "C" {
 
 void __kitrt_CommonInit() {
 
-  if (__kitrt_getEnvValue("KITRT_THREADS_PER_BLOCK", _kitrtThreadsPerBlock))
+  if (__kitrt_getEnvValue("KITRT_THREADS_PER_BLOCK", 
+                          _kitrtThreadsPerBlock))
     _kitrtUseCustomLaunchParameters = true;
+
+  if (__kitrt_getEnvValue("KITRT_N_PREFETCH_STREAMS", _
+                          kirtNumPrefetchStreams))
+    _kitrtUseCustomPrefetchStreams = true;
+
   __kitrt_getEnvValue("KITRT_VERBOSE", _kitrtVerboseMode);
   __kitrt_getEnvValue("KITRT_MAX_NUM_PREFETCH_STREAMS", _kitrt_MaxPrefetchStreams);
   __kitrt_getEnvValue("KITRT_DEVICE_ID", _kitrt_DefaultDeviceID);
@@ -122,6 +130,13 @@ void __kitrt_getLaunchParameters(size_t numElements,
     threadsPerBlock = _kitrtDefaultThreadsPerBlock;
 
   blocksPerGrid = (numElements + threadsPerBlock - 1) / threadsPerBlock;
+}
+
+unsigned __kitrt_getNumPrefetchStreams(void) {
+  if (_kitrtNumPrefetchStreams == 0)
+    return _kitrt_DefaultNumPrefetchStreams;
+  else 
+    return _kitrtNumPrefetchStreams;
 }
 
 void __kitrt_setDefaultThreadsPerBlock(unsigned threadsPerBlock) {
