@@ -58,7 +58,9 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
+#include "llvm/Support/TargetParser.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
@@ -1139,14 +1141,54 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   }
   LLVM_DEBUG(dbgs() << "hipabi: setting kernel's minimum warps per execution unit to: " 
                     << MinWarpsPerExecUnit << "\n");
-
+  using namespace llvm::AMDGPU;
+  std::string target_feature_str = "";
+  switch(llvm::AMDGPU::parseArchAMDGCN(GPUArch)) {
+    case GK_GFX90A:
+      target_feature_str = "+gfx90a-insts,";
+      [[fallthrough]];
+    case GK_GFX908:
+      target_feature_str += "+dot3-insts,+dot4-insts,+dot5-insts,"
+                            "+dot6-insts,+mai-insts,";
+     [[fallthrough]];
+    case GK_GFX906:
+      target_feature_str += "+dl-insts,+dot1-insts,+dot2-insts,+dot7-insts,";
+      [[fallthrough]];
+    case GK_GFX90C:
+    case GK_GFX909:
+    case GK_GFX904:
+    case GK_GFX902:
+    case GK_GFX900:
+      target_feature_str += "+gfx9-insts,";
+      [[fallthrough]];
+    case GK_GFX810:
+    case GK_GFX805:
+    case GK_GFX803:
+    case GK_GFX802:
+    case GK_GFX801:
+      target_feature_str += "+gfx8-insts,+16-bit-insts,+dpp,"
+                            "+s-memrealtime,";
+      [[fallthrough]];
+    case GK_GFX705:
+    case GK_GFX704:
+    case GK_GFX703:
+    case GK_GFX702:
+    case GK_GFX701:
+    case GK_GFX700:
+      target_feature_str += "+ci-insts,";
+      [[fallthrough]];
+    case GK_GFX602:
+    case GK_GFX601:
+    case GK_GFX600:
+      target_feature_str += "+s-memtime-inst";
+      break;
+    case GK_NONE:
+      break;
+    default:
+      llvm_unreachable("Unhandled GPU!"); 
+  }
   // TODO: Need to build target-specific string... and decide if we
   // really need this...
-  const std::string target_feature_str =
-      "+16-bit-insts,+ci-insts,+dl-insts,+dot1-insts,+dot2-insts,+dot3-"
-      "insts,+dot4-insts,+dot5-insts,+dot6-insts,+dot7-insts,+dpp,+"
-      "flat-address-space,+gfx8-insts,+gfx9-insts,+gfx90a-insts,+mai-"
-      "insts,+s-memrealtime,+s-memtime-inst";
   KernelF->addFnAttr("target-cpu", GPUArch);
   KernelF->addFnAttr("uniform-work-group-size", "true");
   std::string AttrVal = llvm::utostr(MinWarpsPerExecUnit) + std::string(",") + llvm::utostr(MaxThreadsPerBlock);
@@ -1710,7 +1752,6 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
     pto.LoopInterleaving = OptLevel > 2;
     pto.LoopStripmine = OptLevel > 2;
     pto.ForgetAllSCEVInLoopUnroll = OptLevel > 2;
-    pto.EagerlyInvalidateAnalyses = false;  // this is experimental!!!! 
     LoopAnalysisManager lam;
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;

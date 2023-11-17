@@ -1994,9 +1994,9 @@ CudaABIOutputFile CudaABI::generatePTX() {
     PipelineTuningOptions pto;
     pto.LoopVectorization = OptLevel > 2;
     pto.SLPVectorization = OptLevel > 2;
-    pto.LoopUnrolling = true;
-    pto.LoopInterleaving = true;
-    pto.LoopStripmine = true;
+    pto.LoopUnrolling = OptLevel >= 2;;
+    pto.LoopInterleaving = OptLevel > 2;
+    pto.LoopStripmine = false;
     LoopAnalysisManager lam;
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;

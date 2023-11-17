@@ -5,9 +5,7 @@ ifneq ($(ROCM_PATH),)
     -fno-exceptions \
     -O$(KITSUNE_OPTLEVEL)
 
-  CLANG_HIP=$(KITSUNE_PREFIX)/bin/clang 
-  CLANG_HIP_FLAGS=-xhip --offload-arch=${AMDGPU_ARCH} \
-    -O$(KITSUNE_OPTLEVEL)
+  KITSUNE_HIPCC=$(KITSUNE_PREFIX)/bin/clang++ -x hip 
 
   HIP_LIBS=-L$(ROCM_PATH)/lib -lamdhip64
 

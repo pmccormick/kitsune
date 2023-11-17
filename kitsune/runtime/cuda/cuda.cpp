@@ -331,8 +331,6 @@ bool __kitrt_cuInit() {
   }
 
   if (__kitrt_prefetchStreamsEnabled()) {
-    fprintf(stderr, "kitrt: prefetch streams enabled.\n");
-    fprintf(stderr, "\t\tprefetch stream set size: %d", _kitrt_MaxPrefetchStreams);
     for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
       CUstream stream; 
       CU_SAFE_CALL(cuStreamCreate_p(&stream, CU_STREAM_DEFAULT));
@@ -493,49 +491,47 @@ bool __kitrt_cuIsMemManaged(void *vp) {
 
 void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
-  if (not __kitrt_isMemPrefetched(vp)) {
-    bool is_read_only, is_write_only;
-    size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
-    if (size > 0) {
-      if (is_read_only) {
-        CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
-                                   CU_MEM_ADVISE_SET_READ_MOSTLY,
-                                   _kitrtCUdevice));
-      } else {
-        CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
-                                   CU_MEM_ADVISE_UNSET_READ_MOSTLY,
-                                   _kitrtCUdevice));
-      }
-      // Our semantics assume that a prefetch request suggests an inbound
-      // kernel launch.   Setting the preferred location does not cause
-      // data to migrate to that location immediately. Instead, it guides
-      // the migration policy when a fault occurs on that memory region. If
-      // the data is already in its preferred location and the faulting
-      // processor can establish a mapping without requiring the data to be
-      // migrated, then data migration will be avoided. On the other hand, if
-      // the data is not in its preferred location or if a direct mapping cannot
-      // be established, then it will be migrated to the processor accessing it.
-      // It is important to note that setting the preferred location does not
-      // prevent data prefetching done using cuMemPrefetchAsync(). Having a
-      // preferred location can override the page thrash detection and
-      // resolution logic in the Unified Memory driver. Normally, if a page is
-      // detected to be constantly thrashing between host and device
-      // memory, the page may eventually be pinned to host memory. But if the
-      // preferred location is set as device memory, then the page will continue
-      // to thrash indefinitely. If CU_MEM_ADVISE_SET_READ_MOSTLY is also set on
-      // this memory region or any subset of it, then the policies associated
-      // with that advice will override the policies of this advice, unless read
-      // accesses from device will not result in a read-only copy being created
-      // on that device as outlined in description for the advice
-      // CU_MEM_ADVISE_SET_READ_MOSTLY.
+  bool is_read_only, is_write_only;
+  size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
+  if (size > 0) {
+    // If we have a size, we know this pointer is from managed memory...
+    if (is_read_only) {
       CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
-                                 CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
+                                 CU_MEM_ADVISE_SET_READ_MOSTLY,
                                  _kitrtCUdevice));
-
-      CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitrtCUdevice,
-                                        (CUstream)stream));
-      __kitrt_markMemPrefetched(vp);
+    } else {
+      CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
+                                 CU_MEM_ADVISE_UNSET_READ_MOSTLY,
+                                 _kitrtCUdevice));
     }
+    // Our semantics assume that a prefetch request suggests an inbound
+    // kernel launch.   Setting the preferred location does not cause
+    // data to migrate to that location immediately. Instead, it guides
+    // the migration policy when a fault occurs on that memory region. If
+    // the data is already in its preferred location and the faulting
+    // processor can establish a mapping without requiring the data to be
+    // migrated, then data migration will be avoided. On the other hand, if
+    // the data is not in its preferred location or if a direct mapping cannot
+    // be established, then it will be migrated to the processor accessing it.
+    // It is important to note that setting the preferred location does not
+    // prevent data prefetching done using cuMemPrefetchAsync(). Having a
+    // preferred location can override the page thrash detection and
+    // resolution logic in the Unified Memory driver. Normally, if a page is
+    // detected to be constantly thrashing between host and device
+    // memory, the page may eventually be pinned to host memory. But if the
+    // preferred location is set as device memory, then the page will continue
+    // to thrash indefinitely. If CU_MEM_ADVISE_SET_READ_MOSTLY is also set on
+    // this memory region or any subset of it, then the policies associated
+    // with that advice will override the policies of this advice, unless read
+    // accesses from device will not result in a read-only copy being created
+    // on that device as outlined in description for the advice
+    // CU_MEM_ADVISE_SET_READ_MOSTLY.
+    CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
+                                CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
+                                _kitrtCUdevice));
+    CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitrtCUdevice,
+                                      (CUstream)stream));
+    __kitrt_markMemPrefetched(vp);
   }
 }
 
