@@ -41,9 +41,8 @@ struct Float3 {
 
 inline __attribute__((always_inline))
 void cpy(float* dst, const float* src, int N) {
-  forall(unsigned int i = 0; i < N; i++) {
+  forall(unsigned int i = 0; i < N; i++)
     dst[i] = src[i];
-  }
 }
 
 void dump(float* variables, int nel, int nelr)
@@ -137,7 +136,8 @@ float compute_pressure(float density,
                        float density_energy,
                        float speed_sqd)
 {
-  return (float(GAMMA)-float(1.0f))*(density_energy - float(0.5f)*density*speed_sqd);
+  return (float(GAMMA)-float(1.0f))*(density_energy -
+	  float(0.5f)*density*speed_sqd);
 }
 
 inline __attribute__((always_inline))
@@ -146,7 +146,6 @@ float compute_speed_of_sound(float density, float pressure)
   return sqrtf(float(GAMMA)*pressure/density);
 }
 
-//inline __attribute__((always_inline))
 void compute_step_factor(int nelr,
                          const float* __restrict variables,
                          const float* areas,
@@ -194,11 +193,11 @@ void compute_flux(int nelr,
   using namespace std;
   const float smoothing_coefficient = 0.2f;
 
-  forall(int blk = 0; blk < nelr/block_length; ++blk) {
-    int b_start = blk*block_length;
-    int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
+  forall(unsigned int blk = 0; blk < nelr/block_length; ++blk) {
+    unsigned int b_start = blk*block_length;
+    unsigned int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
 
-    for(int i = b_start; i < b_end; ++i) {
+    for(unsigned int i = b_start; i < b_end; ++i) {
       float density_i = variables[i + VAR_DENSITY*nelr];
       Float3 momentum_i;
       momentum_i.x = variables[i + (VAR_MOMENTUM+0)*nelr];
@@ -417,11 +416,11 @@ int main(int argc, char** argv)
       
   cout << "  Reading input data, allocating arrays, initializing data, etc..." 
        << std::flush;
+
   auto total_start_time = chrono::steady_clock::now();
 
   // these need to be computed the first time in order to compute time step
-       
-  float *ff_variable = alloc<float>(NVAR);
+    float *ff_variable = alloc<float>(NVAR);
   Float3 ff_flux_contribution_momentum_x,
     ff_flux_contribution_momentum_y,
     ff_flux_contribution_momentum_z;
@@ -526,8 +525,8 @@ int main(int argc, char** argv)
   double copy_total = 0.0;
   double sf_total = 0.0;
   double rk_total = 0.0;
+
   for(int i = 0; i < iterations; i++) {
-    
     auto copy_start = chrono::steady_clock::now();
     cpy(old_variables, variables, nelr*NVAR);
     auto copy_end = chrono::steady_clock::now();
@@ -553,8 +552,10 @@ int main(int argc, char** argv)
     }
     auto rk_end = chrono::steady_clock::now();
     time = chrono::duration<double>(rk_end-rk_start).count();
-    rk_times[i] = time;
-    rk_total += time;
+    if (i > 0) {
+      rk_times[i] = time;
+      rk_total += time;
+    }
   }
   
   dump(variables, nel, nelr);
@@ -562,9 +563,9 @@ int main(int argc, char** argv)
   auto end_time = chrono::steady_clock::now();
   double elapsed_time = chrono::duration<double>(end_time-start_time).count();
   double total_time = chrono::duration<double>(end_time-total_start_time).count();
-  double rk_mean = rk_total / iterations;
+  double rk_mean = rk_total / (iterations-1);
   double sum = 0.0;
-  for(int i = 0; i < iterations; i++) {
+  for(int i = 1; i < iterations; i++) {
     double dist = rk_times[i] - rk_mean;
     sum += dist * dist; 
   }

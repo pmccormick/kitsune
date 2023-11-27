@@ -44,8 +44,7 @@ struct Float3 {
 #define __restrict
 #endif
 
-template <typename T>
-void cpy(View<T> &dst, View<T> &src, int N) {
+void cpy(View<float> &dst, View<float> &src, int N) {
   src.sync_device();
   dst.sync_device();
   Kokkos::parallel_for("copy", N, KOKKOS_LAMBDA(const int &i) {
@@ -170,14 +169,13 @@ void compute_step_factor(int nelr,
   variables.sync_device();
   areas.sync_device();
   step_factors.sync_device();
-  step_factors.modify_device();
 
   Kokkos::parallel_for("compute_step_factor", nelr/block_length,
         KOKKOS_LAMBDA(const int &blk) {
     int b_start = blk*block_length;
     int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
 
-    for(int i = b_start; i < b_end; i++) {
+    for(unsigned int i = b_start; i < b_end; i++) {
       float density = variables.d_view(i + VAR_DENSITY*nelr);
 
       Float3 momentum;
@@ -199,6 +197,7 @@ void compute_step_factor(int nelr,
         (sqrtf(speed_sqd) + speed_of_sound));
     }
   });
+  step_factors.modify_device();
   Kokkos::fence();
 }
 

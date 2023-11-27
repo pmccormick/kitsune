@@ -1742,9 +1742,10 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
   ObjFile->keep();
 
   if (OptLevel > 0) {
-    if (OptLevel > 3)
+
+    if (OptLevel > 3)  // This (I think) is consistent w/ Clang behavior...
       OptLevel = 3;
-    LLVM_DEBUG(dbgs() << "\trunning kernel module optimization passes.\n");
+
     PipelineTuningOptions pto;
     pto.LoopVectorization = OptLevel > 2;
     pto.SLPVectorization = OptLevel > 2;
@@ -1752,11 +1753,17 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
     pto.LoopInterleaving = OptLevel > 2;
     pto.LoopStripmine = OptLevel > 2;
     pto.ForgetAllSCEVInLoopUnroll = OptLevel > 2;
+    
+    // From the LLVM docs: Create the analysis managers.
+    // These must be declared in this order so that they are destroyed in the
+    // correct order due to inter-analysis-manager 
+    // references.
     LoopAnalysisManager lam;
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;
     ModuleAnalysisManager mam;
-    PassBuilder pb(AMDTargetMachine, pto);
+
+    PassBuilder pb(AMDTargetMachine);//, pto);
     pb.registerModuleAnalyses(mam);
     pb.registerCGSCCAnalyses(cgam);
     pb.registerFunctionAnalyses(fam);
@@ -1770,10 +1777,13 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
         OptimizationLevel::O3,
     };
     OptimizationLevel optLevel = optLevels[OptLevel];
-    ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
-    mpm.addPass(VerifierPass());
-    LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");
-    mpm.run(KernelModule, mam);
+    ModulePassManager mpm0 = pb.buildModuleSimplificationPipeline(optLevels[3], ThinOrFullLTOPhase::None);
+    ModulePassManager mpm1 = pb.buildPerModuleDefaultPipeline(optLevels[2]);
+    mpm0.addPass(VerifierPass());
+    mpm1.addPass(VerifierPass());
+    LLVM_DEBUG(dbgs() << "\t\t* optimize module: " << KernelModule.getName() << "\n");
+    mpm0.run(KernelModule, mam);
+    mpm1.run(KernelModule, mam);
     LLVM_DEBUG(dbgs() << "\t\tpasses complete.\n");
   }
 
