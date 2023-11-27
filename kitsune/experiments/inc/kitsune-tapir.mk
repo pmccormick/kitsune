@@ -4,7 +4,7 @@
 # 
 KITSUNE_PREFIX?=/projects/kitsune/${host_arch}/16.x
 KITSUNE_OPTLEVEL?=3
-KITSUNE_ABI_OPTLEVEL?=2
+KITSUNE_ABI_OPTLEVEL?=3
 KITSUNE_OPTFLAGS?=-O$(KITSUNE_OPTLEVEL)
 
 # For now we disable stripmining on GPUs.

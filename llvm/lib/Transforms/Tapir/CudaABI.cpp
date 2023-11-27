@@ -56,7 +56,7 @@ using namespace llvm;
 #define DEBUG_TYPE "cuabi" // support for -debug-only=cuabi
 
 static const std::string CUABI_PREFIX = "__cuabi";
-static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + ".kern.";
+static const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_kern_";
 
 // NOTE: At this point in time we do not provide support for the older range
 // of GPU architectures. We favor 64-bit and SM_60 or newer, which
@@ -115,12 +115,6 @@ static cl::opt<bool>
 static cl::opt<unsigned>
     OptLevel("cuabi-opt-level", cl::init(3), cl::NotHidden,
              cl::desc("Specify the GPU kernel optimization level."));
-static const OptimizationLevel *optLevels[4] = {
-    &OptimizationLevel::O0,
-    &OptimizationLevel::O1,
-    &OptimizationLevel::O2,
-    &OptimizationLevel::O3
-};
 
 /// Enable an extra set of passes over the host-side code after the
 /// code has been transformed (e.g., loops replaced with kernel launch
@@ -1380,11 +1374,7 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
 
   // For now let's always warn if we spill registers...
   PTXASArgList.push_back("--warn-on-spills");
-
-  if (Verbose)
-    PTXASArgList.push_back("--verbose");
-  else
-    LLVM_DEBUG(PTXASArgList.push_back("--verbose"));
+  PTXASArgList.push_back("--verbose");
 
   if (Debug) {
     PTXASArgList.push_back("--device-debug");
@@ -1417,7 +1407,9 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
       break;
     case 3:
       PTXASArgList.push_back("3");
-      PTXASArgList.push_back("--extensible-whole-program");
+      // TODO: Some compiled codes (e.g., the raytracer test) crash with a
+      // corrupted kernel error (module load time) if this flag is enabled.
+      //PTXASArgList.push_back("--extensible-whole-program");
       break;
     default:
       llvm_unreachable_internal("unhandled/unexpected optimization level",
@@ -1994,9 +1986,17 @@ CudaABIOutputFile CudaABI::generatePTX() {
     PipelineTuningOptions pto;
     pto.LoopVectorization = OptLevel > 2;
     pto.SLPVectorization = OptLevel > 2;
-    pto.LoopUnrolling = OptLevel >= 2;;
+    pto.LoopUnrolling = OptLevel >= 2;
     pto.LoopInterleaving = OptLevel > 2;
-    pto.LoopStripmine = false;
+    pto.LoopStripmine = OptLevel > 2;
+    OptimizationLevel optLevels[] = {
+        OptimizationLevel::O0,
+        OptimizationLevel::O1,
+        OptimizationLevel::O2,
+        OptimizationLevel::O3,
+    };
+    OptimizationLevel optLevel = optLevels[OptLevel];
+
     LoopAnalysisManager lam;
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;
@@ -2008,8 +2008,9 @@ CudaABIOutputFile CudaABI::generatePTX() {
     pb.registerLoopAnalyses(lam);
     PTXTargetMachine->registerPassBuilderCallbacks(pb);
     pb.crossRegisterProxies(lam, fam, cgam, mam);
-    ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(*optLevels[OptLevel]);
+    ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
     mpm.addPass(VerifierPass());
+    LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");
     mpm.run(KernelModule, mam);
     LLVM_DEBUG(dbgs() << "\t\tpasses complete.\n");
   }
@@ -2072,7 +2073,13 @@ void CudaABI::postProcessModule() {
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;
     ModuleAnalysisManager mam;
-
+    OptimizationLevel optLevels[] = {
+        OptimizationLevel::O0,
+        OptimizationLevel::O1,
+        OptimizationLevel::O2,
+        OptimizationLevel::O3,
+    };
+    OptimizationLevel optLevel = optLevels[OptLevel];
     PassBuilder pb(PTXTargetMachine, pto);
     pb.registerModuleAnalyses(mam);
     pb.registerCGSCCAnalyses(cgam);
@@ -2081,7 +2088,7 @@ void CudaABI::postProcessModule() {
     PTXTargetMachine->registerPassBuilderCallbacks(pb);
     pb.crossRegisterProxies(lam, fam, cgam, mam);
 
-    ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(*optLevels[OptLevel]);
+    ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
     mpm.addPass(VerifierPass());
     mpm.run(M, mam);
     LLVM_DEBUG(dbgs() << "\tpasses complete.\n");
@@ -2110,14 +2117,14 @@ CudaABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
     // If we have debug info in the module use a line number
     // based naming scheme for kernels.
     unsigned LineNumber = TL->getLoop()->getStartLoc()->getLine();
-    KernelName = CUABI_PREFIX + ModuleName + "_" + Twine(LineNumber).str();
+    KernelName = CUABI_KERNEL_NAME_PREFIX + ModuleName + "_" + Twine(LineNumber).str();
   } else {
     //SmallString<255> ModName(Twine(ModuleName).str());
     //sys::path::replace_extension(ModName, "");
     //KernelName = CUABI_PREFIX + ModName.c_str();
     // In the non-debug mode we use a consecutive numbering scheme for our
     // kernel names (this is currently handled via the 'make unique' parameter).
-    KernelName = CUABI_PREFIX + KernelName;
+    KernelName = CUABI_KERNEL_NAME_PREFIX + KernelName;
   }
 
   CudaLoop *Outliner = new CudaLoop(M, KernelModule, KernelName, this);

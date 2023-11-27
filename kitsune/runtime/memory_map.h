@@ -110,7 +110,7 @@ extern void __kitrt_memNeedsPrefetch(void *addr);
 
 /// @brief Return the prefetch status of the given allocation.
 /// @param addr: The pointer to the managed allocation.
-bool __kitrt_isMemPrefetched(void *addr);
+bool __kitrt_isMemPrefetched(void *addr, size_t *size = nullptr);
 
 /// @brief Is the given managed allocation marked as ready-only?
 /// @param addr: The pointer to the managed allocation. 

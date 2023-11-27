@@ -26,6 +26,7 @@ raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp
 	@echo $@
 	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
+
 raytracer-forall.hip.${host_arch}: raytracer-forall.cpp 
 	@echo $@
 	@$(TIME_CMD) $(KIT_CXX) -v $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib

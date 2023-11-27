@@ -52,11 +52,10 @@
 //===----------------------------------------------------------------------===//
 
 // TODO:
-//   * Need to do a better job tracking and freeing resources as necessary.
-//   * Need to ponder a path for better stream usage (probably related to
-//     more complex code generation on the compiler side).
-//
-//
+//   * Need a few options for stream usage that will likely require some 
+//     compiler-side static analysis and additional entry points for 
+//     runtime tuning.  (consider: blocked prefetches, prefetch streams, etc.).
+
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -121,6 +120,13 @@ static KitRTActiveStreamsList _kitrtActiveStreams;
 extern unsigned _kitrt_MaxPrefetchStreams;
 static unsigned _kitrt_CurPrefetchStream = 0;
 std::vector<CUstream> _kitrt_PrefetchStreams;
+
+struct KitRTPrefetchRequest {
+  void *addr;
+  size_t size;
+};
+
+std::list<KitRTPrefetchRequest> _kitrt_PrefetchRequests;
 
 // NOTE: Over a series of CUDA releases it is worthwhile to
 // check in on the header files for replacement versioned
@@ -326,13 +332,9 @@ bool __kitrt_cuInit() {
     _kitrtUseHeuristicLaunchParameters = false;
   }
 
-  if (__kitrt_prefetchEnabled()) {
-    fprintf(stderr, "kitrt: prefetching enabled.\n");
-  }
-
   if (__kitrt_prefetchStreamsEnabled()) {
     for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
-      CUstream stream; 
+      CUstream stream;
       CU_SAFE_CALL(cuStreamCreate_p(&stream, CU_STREAM_DEFAULT));
       _kitrt_PrefetchStreams.push_back(stream);
     }
@@ -347,14 +349,14 @@ void __kitrt_cuDestroy() {
     void __kitrt_cuFreeManagedMem(void *vp);
     __kitrt_destroyMemoryMap(__kitrt_cuFreeManagedMem);
 
-    /*for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
-      CUstream stream = _kitrt_PrefetchStreams[si];
-      CU_SAFE_CALL(hipStreamDestroy_p(stream));
+    if (__kitrt_prefetchStreamsEnabled()) {
+      for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
+        CUstream stream = _kitrt_PrefetchStreams[si];
+        CU_SAFE_CALL(cuStreamDestroy_v2_p(stream));
+      }
     }
-    */
 
     // Note that all resources associated with the context will be destroyed.
-    CU_SAFE_CALL(cuDevicePrimaryCtxRelease_v2_p(_kitrtCUdevice));
     CU_SAFE_CALL(cuDevicePrimaryCtxReset_v2_p(_kitrtCUdevice));
     _kitrt_cuIsInitialized = false;
   }
@@ -489,20 +491,65 @@ bool __kitrt_cuIsMemManaged(void *vp) {
 
 // ---- Memory/data prefetch and data movement support.
 
+void __kitrt_cuPrefetchRequest(void *vp) {
+  size_t size = 0;
+  if (not __kitrt_isMemPrefetched(vp, &size)) {
+    if (size > 0) {
+      struct KitRTPrefetchRequest R;
+      R.addr = vp;
+      R.size = size;
+      _kitrt_PrefetchRequests.push_back(R);
+    }
+  }
+}
+
+
 void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
-  bool is_read_only, is_write_only;
-  size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
-  if (size > 0) {
-    // If we have a size, we know this pointer is from managed memory...
-    if (is_read_only) {
+  size_t size = 0;
+  if (not __kitrt_isMemPrefetched(vp, &size)) {
+    if (size > 0) {
+      
+      //if (is_read_only) {
+      //  CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
+      //                             CU_MEM_ADVISE_SET_READ_MOSTLY,
+      //                             _kitrtCUdevice));
+      //} else {
+      //  CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
+      //                             CU_MEM_ADVISE_UNSET_READ_MOSTLY,
+      //                             _kitrtCUdevice));
+      //}
+
+      
+      // Our semantics assume that a prefetch request suggests an inbound
+      // kernel launch.   Setting the preferred location does not cause
+      // data to migrate to that location immediately. Instead, it guides
+      // the migration policy when a fault occurs on that memory region. If
+      // the data is already in its preferred location and the faulting
+      // processor can establish a mapping without requiring the data to be
+      // migrated, then data migration will be avoided. On the other hand, if
+      // the data is not in its preferred location or if a direct mapping cannot
+      // be established, then it will be migrated to the processor accessing it.
+      // It is important to note that setting the preferred location does not
+      // prevent data prefetching done using cuMemPrefetchAsync(). Having a
+      // preferred location can override the page thrash detection and
+      // resolution logic in the Unified Memory driver. Normally, if a page is
+      // detected to be constantly thrashing between host and device
+      // memory, the page may eventually be pinned to host memory. But if the
+      // preferred location is set as device memory, then the page will continue
+      // to thrash indefinitely. If CU_MEM_ADVISE_SET_READ_MOSTLY is also set on
+      // this memory region or any subset of it, then the policies associated
+      // with that advice will override the policies of this advice, unless read
+      // accesses from device will not result in a read-only copy being created
+      // on that device as outlined in description for the advice
+      // CU_MEM_ADVISE_SET_READ_MOSTLY.
       CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
-                                 CU_MEM_ADVISE_SET_READ_MOSTLY,
-                                 _kitrtCUdevice));
-    } else {
-      CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
-                                 CU_MEM_ADVISE_UNSET_READ_MOSTLY,
-                                 _kitrtCUdevice));
+                                 CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
+                                _kitrtCUdevice));
+
+      CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitrtCUdevice,
+                                        (CUstream)stream));
+      __kitrt_markMemPrefetched(vp);
     }
     // Our semantics assume that a prefetch request suggests an inbound
     // kernel launch.   Setting the preferred location does not cause
@@ -535,12 +582,23 @@ void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   }
 }
 
+  
 void __kitrt_cuMemPrefetch(void *vp) {
   assert(vp && "unexpected null pointer!");
   __kitrt_cuMemPrefetchOnStream(vp, NULL);
 }
 
+
 void __kitrt_cuStreamSetMemPrefetch(void *vp) {
+  // Prefetching with streams has some rules that make a guarenteed
+  // behavior difficult...  For a busy stream, the prefetch is
+  // deferred to a background thread by the driver to maintain stream
+  // ordering. This background thread executes the prefetch when all
+  // prior operations in the stream are completed. For idle streams,
+  // the driver can either defer the operation or not, but the driver
+  // often (how often?) does not defer because of the associated
+  // overhead.  The exact details for when the driver may defer vary
+  // across driver versions.
   assert(vp && "unexpected null pointer!");
   CUstream stream = _kitrt_PrefetchStreams[_kitrt_CurPrefetchStream];
   __kitrt_cuMemPrefetchOnStream(vp, (void*)stream);
@@ -1002,7 +1060,7 @@ void __kitrt_cuSynchronizeStreams() {
   CU_SAFE_CALL(cuCtxSynchronize());
   while (not _kitrtActiveStreams.empty()) {
     CUstream stream = _kitrtActiveStreams.front();
-    CU_SAFE_CALL(cuStreamDestroy(stream));
+    CU_SAFE_CALL(cuStreamDestroy_v2_p(stream));
     _kitrtActiveStreams.pop_front();
   }
 }

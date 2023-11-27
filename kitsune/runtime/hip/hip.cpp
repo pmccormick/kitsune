@@ -365,11 +365,13 @@ void __kitrt_hipDestroy() {
     extern void __kitrt_hipFreeManagedMem(void *);
     __kitrt_destroyMemoryMap(__kitrt_hipFreeManagedMem);
 
-    /*for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
-      hipStream_t stream = *(_kitrt_PrefetchStreams[si]);
-      HIP_SAFE_CALL(hipStreamDestroy_p(stream));
+  
+    if (__kitrt_prefetchStreamsEnabled()) {
+      for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
+        hipStream_t stream = *(_kitrt_PrefetchStreams[si]);
+        HIP_SAFE_CALL(hipStreamDestroy_p(stream));
+      }
     }
-    */
     HIP_SAFE_CALL(hipDeviceReset_p());
 
     _kitrt_hipIsInitialized = false;

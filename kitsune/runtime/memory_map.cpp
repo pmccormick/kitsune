@@ -143,10 +143,12 @@ void __kitrt_clearMemAdvice(void *addr) {
   }
 }
 
-bool __kitrt_isMemPrefetched(void *addr) {
+bool __kitrt_isMemPrefetched(void *addr, size_t *size) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMap::const_iterator cit = _kitrtAllocMap.find(addr);
   if (cit != _kitrtAllocMap.end()) {
+    if (size != nullptr)
+      *size = cit->second.size;
     return cit->second.prefetched;
   } else {
     #ifdef _KITRT_VERBOSE_

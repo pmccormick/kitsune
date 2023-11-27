@@ -103,10 +103,12 @@ void __kitrt_CommonInit() {
   __kitrt_getEnvValue("KITRT_MAX_NUM_PREFETCH_STREAMS", _kitrt_MaxPrefetchStreams);
   __kitrt_getEnvValue("KITRT_DEVICE_ID", _kitrt_DefaultDeviceID);
 
-  if (__kitrt_prefetchEnabled())
-    fprintf(stderr, "kitrt: prefetch enabled.\n");
-  if (__kitrt_prefetchStreamsEnabled())
-    fprintf(stderr, "kitrt: maximum prefetch streams: %d\n", _kitrt_MaxPrefetchStreams);
+  if (_kitrtVerboseMode) {
+    if (__kitrt_prefetchEnabled())
+      fprintf(stderr, "kitrt: prefetch enabled.\n");
+    if (__kitrt_prefetchStreamsEnabled())
+      fprintf(stderr, "kitrt: maximum prefetch streams: %d\n", _kitrt_MaxPrefetchStreams);
+  }
 }
 
 void __kitrt_setVerboseMode(bool Enable) {
