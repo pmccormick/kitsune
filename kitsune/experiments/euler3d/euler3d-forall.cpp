@@ -75,7 +75,7 @@ void dump(float* variables, int nel, int nelr)
 
 }
 
-
+inline __attribute__((always_inline))
 void initialize_variables(int nelr,
                           float* variables,
                           float* ff_variable)
@@ -129,9 +129,7 @@ void compute_velocity(float density,
 inline __attribute__((always_inline))
 float compute_speed_sqd(const Float3 &velocity)
 {
-  return velocity.x*velocity.x +
-         velocity.y*velocity.y +
-         velocity.z*velocity.z;
+  return velocity.x * velocity.x + velocity.y * velocity.y + velocity.z*velocity.z;
 }
 
 inline __attribute__((always_inline))
@@ -182,6 +180,7 @@ void compute_step_factor(int nelr,
   }
 }
 
+//inline __attribute__((always_inline))
 void compute_flux(int nelr,
                   int* elements_surrounding_elements,
                   float* normals,
@@ -543,24 +542,14 @@ int main(int argc, char** argv)
     sf_total += time;
 
     auto rk_start = chrono::steady_clock::now();
-    #pragma nounroll 
     for(int j = 0; j < RK; j++) {
-      //auto cf_start_time = chrono::steady_clock::now();      
       compute_flux(nelr, elements_surrounding_elements, normals, variables,
                    fluxes, ff_variable,
                    ff_flux_contribution_momentum_x,
                    ff_flux_contribution_momentum_y,
                    ff_flux_contribution_momentum_z,
                    ff_flux_contribution_density_energy);
-      //auto cf_end_time = chrono::steady_clock::now();
-      //time = chrono::duration<double>(cf_end_time-cf_start_time).count();
-      //cout << "\t\tcompute_flux runtime: " << time << " sec.\n";
-
-      //auto ts_start_time = chrono::steady_clock::now();            
       time_step(j, nelr, old_variables, variables, step_factors, fluxes);
-      //auto ts_end_time = chrono::steady_clock::now();
-      //time = chrono::duration<double>(ts_end_time-ts_start_time).count();
-      //cout << "\t\ttime_step runtime: " << time << " sec.\n";      
     }
     auto rk_end = chrono::steady_clock::now();
     time = chrono::duration<double>(rk_end-rk_start).count();

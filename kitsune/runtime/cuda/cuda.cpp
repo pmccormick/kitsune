@@ -121,6 +121,8 @@ extern unsigned _kitrt_MaxPrefetchStreams;
 static unsigned _kitrt_CurPrefetchStream = 0;
 std::vector<CUstream> _kitrt_PrefetchStreams;
 
+CUstream _kitrt_cuPrimaryStream;
+
 struct KitRTPrefetchRequest {
   void *addr;
   size_t size;
@@ -302,7 +304,7 @@ bool __kitrt_cuInit() {
   __kitrt_CommonInit();
 
   int deviceCount = 0;
-  CU_SAFE_CALL(cuInit_p(0 /*, __CUDA_API_VERSION*/));
+  CU_SAFE_CALL(cuInit_p(0));
   CU_SAFE_CALL(cuDeviceGetCount_p(&deviceCount));
   if (deviceCount == 0) {
     fprintf(stderr, "kitrt: warning -- no CUDA devices found!\n");
@@ -332,6 +334,8 @@ bool __kitrt_cuInit() {
     _kitrtUseHeuristicLaunchParameters = false;
   }
 
+  CU_SAFE_CALL(cuStreamCreate_p(&_kitrt_cuPrimaryStream, CU_STREAM_DEFAULT));
+
   if (__kitrt_prefetchStreamsEnabled()) {
     for(unsigned si = 0; si < _kitrt_MaxPrefetchStreams; si++) {
       CUstream stream;
@@ -355,6 +359,9 @@ void __kitrt_cuDestroy() {
         CU_SAFE_CALL(cuStreamDestroy_v2_p(stream));
       }
     }
+
+    CU_SAFE_CALL(cuStreamDestroy_v2_p(_kitrt_cuPrimaryStream));
+
 
     // Note that all resources associated with the context will be destroyed.
     CU_SAFE_CALL(cuDevicePrimaryCtxReset_v2_p(_kitrtCUdevice));
@@ -403,6 +410,7 @@ void *__kitrt_cuMemAllocManaged(size_t size) {
   // locality (and affinity) of data.
   __kitrt_registerMemAlloc((void *)devp, size);
 
+  CU_SAFE_CALL(cuMemPrefetchAsync_p(devp, size, _kitrtCUdevice, _kitrt_cuPrimaryStream));
   return (void *)devp;
 }
 
@@ -548,7 +556,7 @@ void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
                                 _kitrtCUdevice));
 
       CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitrtCUdevice,
-                                        (CUstream)stream));
+                                        _kitrt_cuPrimaryStream));
       __kitrt_markMemPrefetched(vp);
     }
     // Our semantics assume that a prefetch request suggests an inbound
@@ -573,19 +581,19 @@ void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
     // accesses from device will not result in a read-only copy being created
     // on that device as outlined in description for the advice
     // CU_MEM_ADVISE_SET_READ_MOSTLY.
-    CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
-                                CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
-                                _kitrtCUdevice));
-    CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitrtCUdevice,
-                                      (CUstream)stream));
-    __kitrt_markMemPrefetched(vp);
+    //CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
+    //                            CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
+    //                            _kitrtCUdevice));
+    //CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitrtCUdevice,
+    //                                  (CUstream)stream));
+    //__kitrt_markMemPrefetched(vp);
   }
 }
 
   
 void __kitrt_cuMemPrefetch(void *vp) {
   assert(vp && "unexpected null pointer!");
-  __kitrt_cuMemPrefetchOnStream(vp, NULL);
+  __kitrt_cuMemPrefetchOnStream(vp, _kitrt_cuPrimaryStream);
 }
 
 
@@ -789,7 +797,7 @@ void *__kitrt_cuLaunchModuleKernel(void *mod, const char *kernelName,
 #endif
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
-                                1, 0, nullptr /*stream*/, fatBinArgs, NULL));
+                                1, 0, _kitrt_cuPrimaryStream, fatBinArgs, NULL));
 
   if (_kitrtEnableTiming) {
     cuEventRecord_p(stop, 0);
@@ -861,7 +869,7 @@ void *__kitrt_cuStreamLaunchFBKernel(const void *fatBin, const char *kernelName,
 #endif
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
-                                1, 0, stream, fatBinArgs, NULL));
+                                1, 0, _kitrt_cuPrimaryStream, fatBinArgs, NULL));
   if (_kitrtEnableTiming) {
     cuEventRecord_p(stop, stream);
     cuEventSynchronize_p(stop);
@@ -932,7 +940,7 @@ void __kitrt_cuLaunchFBKernelOnStream(const void *fatBin,
 #endif
 
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
-                                1, 0, cu_stream, fatBinArgs, NULL));
+                                1, 0, _kitrt_cuPrimaryStream, fatBinArgs, NULL));
   if (_kitrtEnableTiming) {
     cuEventRecord_p(stop, cu_stream);
     cuEventSynchronize_p(stop);
@@ -998,7 +1006,7 @@ void __kitrt_cuLaunchKernel(const void *fatBin, const char *kernelName,
   CU_SAFE_CALL(cuLaunchKernel_p(kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1,
                                 1,
                                 0, // shared mem size
-                                (CUstream)stream, fatBinArgs, NULL));
+                                _kitrt_cuPrimaryStream, fatBinArgs, NULL));
 
   if (_kitrtEnableTiming) {
     cuEventRecord_p(stop, 0);
@@ -1030,7 +1038,7 @@ void *__kitrt_cuLaunchELFKernel(const void *elf, void **args,
   __kitrt_getLaunchParameters(numElements, threadsPerBlock, blocksPerGrid);
   CU_SAFE_CALL(cuLaunchKernel_p(kernel, blocksPerGrid, 1, 1, // grid dim
                                 threadsPerBlock, 1, 1,       // block dim
-                                0, stream,    // shared mem and stream
+                                0, _kitrt_cuPrimaryStream,    // shared mem and stream
                                 args, NULL)); // arguments
   return stream;
 }
@@ -1049,20 +1057,21 @@ void *__kitrt_cuLaunchKernel(llvm::Module &m, void **args, size_t n) {
 void __kitrt_cuStreamSynchronize(void *vs) {
   if (_kitrtEnableTiming)
     return; // TODO: Is this really safe?  We sync with events for timing.
-  CU_SAFE_CALL(cuCtxSynchronize());
-  // CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
+  CU_SAFE_CALL(cuStreamSynchronize_p(_kitrt_cuPrimaryStream));
+  //CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
 }
 
 void __kitrt_cuSynchronizeStreams() {
   // If the active stream is empty, our launch path went through the
   // default stream.  Otherwise, we need to sync on each of the active
   // streams.
-  CU_SAFE_CALL(cuCtxSynchronize());
-  while (not _kitrtActiveStreams.empty()) {
-    CUstream stream = _kitrtActiveStreams.front();
-    CU_SAFE_CALL(cuStreamDestroy_v2_p(stream));
-    _kitrtActiveStreams.pop_front();
-  }
+  CU_SAFE_CALL(cuStreamSynchronize_p(_kitrt_cuPrimaryStream));
+  //CU_SAFE_CALL(cuCtxSynchronize_p());
+  //while (not _kitrtActiveStreams.empty()) {
+  //  CUstream stream = _kitrtActiveStreams.front();
+  //  CU_SAFE_CALL(cuStreamDestroy_v2_p(stream));
+  //  _kitrtActiveStreams.pop_front();
+  //}
 }
 
 // ---- Event management for timing, etc.
