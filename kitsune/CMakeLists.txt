@@ -6,7 +6,12 @@
 # the LLVM license.
 #
 cmake_minimum_required(VERSION 3.19)
-project(Kitsune)
+if (KITRT_ENABLE_CUDA)
+  project(Kitsune C CXX CUDA)
+else()
+  project(Kitsune C CXX)
+endif()
+
 include(FetchContent)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")

@@ -65,7 +65,6 @@ extern "C" {
 
 // ---- Initialization, properties, clean up, etc.
 
-
 /// @brief Initialize HIP support within the kitsune runtime.
 /// @return True on success, false otherwise.
 bool __kitrt_hipInit();

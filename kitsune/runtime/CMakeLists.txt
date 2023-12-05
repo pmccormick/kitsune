@@ -22,7 +22,6 @@ option(KITRT_ENABLE_VERBOSE "Enable verbose execution mode for debuggin." OFF)
 set(KITSUNE_BITCODE_INSTALL_DIR  "lib/bitcode/" CACHE STRING
   "Location to install Kitsune's runtime bitcode files.")
 
-
 include_directories(${KITSUNE_SOURCE_DIR}/include)
 include_directories(${KITSUNE_RUNTIME_INCLUDE_DIR})
 
@@ -51,6 +50,7 @@ set(KITRT_SRCS
 set(KITRT_LINK_LIBS "")
 
 if (KITRT_ENABLE_CUDA)
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin /opt/cuda/bin --gpu-architecture sm_86")
   message(STATUS "Kitsune runtime adding CUDA components to build...")
   find_package(CUDAToolkit REQUIRED)
   add_definitions(-DKITRT_CUDA_ENABLED)
@@ -59,7 +59,8 @@ if (KITRT_ENABLE_CUDA)
     cuda/llvm-cuda.h)
   list(APPEND KITRT_SRCS
      cuda/cuda.cpp
-     cuda/llvm-cuda.cpp)
+     cuda/llvm-cuda.cpp
+     cuda/spin.cu)
   link_directories(${CUDAToolkit_LIBRARY_DIR})
   include_directories(${CUDAToolkit_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda)

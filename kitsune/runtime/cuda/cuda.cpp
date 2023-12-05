@@ -121,6 +121,11 @@ extern unsigned _kitrt_MaxPrefetchStreams;
 static unsigned _kitrt_CurPrefetchStream = 0;
 std::vector<CUstream> _kitrt_PrefetchStreams;
 
+extern "C" {
+unsigned int *_kitrt_SpinLatch = nullptr;
+}
+
+extern "C" void __kitrt_cuLaunchSpinWait(CUstream stream);
 CUstream _kitrt_cuPrimaryStream;
 
 struct KitRTPrefetchRequest {
@@ -172,6 +177,8 @@ DECLARE_DLSYM(cuModuleGetFunction);
 DECLARE_DLSYM(cuModuleUnload);
 
 DECLARE_DLSYM(cuMemAllocManaged);
+DECLARE_DLSYM(cuMemAllocHost);
+DECLARE_DLSYM(cuMemHostAlloc);
 DECLARE_DLSYM(cuMemsetD8Async);
 DECLARE_DLSYM(cuMemFree_v2);
 DECLARE_DLSYM(cuMemPrefetchAsync);
@@ -226,6 +233,8 @@ static bool __kitrt_cuLoadDLSyms() {
     DLSYM_LOAD(cuCtxGetCurrent);
 
     DLSYM_LOAD(cuMemAllocManaged);
+    DLSYM_LOAD(cuMemAllocHost);
+    DLSYM_LOAD(cuMemHostAlloc);
     DLSYM_LOAD(cuMemsetD8Async);
     DLSYM_LOAD(cuMemFree_v2);
     DLSYM_LOAD(cuMemPrefetchAsync);
@@ -343,7 +352,9 @@ bool __kitrt_cuInit() {
       _kitrt_PrefetchStreams.push_back(stream);
     }
   }
-
+  //CU_SAFE_CALL(cuMemHostAlloc_p((void**)&_kitrt_SpinLatch, 
+  //                              sizeof(unsigned int),
+  //                              CU_MEMHOSTALLOC_PORTABLE));
   return _kitrt_cuIsInitialized;
 }
 
@@ -361,7 +372,6 @@ void __kitrt_cuDestroy() {
     }
 
     CU_SAFE_CALL(cuStreamDestroy_v2_p(_kitrt_cuPrimaryStream));
-
 
     // Note that all resources associated with the context will be destroyed.
     CU_SAFE_CALL(cuDevicePrimaryCtxReset_v2_p(_kitrtCUdevice));
@@ -410,6 +420,7 @@ void *__kitrt_cuMemAllocManaged(size_t size) {
   // locality (and affinity) of data.
   __kitrt_registerMemAlloc((void *)devp, size);
 
+  //CU_SAFE_CALL(cuStreamAttachMemAsync(_kitrt_cuPrimaryStream, devp, size,  CU_MEM_ATTACH_GLOBAL));
   CU_SAFE_CALL(cuMemPrefetchAsync_p(devp, size, _kitrtCUdevice, _kitrt_cuPrimaryStream));
   return (void *)devp;
 }
@@ -514,6 +525,10 @@ void __kitrt_cuPrefetchRequest(void *vp) {
 
 void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
   assert(vp && "unexpected null pointer!");
+
+  //if ((*_kitrt_SpinLatch) == 1)
+  //  __kitrt_cuLaunchSpinWait(_kitrt_cuPrimaryStream);
+
   size_t size = 0;
   if (not __kitrt_isMemPrefetched(vp, &size)) {
     if (size > 0) {
@@ -1057,6 +1072,7 @@ void *__kitrt_cuLaunchKernel(llvm::Module &m, void **args, size_t n) {
 void __kitrt_cuStreamSynchronize(void *vs) {
   if (_kitrtEnableTiming)
     return; // TODO: Is this really safe?  We sync with events for timing.
+  //*_kitrt_SpinLatch = 1;
   CU_SAFE_CALL(cuStreamSynchronize_p(_kitrt_cuPrimaryStream));
   //CU_SAFE_CALL(cuStreamSynchronize_p((CUstream)vs));
 }
@@ -1065,6 +1081,7 @@ void __kitrt_cuSynchronizeStreams() {
   // If the active stream is empty, our launch path went through the
   // default stream.  Otherwise, we need to sync on each of the active
   // streams.
+  //*_kitrt_SpinLatch = 1;
   CU_SAFE_CALL(cuStreamSynchronize_p(_kitrt_cuPrimaryStream));
   //CU_SAFE_CALL(cuCtxSynchronize_p());
   //while (not _kitrtActiveStreams.empty()) {
