@@ -100,6 +100,10 @@ static bool _kitrt_hipEnablePrefetch = true;
 typedef std::list<hipStream_t> KitRTActiveStreamsList;
 static KitRTActiveStreamsList _kitrtActiveStreams;
 
+// We keep a single "primary" stream for data movement and kernel 
+// launches. This is done to avoid the default stream. 
+hipStream_t _kitrt_hipPrimaryStream;
+
 // Declare the various dynamic entry points into the the HIP
 // API for use in the runtime.  This is helpful feature for
 // use during JIT compilation or related similar operations.
@@ -177,6 +181,7 @@ static bool __kitrt_hipLoadDLSyms() {
     // ---- Initialize, properties, error handling, clean up, etc.
     DLSYM_LOAD(hipInit);
     DLSYM_LOAD(hipDeviceSynchronize);
+
     DLSYM_LOAD(hipSetDevice);
     DLSYM_LOAD(hipGetDevice);
     DLSYM_LOAD(hipGetDeviceCount);
@@ -343,6 +348,9 @@ bool __kitrt_hipInit() {
                     "managed memory accesses!\n");
     abort(); // TODO: eventually want to return false so JIT runtime won't fail.
   } else {
+
+    HIP_SAFE_CALL(hipStreamCreate_p(&_kitrt_hipPrimaryStream));
+
     if (__kitrt_verboseMode())
       fprintf(stderr, "kitrt: hip -- successfully initialized.\n");
     _kitrt_hipIsInitialized = true;
@@ -393,21 +401,21 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
   void *memPtr;
 
   HIP_SAFE_CALL(hipSetDevice(_kitrt_hipDeviceID));
-
   HIP_SAFE_CALL(hipMallocManaged_p(&memPtr, size, hipMemAttachGlobal));
+  
   // Per AMD docs: Set the preferred location for the data as the specified device.
-  //HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetPreferredLocation,
-  //                            _kitrt_hipDeviceID));
+  HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetPreferredLocation,
+                              _kitrt_hipDeviceID));
   // Per AMD docs: Data will be accessed by the specified device, so 
   // prevent page faults as much as possible.
-  //HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetAccessedBy,
-  //                            _kitrt_hipDeviceID));
+  HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetAccessedBy,
+                              _kitrt_hipDeviceID));
   // Per AMD docs: The default memory model is fine-grain. That allows coherent 
   // operations between host and device, while executing kernels. The coarse-grain 
   // can be used for data that only needs to be coherent at dispatch boundaries 
   // for better performance.
-  //HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetCoarseGrain,
-  //                            _kitrt_hipDeviceID));
+  HIP_SAFE_CALL(hipMemAdvise_p(memPtr, size, hipMemAdviseSetCoarseGrain,
+                               _kitrt_hipDeviceID));
   __kitrt_registerMemAlloc(memPtr, size);
 
   if (__kitrt_verboseMode())
@@ -416,7 +424,12 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
             "(%ld bytes @ %p).\n",
             size, memPtr);
 
-  HIP_SAFE_CALL(hipMemPrefetchAsync_p(memPtr, size, _kitrt_hipDeviceID, _kitrt_hipPrimaryStream));
+  // Cheat a bit an just go ahead and issue a prefetch...  This seems
+  // beneficial in certain cases with CUDA but the jury is still out
+  // for HIP/ROCm...
+  HIP_SAFE_CALL(hipMemPrefetchAsync_p(memPtr, size,
+				      _kitrt_hipDeviceID,
+				      _kitrt_hipPrimaryStream));
   return (void *)memPtr;
 }
 
@@ -488,9 +501,7 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
     __kitrt_markMemPrefetched(vp);
     if (__kitrt_verboseMode())
       fprintf(stderr,
-              "kitrt: hip -- issued prefetch for %p (bytes = %ld), "
-              "sync'ing device",
-              vp, size);
+              "kitrt: hip -- issued prefetch for %p (bytes = %ld).\n", vp, size);
   }
 }
     
@@ -575,12 +586,6 @@ void __kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
                         HIP_LAUNCH_PARAM_BUFFER_SIZE, &argsSize,
                         HIP_LAUNCH_PARAM_END};
 
-  // TODO: Should we sync here for prefetch calls that were issued before
-  // the launch?  In *theory* the kernel launch should wait for all streams
-  // to complete -- i.e., this is just overhead...  However, it is not at all
-  // clear that this is actually working well with managed memory... 
-  //HIP_SAFE_CALL(hipDeviceSynchronize_p());
-
   // Note the discrepancy between hip and cuda here. 
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(
       kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1, 1, 0, _kitrt_hipPrimaryStream,
@@ -654,7 +659,8 @@ void __kitrt_hipSynchronizeStreams() {
   // default stream.  Otherwise, we need to sync on each of the active
   // streams.
   //HIP_SAFE_CALL(hipSetDevice_p(_kitrt_hipDeviceID));
-  HIP_SAFE_CALL(hipDeviceSynchronize_p());
+  HIP_SAFE_CALL(hipStreamSynchronize_p(_kitrt_hipPrimaryStream));
+  //HIP_SAFE_CALL(hipDeviceSynchronize_p());
 }
 
 // ---- Event management and handling.
