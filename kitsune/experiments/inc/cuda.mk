@@ -8,6 +8,7 @@ ifneq ($(CUDA_PATH),)
     --relocatable-device-code=false \
     --expt-extended-lambda \
     --expt-relaxed-constexpr \
+    -ccbin /usr/bin \
     -O$(KITSUNE_OPTLEVEL)
 
   CLANG_CUDA=$(KITSUNE_PREFIX)/bin/clang 

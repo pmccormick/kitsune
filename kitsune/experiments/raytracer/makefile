@@ -45,7 +45,7 @@ raytracer-kokkos.hip.kitsune.${host_arch}: raytracer-kokkos-no-view.cpp
 # kokkos-based tests (using views -- currently not compatible w/ kitsune)
 raytracer-kokkos.nvcc.${host_arch}: raytracer-kokkos.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+	$(TIME_CMD) $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
 	@$(FILE_SIZE)
 raytracer-kokkos.hipcc.${host_arch}: raytracer-kokkos.cpp 
 	@echo $@

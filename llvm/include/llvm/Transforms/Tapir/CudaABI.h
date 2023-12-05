@@ -200,7 +200,7 @@ public:
                                DominatorTree &DT) override final;
   void transformForPTX(Function &F);
 
-  Function *resolveLibDeviceFunction(Function *F);
+  Function *resolveLibDeviceFunction(Function *F, bool enableFastMode);
 };
 
 }

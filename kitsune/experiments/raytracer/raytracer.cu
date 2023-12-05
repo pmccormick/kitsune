@@ -232,11 +232,14 @@ int main(int argc, char **argv) {
     fprintf(stderr, "failed to allocate managed memory!\n");
     return 1;
   }
+  int myGpuID;
+  cudaGetDevice(&myGpuID);
+  cudaMemPrefetchAsync ( (const void*)img, totalPixels * sizeof(Pixel), myGpuID);
   cout << "  done.\n\n";
 
   cout << "  Starting benchmark..." << std::flush;
   auto start_time = chrono::steady_clock::now();
-  int threadsPerBlock = 256;
+  int threadsPerBlock = 32;
   int blocksPerGrid = (totalPixels + threadsPerBlock - 1) / threadsPerBlock;
   PathTracer<<<blocksPerGrid, threadsPerBlock>>>(sampleCount, img, totalPixels,
                                                  imageWidth, imageHeight);

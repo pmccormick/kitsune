@@ -240,6 +240,8 @@ extern unsigned _kitrt_MaxPrefetchStreams;
 static unsigned _kitrt_CurPrefetchStream = 0;
 static std::vector<hipStream_t*> _kitrt_PrefetchStreams;
 
+hipStream_t _kitrt_hipPrimaryStream; 
+
 static bool _kitrt_enableXnack = false;
 
 void __kitrt_hipEnableXnack() { _kitrt_enableXnack = true; }
@@ -268,8 +270,7 @@ bool __kitrt_hipInit() {
 
   __kitrt_CommonInit();
 
-
-
+  __kitrt_setDefaultThreadsPerBlock(1024);
   // Note: From the HIP docs, "most HIP APIs implicitly initialize the
   // HIP runtime. This [call] provides control over the timing of the
   // initialization.".  The compiler will insert this call into a global
@@ -357,6 +358,8 @@ bool __kitrt_hipInit() {
     }
   }
 
+  HIP_SAFE_CALL(hipStreamCreate_p(&_kitrt_hipPrimaryStream));
+
   return _kitrt_hipIsInitialized;
 }
 
@@ -372,6 +375,9 @@ void __kitrt_hipDestroy() {
         HIP_SAFE_CALL(hipStreamDestroy_p(stream));
       }
     }
+
+    HIP_SAFE_CALL(hipStreamDestroy_p(_kitrt_hipPrimaryStream));
+
     HIP_SAFE_CALL(hipDeviceReset_p());
 
     _kitrt_hipIsInitialized = false;
@@ -410,6 +416,7 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
             "(%ld bytes @ %p).\n",
             size, memPtr);
 
+  HIP_SAFE_CALL(hipMemPrefetchAsync_p(memPtr, size, _kitrt_hipDeviceID, _kitrt_hipPrimaryStream));
   return (void *)memPtr;
 }
 
@@ -473,13 +480,11 @@ void __kitrt_hipMemPrefetchOnStream(void *vp, void *stream) {
   // memory, the impact is performance vs. correctness but more
   // work needs to be done on the runtime's tracking and
   // possibly stronger connections with the compiler analysis.
-  if (__kitrt_isMemPrefetched(vp))
-    return;
-  bool is_read_only, is_write_only;
-  size_t size = __kitrt_getMemAllocSize(vp, &is_read_only, &is_write_only);
-  if (size > 0) {
-    HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
-                                        (hipStream_t)stream));
+  size_t size = 0;
+  if (not __kitrt_isMemPrefetched(vp, &size)) {
+    if (size > 0)
+      HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, _kitrt_hipDeviceID,
+                                          _kitrt_hipPrimaryStream));
     __kitrt_markMemPrefetched(vp);
     if (__kitrt_verboseMode())
       fprintf(stderr,
@@ -500,7 +505,7 @@ void *__kitrt_hipStreamMemPrefetch(void *vp) {
 
 void __kitrt_hipMemPrefetch(void *vp) {
   assert(vp && "unexpected null pointer!");
-  __kitrt_hipMemPrefetchOnStream(vp, nullptr);
+  __kitrt_hipMemPrefetchOnStream(vp, _kitrt_hipPrimaryStream);
 }
 
 void __kitrt_hipMemcpySymbolToDevice(void *hostPtr, void *devPtr, size_t size) {
@@ -578,7 +583,7 @@ void __kitrt_hipLaunchModuleKernel(void *module, const char *kernelName,
 
   // Note the discrepancy between hip and cuda here. 
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(
-      kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1, 1, 0, (hipStream_t)stream,
+      kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1, 1, 0, _kitrt_hipPrimaryStream,
       nullptr, (void **)&configArgs[0]));
   _kitrt_CurPrefetchStream = 0;
 }
@@ -634,7 +639,7 @@ void __kitrt_hipLaunchKernel(const void *fatBin, const char *kernelName,
   // Note the discrepancy between hip and cuda here -- for hip the module
   // launch is the same as the "standard" cuda launch.
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(
-      kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1, 1, 0, (hipStream_t)stream,
+      kFunc, blocksPerGrid, 1, 1, threadsPerBlock, 1, 1, 0, _kitrt_hipPrimaryStream,
       nullptr, (void **)&configArgs[0]));
 
   _kitrt_CurPrefetchStream = 0;

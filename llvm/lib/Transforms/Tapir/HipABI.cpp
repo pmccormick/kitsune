@@ -1828,7 +1828,7 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("--no-undefined");
   LDDArgList.push_back("-shared");
   //LDDArgList.push_back("--eh-frame-hdr");
-  //LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
+  LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
   LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
   LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=false");
   std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch;

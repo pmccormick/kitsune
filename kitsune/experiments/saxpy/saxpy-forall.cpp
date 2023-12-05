@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
   unsigned int iterations = 10;
   if (argc > 1) {
     size = atol(argv[1]);
-    if (argc == 2)
+    if (argc == 3)
       iterations = atoi(argv[2]);
     else {
       cout << "usage: saxpy [size] [iterations]\n";

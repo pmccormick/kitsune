@@ -13,14 +13,17 @@ GPU_STRIPMINE_FLAGS?=
 ##################################
 TAPIR_CUDA_FLAGS?=-ftapir=cuda \
  -O$(KITSUNE_OPTLEVEL) \
- -mllvm -hipabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
+ -mllvm -cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
  -mllvm -cuabi-arch=$(CUDA_ARCH) \
  -ffp-contract=fast \
+ -ffast-math -fno-vectorize \
  -mllvm -cuabi-prefetch=true \
- -mllvm -cuabi-streams=false \
  $(GPU_STRIPMINE_FLAGS) \
  $(TAPIR_CUDA_EXTRA_FLAGS)
+
+ #-ffast-math -fno-vectorize \
  #-mllvm -cuabi-run-post-opts \
+ # -mllvm -cuabi-streams=true \
 
 TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda,--lto-O${KITSUNE_OPTLEVEL},\
 -mllvm,-cuabi-opt-level=${KITSUNE_OPTLEVEL},-mllvm,-cuabi-arch=$(CUDA_ARCH),\
@@ -41,11 +44,11 @@ TAPIR_HIP_FLAGS?=-ftapir=hip \
   -fno-vectorize \
   -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
   -mllvm -hipabi-prefetch=true \
-  -mllvm -hipabi-streams=true \
+  -mllvm -hipabi-streams=false \
+  -mllvm -hipabi-xnack=true \
   $(TAPIR_HIP_EXTRA_FLAGS) \
   $(GPU_STRIPMINE_FLAGS)
 
-#-mllvm -hipabi-xnack=true \
 
 
 TAPIR_HIP_LTO_FLAGS?=-Wl,--tapir-target=hip,--lto-O$(KITSUNE_OPTLEVEL),\
