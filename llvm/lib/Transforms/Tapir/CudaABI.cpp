@@ -1019,22 +1019,22 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
     else if (Fn->getName() == "llvm.tan.f64")
       FnName += "tan";
     else {
-      errs() << "cuabi: transforming intrinsic call " << Fn->getName() << "()\n";
+      //errs() << "cuabi: transforming intrinsic call " << Fn->getName() << "()\n";
       //report_fatal_error("cuabi: no transform for llvm intrinsic!");
       return nullptr;
     }
   } else {
-    errs() << "cuabi: transform call " << Fn->getName() << "()\n";
+    //errs() << "cuabi: transform call " << Fn->getName() << "()\n";
     if (Fn->getName() == "__sqrtf_finite") {
       FnName = "llvm.nvvm.sqrt.approx.ftz.f";
-      errs() << "\t mapping to " << FnName << "\n";
-      return FnName;
+      //errs() << "\t mapping to " << FnName << "\n";
     } else if (Fn->getName() == "__powf_finite")
       FnName = "fast_powf";
     else if (Fn->getName() == "__fmodf_finite")
       FnName = "modff";
-
-  } FnName = Fn->getName().str();
+  } 
+  
+  FnName = Fn->getName().str();
   if (Function *KF = KernelModule.getFunction(NVPrefix + FnName)) {
     LLVM_DEBUG(dbgs() << "\t\tfound existing device function '" << KF->getName()
                       << "'.\n");
