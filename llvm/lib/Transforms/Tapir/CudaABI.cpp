@@ -1025,9 +1025,11 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
     }
   } else {
     errs() << "cuabi: transform call " << Fn->getName() << "()\n";
-    if (Fn->getName() == "__sqrtf_finite")
-      FnName = "llvm.nvvm.";
-    else if (Fn->getName() == "__powf_finite")
+    if (Fn->getName() == "__sqrtf_finite") {
+      FnName = "llvm.nvvm.sqrt.approx.ftz.f";
+      errs() << "\t mapping to " << FnName << "\n";
+      return FnName;
+    } else if (Fn->getName() == "__powf_finite")
       FnName = "fast_powf";
     else if (Fn->getName() == "__fmodf_finite")
       FnName = "modff";
