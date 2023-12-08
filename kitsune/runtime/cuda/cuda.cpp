@@ -68,8 +68,11 @@
 #include <mutex>
 #include <sstream>
 #include <stdbool.h>
+#include <sys/syscall.h>
 #include <unordered_map>
 #include <unistd.h>
+
+#define gettid() syscall(SYS_gettid)
 
 #include "../debug.h"
 #include "../dlutils.h"
