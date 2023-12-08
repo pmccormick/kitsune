@@ -150,7 +150,6 @@ extern "C" {
   void __kitrt_cuStreamSynchronize(void *vs);
   void __kitrt_cuSynchronizeStreams();
 
-
 #ifdef __cplusplus
 } // extern "C"
 #endif

@@ -59,14 +59,15 @@ if (KITRT_ENABLE_CUDA)
     cuda/llvm-cuda.h)
   list(APPEND KITRT_SRCS
      cuda/cuda.cpp
-     cuda/llvm-cuda.cpp
-     cuda/spin.cu)
+     cuda/llvm-cuda.cpp)
   link_directories(${CUDAToolkit_LIBRARY_DIR})
   include_directories(${CUDAToolkit_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
   list(APPEND KITRT_LINK_LIBS
     "-lnvptxcompiler_static -lcudart -lcuda")
+
   #add_subdirectory(cuda/numpy)
+
 endif()
 
 if (KITRT_ENABLE_HIP)
