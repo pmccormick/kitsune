@@ -16,7 +16,6 @@ TAPIR_CUDA_FLAGS?=-ftapir=cuda \
  -mllvm -cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
  -mllvm -cuabi-arch=$(CUDA_ARCH) \
  -ffp-contract=fast \
- -ffast-math -fno-vectorize \
  -mllvm -cuabi-prefetch=true \
  $(GPU_STRIPMINE_FLAGS) \
  $(TAPIR_CUDA_EXTRA_FLAGS)

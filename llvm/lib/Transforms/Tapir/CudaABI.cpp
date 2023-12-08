@@ -18,6 +18,7 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfoMetadata.h"
+#include "llvm/IR/FMF.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
@@ -150,12 +151,6 @@ static cl::opt<bool>
                         cl::Hidden,
                         cl::desc("Disable the use of the constants bank in "
                                  "GPU code generation. (default=false)"));
-
-/// Enable fast math mode for the transforms. 
-static cl::opt<bool>
-    EnableFastMath("cuabi-use-fast-math", cl::init(false),
-                   cl::Hidden,
-                   cl::desc("Enable fast math code generation. (default=false)"));
 
 /// Set the CUDA ABI's default grain size value.  This is used internally
 /// by the transform.
@@ -1080,12 +1075,15 @@ void CudaLoop::transformForPTX(Function &F) {
   bool enableFast;
   for (auto I = inst_begin(&F); I != inst_end(&F); I++) {
     if (auto CI = dyn_cast<CallInst>(&*I)) {
-
-      enableFast = false;
       if (FPMathOperator *FPO = dyn_cast<FPMathOperator>(CI)) {
+        LLVM_DEBUG(dbgs() << "\tCall is for a FP math operation: " << *FPO);
         if (FPO->isFast()) {
-          errs() << "fast math operator: " << *CI << "\n";
+          LLVM_DEBUG(dbgs() << " [fast]\n");
+          FastMathFlags FMF = FPO->getFastMathFlags();
           enableFast = true;
+        } else {
+          LLVM_DEBUG(dbgs() << " [std/full precision]\n");
+          enableFast = false;
         }
       }
 

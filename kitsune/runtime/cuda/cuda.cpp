@@ -64,6 +64,7 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <mutex>
 #include <sstream>
 #include <stdbool.h>
 #include <unordered_map>
@@ -394,10 +395,13 @@ void __kitrt_cuCheckCtxState() {
 
 // ---- Managed memory allocation, tracking, etc.
 
+static std::mutex _kitrt_mem_alloc_mutex;
 __attribute__((malloc)) 
 void *__kitrt_cuMemAllocManaged(size_t size) {
   if (not _kitrt_cuIsInitialized)
     __kitrt_cuInit();
+
+  _kitrt_mem_alloc_mutex.lock();
 
   CUdeviceptr devp;
   CU_SAFE_CALL(cuMemAllocManaged_p(&devp, size, CU_MEM_ATTACH_GLOBAL));
@@ -419,8 +423,8 @@ void *__kitrt_cuMemAllocManaged(size_t size) {
   // Register this allocation so the runtime can help track the
   // locality (and affinity) of data.
   __kitrt_registerMemAlloc((void *)devp, size);
+  _kitrt_mem_alloc_mutex.unlock();
 
-  //CU_SAFE_CALL(cuStreamAttachMemAsync(_kitrt_cuPrimaryStream, devp, size,  CU_MEM_ATTACH_GLOBAL));
   CU_SAFE_CALL(cuMemPrefetchAsync_p(devp, size, _kitrtCUdevice, _kitrt_cuPrimaryStream));
   return (void *)devp;
 }
@@ -487,14 +491,20 @@ void __kitrt_cuMemFree(void *vp) {
   // crashes...
   if (not _kitrt_cuIsInitialized)
     __kitrt_cuInit();
+
+  _kitrt_mem_alloc_mutex.lock();
   __kitrt_unregisterMemAlloc(vp);
   CU_SAFE_CALL(cuMemFree_v2_p((CUdeviceptr)vp));
+  _kitrt_mem_alloc_mutex.unlock();
 }
 
 void __kitrt_cuFreeManagedMem(void *vp) {
   if (not _kitrt_cuIsInitialized)
     __kitrt_cuInit();
+  _kitrt_mem_alloc_mutex.lock();
   CU_SAFE_CALL(cuMemFree_v2_p((CUdeviceptr)vp));
+  __kitrt_unregisterMemAlloc(vp);
+  _kitrt_mem_alloc_mutex.unlock();
 }
 
 bool __kitrt_cuIsMemManaged(void *vp) {
@@ -542,7 +552,6 @@ void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
       //                             CU_MEM_ADVISE_UNSET_READ_MOSTLY,
       //                             _kitrtCUdevice));
       //}
-
       
       // Our semantics assume that a prefetch request suggests an inbound
       // kernel launch.   Setting the preferred location does not cause
@@ -569,39 +578,11 @@ void __kitrt_cuMemPrefetchOnStream(void *vp, void *stream) {
       CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
                                  CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
                                 _kitrtCUdevice));
-
       CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitrtCUdevice,
                                         _kitrt_cuPrimaryStream));
       __kitrt_markMemPrefetched(vp);
     }
-    // Our semantics assume that a prefetch request suggests an inbound
-    // kernel launch.   Setting the preferred location does not cause
-    // data to migrate to that location immediately. Instead, it guides
-    // the migration policy when a fault occurs on that memory region. If
-    // the data is already in its preferred location and the faulting
-    // processor can establish a mapping without requiring the data to be
-    // migrated, then data migration will be avoided. On the other hand, if
-    // the data is not in its preferred location or if a direct mapping cannot
-    // be established, then it will be migrated to the processor accessing it.
-    // It is important to note that setting the preferred location does not
-    // prevent data prefetching done using cuMemPrefetchAsync(). Having a
-    // preferred location can override the page thrash detection and
-    // resolution logic in the Unified Memory driver. Normally, if a page is
-    // detected to be constantly thrashing between host and device
-    // memory, the page may eventually be pinned to host memory. But if the
-    // preferred location is set as device memory, then the page will continue
-    // to thrash indefinitely. If CU_MEM_ADVISE_SET_READ_MOSTLY is also set on
-    // this memory region or any subset of it, then the policies associated
-    // with that advice will override the policies of this advice, unless read
-    // accesses from device will not result in a read-only copy being created
-    // on that device as outlined in description for the advice
-    // CU_MEM_ADVISE_SET_READ_MOSTLY.
-    //CU_SAFE_CALL(cuMemAdvise_p((CUdeviceptr)vp, size,
-    //                            CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
-    //                            _kitrtCUdevice));
-    //CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitrtCUdevice,
-    //                                  (CUstream)stream));
-    //__kitrt_markMemPrefetched(vp);
+    
   }
 }
 

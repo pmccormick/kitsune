@@ -59,6 +59,7 @@
 #include <iostream>
 #include <list>
 #include <map>
+#include <mutex>
 #include <sstream>
 #include <stdbool.h>
 #include <unordered_map>
@@ -245,8 +246,6 @@ extern unsigned _kitrt_MaxPrefetchStreams;
 static unsigned _kitrt_CurPrefetchStream = 0;
 static std::vector<hipStream_t*> _kitrt_PrefetchStreams;
 
-hipStream_t _kitrt_hipPrimaryStream; 
-
 static bool _kitrt_enableXnack = false;
 
 void __kitrt_hipEnableXnack() { _kitrt_enableXnack = true; }
@@ -396,10 +395,12 @@ void __kitrt_hipDestroy() {
 
 // ---- Managed memory allocation, tracking, etc.
 
+static std::mutex _kitrt_mem_alloc_mutex;
 void *__kitrt_hipMemAllocManaged(size_t size) {
   assert(_kitrt_hipIsInitialized && "kitrt: hip has not been initialized!");
   void *memPtr;
 
+  _kitrt_mem_alloc_mutex.lock();
   HIP_SAFE_CALL(hipSetDevice(_kitrt_hipDeviceID));
   HIP_SAFE_CALL(hipMallocManaged_p(&memPtr, size, hipMemAttachGlobal));
   
@@ -423,6 +424,7 @@ void *__kitrt_hipMemAllocManaged(size_t size) {
             "kitrt: hip -- allocated managed memory "
             "(%ld bytes @ %p).\n",
             size, memPtr);
+  _kitrt_mem_alloc_mutex.unlock();
 
   // Cheat a bit an just go ahead and issue a prefetch...  This seems
   // beneficial in certain cases with CUDA but the jury is still out
@@ -439,12 +441,16 @@ void __kitrt_hipMemFree(void *memPtr) {
   if (__kitrt_verboseMode())
     fprintf(stderr, "kitrt: hip -- freed managed memory @ %p.\n", memPtr);
 
+  _kitrt_mem_alloc_mutex.lock();
   __kitrt_unregisterMemAlloc(memPtr);
   HIP_SAFE_CALL(hipFree_p(memPtr));
+  _kitrt_mem_alloc_mutex.unlock();
 }
 
 void __kitrt_hipFreeManagedMem(void *memPtr) {
+  _kitrt_mem_alloc_mutex.lock();
   HIP_SAFE_CALL(hipFree_p(memPtr));
+  _kitrt_mem_alloc_mutex.unlock();
 }
 
 bool __kitrt_hipIsMemManaged(void *vp) {
