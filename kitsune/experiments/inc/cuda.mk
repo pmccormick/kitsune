@@ -1,5 +1,5 @@
 ifneq ($(CUDA_PATH),)
-  CUDA_ARCH?=sm_90
+  CUDA_ARCH?=sm_86
   NVCC=$(CUDA_PATH)/bin/nvcc
   NVCC_C_FLAGS?=-arch=$(CUDA_ARCH)
   NVCC_CXX_FLAGS?=-arch=$(CUDA_ARCH) \
@@ -7,7 +7,6 @@ ifneq ($(CUDA_PATH),)
     --relocatable-device-code=false \
     --expt-extended-lambda \
     --expt-relaxed-constexpr \
-    -ccbin /usr/bin \
     -O$(KITSUNE_OPTLEVEL)
 
   CLANG_CUDA=$(KITSUNE_PREFIX)/bin/clang 

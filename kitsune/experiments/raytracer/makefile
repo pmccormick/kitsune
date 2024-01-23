@@ -58,9 +58,9 @@ raytracer-kokkos.hip.${host_arch}: raytracer-kokkos.cpp
 
 # cuda version 
 raytracer-cuda.${host_arch}: raytracer.cu
-	echo $@
-	$(TIME_CMD) $(NVCC) $(NVCC_CXX_FLAGS) -o $@ $<
-	$(FILE_SIZE)
+	@echo $@
+	@$(TIME_CMD) $(NVCC) $(NVCC_CXX_FLAGS) -o $@ $<
+	@$(FILE_SIZE)
 
 # hip version 
 raytracer-hip.${host_arch}: raytracer-hip.cpp
@@ -70,7 +70,7 @@ raytracer-hip.${host_arch}: raytracer-hip.cpp
 
 raytracer-hip.clang.${host_arch}: raytracer-hip.cpp
 	@echo $@
-	$(KIT_CXX) -x hip -v $(HIPCC_CXX_FLAGS) -o $@ $< -L$(ROCM_PATH)/lib -lamdhip64
+	@$(KIT_CXX) -x hip -v $(HIPCC_CXX_FLAGS) -o $@ $< -L$(ROCM_PATH)/lib -lamdhip64
 	@$(FILE_SIZE)
 #####
 define newline 
