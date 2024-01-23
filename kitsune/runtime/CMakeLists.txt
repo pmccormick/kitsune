@@ -44,8 +44,7 @@ set(KITRT_SRCS
   kitrt.cpp
   debug.cpp
   memory.cpp
-  memory_map.cpp
-  support.cpp)
+  memory_map.cpp)
 
 set(KITRT_LINK_LIBS "")
 
@@ -53,18 +52,27 @@ if (KITRT_ENABLE_CUDA)
   set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin /opt/cuda/bin --gpu-architecture sm_86")
   message(STATUS "Kitsune runtime adding CUDA components to build...")
   find_package(CUDAToolkit REQUIRED)
-  add_definitions(-DKITRT_CUDA_ENABLED)
+  
+  option(KITCUDA_ENABLE_NVTX "Enable NVTX profiling within the runtime" OFF)
+  if (KITCUDA_ENABLE_NVTX)
+    add_definitions(-DKITCUDA_ENABLE_NVTX)
+  endif()
+  add_definitions(-DKITRT_CUDA_ENABLED -DKITCUDA_ENABLE_NVTX)
+
   list(APPEND KITRT_HDRS
-    cuda/cuda.h
-    cuda/llvm-cuda.h)
+    cuda/kitcuda.h
+    cuda/kitcuda_dylib.h)
   list(APPEND KITRT_SRCS
-     cuda/cuda.cpp
-     cuda/llvm-cuda.cpp)
+     cuda/kitcuda.cpp
+     cuda/dylib_support.cpp
+     cuda/launching.cpp
+     cuda/memory.cpp
+     cuda/streams.cpp)
   link_directories(${CUDAToolkit_LIBRARY_DIR})
   include_directories(${CUDAToolkit_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
   list(APPEND KITRT_LINK_LIBS
-    "-lnvptxcompiler_static -lcudart -lcuda")
+	  "-lnvptxcompiler_static -lcudart -lcuda -lnvToolsExt")
 
   #add_subdirectory(cuda/numpy)
 
@@ -80,11 +88,14 @@ if (KITRT_ENABLE_HIP)
   find_package(hip REQUIRED)
   add_definitions(-DKITRT_HIP_ENABLED)
   list(APPEND KITRT_HDRS
-    hip/hip.h
-    hip/llvm-hip.h)
+    hip/kithip.h
+    hip/kithip_dylib.h)
   list(APPEND KITRT_SRCS
-    hip/hip.cpp
-    hip/llvm-hip.cpp)
+     hip/kithip.cpp
+     hip/dylib_support.cpp
+     hip/launching.cpp
+     hip/memory.cpp
+     hip/streams.cpp)  
   list(APPEND KITRT_LINK_LIBS hip::host)
   add_subdirectory(hip)
 endif()
@@ -92,6 +103,7 @@ endif()
 set(CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
 message(STATUS "kitsune runtime library source files: ${KITRT_SRCS}")
 add_library(kitrt SHARED ${KITRT_SRCS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(kitrt
   BEFORE PRIVATE
     ${LLVM_MAIN_INCLUDE_DIR}

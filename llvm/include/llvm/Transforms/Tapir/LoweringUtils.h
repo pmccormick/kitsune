@@ -565,6 +565,13 @@ Instruction *replaceLoopWithCallToOutline(
     TapirLoopInfo *TL, TaskOutlineInfo &Out,
     SmallVectorImpl<Value *> &OutlineInputs);
 
+void saveModuleToFile(const Module *M,
+                      const std::string &FileName,
+                      const std::string &Extension = ".ll");
+
+void saveFunctionToFile(const Function *Fn,
+                        const std::string &FileName,
+                        const std::string &Extension = ".ll");
 }  // end namepsace llvm
 
 #endif

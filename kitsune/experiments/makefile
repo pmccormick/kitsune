@@ -7,7 +7,8 @@ subdirs := \
   saxpy \
   srad \
   raytracer \
-  euler3d 
+  euler3d \
+  multi-target
 
 .PHONY: all clean run $(subdirs)
 

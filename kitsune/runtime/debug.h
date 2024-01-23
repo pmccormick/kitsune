@@ -63,10 +63,5 @@
 #define KITRT_DEBUG(X) { ; }
 #endif
 
-namespace kitrt
-{
-  extern llvm::raw_fd_ostream &errs();
-  extern llvm::raw_ostream &kitdbgs();
-}
 
 #endif

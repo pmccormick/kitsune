@@ -22,11 +22,11 @@ copy-forall.opencilk.${host_arch}: copy-forall.cpp
 	@${FILE_SIZE}
 copy-forall.cuda.${host_arch}: copy-forall.cpp 
 	@echo $@
-	@${TIME_CMD} $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	${TIME_CMD} $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@${FILE_SIZE}
 copy-forall.hip.${host_arch}: copy-forall.cpp 
 	@echo $@
-	@${TIME_CMD} $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	${TIME_CMD} $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@${FILE_SIZE}
 
 # kokkos-based tests (w/out views)
@@ -61,8 +61,11 @@ define newline
 endef 
 
 run: $(targets) 
-	@echo "running generated exeutables..."
+	@echo "running generated executables..."
 	@$(foreach prog,$(targets),$(call RUN_test,$(prog)))
+
+launch_bench: copy-forall.cuda.${host_arch}
+	../launch-bench.sh $<
 ##### 
 
 .PHONY: all clean run

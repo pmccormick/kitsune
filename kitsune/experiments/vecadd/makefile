@@ -2,6 +2,7 @@ include ../experiments.mk
 
 targets = vecadd-forall.opencilk.${host_arch}
 
+$(info "$(BUILD_CUDA_EXPERIMENTS)")
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += vecadd-forall.cuda.${host_arch}
   targets += vecadd-kokkos.cuda.kitsune.${host_arch}
@@ -29,6 +30,10 @@ vecadd-forall.hip.${host_arch}: vecadd-forall.cpp
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)
+vecadd-kokkos.opencilk.kitsune.${host_arch}: vecadd-kokkos-no-views.cpp 
+	@echo $@
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(FILE_SIZE)
 vecadd-kokkos.cuda.kitsune.${host_arch}: vecadd-kokkos-no-views.cpp 
 	@echo $@
 	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
@@ -59,8 +64,11 @@ define RUN_test
 endef
 
 run: $(targets) 
-	@echo "running generated exeutables..."
+	@echo "running generated executables..."
 	$(foreach prog,$(targets),$(call RUN_test,$(prog)))
+
+launch_bench: vecadd-forall.cuda.${host_arch}
+	../launch-bench.sh $<
 #####
 
 .PHONY: all clean run

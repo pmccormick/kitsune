@@ -291,11 +291,8 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   // Code Modifications necessary for implementing parallel loops not required
   // by serial loops.
 
-  LoopAttributes::LTarget TT = GetTapirTargetAttr(KokkosAttrs);
-  if (TT == LoopAttributes::CudaRT) {
-    fprintf(stderr, "Found a cuda attributed Kokkos::parallel_for statement.\n");
-  }
-
+  int TT = GetTapirTargetAttr(KokkosAttrs);
+  LoopStack.setLoopTarget(TT);
 
   // New basic blocks and jump destinations with Tapir terminators
   // Note that we only need one of each of these regardless of the number of

@@ -17,6 +17,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
+#include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 
 namespace llvm {
 
@@ -250,7 +251,11 @@ public:
   };
 
 private:
-  enum HintKind { HK_STRATEGY, HK_GRAINSIZE };
+  enum HintKind { HK_STRATEGY,
+		  HK_GRAINSIZE,
+		  HK_LOOPTARGET,
+		  HK_THREADS_PER_BLOCK,
+		  HK_AUTO_TUNE };
 
   /// Hint - associates name and validation with the hint value.
   struct Hint {
@@ -267,6 +272,13 @@ private:
         return (Val < ST_END);
       case HK_GRAINSIZE:
         return true;
+      case HK_LOOPTARGET:
+        // DWS don't like the conversion from scoped enum to unsigned, better way?
+        return (Val < static_cast<unsigned int>(TapirTargetID::Last_TapirTargetID));
+      case HK_THREADS_PER_BLOCK:
+	return Val;
+      case HK_AUTO_TUNE:
+	return Val;
       }
       return false;
     }
@@ -276,6 +288,10 @@ private:
   Hint Strategy;
   /// Grainsize
   Hint Grainsize;
+  /// LoopTarget
+  Hint LoopTarget;
+  Hint ThreadsPerBlock;
+  Hint AutoTune;
 
   /// Return the loop metadata prefix.
   static StringRef Prefix() { return "tapir.loop."; }
@@ -298,6 +314,13 @@ public:
   TapirLoopHints(const Loop *L)
       : Strategy("spawn.strategy", ST_SEQ, HK_STRATEGY),
         Grainsize("grainsize", 0, HK_GRAINSIZE),
+        // DWS don't like the conversion from scoped enum to unsigned, better way?
+        // Is Serial the right default, here and and in clearHintsMetadata
+        LoopTarget("target", static_cast<unsigned int>(TapirTargetID::Serial),
+		   HK_LOOPTARGET),
+	ThreadsPerBlock("kitsune.launch.threads.per.block", 0,
+			HK_THREADS_PER_BLOCK),
+	AutoTune("kitsune.launch.auto.tune", 0, HK_AUTO_TUNE), 
         TheLoop(L) {
     // Populate values with existing loop metadata.
     getHintsFromMetadata();
@@ -319,6 +342,20 @@ public:
     return Grainsize.Value;
   }
 
+  // DWS emulate printStrategy
+  // also change to casted version like SpawingStrategy
+  unsigned getLoopTarget() const {
+    return LoopTarget.Value;
+  }
+
+  unsigned getThreadsPerBlock() const {
+    return ThreadsPerBlock.Value;
+  }
+
+  unsigned getAutoTune() const {
+    return AutoTune.Value;
+  }
+  
   /// Clear Tapir Hints metadata.
   void clearHintsMetadata();
 

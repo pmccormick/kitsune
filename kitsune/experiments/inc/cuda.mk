@@ -1,6 +1,5 @@
 ifneq ($(CUDA_PATH),)
   CUDA_ARCH?=sm_90
-
   NVCC=$(CUDA_PATH)/bin/nvcc
   NVCC_C_FLAGS?=-arch=$(CUDA_ARCH)
   NVCC_CXX_FLAGS?=-arch=$(CUDA_ARCH) \

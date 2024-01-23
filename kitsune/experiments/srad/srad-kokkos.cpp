@@ -48,7 +48,7 @@ int main(int argc, char* argv[])
 {
   using namespace std;
 
-  int rows, cols, size_I, size_R, niter = 20;
+  int rows, cols, size_I, size_R, niter;
   float q0sqr, sum, sum2, tmp, meanROI,varROI ;
   int r1, r2, c1, c2;
   float lambda;
@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
     c1 = 0;
     c2 = 127;
     lambda = 0.5;
-    niter = 200;
+    niter = 2000;
   } else {
     usage(argc, argv);
   }
@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
     size_I = cols * rows;
     size_R = (r2-r1+1)*(c2-c1+1);
 
-    cout << "  Allocating arrays..." 
+    cout << "  Allocating arrays and building random matrix..."     
          << std::flush;
 
     FloatDualView I  = FloatDualView("I", size_I);
@@ -106,11 +106,7 @@ int main(int argc, char* argv[])
     FloatDualView dS = FloatDualView("dS", size_I);
     FloatDualView dW = FloatDualView("dW", size_I);
     FloatDualView dE = FloatDualView("dE", size_I);
-    cout << "  done.\n\n";
 
-    // Right now this initialization hides a lot of other details 
-    // (due to the slow performance of rand() on certain systems).
-    // So we do this before we start the timer... 
     random_matrix(I, rows, cols);
 
     cout << "  Starting benchmark...\n" << std::flush;
@@ -133,22 +129,22 @@ int main(int argc, char* argv[])
     Kokkos::fence();
 
     iN.sync_host();
+    iN.modify_host();    
     iN.h_view(0) = 0;
-    iN.modify_host();
 
-    iS.sync_host();    
+    iS.sync_host();
+    iS.modify_host();    
     iS.h_view(rows-1) = rows-1;
-    iS.modify_host();
 
     jW.sync_host();
+    jW.modify_host();    
     jW.h_view(0) = 0;
-    jW.modify_host();
-
-    jE.sync_host();    
+    
+    jE.sync_host();
+    jE.modify_host();    
     jE.h_view(cols-1) = cols-1;
     jE.modify_host();
 
-    
     I.sync_device();
     J.modify_device();        
     Kokkos::parallel_for("size_I", size_I, KOKKOS_LAMBDA(const int &k) {
@@ -180,6 +176,7 @@ int main(int argc, char* argv[])
       q0sqr   = varROI / (meanROI*meanROI);
 
       auto loop1_start_time = chrono::steady_clock::now();
+      c.modify_device();              
       Kokkos::parallel_for("loop1", rows, KOKKOS_LAMBDA(const int &i) {
 	  for (int j = 0; j < cols; j++) {
 	    int k = i * cols + j;
@@ -212,6 +209,7 @@ int main(int argc, char* argv[])
 	  }
 	});
       Kokkos::fence();
+
       auto loop1_end_time = chrono::steady_clock::now();
       double etime = chrono::duration<double>(loop1_end_time-loop1_start_time).count(); 
       loop1_total_time += etime;
@@ -220,13 +218,12 @@ int main(int argc, char* argv[])
       else if (etime < loop1_min_time)
 	loop1_min_time = etime;      
 
-      J.modify_device();
       auto loop2_start_time = chrono::steady_clock::now();
-      Kokkos::parallel_for("loop2", rows, KOKKOS_LAMBDA(const int &i) {
+      J.modify_device();      
+      Kokkos::parallel_for("loop2", rows, KOKKOS_LAMBDA(const int i) {
 	  for (int j = 0; j < cols; j++) {
 	    // current index
 	    int k = i * cols + j;
-
 	    // diffusion coefficient
 	    float cN = c.d_view(k);
 	    float cS = c.d_view(iS.d_view(i) * cols + j);
@@ -241,6 +238,7 @@ int main(int argc, char* argv[])
 	  }
 	});
       Kokkos::fence();
+
       auto loop2_end_time = chrono::steady_clock::now();
       etime = chrono::duration<double>(loop2_end_time-loop2_start_time).count(); 
       loop2_total_time += etime;
@@ -252,16 +250,19 @@ int main(int argc, char* argv[])
     auto end_time = chrono::steady_clock::now();
     double elapsed_time = chrono::duration<double>(end_time-start_time).count();
     cout << "  Avg. loop 1 time: " << loop1_total_time / niter << "\n"
-	 << "  Avg. loop 2 time: " << loop2_total_time / niter << "\n";
-    cout << "  Running time: " << elapsed_time << " seconds.\n"
-         << "*** " << elapsed_time << ", " << elapsed_time << "\n"
+	 << "       loop 1 min : " << loop1_min_time << "\n"
+	 << "       loop 1 max : " << loop1_max_time << "\n"
+	 << "  Avg. loop 2 time: " << loop2_total_time / niter << "\n"
+	 << "       loop 2 min : " << loop2_min_time << "\n"
+	 << "       loop 2 max : " << loop2_max_time << "\n";
+    cout << "  Running time: " << elapsed_time << " seconds.\n"    
          << "----\n\n";
 
     J.sync_host();
-    auto V = J.view_host();
+    auto V = J.view_host().data();
     FILE *fp = fopen("srad-kokkos.dat", "wb");
     if (fp != NULL) {
-      fwrite((void*)V.data(), sizeof(float), size_I, fp);
+      fwrite((void*)V, sizeof(float), size_I, fp);
       fclose(fp);
     }
 

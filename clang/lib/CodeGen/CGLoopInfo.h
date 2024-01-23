@@ -91,14 +91,17 @@ struct LoopAttributes {
   /// Value for tapir.loop.spawn.strategy metadata.
   LSStrategy SpawnStrategy;
 
-  /// Kitsune/Tapir loop target strategy.
-  enum LTarget { CheetahRT,  CilkRT,  CudaRT,     HipRT,
-                 OmpRT,      NoneRT,  QthreadsRT, RealmRT,
-                 RocmRT,     SequentialRT, ZeroRT
-               };
+  // /// Kitsune/Tapir loop target strategy.
+  // /// WILL DELETE AFTER PORTING KOKKOS ATTRIBUTES
+  // enum LTarget { CheetahRT,  CilkRT,  CudaRT,     HipRT,
+  //                OmpRT,      QthreadsRT, RealmRT,
+  //                RocmRT,     SequentialRT, ZeroRT, OpenCLRT
+  //              };
 
   /// Value for tapir.loop.target metadata.
-  LTarget LoopTarget;
+  unsigned LoopTarget;
+  unsigned ThreadsPerBlock;
+  bool AutoTune;
 };
 
 /// Information used when generating a structured loop.
@@ -317,6 +320,17 @@ public:
 
   /// Set the Tapir-loop grainsize for the next loop pushed.
   void setTapirGrainsize(unsigned C) { StagedAttrs.TapirGrainsize = C; }
+
+  /// Set the Tapir loop target
+  void setLoopTarget(int LT) {
+    StagedAttrs.LoopTarget=LT;
+  }
+
+  /// Set the kitsune launch meta data.
+  void setLaunchMD(unsigned ThreadsPerBlock, bool AutoTune) {
+    StagedAttrs.ThreadsPerBlock = ThreadsPerBlock;
+    StagedAttrs.AutoTune = AutoTune;
+  }
 
 private:
   /// Returns true if there is LoopInfo on the stack.

@@ -5,7 +5,8 @@ targets = saxpy-forall.opencilk.${host_arch}
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += saxpy-forall.cuda.${host_arch}
   targets += saxpy-kokkos.nvcc.${host_arch}
-  targets += saxpy-kokkos.clang.${host_arch}
+  # TODO: some build problems here (need clang-specific kokkos build to work)
+  #targets += saxpy-kokkos.clang.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
@@ -26,7 +27,7 @@ saxpy-forall.cuda.${host_arch}: saxpy-forall.cpp
 	@$(FILE_SIZE)
 saxpy-forall.hip.${host_arch}: saxpy-forall.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 # kokkos-based tests (w/out views)
 #saxpy-kokkos.cuda.kitsune.${host_arch}: saxpy-kokkos-no-view.cpp 
@@ -56,8 +57,11 @@ define newline
 endef 
 
 run: $(targets) 
-	@echo "running generated exeutables..."
+	@echo "running generated executables..."
 	$(foreach prog,$(targets),$(call RUN_test,$(prog)))
+
+launch_bench: saxpy-forall.cuda.${host_arch}
+	../launch-bench.sh $<
 ##### 
 
 .PHONY: all clean run

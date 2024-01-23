@@ -24,7 +24,7 @@ raytracer-forall.opencilk.${host_arch}: raytracer-forall.cpp
 	@$(FILE_SIZE)
 raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) $(KITSUNE_FAST_MATH) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
 raytracer-forall.hip.${host_arch}: raytracer-forall.cpp 
@@ -79,8 +79,11 @@ define newline
 endef 
 
 run: $(targets) 
-	@echo "running generated exeutables..."
+	@echo "running generated executables..."
 	$(foreach prog,$(targets),$(call RUN_test,$(prog)))
+
+launch_bench: raytracer-forall.cuda.${host_arch}
+	../launch-bench.sh $<
 #####
 
 .PHONY: all clean run

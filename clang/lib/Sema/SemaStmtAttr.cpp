@@ -587,6 +587,35 @@ static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,
   return ::new (S.Context) TapirStrategyAttr(S.Context, A, strategyKind);
 }
 
+static Attr *handleKitsuneLaunchAttr(Sema &S, Stmt *St, const ParsedAttr &A,
+				     SourceRange Range) {
+  unsigned ThreadsPerBlock = 0;
+  bool Autotune = false;
+  if (A.getNumArgs() == 2) {
+    Expr *E = A.getArgAsExpr(0);
+    std::optional<llvm::APSInt> ArgVal;
+    if (!(ArgVal = E->getIntegerConstantExpr(S.Context))) {
+      S.Diag(A.getLoc(), diag::err_attribute_argument_type)
+	<< A << AANT_ArgumentIntegerConstant << E->getSourceRange();
+      return nullptr;
+    }
+
+    int Val = ArgVal->getSExtValue();
+    if (Val <= 0) {
+      S.Diag(A.getRange().getBegin(),
+	     diag::err_attribute_requires_positive_integer)
+	<< A << /* positive */ 0;
+      return nullptr;
+    }
+
+    ThreadsPerBlock = static_cast<unsigned>(Val);
+  }
+
+  return ::new (S.Context) KitsuneLaunchAttr(S.Context, A,
+					     ThreadsPerBlock, false);
+}
+
+
 // =====+
 
 
@@ -635,7 +664,9 @@ static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const ParsedAttr &A,
   case ParsedAttr::AT_Unlikely:
     return handleUnlikely(S, St, A, Range);
   case ParsedAttr::AT_TapirTarget:
-    return handleTapirTargetAttr(S, St, A, Range);    
+    return handleTapirTargetAttr(S, St, A, Range);
+  case ParsedAttr::AT_KitsuneLaunch:
+    return handleKitsuneLaunchAttr(S, St, A, Range);        
   default:
     // N.B., ClangAttrEmitter.cpp emits a diagnostic helper that ensures a
     // declaration attribute is not written on a statement, but this code is

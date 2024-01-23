@@ -72,8 +72,12 @@ define RUN_euler_test
 endef
 
 run: $(targets) 
-	@echo "running generated exeutables..."
+	@echo "running generated executables..."
 	$(foreach prog,$(targets),$(call RUN_euler_test,$(prog)))
+
+launch_bench: euler3d-forall.cuda.${host_arch}
+	../launch-bench.sh $< fvcorr.domn.193K
+
 #####
 
 .PHONY: all clean run

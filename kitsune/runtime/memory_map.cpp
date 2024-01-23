@@ -1,7 +1,4 @@
-//===- memory_map.cpp - Kitsune runtime  CUDA support    -----------------===//
-//
-// TODO:
-//     - Need to update LANL/Triad Copyright notice.
+//===- memory_map.cpp - Kitsune runtime high-level memory map ---------------===//
 //
 // Copyright (c) 2021, Los Alamos National Security, LLC.
 // All rights reserved.
@@ -55,60 +52,56 @@
 #include <cassert>
 #include <unordered_map>
 #include <map>
+#include "kitrt.h"
 #include "memory_map.h"
 
-//#define _KITRT_VERBOSE_
-
-
 typedef std::unordered_map<void *, KitRTAllocMapEntry> KitRTAllocMap;
-static KitRTAllocMap _kitrtAllocMap;
+static KitRTAllocMap _kitrt_alloc_map;
 
-void __kitrt_registerMemAlloc(void *addr, size_t size) {
+void __kitrt_register_mem_alloc(void *addr, size_t size) {
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMapEntry entry;
   entry.size = size;
   entry.prefetched = false;
   entry.read_only = false;
   entry.write_only = false;
-  _kitrtAllocMap[addr] = entry;
-  #ifdef _KITRT_VERBOSE_
-  fprintf(stderr, "kitrt: registered memory allocation (%p) "
-		  "of %ld bytes.\n", addr, size);
-  #endif
+  _kitrt_alloc_map[addr] = entry;
+  if (__kitrt_verbose_mode())
+    fprintf(stderr, "kitrt: registered memory allocation (%p) "
+	    "of %ld bytes.\n", addr, size);
 }
 
-void __kitrt_setMemPrefetch(void *addr, bool prefetched) {
+void __kitrt_set_mem_prefetch(void *addr, bool prefetched) {
   assert(addr != nullptr && "unexpected null pointer!");
-  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
-  if (ait != _kitrtAllocMap.end()) {
+  KitRTAllocMap::iterator ait = _kitrt_alloc_map.find(addr);
+  if (ait != _kitrt_alloc_map.end()) {
     ait->second.prefetched = prefetched;
-    #ifdef _KITRT_VERBOSE
-    fprintf(stderr, "kitrt: __kitrt_setMemPrefetch() -- "
-            "marked memory at %p, size %ld, as '%s'.\n", addr, ait->second.size,
-            prefetched ? "prefetched" : "not prefetched");
-    #endif
-  } else {
-    #ifdef _KITRT_VERBOSE_
-    fprintf(stderr,
-            "kitrt: __kitrt_setMemPrefetch() -- "
-            "warning, address %p not found in memory map.\n",
-            addr);
-    #endif
+    if (__kitrt_verbose_mode())
+      fprintf(stderr, "kitrt: marked memory at %p, size %ld, as '%s'.\n",
+	      addr, ait->second.size,
+	      prefetched ? "prefetched" : "not prefetched");
   }
+  // We could consider a diagnostic here reporting use of an unregistered
+  // pointer.  However, this is tricky with the compiler generating calls
+  // as it currently has no way to distinguish managed pointer types.  At
+  // present we quietly ignore bogus requests...
+  //
+  // TODO: Should we introduce something more specific at the langauge
+  // level to denote managed memory?
 }
 
-void __kitrt_markMemAsReadOnly(void *addr) {
+void __kitrt_mark_mem_read_only(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
-  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
-  if (ait != _kitrtAllocMap.end()) {
+  KitRTAllocMap::iterator ait = _kitrt_alloc_map.find(addr);
+  if (ait != _kitrt_alloc_map.end()) {
     ait->second.read_only = true;
   }
 }
 
-bool __kitrt_isMemReadyOnly(void *addr) {
+bool __kitrt_is_mem_read_only(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
-  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
-  if (ait != _kitrtAllocMap.end())
+  KitRTAllocMap::iterator ait = _kitrt_alloc_map.find(addr);
+  if (ait != _kitrt_alloc_map.end())
     return ait->second.read_only;
   else 
     return false;
@@ -116,131 +109,135 @@ bool __kitrt_isMemReadyOnly(void *addr) {
 
 /// @brief Flag the given memory allocation as write only.
 /// @param addr: the pointer to the managed memory allocation. 
-extern void __kitrt_markMemAsWriteOnly(void *addr) {
+extern void __kitrt_mark_mem_write_only(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
-  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
-  if (ait != _kitrtAllocMap.end()) {
+  KitRTAllocMap::iterator ait = _kitrt_alloc_map.find(addr);
+  if (ait != _kitrt_alloc_map.end()) {
     ait->second.write_only = true;
   }
 }
 
 
-bool __kitrt_isMemWriteOnly(void *addr) {
+bool __kitrt_is_mem_write_only(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
-  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
-  if (ait != _kitrtAllocMap.end())
+  KitRTAllocMap::iterator ait = _kitrt_alloc_map.find(addr);
+  if (ait != _kitrt_alloc_map.end())
     return ait->second.write_only;
   else 
     return false;
 }
 
-void __kitrt_clearMemAdvice(void *addr) {
+void __kitrt_clear_mem_advice(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
-  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
-  if (ait != _kitrtAllocMap.end()) {
+  KitRTAllocMap::iterator ait = _kitrt_alloc_map.find(addr);
+  if (ait != _kitrt_alloc_map.end()) {
     ait->second.read_only = false;
     ait->second.write_only = false;
   }
 }
 
-bool __kitrt_isMemPrefetched(void *addr, size_t *size) {
+bool __kitrt_is_mem_prefetched(void *addr, size_t *size) {
   assert(addr != nullptr && "unexpected null pointer!");
-  KitRTAllocMap::const_iterator cit = _kitrtAllocMap.find(addr);
-  if (cit != _kitrtAllocMap.end()) {
+  KitRTAllocMap::const_iterator cit = _kitrt_alloc_map.find(addr);
+  if (cit != _kitrt_alloc_map.end()) {
     if (size != nullptr)
       *size = cit->second.size;
     return cit->second.prefetched;
   } else {
-    #ifdef _KITRT_VERBOSE_
-    fprintf(stderr,
-            "kitrt: __kitrt_isMemPrefetched() -- "
-            "warning, address %p not found in address map. "
-            "returning false state!\n",
-            addr);
-    #endif
+    // NOTE: This is a bit strange but we have to deal with the
+    // compiler's code generation mechanisms here.  Specifically it is
+    // only able to identify pointers but not pointers allocated in
+    // managed memory.  For this reason we may generate requests for
+    // un-managed pointers.  To "behave" we currently treat such
+    // requests as prefetched (and thus avoid additional calls that
+    // might presume a valid managed memory region is associated with
+    // the pointer).
     return true;
   }
 }
 
-size_t __kitrt_getMemAllocSize(void *addr, bool *read_only, bool *write_only) {
+size_t __kitrt_get_mem_alloc_size(void *addr,
+				  bool *read_only,
+				  bool *write_only) {
   assert(addr != nullptr && "unexpected null addr pointer!");
   assert(read_only != nullptr && "unexpected null read_only pointer!");
   assert(write_only != nullptr && "unexpected null write_only pointer!");
-
-  KitRTAllocMap::const_iterator cit = _kitrtAllocMap.find(addr);
-  if (cit != _kitrtAllocMap.end()) {
+  size_t size = 0;
+  KitRTAllocMap::const_iterator cit = _kitrt_alloc_map.find(addr);
+  if (cit != _kitrt_alloc_map.end()) {
     *read_only = cit->second.read_only;
     *write_only = cit->second.write_only;
-    return cit->second.size;
-  } 
-  #ifdef _KITRT_VERBOSE_
-    fprintf(stderr,
-            "kitrt: __kitrt_getMemAllocSize() -- "
-            "warning, address %p not found in address map. "
-            "returning zero size.\n",
-            addr);
-  #endif            
-  *read_only = false;
-  *write_only = false;
-  return 0;
-}
-
-void __kitrt_unregisterMemAlloc(void *addr) {
-  assert(addr != nullptr && "unexpected null pointer!");
-  KitRTAllocMap::iterator ait = _kitrtAllocMap.find(addr);
-  if (ait != _kitrtAllocMap.end()) {
-    _kitrtAllocMap.erase(ait);
+    size = cit->second.size;
   } else {
-    #ifdef _KITRT_VERBOSE_
-    fprintf(stderr,
-            "kitrt: __kitrt_unregisterMemAlloc() -- "
-            "warning, address %p not found in address map.\n",
-            addr);
-    #endif
+    // NOTE: This is a bit strange but we have to deal with the
+    // compiler's code generation mechanisms here.  Specifically it is
+    // only able to identify pointers but not pointers allocated in
+    // managed memory.  For this reason we may generate requests for
+    // un-managed pointers.  To "behave" we currently treat such
+    // requests as prefetched (and thus avoid additional calls that
+    // might presume a valid managed memory region is associated with
+    // the pointer).
+    *read_only = false;
+    *write_only = false;
   }
+  
+  return size;
 }
 
-void __kitrt_memNeedsPrefetch(void *addr) {
+void __kitrt_unregister_mem_alloc(void *addr) {
   assert(addr != nullptr && "unexpected null pointer!");
-  KitRTAllocMap::iterator it = _kitrtAllocMap.find(addr);
-  if (it != _kitrtAllocMap.end()) {
-    #ifdef _KITRT_VERBOSE_
-    fprintf(stderr,
-            "kitrt: allocation (%p) needs prefetching (updated on host).\n",
-            addr);
-    #endif
+  KitRTAllocMap::iterator ait = _kitrt_alloc_map.find(addr);
+  if (ait != _kitrt_alloc_map.end())
+    _kitrt_alloc_map.erase(ait);
+
+  // NOTE: We currently silently ignore requests to unregister
+  // an pointer that was not found in the map.  This mostly has
+  // to do with the nuanaces of the compiler's code generation
+  // and its inability to distinguish between various pointer
+  // types.
+}
+
+void __kitrt_mem_needs_prefetch(void *addr) {
+  assert(addr != nullptr && "unexpected null pointer!");
+  KitRTAllocMap::iterator it = _kitrt_alloc_map.find(addr);
+  if (it != _kitrt_alloc_map.end()) {
     it->second.prefetched = false;
   }
 }
 
-extern "C" void __kitrt_printMemoryMap() {
+extern "C" void __kitrt_print_memory_map() {
   fprintf(stdout, "kitsune runtime memory allocation map:\n");
-
-  if (_kitrtAllocMap.empty()) 
+  if (_kitrt_alloc_map.empty()) 
     fprintf(stdout, "\t[... empty ...]\n");
   else {
     const size_t MBYTE = 1024 * 1024;
     size_t total_allocated = 0;
     unsigned int num_allocations = 0;
-    for(auto &mapEntry : _kitrtAllocMap) {
-      void *addr = mapEntry.first;
-      const KitRTAllocMapEntry *entry = &mapEntry.second;
-      total_allocated += entry->size;
+    for(auto &entry : _kitrt_alloc_map) {
+      void *addr = entry.first;
+      const KitRTAllocMapEntry *alloc_entry = &entry.second;
+      total_allocated += alloc_entry->size;
       num_allocations++;
-      fprintf(stdout, "\tAddress: %p --> [Size: %6.2f MBytes, prefetched: %8s, "
-              "Read Only: %8s, Write Only: %8s]\n",
-              addr, entry->size / (double)MBYTE, entry->prefetched ? "True" : "False", 
-              entry->read_only ? "True" : "False", 
-              entry->write_only ? "True": "False");
+      fprintf(stderr, "\tAddress: %p --> [size: %6.2f Mbytes, prefetched: %8s, "
+              "read-only: %8s, write-only: %8s]\n",
+              addr,
+	      alloc_entry->size / (double)MBYTE,
+	      alloc_entry->prefetched ? "true" : "false", 
+              alloc_entry->read_only ? "true" : "false", 
+              alloc_entry->write_only ? "true": "false");
     }
-    fprintf(stdout, "\n\tTotal Memory Allocation: %6.2f MBytes\n", total_allocated / (double)MBYTE);
-    fprintf(stderr, "\n\tAverage Size per Allocation: %6.2f MBytes\n", 
+    fprintf(stderr, "\n");
+    fprintf(stdout, "\ttotal memory allocation: %6.2f Mbytes\n",
+	    total_allocated / (double)MBYTE);
+    fprintf(stderr, "\taverage size per allocation: %6.2f Mbytes\n", 
             (total_allocated / (double)MBYTE)/ num_allocations);
   }
 }
 
-extern "C" void __kitrt_destroyMemoryMap(void (*freeMem)(void *)) {
-  for (auto &mapEntry : _kitrtAllocMap)
-    freeMem(mapEntry.first);
+extern "C" void __kitrt_destroy_memory_map(void (*free_mem_call)(void *)) {
+  assert(free_mem_call != nullptr && "unexpected null function pointer!");
+  for (auto &entry : _kitrt_alloc_map)
+    free_mem_call(entry.first);
+  _kitrt_alloc_map.clear();
 }
 

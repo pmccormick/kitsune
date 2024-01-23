@@ -11,11 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Analysis/TapirTaskInfo.h"
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Transforms/Tapir/CilkABI.h"
 #include "llvm/Transforms/Tapir/CudaABI.h"
@@ -1224,4 +1227,54 @@ bool TapirTarget::processOrdinaryFunction(Function &F, BasicBlock *TFEntry) {
   // By default, do no special processing for ordinary functions.  Instead, the
   // function will be processed using TapirToTargetImpl::processSimpleABI().
   return false;
+}
+
+
+/// @brief Wite the given module to a file as readable IR.
+/// @param M - the module to save.
+/// @param Filename - optional file name (empty string uses module name).
+void llvm::saveModuleToFile(const Module *M,
+                      const std::string &FileName,
+                      const std::string &Extension) {
+  std::error_code EC;
+  SmallString<256> IRFileName;
+  if (FileName.empty())
+    IRFileName = Twine(sys::path::filename(M->getName())).str() 
+                  + Extension;
+  else
+    IRFileName = Twine(FileName).str() + Extension;
+
+  std::unique_ptr<ToolOutputFile> IRFile = std::make_unique<ToolOutputFile>(
+      IRFileName, EC, sys::fs::OpenFlags::OF_None);
+  if (not EC) {
+    M->print(IRFile->os(), nullptr);
+    IRFile->keep();
+  } else
+    errs() << "warning: unable to save module '" << IRFileName.c_str() << "'\n";
+}
+
+/// @brief Write the given function to a file as readable IR.
+/// @param Fn - the function to save.
+/// @param Filename - optional file name (empty string uses function name).
+void llvm::saveFunctionToFile(const Function *Fn,
+                        const std::string &FileName,
+                        const std::string &Extension) {
+  std::error_code EC;
+  SmallString<256> IRFileName;
+  if (FileName.empty()) {
+    std::string DName = demangle(Fn->getName().str());
+    auto ParenLoc = DName.find("(");
+    std::string ShortName = DName.substr(0, ParenLoc);
+    IRFileName = ShortName + Extension;
+  } else
+    IRFileName = Twine(FileName).str() + Extension;
+
+  std::unique_ptr<ToolOutputFile> IRFile = std::make_unique<ToolOutputFile>(
+      IRFileName, EC, sys::fs::OpenFlags::OF_None);
+  if (not EC) {
+    Fn->print(IRFile->os(), nullptr);
+    IRFile->keep();
+  } else
+    errs() << "warning: unable to save function '" << IRFileName.c_str()
+           << "'\n";
 }

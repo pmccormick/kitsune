@@ -54,12 +54,18 @@
 #ifndef __KITRT_DL_UTILS_H__
 #define __KITRT_DL_UTILS_H__
 
-#define DECLARE_DLSYM(funcName) decltype(funcName)* funcName##_p = NULL;
+#include <dlfcn.h>
 
-#define DLSYM_LOAD(funcName)                                                   \
-  if (!(funcName##_p = (decltype(funcName) *)dlsym(dlHandle, #funcName))) {    \
-    fprintf(stderr, "kitrt: failed to load symbol 'funcName##'.");             \
-    return false;                                                              \
+#ifdef __KITRT_DISABLE_EXTERN_DECLS__ 
+#define DECLARE_DLSYM(fName) decltype(fName)* fName##_p = NULL;
+#else
+#define DECLARE_DLSYM(fName) extern decltype(fName)* fName##_p;
+#endif 
+
+#define DLSYM_LOAD(fName)                                                  \
+  if (!(fName##_p = (decltype(fName) *)dlsym(kitrt_dl_handle, #fName))) {  \
+    fprintf(stderr, "kitrt: failed to load symbol 'fName##'.");         \
+    return false;                                                          \
   }
 
 #endif

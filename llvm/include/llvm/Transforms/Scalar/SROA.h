@@ -97,8 +97,8 @@ class SROAPass : public PassInfoMixin<SROAPass> {
   LLVMContext *C = nullptr;
   DomTreeUpdater *DTU = nullptr;
   AssumptionCache *AC = nullptr;
-  const bool PreserveCFG;
   TaskInfo *TI = nullptr;
+  const bool PreserveCFG;
 
   /// Worklist of alloca instructions to simplify.
   ///
@@ -174,7 +174,7 @@ private:
 
   /// Helper used by both the public run method and by the legacy pass.
   PreservedAnalyses runImpl(Function &F, DomTreeUpdater &RunDTU,
-                            AssumptionCache &RunAC, TaskInfo& RunTI);
+                            AssumptionCache &RunAC, TaskInfo &RunTI);
   PreservedAnalyses runImpl(Function &F, DominatorTree &RunDT,
                             AssumptionCache &RunAC, TaskInfo &RunTI);
 
