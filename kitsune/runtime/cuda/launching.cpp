@@ -98,6 +98,15 @@ static int _kitcuda_default_threads_per_blk =
     _kitcuda_default_max_threads_per_blk;
 
 void __kitcuda_use_occupancy_launch(bool enable) {
+
+  int threads_per_block = 0;
+  if (__kitrt_get_env_value("KITCUDA_THREADS_PER_BLOCK", threads_per_block)) {
+    if (enable)
+      fprintf(stderr, "kitcuda: KITCUDA_THREADS_PER_BLOCK overriding occupancy lanuch.\n");
+    _kitcuda_use_occupancy_calc = false;
+  } else 
+    _kitcuda_use_occupancy_calc = enable;
+
   if (__kitrt_verbose_mode()) {
     if (enable)
       fprintf(stderr,
@@ -106,7 +115,7 @@ void __kitcuda_use_occupancy_launch(bool enable) {
       fprintf(stderr,
               "kitcuda: disabling occupancy-computed launch parameters.\n");
   }
-  _kitcuda_use_occupancy_calc = enable;
+
 }
 
 void __kitcuda_set_default_max_threads_per_blk(int num_threads) {
@@ -182,31 +191,28 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
           CU_OCCUPANCY_DISABLE_CACHING_OVERRIDE));
       _kitcuda_launch_param_map[map_entry_name] = threads_per_blk;
     }
+    int block_count = trip_count / threads_per_blk;
+    int num_active_sms = block_count / max_blks_per_multiproc;
+    if (num_active_sms < num_multiprocs) {
+      int iterations_per_sm = trip_count / num_multiprocs;
+      int new_threads_per_block = iterations_per_sm / max_blks_per_multiproc;
+      if (__kitrt_verbose_mode()) {
+        fprintf(stderr,
+                "Calculated launch parameters under subscribes target GPU.\n");
+        fprintf(stderr, "  - launch would utilize %f of available SMs",
+                (float)block_count / max_blks_per_multiproc);
+        fprintf(stderr, "  - Target GPU has %d SMs\n", num_multiprocs);
+        fprintf(stderr, "  - maximum number of blocks per SM: %d\n",
+                max_blks_per_multiproc);
+        fprintf(stderr, "  - maximum number of threads/block: %d\n",
+                max_threads_per_blk);
+        fprintf(stderr, "New thread-per-block parameter = %d (vs. %d)\n",
+                new_threads_per_block, threads_per_blk);
+      }
+      threads_per_blk = new_threads_per_block;
+    }
   } else
     threads_per_blk = _kitcuda_default_threads_per_blk;
-
-  // FIXME: Need to make sure we adjust to leverage all the SMs of the
-  // GPU...
-  int block_count = trip_count / threads_per_blk;
-  int num_active_sms = block_count / max_blks_per_multiproc;
-  if (num_active_sms < num_multiprocs) {
-    int iterations_per_sm = trip_count / num_multiprocs;
-    int new_threads_per_block = iterations_per_sm / max_blks_per_multiproc;
-    if (__kitrt_verbose_mode()) {
-      fprintf(stderr,
-              "Calculated launch parameters under subscribes target GPU.\n");
-      fprintf(stderr, "  - launch would utilize %f of avilable SMs",
-              (float)block_count / max_blks_per_multiproc);
-      fprintf(stderr, "  - Target GPU has %d SMs\n", num_multiprocs);
-      fprintf(stderr, "  - maximum number of blocks per SM: %d\n",
-              max_blks_per_multiproc);
-      fprintf(stderr, "  - maximum number of threads/block: %d\n",
-              max_threads_per_blk);
-      fprintf(stderr, "New thread-per-block parameter = %d (vs. %d)\n",
-              new_threads_per_block, threads_per_blk);
-    }
-    threads_per_blk = new_threads_per_block;
-  }
 
   // Need to round-up based on array size/trip count.
   blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
