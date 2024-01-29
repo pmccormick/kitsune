@@ -141,11 +141,31 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
                                  int &threads_per_blk, int &blks_per_grid) {
   KIT_NVTX_PUSH("kitcuda:get_launch_params", KIT_NVTX_LAUNCH);
 
+  extern int _kitcuda_device_id;
+
+  // TODO: For now we are only launching forall-based kernels.  In this
+  // case we tweak the kernel such that it always run in "prefer cache"
+  // mode.  We will probably need to revisit this for other kernel
+  // kinds (e.g., reductions).
+  CU_SAFE_CALL(cuFuncSetCacheConfig_p(cu_func, CU_FUNC_CACHE_PREFER_L1));
+
+  int num_multiprocs = 0;
+  CU_SAFE_CALL(cuDeviceGetAttribute_p(&num_multiprocs,
+                                      CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT,
+                                      _kitcuda_device_id));
+  int max_blks_per_multiproc = 0;
+  CU_SAFE_CALL(cuDeviceGetAttribute_p(
+      &max_blks_per_multiproc,
+      CU_DEVICE_ATTRIBUTE_MAX_BLOCKS_PER_MULTIPROCESSOR, _kitcuda_device_id));
+  int max_threads_per_blk = 0;
+  CU_SAFE_CALL(cuDeviceGetAttribute_p(&max_threads_per_blk,
+                                      CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
+                                      _kitcuda_device_id));
+
   // TODO: Need to handle custom launch parameters on a per-launch
   // use case.  This is now a bit tricky as we can have multiple
   // threads launching and will need to pair custom parameters with
   // a thread id.
-
   if (_kitcuda_use_occupancy_calc) {
     const char *cu_func_name;
     CU_SAFE_CALL(cuFuncGetName_p(&cu_func_name, cu_func));
@@ -164,6 +184,29 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
     }
   } else
     threads_per_blk = _kitcuda_default_threads_per_blk;
+
+  // FIXME: Need to make sure we adjust to leverage all the SMs of the
+  // GPU...
+  int block_count = trip_count / threads_per_blk;
+  int num_active_sms = block_count / max_blks_per_multiproc;
+  if (num_active_sms < num_multiprocs) {
+    int iterations_per_sm = trip_count / num_multiprocs;
+    int new_threads_per_block = iterations_per_sm / max_blks_per_multiproc;
+    if (__kitrt_verbose_mode()) {
+      fprintf(stderr,
+              "Calculated launch parameters under subscribes target GPU.\n");
+      fprintf(stderr, "  - launch would utilize %f of avilable SMs",
+              (float)block_count / max_blks_per_multiproc);
+      fprintf(stderr, "  - Target GPU has %d SMs\n", num_multiprocs);
+      fprintf(stderr, "  - maximum number of blocks per SM: %d\n",
+              max_blks_per_multiproc);
+      fprintf(stderr, "  - maximum number of threads/block: %d\n",
+              max_threads_per_blk);
+      fprintf(stderr, "New thread-per-block parameter = %d (vs. %d)\n",
+              new_threads_per_block, threads_per_blk);
+    }
+    threads_per_blk = new_threads_per_block;
+  }
 
   // Need to round-up based on array size/trip count.
   blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
@@ -216,7 +259,7 @@ void __kitcuda_launch_kernel(const void *fat_bin, const char *kernel_name,
   if (threads_per_blk == 0)
     __kitcuda_get_launch_params(trip_count, cu_func, threads_per_blk,
                                 blks_per_grid);
-  else 
+  else
     blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 
   if (__kitrt_verbose_mode()) {

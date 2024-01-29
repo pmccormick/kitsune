@@ -48,7 +48,7 @@ MDNode *LoopInfo::createTapirLoopMetadata(const LoopAttributes &Attrs,
     return createLoopPropertiesMetadata(LoopProperties);
 
   SmallVector<Metadata *, 4> Args;
-  TempMDTuple TempNode = MDNode::getTemporary(Ctx, None);
+  TempMDTuple TempNode = MDNode::getTemporary(Ctx, std::nullopt);
   Args.push_back(TempNode.get());
   Args.append(LoopProperties.begin(), LoopProperties.end());
 
@@ -583,26 +583,6 @@ void LoopInfo::getTapirLoopProperties(
   ConstantAsMetadata::get(ConstantInt::get(llvm::Type::getInt32Ty(Ctx),
                                             Attrs.LoopTarget))};
   LoopProperties.push_back(MDNode::get(Ctx, Vals));   
-
-  // Setting kitsune launch 
-  if (Attrs.ThreadsPerBlock > 0) {
-    Metadata *Vals[] = { 
-      MDString::get(Ctx, "tapir.loop.kitsune.launch.threads.per.block"),
-      ConstantAsMetadata::get(ConstantInt::get(llvm::Type::getInt32Ty(Ctx),
-                                              Attrs.ThreadsPerBlock))};
-    LoopProperties.push_back(MDNode::get(Ctx, Vals));
-
-  }
-
- // Setting kitsune launch 
-  if (Attrs.AutoTune) {
-    Metadata *Vals[] = { 
-      MDString::get(Ctx, "tapir.loop.kitsune.launch.autotune"),
-      ConstantAsMetadata::get(ConstantInt::getTrue(Ctx))};
-      
-    LoopProperties.push_back(MDNode::get(Ctx, Vals));
-  }
-
 }
 
 void LoopInfo::finish() {

@@ -3947,7 +3947,7 @@ public:
 
   LoopAttributes::LSStrategy GetTapirStrategyAttr(ArrayRef<const Attr*> Attrs);
   unsigned GetTapirTargetAttr(ArrayRef<const Attr*> Attrs);
-  unsigned GetKitsuneLaunchAttr(ArrayRef<const Attr*> Attrs, bool &AutoTune);
+  llvm::Value* GetKitsuneLaunchAttr(ArrayRef<const Attr*> Attrs);
 
   // Kitsune support for Kokkos.
   bool InKokkosConstruct = false; // FIXME: Should/can we refactor this away?

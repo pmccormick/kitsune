@@ -194,12 +194,6 @@ int main(int argc, char **argv) {
   Pixel *img = alloc<Pixel>(totalPixels);
   cout << "  done.\n\n";
 
-  #ifdef MIMIC_PREFETCH
-  forall(unsigned int i = 0; i < totalPixels; ++i) { 
-    img[i].r = img[i].g = img[i].b = 0.0f;
-  }
-  #endif
-
   cout << "  Starting benchmark..." << std::flush;
 
   auto start_time = chrono::steady_clock::now();

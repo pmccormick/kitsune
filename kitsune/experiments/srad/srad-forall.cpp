@@ -60,14 +60,14 @@ int main(int argc, char* argv[])
     niter = atoi(argv[8]); //number of iterations
   } else if (argc == 1) {
     // run with a default configuration.
-    rows = 32000;
-    cols = 32000;
+    rows = 6400;
+    cols = 6400;
     r1 = 0;
     r2 = 127;
     c1 = 0;
     c2 = 127;
     lambda = 0.5;
-    niter = 2000;
+    niter = 100;
   } else {
     usage(argc, argv);
   }

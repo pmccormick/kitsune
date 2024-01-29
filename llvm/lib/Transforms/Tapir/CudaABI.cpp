@@ -403,7 +403,7 @@ CudaLoop::CudaLoop(Module &M, Module &KernelModule, const std::string &KN,
                                           VoidPtrTy,    // kernel name
                                           VoidPtrPtrTy, // arguments
                                           Int64Ty,      // trip count
-                                          Int32Ty);       // threads-per-block
+                                          Int32Ty);     // threads-per-block
   KitCudaMemPrefetchFn =
       M.getOrInsertFunction("__kitcuda_mem_gpu_prefetch",
                             VoidTy,     // no return.
@@ -1071,10 +1071,20 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   } else
     CastTripCount = TripCount;
 
-  // Prior to the kernel launch, check to see if we have any attributes
-  // (meta data) for launch parameters.
+  // At this point we need a threads-per-block value for the launch
+  // call.  The runtime will determine this value if ThreadsPerBlock
+  // is zero but it can also be overridden via kitsune's forall launch
+  // attribute.  The catch here is the launch attribute's value for
+  // this is flexible and be a computed expression vs. a compile-time
+  // constant.  For this first step of creating the kernel launch, we
+  // take the path of a runtime configuraiton vs. an attributed
+  // launch.  This will get patched up as needed when we post-process
+  // the module and replace the DummyFBPtr (as we will also need to
+  // replace the kernel launch call parameter for threads-per-block if
+  // an attributed expression is present).  See postProcessModule()'s
+  // stage of finalizing the launch calls for details.
   TapirLoopHints Hints(TL.getLoop());
-  unsigned ThreadsPerBlock = Hints.getThreadsPerBlock();
+  unsigned ThreadsPerBlock = 0;
   Constant *TPBlockValue =
       ConstantInt::get(Type::getInt32Ty(Ctx), ThreadsPerBlock);
 
@@ -1393,17 +1403,48 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
   // in each call (which is currently null) with the fat binary pointer.
   LLVM_DEBUG(dbgs() << "\t\tsearching...\n");
   auto &FnList = M.getFunctionList();
+
+  // If we have encountered any attributed launches (forall loops) we
+  // will have a call to a dummy runtime entry point
+  // (_kitrt_dummy_threads_per_blk) that we use to keep the
+  // threads-per-block expression from getting DCE'ed.  When lowered
+  // from clang, this call was inserted and we need to use its sole
+  // parameter in place of the threads-per-block parameter in the
+  // kernel launch call.  These dummy calls should be paired with
+  // launch calls, so as we look for a launch we *should* first
+  // encounter the threads-per-block call to pair with it.  We keep
+  // track of the dummy calls so they can removed at the end of the
+  // launch finalization.
+  CallInst *ThreadsPerBlockCI = nullptr;
+  std::list<CallInst *> DummyCIList;
+
   for (auto &Fn : FnList) {
     for (auto &BB : Fn) {
       for (auto &I : BB) {
         if (CallInst *CI = dyn_cast<CallInst>(&I)) {
           if (Function *CFn = CI->getCalledFunction()) {
-            if (CFn->getName().startswith("__kitcuda_launch_kernel")) {
+
+            if (CFn->getName().startswith("__kitrt_dummy_threads_per_blk")) {
+              LLVM_DEBUG(dbgs() << "\t\t\t* discovered a threads-per-block "
+                                   "placeholder call.\n");
+              assert(ThreadsPerBlockCI == nullptr && "expected null pointer!");
+              ThreadsPerBlockCI = CI;
+            } else if (CFn->getName().startswith("__kitcuda_launch_kernel")) {
               LLVM_DEBUG(dbgs() << "\t\t\t* patching launch: " << *CI << "\n");
               Value *CFatbin;
               CFatbin = CastInst::CreateBitOrPointerCast(Fatbin, VoidPtrTy,
                                                          "_cubin.fatbin", CI);
               CI->setArgOperand(0, CFatbin);
+
+              if (ThreadsPerBlockCI) {
+                LLVM_DEBUG(dbgs()
+                           << "\t\t\t\t replacing thread-per-block arg.\n");
+                Value *TBPParam = ThreadsPerBlockCI->getArgOperand(0);
+                assert(TBPParam && "unexpected null arg operand!");
+                CI->setArgOperand(4, TBPParam);
+                DummyCIList.push_back(ThreadsPerBlockCI);
+                ThreadsPerBlockCI = nullptr;
+              }
 
               Instruction *NI = CI->getNextNonDebugInstruction();
               // Unless someting else has monkeyed with our generated code
@@ -1441,6 +1482,11 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
         }
       }
     }
+  }
+
+  for (auto I : DummyCIList) {
+    LLVM_DEBUG(dbgs() << "\t\t\t erasing dummy threads-per-block call.\n");
+    I->eraseFromParent();
   }
 
   GlobalVariable *ProxyFB = M.getGlobalVariable("_cuabi.dummy_fatbin", true);
@@ -1923,7 +1969,6 @@ void CudaABI::postProcessModule() {
 
   CudaABIOutputFile PTXFile = generatePTX();
   CudaABIOutputFile AsmFile = assemblePTXFile(PTXFile);
-
   CudaABIOutputFile FatbinFile = createFatbinaryFile(AsmFile);
   GlobalVariable *Fatbinary = embedFatbinary(FatbinFile);
 

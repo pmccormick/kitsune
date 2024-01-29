@@ -77,6 +77,7 @@ DECLARE_DLSYM(cuDeviceGetCount);
 DECLARE_DLSYM(cuDeviceGet);
 DECLARE_DLSYM(cuDeviceGetAttribute);
 DECLARE_DLSYM(cuDriverGetVersion);
+DECLARE_DLSYM(cuFuncSetCacheConfig);
 DECLARE_DLSYM(cuFuncGetName);
 
 /* Context management */

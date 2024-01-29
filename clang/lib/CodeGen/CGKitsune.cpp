@@ -105,19 +105,18 @@ unsigned CodeGenFunction::GetTapirTargetAttr(ArrayRef<const Attr *> Attrs) {
   return TapirTargetAttr::DefaultRT; // missing target attribute
 }
 
-unsigned CodeGenFunction::GetKitsuneLaunchAttr(ArrayRef<const Attr *> Attrs,
-                                               bool &AutoTune) {
-  AutoTune = false;
-  for (auto curAttr : Attrs) {
+llvm::Value *
+CodeGenFunction::GetKitsuneLaunchAttr(ArrayRef<const Attr *> Attrs) {
+
+  for (const auto *curAttr : Attrs) {
     if (curAttr->getKind() == attr::KitsuneLaunch) {
-      AutoTune = cast<const KitsuneLaunchAttr>(curAttr)->getAutoTune();
-      unsigned ThreadsPerBlock =
+      const Expr *TPBAttr =
           cast<const KitsuneLaunchAttr>(curAttr)->getThreadsPerBlock();
-      return ThreadsPerBlock;
+      return EmitScalarExpr(TPBAttr, false);
     }
   }
   // missing attribute -- zero threads per block using runtime settings.
-  return 0;
+  return nullptr;
 }
 
 // Stolen from CodeGenFunction.cpp
@@ -310,10 +309,23 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   // set the loop target attribute
   LoopStack.setLoopTarget(TT);
 
-  bool AutoTune = false; // ignored for now...
-  unsigned ThreadsPerBlock = GetKitsuneLaunchAttr(ForallAttr, AutoTune);
-  LoopStack.setLaunchMD(ThreadsPerBlock, AutoTune);
-  
+  if (TT == TapirTargetAttr::CudaRT) {
+    llvm::Value *ThreadsPerBlock = GetKitsuneLaunchAttr(ForallAttr);
+    if (ThreadsPerBlock) {
+      // If we have a threads-per-block launch attribute, it is an expression
+      // that we need to insert code gen for.  While it can simple (contsant)
+      // more complex (a runtime computation) we need to worry about aspects
+      // like DCE removal before we get to the Tapir transformation stage.
+      llvm::Module &Mod = CGM.getModule();
+      llvm::LLVMContext &Ctx = Mod.getContext();
+      llvm::Type *VoidTy = llvm::Type::getVoidTy(Ctx);
+      llvm::Type *IntTy = llvm::Type::getInt32Ty(Ctx);
+      llvm::FunctionCallee TPBRTCall = Mod.getOrInsertFunction(
+          "__kitrt_dummy_threads_per_blk", VoidTy, IntTy);
+      Builder.CreateCall(TPBRTCall, {ThreadsPerBlock});
+    }
+  }
+
   /////////////////////////////////////////////////////////////////////////////
   // Code Modifications necessary for implementing parallel loops not required
   // by serial loops.
@@ -497,10 +509,22 @@ void CodeGenFunction::EmitCXXForallRangeStmt(
   unsigned TT = GetTapirTargetAttr(ForallAttr);
   LoopStack.setLoopTarget(TT);
 
-  bool AutoTune = false; // ignored for now...
-  unsigned ThreadsPerBlock = GetKitsuneLaunchAttr(ForallAttr, AutoTune);
-  if (ThreadsPerBlock > 0)
-    LoopStack.setLaunchMD(ThreadsPerBlock, AutoTune);
+  if (TT == TapirTargetAttr::CudaRT) {
+    llvm::Value *ThreadsPerBlock = GetKitsuneLaunchAttr(ForallAttr);
+    if (ThreadsPerBlock) {
+      // If we have a threads-per-block launch attribute, it is an expression
+      // that we need to insert code gen for.  While it can simple (constant)
+      // more complex (a runtime computation) we need to worry about aspects
+      // like DCE removal before we get to the Tapir transformation stage.
+      llvm::Module &Mod = CGM.getModule();
+      llvm::LLVMContext &Ctx = Mod.getContext();
+      llvm::Type *VoidTy = llvm::Type::getVoidTy(Ctx);
+      llvm::Type *IntTy = llvm::Type::getInt32Ty(Ctx);
+      llvm::FunctionCallee TPBRTCall = Mod.getOrInsertFunction(
+          "__kitrt_dummy_threads_per_blk", VoidTy, IntTy);
+      Builder.CreateCall(TPBRTCall, {ThreadsPerBlock});
+    }
+  }
 
   /////////////////////////////////////////////////////////////////////////////
   // Code modifications necessary for implementing parallel loops not required

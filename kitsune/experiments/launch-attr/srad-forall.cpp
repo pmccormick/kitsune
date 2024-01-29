@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
     c1 = 0;
     c2 = 127;
     lambda = 0.5;
-    niter = 2000;
+    niter = 200;
   } else {
     usage(argc, argv);
   }
@@ -149,7 +149,7 @@ int main(int argc, char* argv[])
     q0sqr   = varROI / (meanROI*meanROI);
 
     auto loop1_start_time = chrono::steady_clock::now();
-    [[kitsune::launch(THREADS_PER_BLOCK,false)]]
+    [[kitsune::launch(THREADS_PER_BLOCK)]]
     forall(int i = 0 ; i < rows; i++) {
       
       for(int j = 0; j < cols; j++) {
@@ -191,7 +191,7 @@ int main(int argc, char* argv[])
       loop1_min_time = etime;
 
     auto loop2_start_time = chrono::steady_clock::now();
-    [[kitsune::launch(THREADS_PER_BLOCK,false)]]
+    [[kitsune::launch(THREADS_PER_BLOCK)]]
     forall(int i = 0; i < rows; i++) {
       for(int j = 0; j < cols; j++) {
         // current index

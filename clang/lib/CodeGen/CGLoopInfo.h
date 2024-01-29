@@ -100,8 +100,6 @@ struct LoopAttributes {
 
   /// Value for tapir.loop.target metadata.
   unsigned LoopTarget;
-  unsigned ThreadsPerBlock;
-  bool AutoTune;
 };
 
 /// Information used when generating a structured loop.
@@ -325,13 +323,7 @@ public:
   void setLoopTarget(int LT) {
     StagedAttrs.LoopTarget=LT;
   }
-
-  /// Set the kitsune launch meta data.
-  void setLaunchMD(unsigned ThreadsPerBlock, bool AutoTune) {
-    StagedAttrs.ThreadsPerBlock = ThreadsPerBlock;
-    StagedAttrs.AutoTune = AutoTune;
-  }
-
+  
 private:
   /// Returns true if there is LoopInfo on the stack.
   bool hasInfo() const { return !Active.empty(); }

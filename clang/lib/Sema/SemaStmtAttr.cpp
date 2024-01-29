@@ -43,8 +43,7 @@ static Attr *handleFallThroughAttr(Sema &S, Stmt *St, const ParsedAttr &A,
 
   // If this is spelled as the standard C++17 attribute, but not in C++17, warn
   // about using it as an extension.
-  if (!S.getLangOpts().CPlusPlus17 && A.isCXX11Attribute() &&
-      !A.getScopeName())
+  if (!S.getLangOpts().CPlusPlus17 && A.isCXX11Attribute() && !A.getScopeName())
     S.Diag(A.getLoc(), diag::ext_cxx17_attr) << A;
 
   FnScope->setHasFallthroughStmt();
@@ -85,14 +84,15 @@ static Attr *handleLoopHintAttr(Sema &S, Stmt *St, const ParsedAttr &A,
   if ((PragmaName == "cilk") &&
       (St->getStmtClass() != Stmt::CilkForStmtClass)) {
     S.Diag(St->getBeginLoc(), diag::err_pragma_cilk_precedes_noncilk)
-      << "#pragma cilk";
+        << "#pragma cilk";
     return nullptr;
   }
 
   // This could be handled automatically by adding a Subjects definition in
   // Attr.td, but that would make the diagnostic behavior worse in this case
   // because the user spells this attribute as a pragma.
-  if (!isa<DoStmt, ForStmt, CXXForRangeStmt, WhileStmt, CilkForStmt, ForallStmt>(St)) {
+  if (!isa<DoStmt, ForStmt, CXXForRangeStmt, WhileStmt, CilkForStmt,
+           ForallStmt>(St)) {
     std::string Pragma = "#pragma " + std::string(PragmaName);
     S.Diag(St->getBeginLoc(), diag::err_pragma_loop_precedes_nonloop) << Pragma;
     return nullptr;
@@ -476,97 +476,95 @@ static Attr *handleOpenCLUnrollHint(Sema &S, Stmt *St, const ParsedAttr &A,
   return ::new (S.Context) OpenCLUnrollHintAttr(S.Context, A, UnrollFactor);
 }
 
-static Attr *handleTapirTargetAttr(Sema &S, Stmt *St, const ParsedAttr &A, 
-                                   SourceRange Range)
-{
-  // Check the details of the attribute syntax... 
+static Attr *handleTapirTargetAttr(Sema &S, Stmt *St, const ParsedAttr &A,
+                                   SourceRange Range) {
+  // Check the details of the attribute syntax...
   if (A.getNumArgs() != 1) {
     S.Diag(A.getLoc(), diag::err_tapir_target_attr_wrong_nargs);
     return nullptr;
   }
 
-  StringRef      targetStr;
+  StringRef targetStr;
   SourceLocation argLoc;
   if (!S.checkStringLiteralArgumentAttr(A, 0, targetStr, &argLoc)) {
     S.Diag(A.getLoc(), diag::err_tapir_target_unknown);
     return nullptr;
-  } 
+  }
 
-  TapirTargetAttr::TapirTargetAttrTy  tapirTK;
+  TapirTargetAttr::TapirTargetAttrTy tapirTK;
   if (!TapirTargetAttr::ConvertStrToTapirTargetAttrTy(targetStr, tapirTK)) {
     S.Diag(A.getLoc(), diag::err_tapir_target_unknown) << targetStr << argLoc;
     return nullptr;
   }
 
-  // We only support a limited range of statements.  Make sure we are dealing 
-  // with one of them -- if not return an error.  
-  // 
-  // TODO: Should spawn and sync statements have special cases here? 
+  // We only support a limited range of statements.  Make sure we are dealing
+  // with one of them -- if not return an error.
   //
-  if (St->getStmtClass() == Stmt::ForallStmtClass || 
+  // TODO: Should spawn and sync statements have special cases here?
+  //
+  if (St->getStmtClass() == Stmt::ForallStmtClass ||
       St->getStmtClass() == Stmt::CXXForallRangeStmtClass) {
-    return ::new(S.Context)TapirTargetAttr(S.Context, A, tapirTK);
+    return ::new (S.Context) TapirTargetAttr(S.Context, A, tapirTK);
 
   } else if (Expr *E = dyn_cast<Expr>(St)) {
 
     if (S.getLangOpts().Kokkos) {
       // See if this is an attributed Kokkos parallel statement (if
-      // so, there is a CallExpr lurking further down in the AST).  
-      // To find this CallExpr we need to work past implicit details 
-      // (including clean up). We need to "un-obfuscating" a bunch of 
+      // so, there is a CallExpr lurking further down in the AST).
+      // To find this CallExpr we need to work past implicit details
+      // (including clean up). We need to "un-obfuscating" a bunch of
       // C++ mechanisms to really find what sort of expression we have.
-      // The most important detail here is that the attribute is really 
-      // not attached to the Kokkos statement (even though it might 
-      // appear to be so from the program syntax and thus the programmer's 
-      // perspective).  How lovely... 
+      // The most important detail here is that the attribute is really
+      // not attached to the Kokkos statement (even though it might
+      // appear to be so from the program syntax and thus the programmer's
+      // perspective).  How lovely...
       //
-      // TODO: If we do more of this we should probably pull this code 
-      // block out into a function for easier use. 
+      // TODO: If we do more of this we should probably pull this code
+      // block out into a function for easier use.
       const Expr *ClarifiedE = E->IgnoreImplicit();
       const Expr *Last = nullptr;
-      while(ClarifiedE != Last) {
+      while (ClarifiedE != Last) {
         Last = ClarifiedE;
         if (const auto *CE = dyn_cast<ExprWithCleanups>(ClarifiedE))
           ClarifiedE = CE->getSubExpr()->IgnoreImplicit();
       }
 
       // With all the extra "stuff" removed check to see if we have a
-      // CallExpr -- if so, see if we can recognize it as a Kokkos 
-      // construct... 
+      // CallExpr -- if so, see if we can recognize it as a Kokkos
+      // construct...
       if (const CallExpr *CE = dyn_cast<CallExpr>(ClarifiedE)) {
         const FunctionDecl *Fdecl = CE->getDirectCallee();
         std::string QName = Fdecl->getQualifiedNameAsString();
         if (QName == "Kokkos::parallel_for" ||
             QName == "Kokkos::parallel_reduce")
-          return ::new(S.Context)TapirTargetAttr(S.Context, A, tapirTK);
+          return ::new (S.Context) TapirTargetAttr(S.Context, A, tapirTK);
       }
     }
   }
-  
-  // Unsupported statement class encountered... 
+
+  // Unsupported statement class encountered...
   S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);
   return nullptr;
 }
 
 static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,
-				                             SourceRange Range) 
-{
+                                     SourceRange Range) {
   bool errState = false;
 
-  // We only support a limited range of statement classes. 
-  // TODO: Add support for spawn and sync statements. 
+  // We only support a limited range of statement classes.
+  // TODO: Add support for spawn and sync statements.
   if (St->getStmtClass() != Stmt::ForallStmtClass &&
       St->getStmtClass() != Stmt::CXXForallRangeStmtClass) {
-    S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);    
+    S.Diag(A.getLoc(), diag::warn_tapir_target_attr_bad_stmt_class);
     errState = true;
   }
-  
+
   if (A.getNumArgs() != 1) {
     S.Diag(A.getLoc(), diag::err_tapir_strategy_attr_wrong_nargs);
     errState = true;
   }
 
-  StringRef      strategyStr;
+  StringRef strategyStr;
   SourceLocation argLoc;
   if (!S.checkStringLiteralArgumentAttr(A, 0, strategyStr, &argLoc)) {
     S.Diag(A.getLoc(), diag::err_tapir_strategy_unknown);
@@ -574,50 +572,52 @@ static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,
   }
 
   TapirStrategyAttr::TapirStrategyTy strategyKind;
-  if (!TapirStrategyAttr::ConvertStrToTapirStrategyTy(strategyStr, strategyKind)) {
+  if (!TapirStrategyAttr::ConvertStrToTapirStrategyTy(strategyStr,
+                                                      strategyKind)) {
     // TODO: Is this redundant w/ CheckString call above???
     S.Diag(A.getLoc(), diag::err_tapir_strategy_unknown)
-      << strategyStr << argLoc;
+        << strategyStr << argLoc;
     errState = true;
   }
 
-  if (errState) 
+  if (errState)
     return nullptr;
 
   return ::new (S.Context) TapirStrategyAttr(S.Context, A, strategyKind);
 }
 
 static Attr *handleKitsuneLaunchAttr(Sema &S, Stmt *St, const ParsedAttr &A,
-				     SourceRange Range) {
+                                     SourceRange Range) {
   unsigned ThreadsPerBlock = 0;
-  bool Autotune = false;
-  if (A.getNumArgs() == 2) {
-    Expr *E = A.getArgAsExpr(0);
-    std::optional<llvm::APSInt> ArgVal;
-    if (!(ArgVal = E->getIntegerConstantExpr(S.Context))) {
-      S.Diag(A.getLoc(), diag::err_attribute_argument_type)
-	<< A << AANT_ArgumentIntegerConstant << E->getSourceRange();
+
+  if (A.getNumArgs() == 1) {
+    Expr *TPBExpr = A.getArgAsExpr(0);
+    QualType QTy = TPBExpr->getType();
+    const Type *Ty = QTy.getTypePtr();
+
+    if (not Ty->isBuiltinType() || not Ty->isIntegerType()) {
+      S.Diag(TPBExpr->getExprLoc(), diag::err_kitsune_launch_non_integral_type);
       return nullptr;
     }
 
-    int Val = ArgVal->getSExtValue();
-    if (Val <= 0) {
-      S.Diag(A.getRange().getBegin(),
-	     diag::err_attribute_requires_positive_integer)
-	<< A << /* positive */ 0;
-      return nullptr;
+    if (QTy.isConstant(S.Context)) {
+      llvm::APSInt ValueAPS;
+      ExprResult R = S.VerifyIntegerConstantExpression(TPBExpr, &ValueAPS);
+      if (R.isInvalid()) 
+        return nullptr;
+
+      if (not ValueAPS.isStrictlyPositive()) {
+        S.Diag(TPBExpr->getExprLoc(), diag::err_kitsune_launch_tpb_must_be_positive);
+        return nullptr;
+      }
     }
-
-    ThreadsPerBlock = static_cast<unsigned>(Val);
-  }
-
-  return ::new (S.Context) KitsuneLaunchAttr(S.Context, A,
-					     ThreadsPerBlock, false);
+    return ::new (S.Context)
+        KitsuneLaunchAttr(S.Context, A, TPBExpr);
+  } else
+    return nullptr;
 }
 
-
 // =====+
-
 
 static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const ParsedAttr &A,
                                   SourceRange Range) {
@@ -666,7 +666,7 @@ static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const ParsedAttr &A,
   case ParsedAttr::AT_TapirTarget:
     return handleTapirTargetAttr(S, St, A, Range);
   case ParsedAttr::AT_KitsuneLaunch:
-    return handleKitsuneLaunchAttr(S, St, A, Range);        
+    return handleKitsuneLaunchAttr(S, St, A, Range);
   default:
     // N.B., ClangAttrEmitter.cpp emits a diagnostic helper that ensures a
     // declaration attribute is not written on a statement, but this code is

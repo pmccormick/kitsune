@@ -101,6 +101,7 @@ bool __kitcuda_load_symbols() {
   DLSYM_LOAD(cuDeviceGetAttribute);
   DLSYM_LOAD(cuDeviceGetAttribute);
   DLSYM_LOAD(cuDriverGetVersion);
+  DLSYM_LOAD(cuFuncSetCacheConfig);
   DLSYM_LOAD(cuFuncGetName);
 
   /* Context management */
