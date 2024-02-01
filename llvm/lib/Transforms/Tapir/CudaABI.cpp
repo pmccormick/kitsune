@@ -741,11 +741,13 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
                      PTXVersionFromCudaVersion() + "," + GPUArch);
   NamedMDNode *Annotations =
       KernelModule.getOrInsertNamedMetadata("nvvm.annotations");
-  SmallVector<Metadata *, 3> AV;
+  SmallVector<Metadata *, 6> AV;
   AV.push_back(ValueAsMetadata::get(KernelF));
   AV.push_back(MDString::get(Ctx, "kernel"));
   AV.push_back(
       ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
+  AV.push_back(MDString::get(Ctx, "maxntidx"));
+  AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 32)));
   Annotations->addOperand(MDNode::get(Ctx, AV));
 
   // Verify that the Thread ID corresponds to a valid iteration.  Because

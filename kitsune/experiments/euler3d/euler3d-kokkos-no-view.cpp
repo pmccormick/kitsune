@@ -418,7 +418,7 @@ int main(int argc, char** argv)
     return 0;
   }
 
-  int iterations = 200000;
+  int iterations = 2000;
   if (argc > 2)
     iterations = atoi(argv[2]);
 
