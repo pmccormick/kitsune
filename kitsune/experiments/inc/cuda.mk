@@ -1,4 +1,4 @@
-ifeq ($(CUDA_ARCH),)
+ifneq ($(CUDA_ARCH),)
   CUDA_ARCH?=sm_90
 
   NVCC=$(CUDA_PATH)/bin/nvcc
