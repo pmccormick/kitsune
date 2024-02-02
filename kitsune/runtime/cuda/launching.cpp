@@ -171,6 +171,10 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
   CU_SAFE_CALL(cuDeviceGetAttribute_p(&max_threads_per_blk,
                                       CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
                                       _kitcuda_device_id));
+  int warp_size = 0;
+  CU_SAFE_CALL(cuDeviceGetAttribute_p(&warp_size,
+                                      CU_DEVICE_ATTRIBUTE_WARP_SIZE,
+                                      _kitcuda_device_id));
 
   // TODO: Need to handle custom launch parameters on a per-launch
   // use case.  This is now a bit tricky as we can have multiple
@@ -210,13 +214,14 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
                   num_multiprocs);
         }
         int trips_per_sm = (trip_count + num_multiprocs - 1) / num_multiprocs;
-        int new_threads_per_block = trips_per_sm / max_blks_per_multiproc;
+        int num_warps_per_sm = (trips_per_sm + warp_size - 1) / warp_size;
+        int new_threads_per_block = num_warps_per_sm * warp_size;
         int new_block_count =
             (trip_count + new_threads_per_block - 1) / new_threads_per_block;
         float new_sm_load = (float)new_block_count / num_multiprocs;
-        if (new_threads_per_block < max_threads_per_blk) {
+        if (new_threads_per_block <= max_threads_per_blk) {
           if (__kitrt_verbose_mode()) {
-            fprintf(stderr, "\trefactored threads per block figure: %d ---> %d\n",
+            fprintf(stderr, "\tthreads per block adjustment: %d ---> %d\n",
                     threads_per_blk, new_threads_per_block);
             fprintf(stderr, "\tblock count went from %d to %d (min %d).\n",
                     block_count, new_block_count, min_grid_size);

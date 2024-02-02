@@ -746,8 +746,10 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   AV.push_back(MDString::get(Ctx, "kernel"));
   AV.push_back(
       ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
-  AV.push_back(MDString::get(Ctx, "maxntidx"));
-  AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 32)));
+  //AV.push_back(MDString::get(Ctx, "maxntidx"));
+  //AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 160)));
+  //AV.push_back(MDString::get(Ctx, "maxnreg"));
+  //AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 48)));
   Annotations->addOperand(MDNode::get(Ctx, AV));
 
   // Verify that the Thread ID corresponds to a valid iteration.  Because

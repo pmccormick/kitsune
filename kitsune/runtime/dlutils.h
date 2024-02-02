@@ -64,7 +64,7 @@
 
 #define DLSYM_LOAD(fName)                                                  \
   if (!(fName##_p = (decltype(fName) *)dlsym(kitrt_dl_handle, #fName))) {  \
-    fprintf(stderr, "kitrt: failed to load symbol 'fName##'.");         \
+    fprintf(stderr, "kitrt: failed to load symbol '%s'.\n", #fName);       \
     return false;                                                          \
   }
 
