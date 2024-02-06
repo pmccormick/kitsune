@@ -13,7 +13,7 @@ all: ${targets}
 srad-forall.cuda.${host_arch}: srad-forall.cpp 
 	@echo $@
 	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS)  -DTHREADS_PER_BLOCK=$(THREADS_PER_BLOCK) \
-		-mllvm --cuabi-occupancy-launches=false -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+		-o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
 srad-forall-exprs.cuda.${host_arch}: srad-forall-exprs.cpp 

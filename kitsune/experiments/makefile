@@ -21,5 +21,6 @@ $(subdirs):
 run: $(subdirs)
 	$(MAKE) -C $< $(MAKECMDGOALS)
 	
-
+launch_bench: $(subdirs)
+	$(MAKE) -C $< $(MAKECMDGOALS)
 

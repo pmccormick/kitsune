@@ -111,11 +111,13 @@ int main(int argc, char* argv[])
     
   cout << "  Starting benchmark...\n" << std::flush;  
   auto start_time = chrono::steady_clock::now();
+  [[kitsune::launch(8)]]
   forall(int i = 0; i < rows; i++) {
     iN[i] = i-1;
     iS[i] = i+1;
   }
 
+  [[kitsune::launch(8)]]
   forall(int j=0; j < cols; j++) {
     jW[j] = j-1;
     jE[j] = j+1;
@@ -126,6 +128,7 @@ int main(int argc, char* argv[])
   jW[0] = 0;
   jE[cols-1] = cols-1;
 
+  [[kitsune::launch(64)]]
   forall(int k = 0;  k < size_I; k++)
     J[k] = (float)exp(I[k]) ;
 
@@ -149,7 +152,7 @@ int main(int argc, char* argv[])
     q0sqr   = varROI / (meanROI*meanROI);
 
     auto loop1_start_time = chrono::steady_clock::now();
-    [[kitsune::launch(THREADS_PER_BLOCK)]]
+    [[kitsune::launch(16)]]
     forall(int i = 0 ; i < rows; i++) {
       
       for(int j = 0; j < cols; j++) {
@@ -191,7 +194,7 @@ int main(int argc, char* argv[])
       loop1_min_time = etime;
 
     auto loop2_start_time = chrono::steady_clock::now();
-    [[kitsune::launch(THREADS_PER_BLOCK)]]
+    [[kitsune::launch(8)]]
     forall(int i = 0; i < rows; i++) {
       for(int j = 0; j < cols; j++) {
         // current index

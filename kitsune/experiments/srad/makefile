@@ -29,8 +29,8 @@ srad-forall.hip.${host_arch}: srad-forall.cpp
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)
-#srad-kokkos.cuda.kitsune.${host_arch}: srad-kokkos-no-view.cpp 
-#	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+srad-kokkos.cuda.kitsune.${host_arch}: srad-kokkos-no-view.cpp 
+	/usr/bin/time $(KIT_CXX) $(TAPIR_CUDA_FLAGS) $(KITSUNE_KOKKOS_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 #srad-kokkos.hip.kitsune.${host_arch}: srad-kokkos-no-view.cpp 
 #	/usr/bin/time $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 

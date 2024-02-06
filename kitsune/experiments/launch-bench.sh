@@ -12,7 +12,7 @@ echo "gpu: $gpuname" >> $outfile
 echo "time stamp: $tstamp" >> $outfile
 echo "ThreadsPerBlock,Time" >> $outfile
 
-for tpb in {16..1024..16}
+for tpb in {8..512..16}
 do 
   export KITCUDA_THREADS_PER_BLOCK=$tpb
   echo "  running '$*' with $tpb threads-per-block"

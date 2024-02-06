@@ -31,6 +31,9 @@ run: $(targets)
 
 .PHONY: all clean run
 
+launch_bench: 
+	@echo "launch benchmark invalid... skipping..."
+
 clean:
 	-rm -f *.${host_arch} *.ll *.o
 	-rm -f *~ core *.log 
