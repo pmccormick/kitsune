@@ -396,14 +396,18 @@ CudaLoop::CudaLoop(Module &M, Module &KernelModule, const std::string &KN,
       Intrinsic::getDeclaration(&KernelModule, Intrinsic::nvvm_barrier0);
 
   // Get entry points into the Cuda-centric portion of the Kitsune GPU runtime.
-
-  KitCudaLaunchFn = M.getOrInsertFunction("__kitcuda_launch_kernel",
-                                          VoidTy,       // no return
-                                          VoidPtrTy,    // fat-binary
-                                          VoidPtrTy,    // kernel name
-                                          VoidPtrPtrTy, // arguments
-                                          Int64Ty,      // trip count
-                                          Int32Ty);     // threads-per-block
+  KernelInstMixTy = StructType::get(Int64Ty,  // number of memory ops.
+                                    Int64Ty,  // number of floating point ops.
+                                    Int64Ty); // number of integer ops.
+  KitCudaLaunchFn = M.getOrInsertFunction(
+      "__kitcuda_launch_kernel",
+      VoidTy,                           // no return
+      VoidPtrTy,                        // fat-binary
+      VoidPtrTy,                        // kernel name
+      VoidPtrPtrTy,                     // arguments
+      Int64Ty,                          // trip count
+      Int32Ty,                          // threads-per-block
+      KernelInstMixTy->getPointerTo()); // instruction mix info
   KitCudaMemPrefetchFn =
       M.getOrInsertFunction("__kitcuda_mem_gpu_prefetch",
                             VoidTy,     // no return.
@@ -733,6 +737,7 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   // occurred before outlining.
   Function *KernelF = Out.Outline;
   KernelF->setName(KernelName);
+
   KernelF->removeFnAttr("target-cpu");
   KernelF->removeFnAttr("target-features");
   KernelF->removeFnAttr("personality");
@@ -744,12 +749,11 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   SmallVector<Metadata *, 6> AV;
   AV.push_back(ValueAsMetadata::get(KernelF));
   AV.push_back(MDString::get(Ctx, "kernel"));
-  AV.push_back(
-      ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
-  //AV.push_back(MDString::get(Ctx, "maxntidx"));
-  //AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 160)));
+  AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
+  // AV.push_back(MDString::get(Ctx, "maxntidx"));
+  // AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 160))); 
   //AV.push_back(MDString::get(Ctx, "maxnreg"));
-  //AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 48)));
+  //AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 63)));
   Annotations->addOperand(MDNode::get(Ctx, AV));
 
   // Verify that the Thread ID corresponds to a valid iteration.  Because
@@ -1081,7 +1085,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // attribute.  The catch here is the launch attribute's value for
   // this is flexible and be a computed expression vs. a compile-time
   // constant.  For this first step of creating the kernel launch, we
-  // take the path of a runtime configuraiton vs. an attributed
+  // take the path of a runtime configuration vs. an attributed
   // launch.  This will get patched up as needed when we post-process
   // the module and replace the DummyFBPtr (as we will also need to
   // replace the kernel launch call parameter for threads-per-block if
@@ -1092,9 +1096,26 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   Constant *TPBlockValue =
       ConstantInt::get(Type::getInt32Ty(Ctx), ThreadsPerBlock);
 
-  LLVM_DEBUG(dbgs() << "\t*- code gen fat-binary based launch call.\n");
+  LLVM_DEBUG(dbgs() << "\tgathering kernel instruction mix....\n");
+  tapir::KernelInstMixData InstMix;
+  tapir::getKernelInstructionMix(&F, InstMix);
+  LLVM_DEBUG(
+      dbgs() << "\tinstruction mix:\n"
+             << "      memory ops      : " << InstMix.num_memory_ops << "\n"
+             << "      flop count      : " << InstMix.num_flops << "\n"
+             << "      integer op count: " << InstMix.num_iops << "\n\n");
+
+  Constant *InstructionMix = ConstantStruct::get(
+      KernelInstMixTy, ConstantInt::get(Int64Ty, InstMix.num_memory_ops),
+      ConstantInt::get(Int64Ty, InstMix.num_flops),
+      ConstantInt::get(Int64Ty, InstMix.num_iops));
+
+  AllocaInst *AI = NewBuilder.CreateAlloca(KernelInstMixTy);
+  StoreInst *SI = NewBuilder.CreateStore(InstructionMix, AI);
+
+  LLVM_DEBUG(dbgs() << "\t*- code gen kernel launch....\n");
   NewBuilder.CreateCall(KitCudaLaunchFn, {DummyFBPtr, KNameParam, argsPtr,
-                                          CastTripCount, TPBlockValue});
+                                          CastTripCount, TPBlockValue, AI});
   TOI.ReplCall->eraseFromParent();
   LLVM_DEBUG(dbgs() << "*** finished processing outlined call.\n");
 }
@@ -1862,7 +1883,7 @@ void CudaABI::registerFatbinary(GlobalVariable *Fatbinary) {
       new GlobalVariable(M, WrapperTy, true, GlobalValue::InternalLinkage,
                          WrapperS, "_cuabi_wrapper");
   Wrapper->setSection(FATBIN_CONTROL_SECTION_NAME);
-  Wrapper->setAlignment(Align(DL.getPrefTypeAlignment(Wrapper->getType())));
+  Wrapper->setAlignment(Align(DL.getPrefTypeAlign(Wrapper->getType())));
 
   // The rest of the registration details are tucked into a constructor
   // entry...

@@ -273,6 +273,23 @@ extern void __kitcuda_memcpy_sym_to_device(void *host_sym, uint64_t dev_sym,
                                            size_t nbytes);
 
 /**
+ * *** EXPERIMENTAL: This is a new interface between the compiler and
+ * the runtime.  It is a quick set of details regarding the particular
+ * instruction mix of a kernel and any device-side functions it calls.
+ * It is gathered from the LLVM form of the code (not ptx/s-code) and
+ * at this point is limited.  In general we are using to explore
+ * impacts on launch parameters.
+ * NOTE: Changing this structure has implications on code generation
+ * inside the CudaABI component of the compiler -- both must be kept
+ * up-to-date. 
+ */
+typedef struct _kitcuda_inst_mix_info  {
+  uint64_t  num_memory_ops;  // load+store (reads/write memory) ops count.
+  uint64_t  num_flops;       // floating point ops count. 
+  uint64_t  num_iops;        // integer ops count.
+} KitCudaInstMix;
+    
+/**
  * Given a pointer to a fat binary, launch the named kernel with the
  * given arguments, and trip count.  For the current Kitsune use cases
  * the compiler will embed the fat binary into the final executable
@@ -292,7 +309,7 @@ extern void __kitcuda_memcpy_sym_to_device(void *host_sym, uint64_t dev_sym,
  */
 extern void __kitcuda_launch_kernel(const void *fat_bin, const char *kern_name,
                                     void **kern_args, uint64_t trip_count, 
-                                    int threads_per_blk);
+                                    int threads_per_blk, const KitCudaInstMix *inst_mix);
 
 /**
  * Enable/Disable the use of occupancy calculations for the

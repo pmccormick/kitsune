@@ -188,8 +188,9 @@ private:
   // Cuda thread synchronize
   Function *CUSyncThreads = nullptr;
 
+  StructType *KernelInstMixTy;
+
   FunctionCallee KitCudaLaunchFn = nullptr;
-  FunctionCallee KitCudaModuleLaunchFn = nullptr;
   FunctionCallee KitCudaSyncFn = nullptr;
 
   // Runtime prefetch support entry points.

@@ -23,13 +23,14 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/SmallVectorMemoryBuffer.h"
+#include "llvm/Transforms/Tapir/TapirGPUUtils.h"
 
 using namespace llvm;
 
 namespace tapir {
-
 
 Constant *getOrInsertFBGlobal(Module &M, StringRef Name, Type *Ty) {
   return M.getOrInsertGlobal(Name, Ty, [&] {
@@ -38,8 +39,7 @@ Constant *getOrInsertFBGlobal(Module &M, StringRef Name, Type *Ty) {
   });
 }
 
-Constant *createConstantStr(const std::string &Str,
-                            Module &M,
+Constant *createConstantStr(const std::string &Str, Module &M,
                             const std::string &Name,
                             const std::string &SectionName,
                             unsigned Alignment) {
@@ -67,17 +67,15 @@ Constant *createConstantStr(const std::string &Str,
 }
 
 // Adapted from Transforms/Utils/ModuleUtils.cpp
-void appendToGlobalCtors(Module &M, Constant *C,
-                         int Priority, Constant *Data) {
+void appendToGlobalCtors(Module &M, Constant *C, int Priority, Constant *Data) {
   IRBuilder<> IRB(M.getContext());
   FunctionType *FnTy = FunctionType::get(IRB.getVoidTy(), false);
 
   // Get the current set of static global constructors and add
   // the new ctor to the list.
   SmallVector<Constant *, 16> CurrentCtors;
-  StructType *EltTy = StructType::get(IRB.getInt32Ty(),
-                                      PointerType::getUnqual(FnTy),
-                                      IRB.getInt8PtrTy());
+  StructType *EltTy = StructType::get(
+      IRB.getInt32Ty(), PointerType::getUnqual(FnTy), IRB.getInt8PtrTy());
   if (GlobalVariable *GVCtor = M.getNamedGlobal("llvm.global_ctors")) {
     if (Constant *Init = GVCtor->getInitializer()) {
       unsigned N = Init->getNumOperands();
@@ -107,10 +105,47 @@ void appendToGlobalCtors(Module &M, Constant *C,
   // Create the new global variable and replace all uses of
   // the old global variable with the new one.
   (void)new GlobalVariable(M, NewInit->getType(), false,
-                           GlobalValue::AppendingLinkage,
-                           NewInit, "llvm.global_ctors");
+                           GlobalValue::AppendingLinkage, NewInit,
+                           "llvm.global_ctors");
 }
 
+void getKernelInstructionMix(const Function *F, KernelInstMixData &InstMix) {
+  InstMix.num_memory_ops = 0;
+  InstMix.num_flops = 0;
+  InstMix.num_iops = 0;
 
+  std::set<const Function *> CalledFuncs;
+  for (auto I = inst_begin(F); I != inst_end(F); I++) {
+    if (I->mayReadOrWriteMemory()) {
+      InstMix.num_memory_ops++;
+    } else if (I->isBinaryOp()) {
+      Type *Ty = I->getType();
+      if (Ty->isHalfTy() || Ty->isFloatTy() || Ty->isDoubleTy() ||
+          Ty->isX86_FP80Ty())
+        InstMix.num_flops++;
+      else
+        InstMix.num_iops++;
+    } else if (I->isUnaryOp()) {
+      Type *Ty = I->getType();
+      if (Ty->isHalfTy() || Ty->isFloatTy() || Ty->isDoubleTy() ||
+          Ty->isX86_FP80Ty())
+        InstMix.num_flops++;
+      else
+        InstMix.num_iops++;
+    } else {
+      if (auto CI = dyn_cast<CallInst>(&*I)) {
+        CalledFuncs.insert(CI->getCalledFunction());
+      }
+    }
+  }
 
+  for (auto F : CalledFuncs) {
+    KernelInstMixData localInstMix;
+    getKernelInstructionMix(F, localInstMix);
+    InstMix.num_memory_ops += localInstMix.num_memory_ops;
+    InstMix.num_flops += localInstMix.num_flops;
+    InstMix.num_iops += localInstMix.num_iops;
+  }
 }
+
+} // namespace tapir

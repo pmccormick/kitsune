@@ -17,20 +17,26 @@
 #include "llvm/IR/Module.h"
 
 namespace tapir {
-  using namespace llvm;
+using namespace llvm;
 
-  extern Constant *getOrInsertFBGlobal(Module &M, StringRef Name, Type *Ty);
+extern Constant *getOrInsertFBGlobal(Module &M, StringRef Name, Type *Ty);
 
-  Constant *createConstantStr(const std::string &Str, Module &M,
-                                   const std::string &Name = "",
-                                   const std::string &SectionName = "",
-                                   unsigned Alignment = 0);
+Constant *createConstantStr(const std::string &Str, Module &M,
+                            const std::string &Name = "",
+                            const std::string &SectionName = "",
+                            unsigned Alignment = 0);
 
-  extern void appendToGlobalCtors(llvm::Module &M,
-                                  llvm::Constant *C,
-                                  int Priority,
-                                  llvm::Constant *Data);
-}
+extern void appendToGlobalCtors(llvm::Module &M, llvm::Constant *C,
+                                int Priority, llvm::Constant *Data);
+
+struct KernelInstMixData {
+  uint64_t num_memory_ops;
+  uint64_t num_flops;
+  uint64_t num_iops;
+};
+
+extern void getKernelInstructionMix(const llvm::Function *F,
+                                    KernelInstMixData &InstMix);
+} // namespace tapir
 
 #endif
-
