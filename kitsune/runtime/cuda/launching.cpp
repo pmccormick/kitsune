@@ -153,7 +153,6 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
                                  const KitCudaInstMix *inst_mix) {
   KIT_NVTX_PUSH("kitcuda:get_launch_params", KIT_NVTX_LAUNCH);
 
-  extern int _kitcuda_device_id;
 
   // TODO: For now we are only launching forall-based kernels.  In this
   // case we tweak the kernel such that it always run in "prefer cache"
@@ -166,7 +165,7 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
   // threads launching and will need to pair custom parameters with
   // a thread id.
   if (_kitcuda_use_occupancy_calc) {
-
+    extern int _kitcuda_device_id;
     int num_multiprocs = 0;
     CU_SAFE_CALL(cuDeviceGetAttribute_p(
         &num_multiprocs, CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT,
@@ -182,11 +181,19 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
     int warp_size = 0;
     CU_SAFE_CALL(cuDeviceGetAttribute_p(
         &warp_size, CU_DEVICE_ATTRIBUTE_WARP_SIZE, _kitcuda_device_id));
-
     int max_regs_per_blk = 0;
     CU_SAFE_CALL(cuDeviceGetAttribute_p(
         &max_regs_per_blk, CU_DEVICE_ATTRIBUTE_MAX_REGISTERS_PER_BLOCK,
         _kitcuda_device_id));
+
+    if (__kitrt_verbose_mode()) {
+      fprintf(stderr, "device properties:\n");
+      fprintf(stderr, "\t- number of SMs: %d\n", num_multiprocs);
+      fprintf(stderr, "\t- max blocks per SM: %d\n", max_blks_per_multiproc);
+      fprintf(stderr, "\t- max threads per block: %d\n", max_threads_per_blk);
+      fprintf(stderr, "\t- max registers per block: %d\n", max_regs_per_blk);
+      fprintf(stderr, "\t- warp size: %d\n", warp_size);
+    }
 
     // When the runtime operates in occupancy-launch mode we
     // use CUDA's built-in heuristics to get a SM-based occupancy
