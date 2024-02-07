@@ -17,7 +17,7 @@
 //
 //  Additionally, redistribution and use in source and binary forms,
 //  with or without modification, are permitted provided that the
-//  following conditions are met:
+
 //
 //    * Redistributions of source code must retain the above copyright
 //      notice, this list of conditions and the following disclaimer.
@@ -133,6 +133,23 @@ void __kitcuda_set_default_threads_per_blk(int threads_per_blk) {
 typedef std::unordered_map<std::string, int> KitCudaLaunchParamMap;
 static KitCudaLaunchParamMap _kitcuda_launch_param_map;
 
+
+static int next_lowest_factor(int n, int m) {
+  
+  if (n > m) {
+    for(int i = n; i != 0; i--) {
+      if (i % m == 0)
+	return i;
+    }
+  } else {
+    for(int i = n; i != 0; i--) {
+      if (m % i == 0)
+	return i;
+    }
+  }
+  return 0;
+}
+  
 /**
  * Get the launch parameters for a given kernel and trip count.  The
  * behavior of this call will depend on various runtime
@@ -231,25 +248,39 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
       }
 
       while (sm_load < 0.7) {
-	if (threads_per_blk < 16)
+	// REALLY EXPERIMENTAL: ak, horrific magic number soup... 
+	if (threads_per_blk < 192) 
 	  break;
-        threads_per_blk = threads_per_blk / 2;	
+	
+        threads_per_blk = threads_per_blk / 2;
+	
         if (__kitrt_verbose_mode()) {
           fprintf(stderr, "\t**** SMs are under-utilized.  Creating more blocks...\n");
 	  fprintf(stderr, "\t\tthreads-per-block = %d\n", threads_per_blk);
 	}
         block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
         sm_load = ((float)block_count / num_multiprocs) / num_multiprocs;
-        if (sm_load > 1)
-          threads_per_blk = threads_per_blk * 2 * 0.25;
+
+        if (sm_load > 1) {
+          threads_per_blk = threads_per_blk * 2;
+	  block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;	  
+	  sm_load = ((float)block_count / num_multiprocs) / num_multiprocs;	  
+	  if (__kitrt_verbose_mode()) {
+	    fprintf(stderr, "\t\t(over-subscribed) dropping back sm compute load: %f\n", sm_load);
+	    fprintf(stderr, "\t\tthreads: %d, adjusted grid size: %d blocks\n", threads_per_blk, block_count);	    
+	  }	  
+	  break;
+	}
 	
         if (__kitrt_verbose_mode()) {
           fprintf(stderr, "\t\tnew sm compute load: %f\n", sm_load);
-          fprintf(stderr, "\t\tadjusted grid size: %d blocks\n", block_count);
+          fprintf(stderr, "\t\tthreads: %d, adjusted grid size: %d blocks\n", threads_per_blk, block_count);
         }
       }
-      threads_per_blk += threads_per_blk & 1;
-
+      
+      //threads_per_blk += threads_per_blk & 1;
+      //threads_per_blk = threads_per_blk - (threads_per_blk % warp_size);
+      
       uint64_t total_insts = inst_mix->num_memory_ops + 
                              inst_mix->num_flops + 
                              inst_mix->num_iops;
@@ -268,16 +299,15 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
                 reg_use);
 
       if (reg_use > 45) {
+        threads_per_blk = threads_per_blk / 2;	
         if (__kitrt_verbose_mode()) 
-          fprintf(stderr, "moderate/high register usage -- increasing block count...\n");
-        threads_per_blk = threads_per_blk / 2;
+          fprintf(stderr, "moderate/high register usage -- increasing block count by reducing threads per block (now %d)\n",
+		  threads_per_blk);
       }
 
-      if (threads_per_blk > 32) {
-        threads_per_blk =
-            ((threads_per_blk - warp_size - 1) / warp_size) * warp_size;
-      }
-
+      int warp_factor = threads_per_blk = next_lowest_factor(threads_per_blk, warp_size);
+      if (warp_factor != -1)
+	threads_per_blk = warp_factor;
       blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 
       if (__kitrt_verbose_mode()) {
