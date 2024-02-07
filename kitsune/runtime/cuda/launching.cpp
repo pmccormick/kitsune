@@ -231,12 +231,18 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
       }
 
       while (sm_load < 0.7) {
-        if (__kitrt_verbose_mode())
+	if (threads_per_blk < 16)
+	  break;
+        threads_per_blk = threads_per_blk / 2;	
+        if (__kitrt_verbose_mode()) {
           fprintf(stderr, "\t**** SMs are under-utilized.  Creating more blocks...\n");
-
-        threads_per_blk = threads_per_blk / 4;
+	  fprintf(stderr, "\t\tthreads-per-block = %d\n", threads_per_blk);
+	}
         block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
         sm_load = ((float)block_count / num_multiprocs) / num_multiprocs;
+        if (sm_load > 1)
+          threads_per_blk = threads_per_blk * 2 * 0.25;
+	
         if (__kitrt_verbose_mode()) {
           fprintf(stderr, "\t\tnew sm compute load: %f\n", sm_load);
           fprintf(stderr, "\t\tadjusted grid size: %d blocks\n", block_count);
