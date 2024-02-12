@@ -1,6 +1,5 @@
-ifneq ($(CUDA_ARCH),)
-  CUDA_ARCH?=sm_90
-
+ifneq ($(CUDA_PATH),)
+  CUDA_ARCH?=sm_86
   NVCC=$(CUDA_PATH)/bin/nvcc
   NVCC_C_FLAGS?=-arch=$(CUDA_ARCH)
   NVCC_CXX_FLAGS?=-arch=$(CUDA_ARCH) \
@@ -18,3 +17,4 @@ ifneq ($(CUDA_ARCH),)
 else 
   BUILD_CUDA_EXPERIMENTS=false
 endif 
+

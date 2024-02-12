@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 #include <kitsune.h>
-#include "kitrt/cuda.h"
+// #include "kitrt/cuda.h"
 #include "nvToolsExt.h"
 
 // #include <kitsune.h>
@@ -140,7 +140,8 @@ T *allocate(MemoryType memory_type, size_t n, const char *label) {
     message = std::string("__kitrt_cuMemAllocManaged ") + label;
     nvtxMark(message.c_str());
     // fprintf(stderr, "Allocating %s\n", message.c_str());
-    return (T *)__kitrt_cuMemAllocManaged(sizeof(T) * n);
+    return (T *) alloc<T>(n);
+    // return (T *)__kitrt_cuMemAllocManaged(sizeof(T) * n);
   }
   return nullptr;
 }

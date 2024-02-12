@@ -24,7 +24,7 @@ constexpr bool HAVE_KITSUNE = false;
 #include <algorithm>
 
 #include <kitsune.h>
-#include "kitrt/cuda.h"
+// #include "kitrt/cuda.h"
 #include "kitsune/timer.h"
 // #include "kitsune/kitrt/llvm-gpu.h"
 // #include <cuda.h>
@@ -54,8 +54,8 @@ int main(int argc, char *argv[]) {
 
   // for profiling, do all the cuda overhead now
   nvtxRangePushA("Kitsune/Cuda Initialization");
-  int *dum = (int *)__kitrt_cuMemAllocManaged(sizeof(int) * 16);
-  //   __kitrt_cuMemFree(dum); // doesn't work ATM
+  int *dum = alloc<int>(16);
+  dealloc(dum); // doesn't work ATM
   nvtxRangePop();
 
   ///////////////////////////////
@@ -365,16 +365,16 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////
 
   nvtxRangeId_t NVTX_FREE1 = nvtxRangeStartA("Free Resources");
-  __kitrt_cuMemFree(source_coordinates_kit);
-  __kitrt_cuMemFree(source_cell_nodes_kit);
-  __kitrt_cuMemFree(source_node_offsets_kit);
+  dealloc(source_coordinates_kit);
+  dealloc(source_cell_nodes_kit);
+  dealloc(source_node_offsets_kit);
   
-  __kitrt_cuMemFree(target_coordinates_kit);
-  __kitrt_cuMemFree(target_cell_nodes_kit);
-  __kitrt_cuMemFree(target_node_offsets_kit);
+  dealloc(target_coordinates_kit);
+  dealloc(target_cell_nodes_kit);
+  dealloc(target_node_offsets_kit);
 
-  __kitrt_cuMemFree(candidate_offsets_kit);
-  __kitrt_cuMemFree(candidates_kit);
+  dealloc(candidate_offsets_kit);
+  dealloc(candidates_kit);
   nvtxRangeEnd(NVTX_FREE1);
 
   nvtxRangeEnd(NVTX_PMC1); // Parallel Mesh Creation 1 in UVM
@@ -513,16 +513,16 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////
 
   nvtxRangeId_t NVTX_FREE2 = nvtxRangeStartA("Free Resources");
-  __kitrt_cuMemFree(source_coordinates_kit);
-  __kitrt_cuMemFree(source_cell_nodes_kit);
-  __kitrt_cuMemFree(source_node_offsets_kit);
+  dealloc(source_coordinates_kit);
+  dealloc(source_cell_nodes_kit);
+  dealloc(source_node_offsets_kit);
   
-  __kitrt_cuMemFree(target_coordinates_kit);
-  __kitrt_cuMemFree(target_cell_nodes_kit);
-  __kitrt_cuMemFree(target_node_offsets_kit);
+  dealloc(target_coordinates_kit);
+  dealloc(target_cell_nodes_kit);
+  dealloc(target_node_offsets_kit);
 
-  __kitrt_cuMemFree(candidate_offsets_kit);
-  __kitrt_cuMemFree(candidates_kit);
+  dealloc(candidate_offsets_kit);
+  dealloc(candidates_kit);
   nvtxRangeEnd(NVTX_FREE2);
 
   nvtxRangeEnd(NVTX_PMC2); // Parallel Mesh Creation 2 in UVM
@@ -661,16 +661,16 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////
 
   nvtxRangeId_t NVTX_FREE3 = nvtxRangeStartA("Free Resources");
-  __kitrt_cuMemFree(source_coordinates_kit);
-  __kitrt_cuMemFree(source_cell_nodes_kit);
-  __kitrt_cuMemFree(source_node_offsets_kit);
+  dealloc(source_coordinates_kit);
+  dealloc(source_cell_nodes_kit);
+  dealloc(source_node_offsets_kit);
   
-  __kitrt_cuMemFree(target_coordinates_kit);
-  __kitrt_cuMemFree(target_cell_nodes_kit);
-  __kitrt_cuMemFree(target_node_offsets_kit);
+  dealloc(target_coordinates_kit);
+  dealloc(target_cell_nodes_kit);
+  dealloc(target_node_offsets_kit);
 
-  __kitrt_cuMemFree(candidate_offsets_kit);
-  __kitrt_cuMemFree(candidates_kit);
+  dealloc(candidate_offsets_kit);
+  dealloc(candidates_kit);
   nvtxRangeEnd(NVTX_FREE3);
 
   nvtxRangeEnd(NVTX_PMC3); // Parallel Mesh Creation 2 in UVM
@@ -842,16 +842,16 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////
 
   nvtxRangeId_t NVTX_FREE4 = nvtxRangeStartA("Free Resources");
-  __kitrt_cuMemFree(source_coordinates_kit);
-  __kitrt_cuMemFree(source_cell_nodes_kit);
-  __kitrt_cuMemFree(source_node_offsets_kit);
+  dealloc(source_coordinates_kit);
+  dealloc(source_cell_nodes_kit);
+  dealloc(source_node_offsets_kit);
   
-  __kitrt_cuMemFree(target_coordinates_kit);
-  __kitrt_cuMemFree(target_cell_nodes_kit);
-  __kitrt_cuMemFree(target_node_offsets_kit);
+  dealloc(target_coordinates_kit);
+  dealloc(target_cell_nodes_kit);
+  dealloc(target_node_offsets_kit);
 
-  __kitrt_cuMemFree(candidate_offsets_kit);
-  __kitrt_cuMemFree(candidates_kit);
+  dealloc(candidate_offsets_kit);
+  dealloc(candidates_kit);
   nvtxRangeEnd(NVTX_FREE4);
 
   nvtxRangeEnd(NVTX_PMC4); // Parallel Mesh Creation 2 in UVM
@@ -1227,16 +1227,16 @@ int main(int argc, char *argv[]) {
   ///////////////////////////////
 
   // nvtxRangeId_t NVTX_FREE5 = nvtxRangeStartA("Free Resources");
-  // __kitrt_cuMemFree(source_coordinates_kit);
-  // __kitrt_cuMemFree(source_cell_nodes_kit);
-  // __kitrt_cuMemFree(source_node_offsets_kit);
+  // dealloc(source_coordinates_kit);
+  // dealloc(source_cell_nodes_kit);
+  // dealloc(source_node_offsets_kit);
   
-  // __kitrt_cuMemFree(target_coordinates_kit);
-  // __kitrt_cuMemFree(target_cell_nodes_kit);
-  // __kitrt_cuMemFree(target_node_offsets_kit);
+  // dealloc(target_coordinates_kit);
+  // dealloc(target_cell_nodes_kit);
+  // dealloc(target_node_offsets_kit);
 
-  // __kitrt_cuMemFree(candidate_offsets_kit);
-  // __kitrt_cuMemFree(candidates_kit);
+  // dealloc(candidate_offsets_kit);
+  // dealloc(candidates_kit);
   // nvtxRangeEnd(NVTX_FREE4);
 
   // nvtxRangeEnd(NVTX_PMC5); // Parallel Mesh Creation 2 in UVM

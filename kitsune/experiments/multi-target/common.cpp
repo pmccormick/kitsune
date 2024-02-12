@@ -14,7 +14,7 @@
 
 #include "common.h"
 #include <kitsune.h>
-#include "kitrt/cuda.h"
+// #include "kitrt/cuda.h"
 
 using namespace std;
 
