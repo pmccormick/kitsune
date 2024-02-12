@@ -18,16 +18,13 @@ TAPIR_CUDA_TARGET_FLAGS?= -O$(KITSUNE_OPTLEVEL) \
  -mllvm -cuabi-arch=$(CUDA_ARCH) \
  $(GPU_STRIPMINE_FLAGS) \
  $(TAPIR_CUDA_EXTRA_FLAGS)
-TAPIR_CUDA_FLAGS= $(TAPIR_CUDA_TARGET) $(TAPIR_CUDA_TARGET_FLAGS)
+TAPIR_CUDA_FLAGS=$(TAPIR_CUDA_TARGET) $(TAPIR_CUDA_TARGET_FLAGS)
 
  #-ffast-math -fno-vectorize \
  #-mllvm -cuabi-run-post-opts \
  # -mllvm -cuabi-streams=true \
 
-TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda,--lto-O${KITSUNE_OPTLEVEL},\
--mllvm,-cuabi-opt-level=${KITSUNE_OPTLEVEL},-mllvm,-cuabi-arch=$(CUDA_ARCH),\
--mllvm,-cuabi-prefetch=true,\
--mllvm,-stripmine-coarsen-factor=1,-mllvm,-stripmine-count=1
+TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda,--lto-O${KITSUNE_OPTLEVEL},--mllvm=-cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL),--mllvm=-cuabi-arch=$(CUDA_ARCH)
 
 ifneq ($(KITSUNE_VERBOSE),)
   TAPIR_CUDA_FLAGS+=-mllvm -debug-only=cuabi $(TAPIR_CUDA_DEBUG_FLAGS)
@@ -58,6 +55,7 @@ endif
 ##################################
 TAPIR_OPENCILK_TARGET=-ftapir=opencilk
 TAPIR_OPENCILK_FLAGS?=-ftapir=opencilk -O$(KITSUNE_OPTLEVEL)
+TAPIR_OPENCILK_LTO_FLAGS?=-Wl,--tapir-target=opencilk,--lto-O${KITSUNE_OPTLEVEL}
 ##################################
 
 ##################################

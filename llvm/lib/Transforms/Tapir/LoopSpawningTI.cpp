@@ -12,8 +12,8 @@
 
 #include "llvm/Transforms/Tapir/LoopSpawningTI.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/LoopIterator.h"
@@ -38,21 +38,21 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Timer.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Transforms/Utils/Local.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/IndVarSimplify.h"
-#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Scalar/LoopDeletion.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Tapir.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Tapir/TapirLoopInfo.h"
 #include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include "llvm/Transforms/Utils.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
+#include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/LoopSimplify.h"
 #include "llvm/Transforms/Utils/LoopUtils.h"
 #include "llvm/Transforms/Utils/ScalarEvolutionExpander.h"
@@ -65,8 +65,7 @@ using namespace llvm;
 #define LS_NAME "loop-spawning-ti"
 #define DEBUG_TYPE LS_NAME
 
-STATISTIC(TapirLoopsFound,
-          "Number of Tapir loops discovered spawning");
+STATISTIC(TapirLoopsFound, "Number of Tapir loops discovered spawning");
 STATISTIC(LoopsConvertedToDAC,
           "Number of Tapir loops converted to divide-and-conquer iteration "
           "spawning");
@@ -104,8 +103,8 @@ public:
   }
 
 private:
-  void implementDACIterSpawnOnHelper(
-      TapirLoopInfo &TL, TaskOutlineInfo &Out, ValueToValueMapTy &VMap);
+  void implementDACIterSpawnOnHelper(TapirLoopInfo &TL, TaskOutlineInfo &Out,
+                                     ValueToValueMapTy &VMap);
 };
 
 static bool isSRetInput(const Value *V, const Function &F) {
@@ -180,7 +179,7 @@ void LoopOutlineProcessor::addSyncToOutlineReturns(TapirLoopInfo &TL,
                                                    TaskOutlineInfo &Out,
                                                    ValueToValueMapTy &VMap) {
   Value *SyncRegion =
-    cast<Value>(VMap[TL.getTask()->getDetach()->getSyncRegion()]);
+      cast<Value>(VMap[TL.getTask()->getDetach()->getSyncRegion()]);
   EscapeEnumerator EE(*Out.Outline, "ls.sync", false);
   while (IRBuilder<> *AtExit = EE.Next()) {
     // TODO: Add an option to insert syncs before resumes.
@@ -197,9 +196,9 @@ void LoopOutlineProcessor::addSyncToOutlineReturns(TapirLoopInfo &TL,
       return;
 
     // Insert a call to sync.unwind.
-    CallInst *SyncUnwind = CallInst::Create(
-        Intrinsic::getDeclaration(&M, Intrinsic::sync_unwind),
-        { SyncRegion }, "", NewExit->getFirstNonPHIOrDbg());
+    CallInst *SyncUnwind =
+        CallInst::Create(Intrinsic::getDeclaration(&M, Intrinsic::sync_unwind),
+                         {SyncRegion}, "", NewExit->getFirstNonPHIOrDbg());
     // If the Tapir loop has an unwind destination, change the sync.unwind to an
     // invoke that unwinds to the cloned unwind destination.
     if (TL.getUnwindDest())
@@ -379,27 +378,27 @@ static void emitMissedWarning(const Loop *L, const TapirLoopHints &LH,
                               OptimizationRemarkEmitter *ORE) {
   switch (LH.getStrategy()) {
   case TapirLoopHints::ST_DAC:
-    ORE->emit(DiagnosticInfoOptimizationFailure(
-                  DEBUG_TYPE, "FailedRequestedSpawning",
-                  L->getStartLoc(), L->getHeader())
-              << "Tapir loop not transformed: "
-              << "failed to use divide-and-conquer loop spawning."
-              << "  Compile with -Rpass-analysis=" << LS_NAME
-              << " for more details.");
+    ORE->emit(
+        DiagnosticInfoOptimizationFailure(DEBUG_TYPE, "FailedRequestedSpawning",
+                                          L->getStartLoc(), L->getHeader())
+        << "Tapir loop not transformed: "
+        << "failed to use divide-and-conquer loop spawning."
+        << "  Compile with -Rpass-analysis=" << LS_NAME
+        << " for more details.");
     break;
   case TapirLoopHints::ST_SEQ:
-    ORE->emit(DiagnosticInfoOptimizationFailure(
-                  DEBUG_TYPE, "SpawningDisabled",
-                  L->getStartLoc(), L->getHeader())
+    ORE->emit(DiagnosticInfoOptimizationFailure(DEBUG_TYPE, "SpawningDisabled",
+                                                L->getStartLoc(),
+                                                L->getHeader())
               << "Tapir loop not transformed: "
               << "loop-spawning transformation disabled");
     break;
   case TapirLoopHints::ST_END:
-    ORE->emit(DiagnosticInfoOptimizationFailure(
-                  DEBUG_TYPE, "FailedRequestedSpawning",
-                  L->getStartLoc(), L->getHeader())
-              << "Tapir loop not transformed: "
-              << "unknown loop-spawning strategy");
+    ORE->emit(
+        DiagnosticInfoOptimizationFailure(DEBUG_TYPE, "FailedRequestedSpawning",
+                                          L->getStartLoc(), L->getHeader())
+        << "Tapir loop not transformed: "
+        << "unknown loop-spawning strategy");
     break;
   }
 }
@@ -407,11 +406,11 @@ static void emitMissedWarning(const Loop *L, const TapirLoopHints &LH,
 /// Process Tapir loops within the given function for loop spawning.
 class LoopSpawningImpl {
 public:
-  LoopSpawningImpl(Function &F, DominatorTree &DT, LoopInfo &LI, TaskInfo &TI,
-                   ScalarEvolution &SE, AssumptionCache &AC,
-                   TargetTransformInfo &TTI, TapirTargetID Target,
-                   OptimizationRemarkEmitter &ORE, 
-                   std::map<TapirTargetID, std::shared_ptr<TapirTarget>> &Targets)
+  LoopSpawningImpl(
+      Function &F, DominatorTree &DT, LoopInfo &LI, TaskInfo &TI,
+      ScalarEvolution &SE, AssumptionCache &AC, TargetTransformInfo &TTI,
+      TapirTargetID Target, OptimizationRemarkEmitter &ORE,
+      std::map<TapirTargetID, std::shared_ptr<TapirTarget>> &Targets)
       : F(F), DT(DT), LI(LI), TI(TI), SE(SE), AC(AC), TTI(TTI), Target(Target),
         ORE(ORE), Targets(Targets) {}
 
@@ -469,8 +468,8 @@ private:
   // Get the LoopOutlineProcessor for handling Tapir loop \p TL.
   LoopOutlineProcessor *getOutlineProcessor(TapirLoopInfo *TL);
 
-  using LOPMapTy = DenseMap<TapirLoopInfo *,
-                            std::unique_ptr<LoopOutlineProcessor>>;
+  using LOPMapTy =
+      DenseMap<TapirLoopInfo *, std::unique_ptr<LoopOutlineProcessor>>;
 
   // For all recorded Tapir loops, determine the function arguments and inputs
   // for the outlined helper functions for those loops.
@@ -498,12 +497,13 @@ private:
   //
   // This method relies on being executed on the Tapir loops in a function in
   // post order.
-  void getTapirLoopTaskBlocks(
-      TapirLoopInfo *TL, std::vector<BasicBlock *> &TaskBlocks,
-      SmallPtrSetImpl<BasicBlock *> &ReattachBlocks,
-      SmallPtrSetImpl<BasicBlock *> &DetachedRethrowBlocks,
-      SmallPtrSetImpl<BasicBlock *> &SharedEHEntries,
-      SmallPtrSetImpl<BasicBlock *> &UnreachableExits);
+  void
+  getTapirLoopTaskBlocks(TapirLoopInfo *TL,
+                         std::vector<BasicBlock *> &TaskBlocks,
+                         SmallPtrSetImpl<BasicBlock *> &ReattachBlocks,
+                         SmallPtrSetImpl<BasicBlock *> &DetachedRethrowBlocks,
+                         SmallPtrSetImpl<BasicBlock *> &SharedEHEntries,
+                         SmallPtrSetImpl<BasicBlock *> &UnreachableExits);
 
   // Outline Tapir loop \p TL into a helper function.  The \p Args set specified
   // the arguments to that helper function.  The map \p VMap will store the
@@ -553,17 +553,16 @@ static BasicBlock *createTaskUnwind(Function *F, BasicBlock *UnwindDest,
 
   // Create the landing bad.
   IRBuilder<> Builder(CallUnwind);
-  LandingPadInst *LPad = Builder.CreateLandingPad(
-      UnwindDest->getLandingPadInst()->getType(), 0);
+  LandingPadInst *LPad =
+      Builder.CreateLandingPad(UnwindDest->getLandingPadInst()->getType(), 0);
   LPad->setCleanup(true);
   // Create the normal return for the detached rethrow.
-  BasicBlock *DRUnreachable = BasicBlock::Create(
-      Ctx, CallUnwind->getName()+".unreachable", F);
+  BasicBlock *DRUnreachable =
+      BasicBlock::Create(Ctx, CallUnwind->getName() + ".unreachable", F);
   // Invoke the detached rethrow.
-  Builder.CreateInvoke(
-      Intrinsic::getDeclaration(M, Intrinsic::detached_rethrow,
-                                { LPad->getType() }),
-      DRUnreachable, UnwindDest, { SyncRegion, LPad });
+  Builder.CreateInvoke(Intrinsic::getDeclaration(M, Intrinsic::detached_rethrow,
+                                                 {LPad->getType()}),
+                       DRUnreachable, UnwindDest, {SyncRegion, LPad});
 
   // Terminate the normal return of the detached rethrow with unreachable.
   Builder.SetInsertPoint(DRUnreachable);
@@ -574,8 +573,9 @@ static BasicBlock *createTaskUnwind(Function *F, BasicBlock *UnwindDest,
 
 /// Implement the parallel loop control for a given outlined Tapir loop to
 /// process loop iterations in a parallel recursive divide-and-conquer fashion.
-void DACSpawning::implementDACIterSpawnOnHelper(
-    TapirLoopInfo &TL, TaskOutlineInfo &Out, ValueToValueMapTy &VMap) {
+void DACSpawning::implementDACIterSpawnOnHelper(TapirLoopInfo &TL,
+                                                TaskOutlineInfo &Out,
+                                                ValueToValueMapTy &VMap) {
   NamedRegionTimer NRT("implementDACIterSpawnOnHelper",
                        "Implement D&C spawning of loop iterations",
                        TimerGroupName, TimerGroupDescription,
@@ -680,7 +680,7 @@ void DACSpawning::implementDACIterSpawnOnHelper(
           Preheader->getTerminator()->getDebugLoc());
     // Create branch based on grainsize.
     PrimaryIVStart = Builder.CreatePHI(PrimaryIV->getType(), 2,
-                                       PrimaryIV->getName()+".dac");
+                                       PrimaryIV->getName() + ".dac");
     PrimaryIVStart->setDebugLoc(PrimaryIV->getDebugLoc());
     PrimaryIVInput->replaceAllUsesWith(PrimaryIVStart);
     Start = PrimaryIVStart;
@@ -690,9 +690,9 @@ void DACSpawning::implementDACIterSpawnOnHelper(
     IterCount = Builder.CreateSub(End, Start, "itercount");
     Value *IterCountCmp = Builder.CreateICmpUGT(IterCount, Grainsize);
     Instruction *RecurTerm =
-      SplitBlockAndInsertIfThen(IterCountCmp, PreheaderOrigFront,
-                                /*Unreachable=*/false,
-                                /*BranchWeights=*/nullptr);
+        SplitBlockAndInsertIfThen(IterCountCmp, PreheaderOrigFront,
+                                  /*Unreachable=*/false,
+                                  /*BranchWeights=*/nullptr);
     RecurHead = RecurTerm->getParent();
     // Create RecurHead, RecurDet, and RecurCont, with appropriate branches.
     RecurDet = SplitBlock(RecurHead, RecurHead->getTerminator());
@@ -752,7 +752,8 @@ void DACSpawning::implementDACIterSpawnOnHelper(
     }
 
     if (!UnwindDest) {
-      // Common case.  Insert a call to the outline immediately before the detach.
+      // Common case.  Insert a call to the outline immediately before the
+      // detach.
       CallInst *RecurCall;
       // Create call instruction.
       RecurCall = Builder.CreateCall(Helper, RecurCallInputs);
@@ -764,11 +765,10 @@ void DACSpawning::implementDACIterSpawnOnHelper(
     } else {
       InvokeInst *RecurCall;
       BasicBlock *CallDest = SplitBlock(RecurDet, RecurDet->getTerminator());
-      BasicBlock *CallUnwind =
-        createTaskUnwind(Helper, UnwindDest, SyncRegion,
-                         RecurDet->getName()+".unwind");
-      RecurCall = InvokeInst::Create(Helper, CallDest, CallUnwind,
-                                     RecurCallInputs);
+      BasicBlock *CallUnwind = createTaskUnwind(
+          Helper, UnwindDest, SyncRegion, RecurDet->getName() + ".unwind");
+      RecurCall =
+          InvokeInst::Create(Helper, CallDest, CallUnwind, RecurCallInputs);
       // Use a fast calling convention for the outline.
       RecurCall->setCallingConv(CallingConv::Fast);
       RecurCall->setDebugLoc(TLDebugLoc);
@@ -787,9 +787,8 @@ void DACSpawning::implementDACIterSpawnOnHelper(
   Instruction *NextIter = MidIter;
   if (TL.isInclusiveRange()) {
     IRBuilder<> Builder(&(RecurCont->front()));
-    NextIter = cast<Instruction>(
-        Builder.CreateAdd(MidIter, ConstantInt::get(End->getType(), 1),
-                          "miditerplusone"));
+    NextIter = cast<Instruction>(Builder.CreateAdd(
+        MidIter, ConstantInt::get(End->getType(), 1), "miditerplusone"));
     // Copy flags from the increment operation on the primary IV.
     NextIter->copyIRFlags(PrimaryIVInc);
     // Extend or truncate NextIter, if necessary
@@ -834,8 +833,7 @@ void DACSpawning::implementDACIterSpawnOnHelper(
     if (!UnwindDest)
       NewDI = Builder.CreateDetach(RecurDet, RecurCont, SyncRegion);
     else
-      NewDI = Builder.CreateDetach(RecurDet, RecurCont, UnwindDest,
-                                   SyncRegion);
+      NewDI = Builder.CreateDetach(RecurDet, RecurCont, UnwindDest, SyncRegion);
     NewDI->setDebugLoc(TLDebugLoc);
     RecurHead->getTerminator()->eraseFromParent();
 
@@ -851,10 +849,9 @@ void DACSpawning::implementDACIterSpawnOnHelper(
 /// processed.  Returns the Task that encodes the loop body if so, or nullptr if
 /// not.
 Task *LoopSpawningImpl::getTaskIfTapirLoop(const Loop *L) {
-  NamedRegionTimer NRT("getTaskIfTapirLoop",
-                       "Check if loop is a Tapir loop to process",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
+  NamedRegionTimer NRT(
+      "getTaskIfTapirLoop", "Check if loop is a Tapir loop to process",
+      TimerGroupName, TimerGroupDescription, TimePassesIsEnabled);
 
   LLVM_DEBUG(dbgs() << "Analyzing for spawning: " << *L);
 
@@ -874,9 +871,9 @@ Task *LoopSpawningImpl::getTaskIfTapirLoop(const Loop *L) {
   } else if (!isa<BranchInst>(Preheader->getTerminator())) {
     LLVM_DEBUG(dbgs() << "Loop preheader is not terminated by a branch.\n");
     if (hintsDemandOutlining(Hints)) {
-      ORE.emit(TapirLoopInfo::createMissedAnalysis(LS_NAME, "ComplexPreheader",
-                                                   L)
-               << "loop preheader not terminated by a branch");
+      ORE.emit(
+          TapirLoopInfo::createMissedAnalysis(LS_NAME, "ComplexPreheader", L)
+          << "loop preheader not terminated by a branch");
       emitMissedWarning(L, Hints, &ORE);
     }
     return nullptr;
@@ -887,9 +884,9 @@ Task *LoopSpawningImpl::getTaskIfTapirLoop(const Loop *L) {
   if (!T) {
     LLVM_DEBUG(dbgs() << "Loop does not match structure of Tapir loop.\n");
     if (hintsDemandOutlining(Hints)) {
-      ORE.emit(TapirLoopInfo::createMissedAnalysis(LS_NAME, "NonCanonicalLoop",
-                                                   L)
-               << "loop does not have the canonical structure of a Tapir loop");
+      ORE.emit(
+          TapirLoopInfo::createMissedAnalysis(LS_NAME, "NonCanonicalLoop", L)
+          << "loop does not have the canonical structure of a Tapir loop");
       emitMissedWarning(L, Hints, &ORE);
     }
     return nullptr;
@@ -900,15 +897,14 @@ Task *LoopSpawningImpl::getTaskIfTapirLoop(const Loop *L) {
 
 /// Get the LoopOutlineProcessor for handling Tapir loop \p TL.
 LoopOutlineProcessor *LoopSpawningImpl::getOutlineProcessor(TapirLoopInfo *TL) {
-  NamedRegionTimer NRT("getOutlineProcessor",
-                       "Get a loop-outline processor for a Tapir loop",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
+  NamedRegionTimer NRT(
+      "getOutlineProcessor", "Get a loop-outline processor for a Tapir loop",
+      TimerGroupName, TimerGroupDescription, TimePassesIsEnabled);
 
   Module &M = *F.getParent();
   Loop *L = TL->getLoop();
   TapirLoopHints Hints(L);
-  unsigned LTID=Hints.getLoopTarget();
+  unsigned LTID = Hints.getLoopTarget();
   TapirTargetID TLTID;
   unsigned int ThreadsPerBlock = Hints.getThreadsPerBlock();
 
@@ -932,31 +928,34 @@ LoopOutlineProcessor *LoopSpawningImpl::getOutlineProcessor(TapirLoopInfo *TL) {
 
   // get the LoopTarget from set of Targets if it exists, otherwise create it
 
-  // FIXME: The order of target processing here possibly breaks a "inside-out" 
-  // contract (loosely speaking) for ordering.  In nested constructs this 
-  // leaves us with a partially completed code transformation when we pop 
-  // up a level of code nesting.  This is important for nested loops with 
-  // different targets... 
-  if (Targets.find(TLTID) == Targets.end()){
-    Targets[TLTID] = std::shared_ptr<TapirTarget>(getTapirTargetFromID(M, (TapirTargetID) TLTID));
+  // FIXME: The order of target processing here possibly breaks a "inside-out"
+  // contract (loosely speaking) for ordering.  In nested constructs this
+  // leaves us with a partially completed code transformation when we pop
+  // up a level of code nesting.  This is important for nested loops with
+  // different targets...
+  if (Targets.find(TLTID) == Targets.end()) {
+    Targets[TLTID] = std::shared_ptr<TapirTarget>(
+        getTapirTargetFromID(M, (TapirTargetID)TLTID));
   }
-  
+
   // Allow the Tapir target to define a custom loop-outline processor.
-  if (LoopOutlineProcessor *TargetLOP = Targets[TLTID]->getLoopOutlineProcessor(TL))
+  if (LoopOutlineProcessor *TargetLOP =
+          Targets[TLTID]->getLoopOutlineProcessor(TL))
     return TargetLOP;
 
   switch (Hints.getStrategy()) {
-  case TapirLoopHints::ST_DAC: return new DACSpawning(M);
-  default: return new DefaultLoopOutlineProcessor(M);
+  case TapirLoopHints::ST_DAC:
+    return new DACSpawning(M);
+  default:
+    return new DefaultLoopOutlineProcessor(M);
   }
 }
 
 /// Associate tasks with Tapir loops that enclose them.
 void LoopSpawningImpl::associateTasksToTapirLoops() {
   NamedRegionTimer NRT("associateTasksToTapirLoops",
-                       "Associate tasks to Tapir loops",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
+                       "Associate tasks to Tapir loops", TimerGroupName,
+                       TimerGroupDescription, TimePassesIsEnabled);
 
   SmallVector<Task *, 4> UnassocTasks;
   // Traverse the tasks in post order, queueing up tasks that are not roots of
@@ -1010,9 +1009,8 @@ void LoopSpawningImpl::getTapirLoopTaskBlocks(
     SmallPtrSetImpl<BasicBlock *> &SharedEHEntries,
     SmallPtrSetImpl<BasicBlock *> &UnreachableExits) {
   NamedRegionTimer NRT("getTapirLoopTaskBlocks",
-                       "Get basic blocks for Tapir loop",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
+                       "Get basic blocks for Tapir loop", TimerGroupName,
+                       TimerGroupDescription, TimePassesIsEnabled);
 
   Task *T = TL->getTask();
   SmallVector<Task *, 4> EnclosedTasks;
@@ -1030,7 +1028,7 @@ void LoopSpawningImpl::getTapirLoopTaskBlocks(
         // "SharedEHEntry," meaning it needs its Phi nodes updated after
         // cloning.
         DetachInst *SubDI =
-          cast<DetachInst>(SubTL->getLoop()->getHeader()->getTerminator());
+            cast<DetachInst>(SubTL->getLoop()->getHeader()->getTerminator());
         if (SubDI->hasUnwindDest())
           SharedEHEntries.insert(SubDI->getUnwindDest());
       }
@@ -1097,8 +1095,8 @@ static Value *computeGrainsize(TapirLoopInfo *TL) {
   IRBuilder<> B(Preheader->getTerminator());
   B.SetCurrentDebugLocation(TL->getDebugLoc());
   return B.CreateCall(
-      Intrinsic::getDeclaration(M, Intrinsic::tapir_loop_grainsize,
-                                { IdxTy }), { TripCount });
+      Intrinsic::getDeclaration(M, Intrinsic::tapir_loop_grainsize, {IdxTy}),
+      {TripCount});
 }
 
 /// Get the grainsize of this loop either from metadata or by computing the
@@ -1121,8 +1119,8 @@ static void getLoopControlInputs(TapirLoopInfo *TL,
   // Add an argument for the primary induction variable.
   auto &PrimaryInduction = TL->getPrimaryInduction();
   PHINode *PrimaryPhi = PrimaryInduction.first;
-  TL->StartIterArg = new Argument(PrimaryPhi->getType(),
-                                  PrimaryPhi->getName() + ".start");
+  TL->StartIterArg =
+      new Argument(PrimaryPhi->getType(), PrimaryPhi->getName() + ".start");
   LCArgs.push_back(TL->StartIterArg);
   LCInputs.push_back(PrimaryInduction.second.getStartValue());
 
@@ -1165,9 +1163,8 @@ void LoopSpawningImpl::getAllTapirLoopInputs(
     DenseMap<Loop *, SmallVector<Value *, 3>> &LoopCtlArgs,
     DenseMap<Loop *, SmallVector<Value *, 3>> &LoopCtlInputs) {
   NamedRegionTimer NRT("getAllTapirLoopInputs",
-                       "Determine inputs for all Tapir loops",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
+                       "Determine inputs for all Tapir loops", TimerGroupName,
+                       TimerGroupDescription, TimePassesIsEnabled);
 
   // Determine the inputs for all tasks.
   TaskValueSetMap TaskInputs = findAllTaskInputs(F, DT, TI);
@@ -1182,30 +1179,29 @@ void LoopSpawningImpl::getAllTapirLoopInputs(
       ValueSet TLInputs = getTapirLoopInputs(TL, TaskInputs[T]);
       LoopInputSets[L] = TLInputs;
       LLVM_DEBUG({
-          dbgs() << "TLInputs\n";
-          for (Value *V : TLInputs)
-            dbgs() << "\t" << *V << "\n";
-        });
+        dbgs() << "TLInputs\n";
+        for (Value *V : TLInputs)
+          dbgs() << "\t" << *V << "\n";
+      });
 
       // Determine loop-control inputs.
       getLoopControlInputs(TL, LoopCtlArgs[L], LoopCtlInputs[L]);
 
       LLVM_DEBUG({
-          dbgs() << "LoopCtlArgs:\n";
-          for (Value *V : LoopCtlArgs[L])
-            dbgs() << "\t" << *V << "\n";
-          dbgs() << "LoopCtlInputs:\n";
-          for (Value *V : LoopCtlInputs[L])
-            dbgs() << "\t" << *V << "\n";
-        });
+        dbgs() << "LoopCtlArgs:\n";
+        for (Value *V : LoopCtlArgs[L])
+          dbgs() << "\t" << *V << "\n";
+        dbgs() << "LoopCtlInputs:\n";
+        for (Value *V : LoopCtlInputs[L])
+          dbgs() << "\t" << *V << "\n";
+      });
     }
   }
 }
 
-static void updateClonedIVs(
-    TapirLoopInfo *TL, BasicBlock *OrigPreheader,
-    ValueSet &Args, ValueToValueMapTy &VMap, unsigned IVArgIndex,
-    unsigned NextIVArgOffset = 3) {
+static void updateClonedIVs(TapirLoopInfo *TL, BasicBlock *OrigPreheader,
+                            ValueSet &Args, ValueToValueMapTy &VMap,
+                            unsigned IVArgIndex, unsigned NextIVArgOffset = 3) {
   NamedRegionTimer NRT("updateClonedIVs", "Updated IVs in Tapir-loop helper",
                        TimerGroupName, TimerGroupDescription,
                        TimePassesIsEnabled);
@@ -1262,6 +1258,7 @@ class ArgEndMaterializer final : public OutlineMaterializer {
 private:
   Value *TripCount;
   Value *ArgEnd;
+
 public:
   ArgEndMaterializer(const Instruction *SrcSyncRegion, Value *TripCount,
                      Value *ArgEnd)
@@ -1275,8 +1272,8 @@ public:
       Metadata *MD = MDV->getMetadata();
       if (auto *LAM = dyn_cast<LocalAsMetadata>(MD))
         if (LAM->getValue() == TripCount)
-          return MetadataAsValue::get(V->getContext(),
-                                      MDTuple::get(V->getContext(), std::nullopt));
+          return MetadataAsValue::get(
+              V->getContext(), MDTuple::get(V->getContext(), std::nullopt));
     }
 
     // Materialize TripCount with ArgEnd.  This should only occur in the loop
@@ -1288,7 +1285,7 @@ public:
     return OutlineMaterializer::materialize(V);
   }
 };
-}
+} // namespace
 
 /// Outline Tapir loop \p TL into a helper function.  The \p Args set specified
 /// the arguments to that helper function.  The map \p VMap will store the
@@ -1330,8 +1327,8 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
     Mat = new OutlineMaterializer(InputSyncRegion);
 
   Twine NameSuffix = ".ls" + Twine(TL->getLoop()->getLoopDepth());
-  SmallVector<ReturnInst *, 4> Returns;  // Ignore returns cloned.
-  ValueSet Outputs;  // Outputs must be empty.
+  SmallVector<ReturnInst *, 4> Returns; // Ignore returns cloned.
+  ValueSet Outputs;                     // Outputs must be empty.
   Function *Helper;
   {
     NamedRegionTimer NRT("CreateHelper", "Create helper for Tapir loop",
@@ -1379,11 +1376,12 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
   // Add alignment assumptions to arguments of helper, based on alignment of
   // values in old function.
   {
-  NamedRegionTimer NRT("AddAlignmentAssumptions",
-                       "Add alignment assumptions to Tapir-loop helper",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
-  AddAlignmentAssumptions(&F, Args, VMap, Preheader->getTerminator(), &AC, &DT);
+    NamedRegionTimer NRT("AddAlignmentAssumptions",
+                         "Add alignment assumptions to Tapir-loop helper",
+                         TimerGroupName, TimerGroupDescription,
+                         TimePassesIsEnabled);
+    AddAlignmentAssumptions(&F, Args, VMap, Preheader->getTerminator(), &AC,
+                            &DT);
   } // end timed region
 
   // CreateHelper partially serializes the cloned copy of the loop by converting
@@ -1438,20 +1436,20 @@ Function *LoopSpawningImpl::createHelperForTapirLoop(
 
   // Convert the cloned detach and reattaches into unconditional branches.
   {
-  NamedRegionTimer NRT("serializeClonedLoop", "Serialize cloned Tapir loop",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
-  DetachInst *ClonedDI = cast<DetachInst>(VMap[DI]);
-  BasicBlock *ClonedDetacher = ClonedDI->getParent();
-  BasicBlock *ClonedContinue = ClonedDI->getContinue();
-  for (BasicBlock *RB : ReattachBlocks) {
-    ReattachInst *ClonedRI = cast<ReattachInst>(VMap[RB->getTerminator()]);
-    ReplaceInstWithInst(ClonedRI, BranchInst::Create(ClonedContinue));
-  }
-  ClonedContinue->removePredecessor(ClonedDetacher);
-  BranchInst *DetachRepl = BranchInst::Create(ClonedDI->getDetached());
-  ReplaceInstWithInst(ClonedDI, DetachRepl);
-  VMap[DI] = DetachRepl;
+    NamedRegionTimer NRT("serializeClonedLoop", "Serialize cloned Tapir loop",
+                         TimerGroupName, TimerGroupDescription,
+                         TimePassesIsEnabled);
+    DetachInst *ClonedDI = cast<DetachInst>(VMap[DI]);
+    BasicBlock *ClonedDetacher = ClonedDI->getParent();
+    BasicBlock *ClonedContinue = ClonedDI->getContinue();
+    for (BasicBlock *RB : ReattachBlocks) {
+      ReattachInst *ClonedRI = cast<ReattachInst>(VMap[RB->getTerminator()]);
+      ReplaceInstWithInst(ClonedRI, BranchInst::Create(ClonedContinue));
+    }
+    ClonedContinue->removePredecessor(ClonedDetacher);
+    BranchInst *DetachRepl = BranchInst::Create(ClonedDI->getDetached());
+    ReplaceInstWithInst(ClonedDI, DetachRepl);
+    VMap[DI] = DetachRepl;
   } // end timed region
 
   return Helper;
@@ -1463,8 +1461,8 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
   for (Task *T : post_order(TI.getRootTask())) {
     if (TapirLoopInfo *TL = getTapirLoop(T)) {
       PredicatedScalarEvolution PSE(SE, *TL->getLoop());
-      bool canOutline = TL->prepareForOutlining(DT, LI, TI, PSE, AC, LS_NAME,
-                                                ORE, TTI);
+      bool canOutline =
+          TL->prepareForOutlining(DT, LI, TI, PSE, AC, LS_NAME, ORE, TTI);
       if (!canOutline) {
         const Loop *L = TL->getLoop();
         TapirLoopHints Hints(L);
@@ -1475,7 +1473,7 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
 
       // Get an outline processor for each Tapir loop.
       OutlineProcessors[TL] =
-        std::unique_ptr<LoopOutlineProcessor>(getOutlineProcessor(TL));
+          std::unique_ptr<LoopOutlineProcessor>(getOutlineProcessor(TL));
     }
   }
 
@@ -1493,23 +1491,22 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
   associateTasksToTapirLoops();
 
   for (Task *T : post_order(TI.getRootTask())) {
-    LLVM_DEBUG(dbgs() << "Examining task@" << T->getEntry()->getName() <<
-               " for outlining\n");
+    LLVM_DEBUG(dbgs() << "Examining task@" << T->getEntry()->getName()
+                      << " for outlining\n");
     // If any subtasks were outlined as Tapir loops, replace these loops with
     // calls to the outlined functions.
     {
-    NamedRegionTimer NRT("replaceSubLoopCalls",
-                         "Update sub-Tapir-loops with calls to helpers",
-                         TimerGroupName, TimerGroupDescription,
-                         TimePassesIsEnabled);
-    for (Task *SubT : T->subtasks()) {
-      if (TapirLoopInfo *TL = getTapirLoop(SubT)) {
-        // emitSCEVChecks(TL->getLoop(), TL->getBypass());
-        Loop *L = TL->getLoop();
-        TaskToOutline[SubT].replaceReplCall(
-            replaceLoopWithCallToOutline(TL, TaskToOutline[SubT], LoopInputs[L]));
+      NamedRegionTimer NRT(
+          "replaceSubLoopCalls", "Update sub-Tapir-loops with calls to helpers",
+          TimerGroupName, TimerGroupDescription, TimePassesIsEnabled);
+      for (Task *SubT : T->subtasks()) {
+        if (TapirLoopInfo *TL = getTapirLoop(SubT)) {
+          // emitSCEVChecks(TL->getLoop(), TL->getBypass());
+          Loop *L = TL->getLoop();
+          TaskToOutline[SubT].replaceReplCall(replaceLoopWithCallToOutline(
+              TL, TaskToOutline[SubT], LoopInputs[L]));
+        }
       }
-    }
     } // end timed region
 
     TapirLoopInfo *TL = getTapirLoop(T);
@@ -1524,38 +1521,35 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
     ValueToValueMapTy InputMap;
     Instruction *ArgStart;
     {
-    NamedRegionTimer NRT("fixupHelperInputs",
-                         "Fixup inputs to Tapir-loop body",
-                         TimerGroupName, TimerGroupDescription,
-                         TimePassesIsEnabled);
-    ArgStart =
-        fixupHelperInputs(F, T, LoopInputSets[L], TLInputsFixed,
-                          L->getLoopPreheader()->getTerminator(),
-                          &*L->getHeader()->getFirstInsertionPt(),
-                          OutlineProcessors[TL]->getArgStructMode(), InputMap,
-                          L);
+      NamedRegionTimer NRT("fixupHelperInputs",
+                           "Fixup inputs to Tapir-loop body", TimerGroupName,
+                           TimerGroupDescription, TimePassesIsEnabled);
+      ArgStart = fixupHelperInputs(F, T, LoopInputSets[L], TLInputsFixed,
+                                   L->getLoopPreheader()->getTerminator(),
+                                   &*L->getHeader()->getFirstInsertionPt(),
+                                   OutlineProcessors[TL]->getArgStructMode(),
+                                   InputMap, L);
     } // end timed region
 
     ValueSet HelperArgs;
     SmallVector<Value *, 8> HelperInputs;
     {
-    NamedRegionTimer NRT("setupLoopOutlineArgs",
-                         "Setup inputs to Tapir-loop helper function",
-                         TimerGroupName, TimerGroupDescription,
-                         TimePassesIsEnabled);
-    OutlineProcessors[TL]->setupLoopOutlineArgs(
-        F, HelperArgs, HelperInputs, LoopInputSets[L], LoopCtlArgs[L],
-        LoopCtlInputs[L], TLInputsFixed);
+      NamedRegionTimer NRT(
+          "setupLoopOutlineArgs", "Setup inputs to Tapir-loop helper function",
+          TimerGroupName, TimerGroupDescription, TimePassesIsEnabled);
+      OutlineProcessors[TL]->setupLoopOutlineArgs(
+          F, HelperArgs, HelperInputs, LoopInputSets[L], LoopCtlArgs[L],
+          LoopCtlInputs[L], TLInputsFixed);
     } // end timed region
 
     LLVM_DEBUG({
-        dbgs() << "HelperArgs:\n";
-        for (Value *V : HelperArgs)
-          dbgs() << "\t" << *V << "\n";
-        dbgs() << "HelperInputs:\n";
-        for (Value *V : HelperInputs)
-          dbgs() << "\t" << *V << "\n";
-      });
+      dbgs() << "HelperArgs:\n";
+      for (Value *V : HelperArgs)
+        dbgs() << "\t" << *V << "\n";
+      dbgs() << "HelperInputs:\n";
+      for (Value *V : HelperInputs)
+        dbgs() << "\t" << *V << "\n";
+    });
 
     LoopArgs[L] = HelperArgs;
     for (Value *V : HelperInputs)
@@ -1581,18 +1575,17 @@ TaskOutlineMapTy LoopSpawningImpl::outlineAllTapirLoops() {
 
     // Do ABI-dependent processing of each outlined Tapir loop.
     {
-    NamedRegionTimer NRT("postProcessOutline",
-                         "Post-process Tapir-loop helper function",
-                         TimerGroupName, TimerGroupDescription,
-                         TimePassesIsEnabled);
-    OutlineProcessors[TL]->postProcessOutline(*TL, TaskToOutline[T], VMap);
+      NamedRegionTimer NRT(
+          "postProcessOutline", "Post-process Tapir-loop helper function",
+          TimerGroupName, TimerGroupDescription, TimePassesIsEnabled);
+      OutlineProcessors[TL]->postProcessOutline(*TL, TaskToOutline[T], VMap);
     } // end timed region
 
     LLVM_DEBUG({
-        dbgs() << "LoopInputs[L]:\n";
-        for (Value *V : LoopInputs[L])
-          dbgs() << "\t" << *V << "\n";
-      });
+      dbgs() << "LoopInputs[L]:\n";
+      for (Value *V : LoopInputs[L])
+        dbgs() << "\t" << *V << "\n";
+    });
 
     {
       NamedRegionTimer NRT("clearMetadata", "Cleanup Tapir-loop metadata",
@@ -1642,49 +1635,47 @@ bool LoopSpawningImpl::run() {
   TaskOutlineMapTy TapirLoopOutlines = outlineAllTapirLoops();
 
   // DWS I reordered this after outlineAllTapirLoops
-  // I don't know if I can do this, but we don't want to preprocess the Target 
-  // yet since with attributed forall's we may never need to preprocess the 
-  // command line target. We also need to preprocess all the backend targets which
-  // we only know after outlining all Tapir loops
+  // I don't know if I can do this, but we don't want to preprocess the Target
+  // yet since with attributed forall's we may never need to preprocess the
+  // command line target. We also need to preprocess all the backend targets
+  // which we only know after outlining all Tapir loops
 
-  // FIXME: The order of target processing here possibly breaks a "inside-out" 
-  // contract (loosely speaking) for ordering.  In nested constructs this 
-  // leaves us with a partially completed code transformation when we pop 
-  // up a level of code nesting.  This is important for nested loops with 
-  // different targets... 
+  // FIXME: The order of target processing here possibly breaks a "inside-out"
+  // contract (loosely speaking) for ordering.  In nested constructs this
+  // leaves us with a partially completed code transformation when we pop
+  // up a level of code nesting.  This is important for nested loops with
+  // different targets...
 
   // Perform any Target-dependent preprocessing of F.
-  for (const auto& [TID, ThisTarget]: Targets)
+  for (const auto &[TID, ThisTarget] : Targets)
     // NOTE: TODO: This is a no-op for GPU targets (currently).  However,
-    // we need to consider if this is a ordering issue (processing per 
-    // target vs. a post-ordering). 
+    // we need to consider if this is a ordering issue (processing per
+    // target vs. a post-ordering).
     ThisTarget->preProcessFunction(F, TI, true);
 
   // Perform target-specific processing of the outlined-loop calls.
   {
-  NamedRegionTimer NRT("processOutlinedLoopCall",
-                       "Process calls to outlined loops",
-                       TimerGroupName, TimerGroupDescription,
-                       TimePassesIsEnabled);
-  for (Task *T : post_order(TI.getRootTask()))
-    if (TapirLoopInfo *TL = getTapirLoop(T))
-      // NOTE: TODO: For GPU transforms this replaces the outlined loop
-      // function call with the necessary code to (possibly) prefetch 
-      // and lauch a kernel for the outlined loop body.
-      OutlineProcessors[TL]->processOutlinedLoopCall(*TL, TapirLoopOutlines[T],
-                                                     DT);
+    NamedRegionTimer NRT("processOutlinedLoopCall",
+                         "Process calls to outlined loops", TimerGroupName,
+                         TimerGroupDescription, TimePassesIsEnabled);
+    for (Task *T : post_order(TI.getRootTask()))
+      if (TapirLoopInfo *TL = getTapirLoop(T))
+        // NOTE: TODO: For GPU transforms this replaces the outlined loop
+        // function call with the necessary code to (possibly) prefetch
+        // and lauch a kernel for the outlined loop body.
+        OutlineProcessors[TL]->processOutlinedLoopCall(
+            *TL, TapirLoopOutlines[T], DT);
   } // end timed region
 
-
-  // FIXME: The order of target processing here possibly breaks a "inside-out" 
-  // contract (loosely speaking) for ordering.  In nested constructs this 
-  // leaves us with a partially completed code transformation when we pop 
-  // up a level of code nesting.  This is important for nested loops with 
-  // different targets... 
+  // FIXME: The order of target processing here possibly breaks a "inside-out"
+  // contract (loosely speaking) for ordering.  In nested constructs this
+  // leaves us with a partially completed code transformation when we pop
+  // up a level of code nesting.  This is important for nested loops with
+  // different targets...
   //
   // Perform any Target-dependent postprocessing of F.
-  // 
-  for (const auto& [TID, ThisTarget]: Targets)
+  //
+  for (const auto &[TID, ThisTarget] : Targets)
     ThisTarget->postProcessFunction(F, true);
   // Target->postProcessFunction(F, true);
 
@@ -1752,33 +1743,38 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
       Changed |= formLCSSARecursively(*L, DT, &LI, &SE);
   }
 
-  // FIXME: Are there any chances of WorkList being empty?  Why not 
+  errs() << "before target id stuff...\n";
+  assert(SavedF && "unexpected null saved function?\n");
+  // FIXME: Are there any chances of WorkList being empty?  Why not
   // just use the head of the WorkList here vs. SavedF?
   TapirTargetID TargetID = GetTLI(*SavedF).getTapirTarget();
+  errs() << " got a target id : " << int(TargetID) << "...\n";
   std::shared_ptr<TapirTarget> Target(getTapirTargetFromID(M, TargetID));
-
+  errs() << " created a target...\n";
   std::map<TapirTargetID, std::shared_ptr<TapirTarget>> Targets;
+  errs() << "after target id stuff...\n";
 
   // Now process each loop.
   bool HasParallelism = false;
   for (Function *F : WorkList) {
-    HasParallelism |= LoopSpawningImpl(*F, GetDT(*F), GetLI(*F), GetTI(*F), GetSE(*F),
-                                GetAC(*F), GetTTI(*F), TargetID, GetORE(*F), Targets)
-                   .run();
+    HasParallelism |=
+        LoopSpawningImpl(*F, GetDT(*F), GetLI(*F), GetTI(*F), GetSE(*F),
+                         GetAC(*F), GetTTI(*F), TargetID, GetORE(*F), Targets)
+            .run();
   }
 
   // if parallelism was discovered during loop spawning postprocess each target
-  if (HasParallelism) 
-    // FIXME: The order of target processing here possibly breaks a "inside-out" 
-    // contract (loosely speaking) for ordering.  In nested constructs this 
-    // leaves us with a partially completed code transformation when we pop 
-    // up a level of code nesting.  This is important for nested loops with 
-    // different targets... 
-    for (const auto& [TID, ThisTarget]: Targets)
+  if (HasParallelism)
+    // FIXME: The order of target processing here possibly breaks a "inside-out"
+    // contract (loosely speaking) for ordering.  In nested constructs this
+    // leaves us with a partially completed code transformation when we pop
+    // up a level of code nesting.  This is important for nested loops with
+    // different targets...
+    for (const auto &[TID, ThisTarget] : Targets)
       ThisTarget->postProcessModule();
 
   Changed |= HasParallelism;
-  
+
   if (Changed)
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
@@ -1814,14 +1810,15 @@ struct LoopSpawningTI : public FunctionPass {
 
     LLVM_DEBUG(dbgs() << "LoopSpawningTI on function " << F.getName() << "\n");
     std::shared_ptr<TapirTarget> Target(getTapirTargetFromID(M, TargetID));
-    // FIXME: The order of target processing here possibly breaks a "inside-out" 
-    // contract (loosely speaking) for ordering.  In nested constructs this 
-    // leaves us with a partially completed code transformation when we pop 
-    // up a level of code nesting.  This is important for nested loops with 
-    // different targets... 
+    // FIXME: The order of target processing here possibly breaks a "inside-out"
+    // contract (loosely speaking) for ordering.  In nested constructs this
+    // leaves us with a partially completed code transformation when we pop
+    // up a level of code nesting.  This is important for nested loops with
+    // different targets...
     std::map<TapirTargetID, std::shared_ptr<TapirTarget>> Targets;
     bool Changed =
-        LoopSpawningImpl(F, DT, LI, TI, SE, AC, TTI, TargetID, ORE, Targets).run();
+        LoopSpawningImpl(F, DT, LI, TI, SE, AC, TTI, TargetID, ORE, Targets)
+            .run();
     return Changed;
   }
 
@@ -1838,7 +1835,7 @@ struct LoopSpawningTI : public FunctionPass {
     AU.addRequired<OptimizationRemarkEmitterWrapperPass>();
   }
 };
-}
+} // namespace
 
 char LoopSpawningTI::ID = 0;
 static const char ls_name[] = "Loop Spawning with Task Info";
@@ -1856,7 +1853,5 @@ INITIALIZE_PASS_DEPENDENCY(OptimizationRemarkEmitterWrapperPass)
 INITIALIZE_PASS_END(LoopSpawningTI, LS_NAME, ls_name, false, false)
 
 namespace llvm {
-Pass *createLoopSpawningTIPass() {
-  return new LoopSpawningTI();
-}
-}
+Pass *createLoopSpawningTIPass() { return new LoopSpawningTI(); }
+} // namespace llvm

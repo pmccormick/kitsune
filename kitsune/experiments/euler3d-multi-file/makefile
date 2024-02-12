@@ -1,18 +1,13 @@
 include ../experiments.mk
 
 cxx_flags += -I${kitsune_prefix}/include 
-
+targets = euler3d-forall.opencilk.${host_arch}
 ifeq ($(KITSUNE_ENABLE_CUDA),TRUE)
   targets += euler3d-forall.cuda.${host_arch}
 endif 
 
-ifeq ($(KITSUNE_ENABLE_HIP), TRUE)
-  targets += euler3d-forall.hip.${host_arch}
-endif 
-
 VPATH := ./forall/
 
-all: ${targets} 
 
 forall_lto_src = forall/compute_flux.cpp \
    forall/compute_step_factor.cpp \
@@ -20,17 +15,35 @@ forall_lto_src = forall/compute_flux.cpp \
 
 forall_src = forall/euler3d-forall.cpp 
 
-forall_lto_objs := $(patsubst %.cpp, forall/%.lto.o, $(notdir $(forall_lto_src)))
-forall_objs := $(patsubst %.cpp, forall/%.o, $(notdir $(forall_src)))
-forall/%.lto.o: forall/%.cpp 
-	${KIT_CXX} -c -flto ${TAPIR_CUDA_FLAGS} -o $@ $<
-forall/%.o: forall/%.cpp
-	${KIT_CXX} -c ${TAPIR_CUDA_FLAGS} -o $@ $<
+all: ${targets}
 
-euler3d-forall.cuda.${host_arch}:  ${forall_lto_objs} ${forall_objs}
-	${KIT_CXX} -flto -fuse-ld=lld -ftapir=cuda \
-	${tapir_cu_lto_flags} -o $@ ${forall_lto_objs} ${forall_objs} ${link_flags} \
-	-Xlinker -rpath=${kitsune_prefix}/lib
+
+#############################
+# opencilk target
+#
+forall_opencilk_lto_objs := $(patsubst %.cpp, forall/%.opencilk.lto.o, $(notdir $(forall_lto_src)))
+forall_opencilk_objs := $(patsubst %.cpp, forall/%.opencilk.o, $(notdir $(forall_src)))
+
+forall/%.opencilk.lto.o: forall/%.cpp 
+	${KIT_CXX} -c -flto ${TAPIR_OPENCILK_FLAGS} -o $@ $<
+forall/%.opencilk.o: forall/%.cpp
+	${KIT_CXX} -c ${TAPIR_OPENCILK_FLAGS} -o $@ $<
+euler3d-forall.opencilk.${host_arch}: ${forall_opencilk_lto_objs} ${forall_opencilk_objs}
+	${KIT_CXX} -flto -fuse-ld=lld -ftapir=opencilk \
+	${TAPIR_OPENCILK_LTO_FLAGS} -o $@ ${forall_opencilk_lto_objs} ${forall_opencilk_objs} ${link_flags} \
+	-Xlinker -rpath=${KITSUNE_PREFIX}/lib
+
+#############################
+# cuda target
+# 
+forall_cuda_lto_objs := $(patsubst %.cpp, forall/%.cuda.lto.o, $(notdir $(forall_lto_src)))
+forall_cuda_objs := $(patsubst %.cpp, forall/%.cuda.o, $(notdir $(forall_src)))
+
+forall/%.cuda.lto.o: forall/%.cpp 
+	${KIT_CXX} -c -flto ${TAPIR_CUDA_FLAGS} -o $@ $<
+euler3d-forall.cuda.${host_arch}: ${forall_cuda_lto_objs}
+	${KIT_CXX} -flto -fuse-ld=lld ${TAPIR_CUDA_LTO_FLAGS} -o $@ ${forall_cuda_lto_objs} \
+	-Xlinker -rpath=${KITSUNE_PREFIX}/lib
 
 clean:
 	-rm -f *.${host_arch} *.o forall/*.o  kokkos/*.o 
