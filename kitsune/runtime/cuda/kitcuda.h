@@ -323,6 +323,17 @@ extern void __kitcuda_launch_kernel(const void *fat_bin, const char *kern_name,
  */
 extern void __kitcuda_use_occupancy_launch(bool enable);
 
+/** 
+ * Enable/Disable the tuning of occupancy-based calculations for
+ * the determination of kernel launch parameters.  If the `enable`
+ * parameter is set to `true` both occupancy-based launches and 
+ * the refinement of the occupancy-driven results will be used. 
+ * `enable == true` will enable occupancy_launches. 
+ *
+ * @param enable - enable/disable tuned occupancy launches.
+ */
+ extern void __kitcuda_refine_occupancy_launches(bool enable);
+
 /**
  * Set the runtime's value for the number of threads-per-block used
  * in simple launch parameter calculations.

@@ -58,8 +58,10 @@
 #include <cassert>
 #include <stdint.h>
 #include <stdlib.h>
+#include <cstring>
 #include <execinfo.h>
 #include <type_traits>
+#include <ctype.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -150,8 +152,20 @@ bool __kitrt_get_env_value(const char *var_name,
       value = atoi(value_string);
       found = true;
     } else if constexpr (std::is_same_v<ValueType, bool>) {
-      value = true;
-      found = true;					       		  
+      found = true;
+      for(int i = 0; value_string[i]; i++) 
+        value_string[i] = tolower(value_string[i]);
+      if (!strcmp(value_string, "true") || !strcmp(value_string, "1"))
+        value = true;
+      else if (!strcmp(value_string, "false") || !strcmp(value_string, "0"))
+        value = false;
+      else {
+        fprintf(stderr, "kitsune_rt: warning, boolean environment variable "
+                        "'%s' not set to true or false.\nTreating presence "
+                        "as an implied true setting.\n", 
+                        var_name);
+        value = true;
+      } 
     } else if constexpr (std::is_same_v<ValueType, long>) {
       value = atol(value_string);
       found = true;

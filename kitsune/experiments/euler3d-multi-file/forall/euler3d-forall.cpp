@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 #include <chrono>
 #include <kitsune.h>
 #include <cmath>
@@ -49,23 +50,39 @@ void initialize_variables(int nelr,
   }
 }
 
+
 /*
  * Main function
  */
 int main(int argc, char** argv)
 {
+  using namespace std;
+
   if (argc < 2) {
     cout << "specify data file name" << endl;
     return 0;
   }
 
-  int iterations = ITERATIONS;
+  int iterations = 4000;  
   if (argc > 2)
     iterations = atoi(argv[2]);
 
   const char* data_file_name = argv[1];
 
-  float *ff_variable = alloc<float>(NVAR);
+  cout << setprecision(5);
+  cout << "\n";
+  cout << "---- euler3d benchmark (forall) ----\n\n"
+       << "  Input file : " << data_file_name << "\n" 
+       << "  Iterations : " << iterations << ".\n\n"; 
+
+      
+  cout << "  Reading input data, allocating arrays, initializing data, etc..." 
+       << std::flush;
+
+  auto total_start_time = chrono::steady_clock::now();
+
+  // these need to be computed the first time in order to compute time step
+    float *ff_variable = alloc<float>(NVAR);
   Float3 ff_flux_contribution_momentum_x,
     ff_flux_contribution_momentum_y,
     ff_flux_contribution_momentum_z;
@@ -156,20 +173,22 @@ int main(int argc, char** argv)
 
   // Create arrays and set initial conditions
   float* variables = alloc<float>(nelr*NVAR);
+  cout << "  done.\n\n";
 
-  auto start = chrono::steady_clock::now();
+  cout << "  Starting benchmark...\n" << std::flush;
+  auto start_time = chrono::steady_clock::now();
   initialize_variables(nelr, variables, ff_variable);
-  
   float* old_variables = alloc<float>(nelr*NVAR);
   float* fluxes = alloc<float>(nelr*NVAR);
   float* step_factors = alloc<float>(nelr);
+  double *rk_times = new double[iterations];
 
+  // Begin iterations
   double copy_total = 0.0;
   double sf_total = 0.0;
   double rk_total = 0.0;
-  // Begin iterations
+
   for(int i = 0; i < iterations; i++) {
-    
     auto copy_start = chrono::steady_clock::now();
     cpy(old_variables, variables, nelr*NVAR);
     auto copy_end = chrono::steady_clock::now();
@@ -180,7 +199,8 @@ int main(int argc, char** argv)
     auto sf_start = chrono::steady_clock::now();
     compute_step_factor(nelr, variables, areas, step_factors);
     auto sf_end = chrono::steady_clock::now();
-    sf_total += chrono::duration<double>(sf_end-sf_start).count();
+    time = chrono::duration<double>(sf_end-sf_start).count();    
+    sf_total += time;
 
     auto rk_start = chrono::steady_clock::now();
     for(int j = 0; j < RK; j++) {
@@ -193,15 +213,43 @@ int main(int argc, char** argv)
       time_step(j, nelr, old_variables, variables, step_factors, fluxes);
     }
     auto rk_end = chrono::steady_clock::now();
-    rk_total += chrono::duration<double>(rk_end-rk_start).count();
+    time = chrono::duration<double>(rk_end-rk_start).count();
+    if (i > 0) {
+      rk_times[i] = time;
+      rk_total += time;
+    }
   }
-
-  auto end = chrono::steady_clock::now();
-  cout << iterations << " ";
-  cout << copy_total << " "
-       << sf_total << " "
-       << rk_total << " "
-       << chrono::duration<double>(end-start).count() << endl;
+  
   dump(variables, nel, nelr);
+
+  auto end_time = chrono::steady_clock::now();
+  double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+  double total_time = chrono::duration<double>(end_time-total_start_time).count();
+  double rk_mean = rk_total / (iterations-1);
+  double sum = 0.0;
+  for(int i = 1; i < iterations; i++) {
+    double dist = rk_times[i] - rk_mean;
+    sum += dist * dist; 
+  }
+  double rk_std_dev = sqrt(sum / iterations);
+
+  cout << "\n"
+       << "      Total time : " << total_time << " seconds.\n"
+       << "    Compute time : " << elapsed_time << " seconds.\n"
+       << "            copy : " << copy_total << " seconds (average: " << copy_total / iterations << " seconds).\n"
+       << "              sf : " << sf_total << " seconds (average: " << sf_total / iterations << " seconds).\n"
+       << "              rk : " << rk_total << " seconds (average: " << rk_mean << " seconds / std dev: " << rk_std_dev << ").\n"
+       << "*** " << elapsed_time << ", " << elapsed_time << "\n"                
+       << "----\n\n";
+
+  dealloc(ff_variable);
+  dealloc(areas);
+  dealloc(elements_surrounding_elements);
+  dealloc(normals);
+  dealloc(variables);
+  dealloc(old_variables);
+  dealloc(fluxes);
+  dealloc(step_factors);
+
   return 0;
 }
