@@ -11,7 +11,8 @@ VPATH := ./forall/
 
 forall_lto_src = forall/compute_flux.cpp \
    forall/compute_step_factor.cpp \
-   forall/time_step.cpp 
+   forall/time_step.cpp \
+   forall/euler3d-forall.cpp 
 
 forall_src = forall/euler3d-forall.cpp 
 
@@ -40,9 +41,9 @@ forall_cuda_lto_objs := $(patsubst %.cpp, forall/%.cuda.lto.o, $(notdir $(forall
 forall_cuda_objs := $(patsubst %.cpp, forall/%.cuda.o, $(notdir $(forall_src)))
 
 forall/%.cuda.lto.o: forall/%.cpp 
-	${KIT_CXX} -c -flto ${TAPIR_CUDA_FLAGS} -o $@ $<
+	${KIT_CXX} -c -flto -ftapir=cuda -O${KITSUNE_OPTLEVEL} -o $@ $<
 euler3d-forall.cuda.${host_arch}: ${forall_cuda_lto_objs}
-	${KIT_CXX} -flto -fuse-ld=lld ${TAPIR_CUDA_LTO_FLAGS} -o $@ ${forall_cuda_lto_objs} \
+	${KIT_CXX} -flto -fuse-ld=lld -ftapir=cuda ${TAPIR_CUDA_LTO_FLAGS} -o $@ ${forall_cuda_lto_objs} \
 	-Xlinker -rpath=${KITSUNE_PREFIX}/lib
 
 clean:

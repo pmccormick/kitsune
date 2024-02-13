@@ -24,7 +24,11 @@ TAPIR_CUDA_FLAGS=$(TAPIR_CUDA_TARGET) $(TAPIR_CUDA_TARGET_FLAGS)
  #-mllvm -cuabi-run-post-opts \
  # -mllvm -cuabi-streams=true \
 
-TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda,--lto-O${KITSUNE_OPTLEVEL},--mllvm=-cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL),--mllvm=-cuabi-arch=$(CUDA_ARCH)
+TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda\
+		      -Wl,--threads=1\
+  		      -Wl,--lto-O${KITSUNE_OPTLEVEL}\
+		      -Wl,-mllvm=-cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL)\
+		      -Wl,-mllvm=-cuabi-arch=$(CUDA_ARCH)
 
 ifneq ($(KITSUNE_VERBOSE),)
   TAPIR_CUDA_FLAGS+=-mllvm -debug-only=cuabi $(TAPIR_CUDA_DEBUG_FLAGS)

@@ -1742,39 +1742,29 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
     for (Loop *L : LoopWorkList)
       Changed |= formLCSSARecursively(*L, DT, &LI, &SE);
   }
-
-  errs() << "before target id stuff...\n";
-  assert(SavedF && "unexpected null saved function?\n");
-  // FIXME: Are there any chances of WorkList being empty?  Why not
-  // just use the head of the WorkList here vs. SavedF?
-  TapirTargetID TargetID = GetTLI(*SavedF).getTapirTarget();
-  errs() << " got a target id : " << int(TargetID) << "...\n";
-  std::shared_ptr<TapirTarget> Target(getTapirTargetFromID(M, TargetID));
-  errs() << " created a target...\n";
-  std::map<TapirTargetID, std::shared_ptr<TapirTarget>> Targets;
-  errs() << "after target id stuff...\n";
-
-  // Now process each loop.
+  
   bool HasParallelism = false;
+  std::map<TapirTargetID, std::shared_ptr<TapirTarget>> Targets;
+  // Now process each loop.
   for (Function *F : WorkList) {
+    TapirTargetID TargetID = GetTLI(*F).getTapirTarget();
+    std::shared_ptr<TapirTarget> Target(getTapirTargetFromID(M, TargetID));
     HasParallelism |=
         LoopSpawningImpl(*F, GetDT(*F), GetLI(*F), GetTI(*F), GetSE(*F),
                          GetAC(*F), GetTTI(*F), TargetID, GetORE(*F), Targets)
             .run();
   }
 
-  // if parallelism was discovered during loop spawning postprocess each target
   if (HasParallelism)
-    // FIXME: The order of target processing here possibly breaks a "inside-out"
-    // contract (loosely speaking) for ordering.  In nested constructs this
-    // leaves us with a partially completed code transformation when we pop
-    // up a level of code nesting.  This is important for nested loops with
-    // different targets...
+    // FIXME: The order of target processing here possibly breaks a
+    // "inside-out" contract (loosely speaking) for ordering.  In nested
+    // constructs this leaves us with a partially completed code
+    // transformation when we pop up a level of code nesting.  This is
+    // important for nested loops with different targets...
     for (const auto &[TID, ThisTarget] : Targets)
       ThisTarget->postProcessModule();
 
   Changed |= HasParallelism;
-
   if (Changed)
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();

@@ -86,7 +86,9 @@ extern "C" {
 
 CUstream __kitcuda_get_thread_stream() {
   KIT_NVTX_PUSH("kitcuda:get_thread_stream", KIT_NVTX_STREAM);
+
   pid_t tid = gettid();
+
   _kitcuda_stream_mutex.lock();
   KitCudaStreamMap::iterator sit = _kitcuda_stream_map.find(tid);
   CUstream stream;

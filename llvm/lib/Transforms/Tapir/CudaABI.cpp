@@ -586,6 +586,7 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
   LLVM_DEBUG(dbgs() << "\t\t- gathering and analyzing global values...\n");
   std::set<GlobalValue *> UsedGlobalValues;
   Loop &L = *TL.getLoop();
+
   for (Loop *SL : L)
     for (BasicBlock *BB : SL->blocks())
       collect(*BB, UsedGlobalValues);
@@ -737,7 +738,7 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   // occurred before outlining.
   Function *KernelF = Out.Outline;
   KernelF->setName(KernelName);
-
+  KernelF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
   KernelF->removeFnAttr("target-cpu");
   KernelF->removeFnAttr("target-features");
   KernelF->removeFnAttr("personality");
@@ -1956,6 +1957,8 @@ CudaABIOutputFile CudaABI::generatePTX() {
     LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");
     mpm.run(KernelModule, mam);
     LLVM_DEBUG(dbgs() << "\t\tpasses complete.\n");
+    LLVM_DEBUG(saveModuleToFile(&KernelModule, KernelModule.getName().str() +
+                                                 ".postopt.LTO.ll"));
   }
 
   // Setup the passes and request that the output goes to the

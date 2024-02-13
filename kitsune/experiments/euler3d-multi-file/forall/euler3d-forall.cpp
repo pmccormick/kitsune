@@ -242,7 +242,7 @@ int main(int argc, char** argv)
        << "*** " << elapsed_time << ", " << elapsed_time << "\n"                
        << "----\n\n";
 
-  dealloc(ff_variable);
+/*dealloc(ff_variable);
   dealloc(areas);
   dealloc(elements_surrounding_elements);
   dealloc(normals);
@@ -250,6 +250,6 @@ int main(int argc, char** argv)
   dealloc(old_variables);
   dealloc(fluxes);
   dealloc(step_factors);
-
+*/
   return 0;
 }
