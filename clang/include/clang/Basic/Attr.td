@@ -4194,14 +4194,8 @@ def TapirTarget : StmtAttr {
   let Args = [
     EnumArgument<"TapirTargetAttrType", "TapirTargetAttrTy",
     // TODO: Is there a difference between "serial" and "none"?
-    ["cheetah",    "cilk",    "cuda",
-     "hip",        "libomp",  "qthreads",   
-     "realm",      "rocm",    "serial",     
-     "zero",       "opencl",  "default"],
-    ["CheetahRT",  "CilkRT",  "CudaRT",
-     "HipRT",      "OmpRT",   "QthreadsRT",
-	     "RealmRT",    "RocmRT",  "SequentialRT",
-     "ZeroRT",     "OpenCLRT", "DefaultRT"], 0>
+    ["none", "serial", "cuda", "hip", "opencilk", "openmp", "qthreads", "realm"], 
+    ["None", "Serial", "Cuda", "Hip", "OpenCilk", "OpenMP", "Qthreads", "Realm"], 0>
   ];
   let Documentation = [TapirRTDocs];
 }

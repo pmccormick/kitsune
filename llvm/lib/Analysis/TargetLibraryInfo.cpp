@@ -42,20 +42,16 @@ static cl::opt<TapirTargetID> ClTapirTarget(
                           "none", "None"),
                clEnumValN(TapirTargetID::Serial,
                           "serial", "Serial code"),
-               clEnumValN(TapirTargetID::Cilk,
-                          "cilk", "Cilk Plus"),
+               clEnumValN(TapirTargetID::Cuda,
+                          "cuda", "Cuda (NVPTX)"),
+               clEnumValN(TapirTargetID::Hip,
+                          "hip", "Hip (AMDGPU)"),	       
                clEnumValN(TapirTargetID::OpenMP,
                           "openmp", "OpenMP"),
-               clEnumValN(TapirTargetID::OpenCL,
-                          "opencl", "OpenCL"),
                clEnumValN(TapirTargetID::Qthreads,
                           "qthreads", "Qthreads"),
                clEnumValN(TapirTargetID::Realm,
                           "realm", "Realm"),
-               clEnumValN(TapirTargetID::GPU,
-                          "gpu", "GPU"),
-               clEnumValN(TapirTargetID::Cheetah,
-                          "cheetah", "Cheetah"),
                clEnumValN(TapirTargetID::OpenCilk,
                           "opencilk", "OpenCilk")));
 
@@ -1255,7 +1251,6 @@ void TargetLibraryInfoImpl::addVectorizableFunctionsFromVecLib(
 void TargetLibraryInfoImpl::addTapirTargetLibraryFunctions(
     TapirTargetID TargetID) {
   switch (TargetID) {
-  case TapirTargetID::Cilk:
   case TapirTargetID::OpenCilk: {
     const StringLiteral TTFuncs[] = {
     #define TLI_DEFINE_CILK_LIBS
@@ -1267,10 +1262,11 @@ void TargetLibraryInfoImpl::addTapirTargetLibraryFunctions(
   }
   case TapirTargetID::None:
   case TapirTargetID::Serial:
-  case TapirTargetID::Cheetah:
   case TapirTargetID::Cuda:
+  case TapirTargetID::Hip:    
   case TapirTargetID::OpenMP:
   case TapirTargetID::Qthreads:
+  case TapirTargetID::Realm:    
   case TapirTargetID::Last_TapirTargetID:
     break;
   }

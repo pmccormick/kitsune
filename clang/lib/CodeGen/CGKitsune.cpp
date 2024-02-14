@@ -96,13 +96,44 @@ CodeGenFunction::GetTapirStrategyAttr(ArrayRef<const Attr *> Attrs) {
 }
 
 unsigned CodeGenFunction::GetTapirTargetAttr(ArrayRef<const Attr *> Attrs) {
+  llvm::TapirTargetID TTID = llvm::TapirTargetID::Last_TapirTargetID;
   for (auto curAttr : Attrs) {
     if (curAttr->getKind() == attr::TapirTarget) {
-      return (int)cast<const TapirTargetAttr>(curAttr)
-          ->getTapirTargetAttrType();
+      const TapirTargetAttr::TapirTargetAttrTy TTA =
+	cast<const TapirTargetAttr>(curAttr)->getTapirTargetAttrType();
+      switch(TTA) {
+      case TapirTargetAttr::None:
+	TTID = llvm::TapirTargetID::None;
+	break;
+      case TapirTargetAttr::Serial:
+	TTID = llvm::TapirTargetID::Serial;
+	break;
+      case TapirTargetAttr::Cuda:
+	TTID = llvm::TapirTargetID::Cuda;
+	break;	
+      case TapirTargetAttr::Hip:
+	TTID = llvm::TapirTargetID::Hip;
+	break;	
+      case TapirTargetAttr::OpenMP:
+	TTID = llvm::TapirTargetID::OpenMP;
+	break;	
+      case TapirTargetAttr::Qthreads:
+	TTID = llvm::TapirTargetID::Qthreads;
+	break;
+      case TapirTargetAttr::Realm:
+	TTID = llvm::TapirTargetID::Realm;
+	break;	
+      default:
+        llvm_unreachable("unhandled tapir target attribute!");
+      }
+      break;
     }
   }
-  return TapirTargetAttr::DefaultRT; // missing target attribute
+
+  if (TTID == llvm::TapirTargetID::Last_TapirTargetID)
+    TTID = CGM.getCodeGenOpts().getTapirTarget();
+  
+  return unsigned(TTID);
 }
 
 llvm::Value *
@@ -119,6 +150,7 @@ CodeGenFunction::GetKitsuneLaunchAttr(ArrayRef<const Attr *> Attrs) {
   return nullptr;
 }
 
+/*
 // Stolen from CodeGenFunction.cpp
 static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
   if (!BB)
@@ -127,6 +159,7 @@ static void EmitIfUsed(CodeGenFunction &CGF, llvm::BasicBlock *BB) {
     return BB->insertInto(CGF.CurFn);
   delete BB;
 }
+*/
 
 llvm::Instruction *CodeGenFunction::EmitLabeledSyncRegionStart(StringRef SV) {
   // Start the sync region.  To ensure the syncregion.start call dominates all
@@ -309,7 +342,7 @@ void CodeGenFunction::EmitForallStmt(const ForallStmt &S,
   // set the loop target attribute
   LoopStack.setLoopTarget(TT);
 
-  if (TT == TapirTargetAttr::CudaRT) {
+  if (TT == TapirTargetAttr::Cuda) {
     llvm::Value *ThreadsPerBlock = GetKitsuneLaunchAttr(ForallAttr);
     if (ThreadsPerBlock) {
       // If we have a threads-per-block launch attribute, it is an expression
@@ -509,7 +542,7 @@ void CodeGenFunction::EmitCXXForallRangeStmt(
   unsigned TT = GetTapirTargetAttr(ForallAttr);
   LoopStack.setLoopTarget(TT);
 
-  if (TT == TapirTargetAttr::CudaRT) {
+  if (TT == TapirTargetAttr::Cuda) {
     llvm::Value *ThreadsPerBlock = GetKitsuneLaunchAttr(ForallAttr);
     if (ThreadsPerBlock) {
       // If we have a threads-per-block launch attribute, it is an expression

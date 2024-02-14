@@ -1622,11 +1622,6 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
 
   switch (TapirTarget) {
 
-  case TapirTargetID::Cheetah:
-    CmdArgs.push_back("-lcheetah");
-    CmdArgs.push_back("-lpthread");
-    break;
-
   case TapirTargetID::OpenCilk: {
     bool StaticOpenCilk = Args.hasArg(options::OPT_static_libopencilk) ||
                               Args.hasArg(options::OPT_static);
@@ -1679,9 +1674,6 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
     CmdArgs.push_back("-lpthread");
     break;
   }
-  case TapirTargetID::Cilk:
-    CmdArgs.push_back("-lcilkrts");
-    break;
   case TapirTargetID::OpenMP:
     if (! KITSUNE_ENABLE_OPENMP_ABI_TARGET)
       getDriver().Diag(diag::warn_drv_tapir_openmp_target_disabled);
@@ -1725,23 +1717,6 @@ void ToolChain::AddTapirRuntimeLibArgs(const ArgList &Args,
       CmdArgs.push_back("-lkitrt");
       #if defined(KITSUNE_HIP_EXTRA_LINK_LIBS)
       ExtractArgsFromString(KITSUNE_HIP_EXTRA_LINK_LIBS, CmdArgs, Args);
-      #endif
-    }
-    break;
-
-  case TapirTargetID::OpenCL:
-    if (! KITSUNE_ENABLE_OPENCL_ABI_TARGET)
-      getDriver().Diag(diag::warn_drv_tapir_opencl_target_disabled);
-    break;
-
-  case TapirTargetID::GPU:
-    if (! KITSUNE_ENABLE_GPU_ABI_TARGET)
-      getDriver().Diag(diag::warn_drv_tapir_gpu_target_disabled);
-    else {
-      CmdArgs.push_back("-lkitrt");
-      CmdArgs.push_back("-ldl");
-      #if defined(KITSUNE_GPU_ABI_EXTRA_LINK_LIBS)
-      ExtractArgsFromString(KITSUNE_GPU_ABI_EXTRA_LINK_LIBS, CmdArgs, Args);
       #endif
     }
     break;

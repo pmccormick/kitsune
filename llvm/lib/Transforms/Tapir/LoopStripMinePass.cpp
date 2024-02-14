@@ -278,12 +278,11 @@ static bool tryToStripMineLoop(
                                     TargetTransformInfo::TCK_SizeAndLatency)) <=
             LoopCost));
 
-  // Some parallel runtimes, such as Cilk, require nested parallel tasks to be
+  // Some parallel runtimes, such as OpenCilk, require nested parallel tasks to be
   // synchronized.
   bool NeedNestedSync = IncludeNestedSync;
   if (!NeedNestedSync && TLI)
-    NeedNestedSync = (TLI->getTapirTarget() == TapirTargetID::Cilk ||
-                      TLI->getTapirTarget() == TapirTargetID::OpenCilk);
+    NeedNestedSync = TLI->getTapirTarget() == TapirTargetID::OpenCilk;
 
   // Save loop properties before it is transformed.
   MDNode *OrigLoopID = L->getLoopID();

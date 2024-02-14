@@ -3515,8 +3515,6 @@ void CompilerInvocation::GenerateLangArgs(const LangOptions &Opts,
 
   if (Opts.getCilk() == LangOptions::Cilk_opencilk)
     GenerateArg(Args, OPT_fopencilk, SA);
-  if (Opts.getCilk() == LangOptions::Cilk_plus)
-    GenerateArg(Args, OPT_fcilkplus, SA);
   if (Opts.CilkOptions.has(CilkOpt_Pedigrees))
     GenerateArg(Args, OPT_fopencilk_enable_pedigrees, SA);
 
@@ -3913,8 +3911,6 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.setCilk(LangOptions::Cilk_opencilk);
     if (Args.hasArg(OPT_fopencilk_enable_pedigrees))
       Opts.CilkOptions.set(CilkOpt_Pedigrees, true);
-  } else if (CilkPlus) {
-    Opts.setCilk(LangOptions::Cilk_plus);
   }
 
   if (Opts.getCilk() != LangOptions::Cilk_none && Opts.ObjC)
@@ -4707,12 +4703,6 @@ bool CompilerInvocation::CreateFromArgsImpl(
     StringRef Name = A->getValue();
     if (Name == "none")
       LangOpts.Tapir = TapirTargetID::None;
-    else if (Name == "cilk")
-      // for now, our deprecation path for cilk is to
-      // use the opencilk ABI.
-      LangOpts.Tapir = TapirTargetID::Cilk;
-    else if (Name == "cilkplus")
-      LangOpts.Tapir = TapirTargetID::Cilk;
     else if (Name == "opencilk")
       LangOpts.Tapir = TapirTargetID::OpenCilk;
     else if (Name == "openmp")
@@ -4725,10 +4715,6 @@ bool CompilerInvocation::CreateFromArgsImpl(
       LangOpts.Tapir = TapirTargetID::Cuda;
     else if (Name == "hip")
       LangOpts.Tapir = TapirTargetID::Hip;
-    else if (Name == "opencl")
-      LangOpts.Tapir = TapirTargetID::OpenCL;
-    else if (Name == "gpu")
-      LangOpts.Tapir = TapirTargetID::GPU;
     else if (Name == "serial")
       LangOpts.Tapir = TapirTargetID::Serial;
     else

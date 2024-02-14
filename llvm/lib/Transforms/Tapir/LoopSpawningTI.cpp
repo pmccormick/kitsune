@@ -904,27 +904,8 @@ LoopOutlineProcessor *LoopSpawningImpl::getOutlineProcessor(TapirLoopInfo *TL) {
   Module &M = *F.getParent();
   Loop *L = TL->getLoop();
   TapirLoopHints Hints(L);
-  unsigned LTID = Hints.getLoopTarget();
-  TapirTargetID TLTID;
+  TapirTargetID TLTID = (TapirTargetID)Hints.getLoopTarget();
   unsigned int ThreadsPerBlock = Hints.getThreadsPerBlock();
-
-  // Translate the loop target ID from Kitsune to Tapir
-  // clang/include/clang/Basic/Attr.td
-  // clang/lib/CodeGen/CGLoopInfo.h ->
-  // llvm/include/llvm/Transforms/Tapir/TapirTargetIDs.h
-  if (LTID == 2) {
-    // Cuda  [[tapir::target("cuda")]] forall
-    TLTID = TapirTargetID::Cuda;
-  } else if (LTID == 1) {
-    // (Open)Cilk  [[tapir::target("cilk")]] forall
-    TLTID = TapirTargetID::OpenCilk;
-  } else if (LTID == 8) {
-    // Serial  [[tapir::target("serial")]] forall
-    TLTID = TapirTargetID::Serial;
-  } else if (LTID == 11) {
-    // Default unattributed forall or [[tapir::target("default")]] forall
-    TLTID = Target;
-  }
 
   // get the LoopTarget from set of Targets if it exists, otherwise create it
 
@@ -935,7 +916,7 @@ LoopOutlineProcessor *LoopSpawningImpl::getOutlineProcessor(TapirLoopInfo *TL) {
   // different targets...
   if (Targets.find(TLTID) == Targets.end()) {
     Targets[TLTID] = std::shared_ptr<TapirTarget>(
-        getTapirTargetFromID(M, (TapirTargetID)TLTID));
+        getTapirTargetFromID(M, TLTID));
   }
 
   // Allow the Tapir target to define a custom loop-outline processor.

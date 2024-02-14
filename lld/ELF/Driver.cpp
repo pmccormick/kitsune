@@ -194,16 +194,12 @@ TapirTargetID parseTapirTarget(const  llvm::StringRef &Target) {
   TapirTargetID TapirTarget = llvm::StringSwitch<TapirTargetID>(Target)
       .Case("none", TapirTargetID::None)
       .Case("serial", TapirTargetID::Serial)
-      .Case("cilk", TapirTargetID::Cilk)
       .Case("cuda", TapirTargetID::Cuda)
+      .Case("cuda", TapirTargetID::Hip)    
       .Case("opencilk", TapirTargetID::OpenCilk)      
-      .Case("cuda", TapirTargetID::Cuda)
       .Case("openmp", TapirTargetID::OpenMP)
       .Case("qthreads", TapirTargetID::Qthreads)
       .Case("realm", TapirTargetID::Realm)
-      .Case("opencl", TapirTargetID::OpenCL)
-      .Case("cilk", TapirTargetID::Cilk)
-      .Case("gpu", TapirTargetID::GPU)
       .Default(TapirTargetID::Last_TapirTargetID);
 
   return TapirTarget;

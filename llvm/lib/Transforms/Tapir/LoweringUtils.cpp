@@ -49,21 +49,14 @@ TapirTarget *llvm::getTapirTargetFromID(Module &M, TapirTargetID ID) {
     return nullptr;
   case TapirTargetID::Serial:
     return new SerialABI(M);
-  case TapirTargetID::Cilk:
-    return new CilkABI(M);
   case TapirTargetID::Cuda:
     return new CudaABI(M);
   case TapirTargetID::Hip:
     return new HipABI(M);
-  case TapirTargetID::Cheetah:
   case TapirTargetID::OpenCilk:
     return new OpenCilkABI(M);
   case TapirTargetID::OpenMP:
     return new OpenMPABI(M);
-  case TapirTargetID::OpenCL:
-    return new OpenCLABI(M);
-  case TapirTargetID::GPU:
-    return new GPUABI(M);
   case TapirTargetID::Qthreads:
     return new QthreadsABI(M);
   case TapirTargetID::Realm:
