@@ -4,12 +4,10 @@ targets = copy-forall.opencilk.${host_arch}
 
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += copy-forall.cuda.${host_arch}
-  targets += copy-kokkos.cuda.kitsune.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += copy-forall.hip.${host_arch}
-  targets += copy-kokkos.hip.kitsune.${host_arch}
   targets += copy-hip.${host_arch}
 endif
 
@@ -22,11 +20,11 @@ copy-forall.opencilk.${host_arch}: copy-forall.cpp
 	@${FILE_SIZE}
 copy-forall.cuda.${host_arch}: copy-forall.cpp 
 	@echo $@
-	${TIME_CMD} $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@${FILE_SIZE}
 copy-forall.hip.${host_arch}: copy-forall.cpp 
 	@echo $@
-	${TIME_CMD} $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@${FILE_SIZE}
 
 # kokkos-based tests (w/out views)

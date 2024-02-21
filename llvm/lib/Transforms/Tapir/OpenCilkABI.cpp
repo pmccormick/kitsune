@@ -12,30 +12,26 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Transforms/Tapir/OpenCilkABI.h"
+#include "llvm/IRReader/IRReader.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/AssumptionCache.h"
 #include "llvm/Analysis/TapirTaskInfo.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
-#include "llvm/IR/DiagnosticInfo.h"
-#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/IRReader/IRReader.h"
 #include "llvm/Linker/Linker.h"
-#include "llvm/Support/Process.h"
 #include "llvm/Transforms/Tapir/CilkRTSCilkFor.h"
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/EscapeEnumerator.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/Transforms/Utils/TapirUtils.h"
-#include "llvm/Support/Process.h"
 #include "llvm/Support/SourceMgr.h"
 
 using namespace llvm;
@@ -74,56 +70,12 @@ static void fixCilkSyncFn(Module &M, Function *Fn) {
         CB->removeFnAttr(Attribute::NoUnwind);
 }
 
-namespace {
-
-// Custom DiagnosticInfo for linking the OpenCilk ABI bitcode file.
-class OpenCilkABILinkDiagnosticInfo : public DiagnosticInfo {
-  const Module *SrcM;
-  const Twine &Msg;
-
-public:
-  OpenCilkABILinkDiagnosticInfo(DiagnosticSeverity Severity, const Module *SrcM,
-                                const Twine &Msg)
-      : DiagnosticInfo(DK_Lowering, Severity), SrcM(SrcM), Msg(Msg) {}
-  void print(DiagnosticPrinter &DP) const override {
-    DP << "linking module '" << SrcM->getModuleIdentifier() << "': " << Msg;
-  }
-};
-
-// Custom DiagnosticHandler to handle diagnostics arising when linking the
-// OpenCilk ABI bitcode file.
-class OpenCilkABIDiagnosticHandler final : public DiagnosticHandler {
-  const Module *SrcM;
-  DiagnosticHandler *OrigHandler;
-
-public:
-  OpenCilkABIDiagnosticHandler(const Module *SrcM,
-                               DiagnosticHandler *OrigHandler)
-      : SrcM(SrcM), OrigHandler(OrigHandler) {}
-
-  bool handleDiagnostics(const DiagnosticInfo &DI) override {
-    if (DI.getKind() != DK_Linker)
-      return OrigHandler->handleDiagnostics(DI);
-
-    std::string MsgStorage;
-    {
-      raw_string_ostream Stream(MsgStorage);
-      DiagnosticPrinterRawOStream DP(Stream);
-      DI.print(DP);
-    }
-    return OrigHandler->handleDiagnostics(
-        OpenCilkABILinkDiagnosticInfo(DI.getSeverity(), SrcM, MsgStorage));
-  }
-};
-
 // Structure recording information about Cilk ABI functions.
 struct CilkRTSFnDesc {
   StringRef FnName;
   FunctionType *FnType;
   FunctionCallee &FnCallee;
 };
-
-} // namespace
 
 void OpenCilkABI::setOptions(const TapirTargetOptions &Options) {
   if (!isa<OpenCilkABIOptions>(Options))
@@ -144,76 +96,54 @@ void OpenCilkABI::prepareModule() {
 
   if (UseOpenCilkRuntimeBC) {
     // If a runtime bitcode path is given via the command line, use it.
-    if ("" != ClOpenCilkRuntimeBCPath)
+    if ("" != ClOpenCilkRuntimeBCPath) {
       RuntimeBCPath = ClOpenCilkRuntimeBCPath;
-
-    std::optional<std::string> path;
-    if("" == RuntimeBCPath){
-      path = sys::Process::FindInEnvPath("LD_LIBRARY_PATH", "libopencilk-abi.bc");
-      if (! path)
-        // TODO: This is an in-tree build solution for now...
-        #if defined(OPENCILK_BC_PATH)
-        path = OPENCILK_BC_PATH;
-        #else
-        report_fatal_error("Could not find OpenCilk runtime bitcode file "
-                           "(libopencilk-abi.bc) in LD_LIBRARY_PATH.");
-        #endif
-    } else {
-      path = ClOpenCilkRuntimeBCPath.getValue();
     }
+
+    if ("" == RuntimeBCPath)
+      C.emitError("OpenCilkABI: No OpenCilk bitcode ABI file given.");
+
     LLVM_DEBUG(dbgs() << "Using external bitcode file for OpenCilk ABI: "
-                      << path << "\n");
+                      << RuntimeBCPath << "\n");
     SMDiagnostic SMD;
 
     // Parse the bitcode file.  This call imports structure definitions, but not
     // function definitions.
-    if (std::unique_ptr<Module> ExternalModule =
-        parseIRFile(RuntimeBCPath, SMD, C)) {
-      // Get the original DiagnosticHandler for this context.
-      std::unique_ptr<DiagnosticHandler> OrigDiagHandler =
-          C.getDiagnosticHandler();
+    std::unique_ptr<Module> ExternalModule = parseIRFile(RuntimeBCPath, SMD, C);
 
-      // Setup an OpenCilkABIDiagnosticHandler for this context, to handle
-      // diagnostics that arise from linking ExternalModule.
-      C.setDiagnosticHandler(std::make_unique<OpenCilkABIDiagnosticHandler>(
-          ExternalModule.get(), OrigDiagHandler.get()));
-
-      // Link the external module into the current module, copying over global
-      // values.
-      //
-      // TODO: Consider restructuring the import process to use
-      // Linker::Flags::LinkOnlyNeeded to copy over only the necessary contents
-      // from the external module.
-      bool Fail = Linker::linkModules(
-          M, std::move(ExternalModule), Linker::Flags::None,
-          [](Module &M, const StringSet<> &GVS) {
-            for (StringRef GVName : GVS.keys()) {
-              LLVM_DEBUG(dbgs() << "Linking global value " << GVName << "\n");
-              if (Function *Fn = M.getFunction(GVName)) {
-                if (!Fn->isDeclaration())
-                  // We set the function's linkage as available_externally, so
-                  // that subsequent optimizations can remove these definitions
-                  // from the module.  We don't want this module redefining any of
-                  // these symbols, even if they aren't inlined, because the
-                  // OpenCilk runtime library will provide those definitions
-                  // later.
-                  Fn->setLinkage(Function::AvailableExternallyLinkage);
-              } else if (GlobalVariable *G = M.getGlobalVariable(GVName)) {
-                if (!G->isDeclaration())
-                  G->setLinkage(GlobalValue::AvailableExternallyLinkage);
-              }
-            }
-          });
-      if (Fail)
-        C.emitError("OpenCilkABI: Failed to link bitcode ABI file: " +
-                    Twine(RuntimeBCPath));
-
-      // Restore the original DiagnosticHandler for this context.
-      C.setDiagnosticHandler(std::move(OrigDiagHandler));
-    } else {
+    if (!ExternalModule)
       C.emitError("OpenCilkABI: Failed to parse bitcode ABI file: " +
                   Twine(RuntimeBCPath));
-    }
+
+    // Link the external module into the current module, copying over global
+    // values.
+    //
+    // TODO: Consider restructuring the import process to use
+    // Linker::Flags::LinkOnlyNeeded to copy over only the necessary contents
+    // from the external module.
+    bool Fail = Linker::linkModules(
+        M, std::move(ExternalModule), Linker::Flags::None,
+        [](Module &M, const StringSet<> &GVS) {
+          for (StringRef GVName : GVS.keys()) {
+            LLVM_DEBUG(dbgs() << "Linking global value " << GVName << "\n");
+            if (Function *Fn = M.getFunction(GVName)) {
+              if (!Fn->isDeclaration())
+                // We set the function's linkage as available_externally, so
+                // that subsequent optimizations can remove these definitions
+                // from the module.  We don't want this module redefining any of
+                // these symbols, even if they aren't inlined, because the
+                // OpenCilk runtime library will provide those definitions
+                // later.
+                Fn->setLinkage(Function::AvailableExternallyLinkage);
+            } else if (GlobalVariable *G = M.getGlobalVariable(GVName)) {
+              if (!G->isDeclaration())
+                G->setLinkage(GlobalValue::AvailableExternallyLinkage);
+            }
+          }
+        });
+    if (Fail)
+      C.emitError("OpenCilkABI: Failed to link bitcode ABI file: " +
+                  Twine(RuntimeBCPath));
   }
 
   // Get or create local definitions of Cilk RTS structure types.
@@ -223,7 +153,6 @@ void OpenCilkABI::prepareModule() {
 
   PointerType *StackFramePtrTy = PointerType::getUnqual(StackFrameTy);
   Type *VoidTy = Type::getVoidTy(C);
-  Type *VoidPtrTy = Type::getInt8PtrTy(C);
 
   // Define the types of the CilkRTS functions.
   FunctionType *CilkRTSFnTy =
@@ -238,18 +167,10 @@ void OpenCilkABI::prepareModule() {
   FunctionType *Grainsize16FnTy = FunctionType::get(Int16Ty, {Int16Ty}, false);
   FunctionType *Grainsize32FnTy = FunctionType::get(Int32Ty, {Int32Ty}, false);
   FunctionType *Grainsize64FnTy = FunctionType::get(Int64Ty, {Int64Ty}, false);
-  FunctionType *PtrPtrTy = FunctionType::get(VoidPtrTy, {VoidPtrTy}, false);
-  FunctionType *UnregTy = FunctionType::get(VoidTy, {VoidPtrTy}, false);
-  FunctionType *Reg32Ty =
-      FunctionType::get(VoidTy, {VoidPtrTy, Int32Ty, VoidPtrTy,
-              VoidPtrTy}, false);
-  FunctionType *Reg64Ty =
-      FunctionType::get(VoidTy, {VoidPtrTy, Int64Ty, VoidPtrTy,
-              VoidPtrTy}, false);
 
   // Create an array of CilkRTS functions, with their associated types and
   // FunctionCallee member variables in the OpenCilkABI class.
-  CilkRTSFnDesc CilkRTSFunctions[] = {
+  SmallVector<CilkRTSFnDesc, 17> CilkRTSFunctions({
       {"__cilkrts_enter_frame", CilkRTSFnTy, CilkRTSEnterFrame},
       {"__cilkrts_enter_frame_helper", CilkRTSFnTy, CilkRTSEnterFrameHelper},
       {"__cilkrts_detach", CilkRTSFnTy, CilkRTSDetach},
@@ -273,11 +194,7 @@ void OpenCilkABI::prepareModule() {
        CilkRTSCilkForGrainsize32},
       {"__cilkrts_cilk_for_grainsize_64", Grainsize64FnTy,
        CilkRTSCilkForGrainsize64},
-      {"__cilkrts_reducer_lookup", PtrPtrTy, CilkRTSReducerLookup},
-      {"__cilkrts_reducer_register_32", Reg32Ty, CilkRTSReducerRegister32},
-      {"__cilkrts_reducer_register_64", Reg64Ty, CilkRTSReducerRegister64},
-      {"__cilkrts_reducer_unregister", UnregTy, CilkRTSReducerUnregister},
-  };
+  });
 
   if (UseOpenCilkRuntimeBC) {
     // Add attributes to internalized functions.
@@ -285,7 +202,7 @@ void OpenCilkABI::prepareModule() {
       assert(!FnDesc.FnCallee && "Redefining Cilk function");
       FnDesc.FnCallee = M.getOrInsertFunction(FnDesc.FnName, FnDesc.FnType);
       assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
-             "Cilk runtime function is not a function");
+             "Cilk function is not a function");
       Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
 
       // Because __cilk_sync is a C function that can throw an exception, update
@@ -306,42 +223,38 @@ void OpenCilkABI::prepareModule() {
     }
     if (GlobalVariable *AlignVar =
         M.getGlobalVariable("__cilkrts_stack_frame_align", true)) {
-      if (auto Align = AlignVar->getAlign())
-        StackFrameAlign = *Align;
+      //if (auto Align = AlignVar->getAlign())
+      //  StackFrameAlign = Align.getValue();
       // Mark this variable with private linkage, to avoid linker failures when
       // compiling with no optimizations.
       AlignVar->setLinkage(GlobalValue::PrivateLinkage);
     }
-  } else if (!DebugABICalls) {
+  } else if (DebugABICalls) {
+    if (StackFrameTy->isOpaque()) {
+      // Create a dummy __cilkrts_stack_frame structure, for debugging purposes
+      // only.
+      StackFrameTy->setBody(Int64Ty);
+    }
+    // Create declarations of all CilkRTS functions, and add basic attributes to
+    // those declarations.
+    for (CilkRTSFnDesc FnDesc : CilkRTSFunctions) {
+      assert(!FnDesc.FnCallee && "Redefining Cilk function");
+      FnDesc.FnCallee = M.getOrInsertFunction(FnDesc.FnName, FnDesc.FnType);
+      assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
+             "Cilk function is not a function");
+      Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
+
+      // Mark all CilkRTS functions nounwind, except for __cilk_sync.
+      if ("__cilk_sync" == FnDesc.FnName)
+        Fn->removeFnAttr(Attribute::NoUnwind);
+      else
+        Fn->setDoesNotThrow();
+    }
+  } else {
     // The OpenCilkABI target requires the use of a bitcode ABI file to generate
     // correct code.
     C.emitError(
         "OpenCilkABI: Bitcode ABI file required for correct code generation.");
-  }
-
-  // If no valid bitcode file was found fill in the missing pieces.
-  // An error should have been emitted already unless the user
-  // set DebugABICalls.
-
-  if (StackFrameTy->isOpaque()) {
-    // Create a dummy __cilkrts_stack_frame structure
-    StackFrameTy->setBody(Int64Ty);
-  }
-  // Create declarations of all CilkRTS functions, and add basic attributes to
-  // those declarations.
-  for (CilkRTSFnDesc FnDesc : CilkRTSFunctions) {
-    if (FnDesc.FnCallee)
-      continue;
-    FnDesc.FnCallee = M.getOrInsertFunction(FnDesc.FnName, FnDesc.FnType);
-    assert(isa<Function>(FnDesc.FnCallee.getCallee()) &&
-           "Cilk function is not a function");
-    Function *Fn = cast<Function>(FnDesc.FnCallee.getCallee());
-
-    // Mark all CilkRTS functions nounwind, except for __cilk_sync.
-    if ("__cilk_sync" == FnDesc.FnName)
-      Fn->removeFnAttr(Attribute::NoUnwind);
-    else
-      Fn->setDoesNotThrow();
   }
 }
 
@@ -355,7 +268,8 @@ void OpenCilkABI::addHelperAttributes(Function &Helper) {
   // function.
   if (getArgStructMode() != ArgStructMode::None) {
     Helper.removeFnAttr(Attribute::WriteOnly);
-    Helper.removeFnAttr(Attribute::Memory);
+    //Helper.removeFnAttr(Attribute::ArgMemOnly);
+    //Helper.removeFnAttr(Attribute::InaccessibleMemOrArgMemOnly);
   }
   // Note that the address of the helper is unimportant.
   Helper.setUnnamedAddr(GlobalValue::UnnamedAddr::Global);
@@ -445,7 +359,7 @@ Value *OpenCilkABI::CreateStackFrame(Function &F) {
   AllocaInst *SF = B.CreateAlloca(SFTy, DL.getAllocaAddrSpace(),
                                   /*ArraySize*/ nullptr,
                                   /*Name*/ StackFrameName);
-  SF->setAlignment(StackFrameAlign);
+  //SF->setAlignment(StackFrameAlign);
 
   return SF;
 }
@@ -606,7 +520,7 @@ void OpenCilkABI::MarkSpawner(Function &F) {
 
   // Mark this function as stealable.
   F.addFnAttr(Attribute::Stealable);
-  F.removeFnAttr(Attribute::Memory);
+  //F.removeFnAttr(Attribute::ArgMemOnly);
 }
 
 /// Lower a call to get the grainsize of a Tapir loop.
@@ -1056,34 +970,9 @@ bool OpenCilkABI::processOrdinaryFunction(Function &F, BasicBlock *TFEntry) {
 
 void OpenCilkABI::postProcessHelper(Function &F) {}
 
-LoopOutlineProcessor *
-OpenCilkABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
+LoopOutlineProcessor *OpenCilkABI::getLoopOutlineProcessor(
+    const TapirLoopInfo *TL) {
   if (UseRuntimeCilkFor)
     return new RuntimeCilkFor(M);
   return nullptr;
-}
-
-void OpenCilkABI::lowerReducerOperation(CallBase *CI) {
-  FunctionCallee Fn = nullptr;
-  const Function *Called = CI->getCalledFunction();
-  assert(Called);
-  Intrinsic::ID ID = Called->getIntrinsicID();
-  switch (ID) {
-  default:
-    llvm_unreachable("unexpected reducer intrinsic");
-  case Intrinsic::hyper_lookup:
-    Fn = Get__cilkrts_reducer_lookup();
-    break;
-  case Intrinsic::reducer_register: {
-    const Type *SizeType = CI->getArgOperand(1)->getType();
-    assert(isa<IntegerType>(SizeType));
-    Fn = Get__cilkrts_reducer_register(SizeType->getIntegerBitWidth());
-    assert(Fn);
-    break;
-  }
-  case Intrinsic::reducer_unregister:
-    Fn = Get__cilkrts_reducer_unregister();
-    break;
-  }
-  CI->setCalledFunction(Fn);
 }

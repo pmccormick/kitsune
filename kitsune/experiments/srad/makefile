@@ -4,8 +4,6 @@ targets = srad-forall.opencilk.${host_arch}
 
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += srad-forall.cuda.${host_arch}
-  targets += srad-kokkos.nvcc.${host_arch}
-  targets += srad-kokkos.clang.cuda.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
@@ -39,9 +37,10 @@ srad-kokkos.nvcc.${host_arch}: srad-kokkos.cpp
 	@echo $@
 	@$(TIME_CMD) $(KOKKOS_NVCC) $(KITSUNE_FAST_MATH) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
 	@$(FILE_SIZE)
+
 srad-kokkos.clang.cuda.${host_arch}: srad-kokkos.cpp 
 	@echo $@
-	$(TIME_CMD) $(kitclangxx) $(KOKKOS_CLANG_CUDA_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+	@$(TIME_CMD) $(kitclangxx) $(KOKKOS_CLANG_CUDA_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
 	@$(FILE_SIZE)
 
 srad-kokkos.hipcc.${host_arch}: srad-kokkos.cpp 

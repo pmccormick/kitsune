@@ -24,10 +24,10 @@ TAPIR_CUDA_FLAGS=$(TAPIR_CUDA_TARGET) $(TAPIR_CUDA_TARGET_FLAGS)
  #-mllvm -cuabi-run-post-opts \
  # -mllvm -cuabi-streams=true \
 
-TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda\
-		      -Wl,--threads=1\
-  		      -Wl,--lto-O${KITSUNE_OPTLEVEL}\
-		      -Wl,-mllvm=-cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL)\
+TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda \
+		      -Wl,--threads=1 \
+		      -Wl,--lto-O${KITSUNE_OPTLEVEL} \
+		      -Wl,-mllvm=-cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
 		      -Wl,-mllvm=-cuabi-arch=$(CUDA_ARCH)
 
 ifneq ($(KITSUNE_VERBOSE),)
@@ -59,7 +59,12 @@ endif
 ##################################
 TAPIR_OPENCILK_TARGET=-ftapir=opencilk
 TAPIR_OPENCILK_FLAGS?=-ftapir=opencilk -O$(KITSUNE_OPTLEVEL)
-TAPIR_OPENCILK_LTO_FLAGS?=-Wl,--tapir-target=opencilk,--lto-O${KITSUNE_OPTLEVEL}
+TAPIR_OPENCILK_BC_PATH=${KITSUNE_PREFIX}/lib/clang/16/lib/${host_arch}-unknown-linux-gnu
+TAPIR_OPENCILK_BC_FILE=libopencilk-abi.bc
+TAPIR_OPENCILK_LTO_FLAGS?=-ftapir=opencilk -Wl,--lto-O${KITSUNE_OPTLEVEL}
+#TAPIR_OPENCILK_LTO_FLAGS?=-Wl,--tapir-target=opencilk,--lto-O${KITSUNE_OPTLEVEL} \
+#                          -Wl,--opencilk-abi-bitcode=${TAPIR_OPENCILK_BC_PATH}/${TAPIR_OPENCILK_BC_FILE}
+
 ##################################
 
 ##################################

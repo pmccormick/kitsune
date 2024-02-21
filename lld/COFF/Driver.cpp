@@ -1934,6 +1934,8 @@ void LinkerDriver::linkerMain(ArrayRef<const char *> argsArr) {
   config->tapirTarget =
       args::parseTapirTarget(args.getLastArgValue(OPT_tapir_target));
 
+  errs() << "opencilk bitcode file: " << config->opencilkABIBitcodeFile << "\n";
+
   if (config->incremental && args.hasArg(OPT_profile)) {
     warn("ignoring '/incremental' due to '/profile' specification");
     config->incremental = false;

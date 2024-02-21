@@ -286,11 +286,13 @@ bool TapirToTargetImpl::processSimpleABI(Function &F, BasicBlock *TFEntry) {
     Changed = true;
   }
 
+  /*
   while (!ReducerOperations.empty()) {
     CallBase *CI = ReducerOperations.pop_back_val();
     Target->lowerReducerOperation(CI);
     Changed = true;
   }
+  */
 
   return Changed;
 }

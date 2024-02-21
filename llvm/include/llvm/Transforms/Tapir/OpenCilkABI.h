@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements the OpenCilk ABI to converts Tapir instructions to calls
+// This file implements the OpenCilk ABI to convert Tapir instructions to calls
 // into the OpenCilk runtime system.
 //
 //===----------------------------------------------------------------------===//
@@ -26,6 +26,7 @@ class OpenCilkABI final : public TapirTarget {
   ValueToValueMapTy DetachCtxToStackFrame;
   SmallPtrSet<CallBase *, 8> CallsToInline;
   DenseMap<BasicBlock *, SmallVector<IntrinsicInst *, 4>> TapirRTCalls;
+  ValueToValueMapTy DefaultSyncLandingpad;
 
   StringRef RuntimeBCPath = "";
 
@@ -59,7 +60,7 @@ class OpenCilkABI final : public TapirTarget {
   FunctionCallee CilkRTSCilkForGrainsize32 = nullptr;
   FunctionCallee CilkRTSCilkForGrainsize64 = nullptr;
 
-  Align StackFrameAlign{8};  
+  MaybeAlign StackFrameAlign{8};
 
   // Accessors for CilkRTS ABI functions. When a bitcode file is loaded, these
   // functions should return the function defined in the bitcode file.
@@ -149,6 +150,8 @@ class OpenCilkABI final : public TapirTarget {
 
   void MarkSpawner(Function &F);
 
+  BasicBlock *GetDefaultSyncLandingpad(Function &F, Value *SF, DebugLoc Loc);
+
 public:
   OpenCilkABI(Module &M);
   ~OpenCilkABI() { DetachCtxToStackFrame.clear(); }
@@ -158,7 +161,7 @@ public:
   void prepareModule() override final;
   Value *lowerGrainsizeCall(CallInst *GrainsizeCall) override final;
   void lowerSync(SyncInst &SI) override final;
-  void lowerReducerOperation(CallBase *CI) override;
+  //void lowerReducerOperation(CallBase *CI) override;
 
   ArgStructMode getArgStructMode() const override final {
     return ArgStructMode::None;

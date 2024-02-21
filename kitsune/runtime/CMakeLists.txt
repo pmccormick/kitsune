@@ -49,7 +49,6 @@ set(KITRT_SRCS
 set(KITRT_LINK_LIBS "")
 
 if (KITRT_ENABLE_CUDA)
-  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -ccbin /opt/cuda/bin --gpu-architecture sm_86")
   message(STATUS "Kitsune runtime adding CUDA components to build...")
   find_package(CUDAToolkit REQUIRED)
   

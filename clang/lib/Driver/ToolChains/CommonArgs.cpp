@@ -134,17 +134,13 @@ static void renderRemarksHotnessOptions(const ArgList &Args,
 static void renderTapirLoweringOptions(const ArgList &Args,
                                        ArgStringList &CmdArgs,
                                        const ToolChain &TC) {
-  if (Args.hasArg(options::OPT_fcilkplus) ||
-      Args.hasArg(options::OPT_fopencilk) ||
-      Args.hasArg(options::OPT_ftapir_EQ)) {
-    if (const Arg *A = Args.getLastArg(options::OPT_ftapir_EQ))
+  if (Args.hasArg(options::OPT_ftapir_EQ)) {
+    if (const Arg *A = Args.getLastArg(options::OPT_ftapir_EQ)) {
       CmdArgs.push_back(Args.MakeArgString(
           Twine("--plugin-opt=tapir-target=") + A->getValue()));
-    else if (Args.hasArg(options::OPT_fopencilk)) {
-      CmdArgs.push_back("--plugin-opt=tapir-target=opencilk");
-      TC.AddOpenCilkABIBitcode(Args, CmdArgs, /*IsLTO=*/true);
-    } else if (Args.hasArg(options::OPT_fcilkplus))
-      CmdArgs.push_back("--plugin-opt=tapir-target=cilkplus");
+      if (std::string(A->getValue()) == std::string("opencilk")) 
+	TC.AddOpenCilkABIBitcode(Args, CmdArgs, /*IsLTO=*/true);
+    }
   }
 }
 

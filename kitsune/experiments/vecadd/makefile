@@ -2,15 +2,12 @@ include ../experiments.mk
 
 targets = vecadd-forall.opencilk.${host_arch}
 
-$(info "$(BUILD_CUDA_EXPERIMENTS)")
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += vecadd-forall.cuda.${host_arch}
-  targets += vecadd-kokkos.cuda.kitsune.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += vecadd-forall.hip.${host_arch}
-  targets += vecadd-kokkos.hip.kitsune.${host_arch}
 endif
 
 all: ${targets}

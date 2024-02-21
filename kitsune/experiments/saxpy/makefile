@@ -4,14 +4,10 @@ targets = saxpy-forall.opencilk.${host_arch}
 
 ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += saxpy-forall.cuda.${host_arch}
-  targets += saxpy-kokkos.nvcc.${host_arch}
-  # TODO: some build problems here (need clang-specific kokkos build to work)
-  #targets += saxpy-kokkos.clang.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
   targets += saxpy-forall.hip.${host_arch}
-  targets += saxpy-kokkos.hip.${host_arch}
 endif
 
 all: ${targets}
@@ -23,11 +19,11 @@ saxpy-forall.opencilk.${host_arch}: saxpy-forall.cpp
 	@$(FILE_SIZE)
 saxpy-forall.cuda.${host_arch}: saxpy-forall.cpp 
 	@echo $@
-	$(TIME_CMD)  $(KIT_CXX) -ftime-trace=. $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD)  $(KIT_CXX) -ftime-trace=. $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 saxpy-forall.hip.${host_arch}: saxpy-forall.cpp 
 	@echo $@
-	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 # kokkos-based tests (w/out views)
 #saxpy-kokkos.cuda.kitsune.${host_arch}: saxpy-kokkos-no-view.cpp 
@@ -43,7 +39,7 @@ saxpy-kokkos.nvcc.${host_arch}: saxpy-kokkos.cpp
 
 saxpy-kokkos.clang.${host_arch}: saxpy-kokkos.cpp 
 	@echo $@
-	$(TIME_CMD) $(CLANG_CUDA) $(KOKKOS_CLANG_CUDA_FLAGS) -ftime-trace=. -fno-exceptions -o $@ $< $(KOKKOS_CLANG_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64
+	@$(TIME_CMD) $(CLANG_CUDA) $(KOKKOS_CLANG_CUDA_FLAGS) -ftime-trace=. -fno-exceptions -o $@ $< $(KOKKOS_CLANG_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64
 	@$(FILE_SIZE)
 
 saxpy-kokkos.hipcc.${host_arch}: saxpy-kokkos.cpp 

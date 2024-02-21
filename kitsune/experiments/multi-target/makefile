@@ -41,24 +41,32 @@ opencilk-hip.cfg:
 
 # cuda 
 vecadd.cuda.${host_arch}: vecadd.cpp opencilk-cuda.cfg 
-	@$(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -o $@ $< 
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -o $@ $< 
 
-nested-launch.cuda.${host_arch}: nested-launch.cpp opencilk-cuda.cfg 
-	@$(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -o $@ $< 
+nested-launch.cuda.${host_arch}: nested-launch.cpp opencilk-cuda.cfg
+	@echo $@
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -o $@ $<
+	@${FILE_SIZE}
 
 
 # hip 
-nested-launch.hip.${host_arch}: nested-launch.cpp opencilk-hip.cfg 
-	@$(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-hip.cfg -o $@ $< 
+nested-launch.hip.${host_arch}: nested-launch.cpp opencilk-hip.cfg
+	@echo $@
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-hip.cfg -o $@ $<
+	@${FILE_SIZE}
 
 # kokkos-based tests
 vecadd-kokkos.cfg:
+	@echo "building custom multi-target config file..."
 	@echo "-D_tapir_cuda_target" > vecadd-kokkos.cfg
 	@echo "$(TAPIR_CUDA_FLAGS)" >> vecadd-kokkos.cfg
 	@cat $(KITSUNE_PREFIX)/share/kitsune/kokkos.cfg >> vecadd-kokkos.cfg
 	@cat $(KITSUNE_PREFIX)/share/kitsune/cuda.cfg >> vecadd-kokkos.cfg
+
 vecadd-kokkos.cuda.${host_arch}: vecadd-kokkos.cpp vecadd-kokkos.cfg
-	$(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) $(KITSUNE_KOKKOS_FLAGS) --config=./vecadd-kokkos.cfg -o $@ $<
+	@echo $@
+	@${TIME_CMD} $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) $(KITSUNE_KOKKOS_FLAGS) --config=./vecadd-kokkos.cfg -o $@ $<
+	@${FILE_SIZE}
 
 #####
 define newline 
