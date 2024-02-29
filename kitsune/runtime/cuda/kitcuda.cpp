@@ -82,6 +82,8 @@ static int _kitcuda_warp_size;
 static int _kitcuda_supports_gpu_overlap;
 static int _kitcuda_supports_concurrent_kerns;
 static int _kitcuda_max_regs_per_blk;
+static int _kitcuda_major_compute_capability;
+static int _kitcuda_minor_compute_capability;
 
 #ifdef KITCUDA_ENABLE_NVTX
 const int KIT_NVTX_INIT = 0;
@@ -97,7 +99,7 @@ extern "C" {
 bool __kitcuda_initialize() {
   KIT_NVTX_PUSH("kitcuda: initialize", KIT_NVTX_INIT);
   if (_kitcuda_initialized) {
-    if (__kitrt_verbose_mode()) 
+    if (__kitrt_verbose_mode())
       fprintf(stderr, "kitcuda: warning, multiple initialization calls!\n");
     return true;
   }
@@ -165,11 +167,24 @@ bool __kitcuda_initialize() {
 
   CU_SAFE_CALL(cuDriverGetVersion_p(&_kitcuda_driver_version));
 
+  CU_SAFE_CALL(cuDeviceGetAttribute_p(
+      &_kitcuda_major_compute_capability,
+      CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, _kitcuda_device));
+
+  CU_SAFE_CALL(cuDeviceGetAttribute_p(
+      &_kitcuda_minor_compute_capability,
+      CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, _kitcuda_device));
+
   if (__kitrt_verbose_mode()) {
     fprintf(stderr, "    kitcuda: found %d devices.\n", device_count);
     fprintf(stderr, "             using device:     %d\n", _kitcuda_device_id);
     fprintf(stderr, "             driver version:   %d\n",
             _kitcuda_driver_version);
+    fprintf(stderr, "             compute capability: %d.%d (sm_%d)\n",
+            _kitcuda_major_compute_capability,
+            _kitcuda_minor_compute_capability,
+            _kitcuda_major_compute_capability * 10 +
+            _kitcuda_minor_compute_capability);
     fprintf(stderr, "             warp size:        %d\n", _kitcuda_warp_size);
     fprintf(stderr, "             max threads/blk:  %d\n",
             _kitcuda_max_threads_per_blk);
@@ -197,7 +212,7 @@ bool __kitcuda_initialize() {
 
   bool enable_occupancy_launch;
   __kitrt_get_env_value("KITCUDA_USE_OCCUPANCY_LAUNCH",
-                            enable_occupancy_launch);
+                        enable_occupancy_launch);
   __kitcuda_use_occupancy_launch(enable_occupancy_launch);
   if (__kitrt_verbose_mode())
     fprintf(stderr, "  kitcuda: occupancy-based launches enabled.\n");

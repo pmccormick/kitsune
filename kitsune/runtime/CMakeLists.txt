@@ -56,7 +56,7 @@ if (KITRT_ENABLE_CUDA)
   if (KITCUDA_ENABLE_NVTX)
     add_definitions(-DKITCUDA_ENABLE_NVTX)
   endif()
-  add_definitions(-DKITRT_CUDA_ENABLED -DKITCUDA_ENABLE_NVTX)
+  add_definitions(-DKITRT_CUDA_ENABLED)
 
   list(APPEND KITRT_HDRS
     cuda/kitcuda.h
