@@ -33,6 +33,8 @@ if (KITRT_ENABLE_VERBOSE)
   add_definitions(-D_KITRT_VERBOSE_)
 endif()
 
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH True)
+
 # Common headers and source files.
 set(KITRT_HDRS
   kitrt.h

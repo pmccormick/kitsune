@@ -90,6 +90,14 @@ bool __kitcuda_load_symbols() {
     return false;  // this will force an abort() during runtime intialization
   }
 
+  if (__kitrt_verbose_mode()) {
+    char dl_path[1025];
+    fprintf(stderr, "\tkitcuda: successfully opened '%s'\n", CUDA_DSO_LIBNAME);
+    if (dlinfo(kitrt_dl_handle, RTLD_DI_ORIGIN, dl_path) != -1) {
+      fprintf(stderr, "\t\tfull path: %s/%s\n", dl_path, CUDA_DSO_LIBNAME);
+    }
+  }
+
   // NOTE: Try to keep the ordering and grouping here sync'ed 
   // with kitcuda_dylib.h.  It makes life a bit easier when
   // adding/removing entry points.
