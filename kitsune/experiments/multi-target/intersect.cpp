@@ -202,19 +202,19 @@ int main(int argc, char *argv[]) {
   // create the mesh in UVM directly
   //////////////////////////////////
 
-  // nvtxRangeId_t NVTX_PMC1 = nvtxRangeStartA("Parallel Mesh Creation 1 in UVM");
+  nvtxRangeId_t NVTX_PMC1 = nvtxRangeStartA("Parallel Mesh Creation 1 in UVM");
 
-  // // create the various pointers
-  // double *source_coordinates_kit;
-  // size_t *source_cell_nodes_kit; 
-  // size_t *source_node_offsets_kit;
+  // create the various pointers
+  double *source_coordinates_kit;
+  size_t *source_cell_nodes_kit; 
+  size_t *source_node_offsets_kit;
   
-  // double *target_coordinates_kit;
-  // size_t *target_cell_nodes_kit;
-  // size_t *target_node_offsets_kit;
+  double *target_coordinates_kit;
+  size_t *target_cell_nodes_kit;
+  size_t *target_node_offsets_kit;
 
-  // size_t *candidate_offsets_kit;
-  // size_t *candidates_kit;
+  size_t *candidate_offsets_kit;
+  size_t *candidates_kit;
 
   // double* centroids_kit1;
   // double* centroids_kit2;
@@ -228,146 +228,146 @@ int main(int argc, char *argv[]) {
   // double* centroids_kit10;
 
 
-  // nvtxRangeId_t NVTX_PR11 = nvtxRangeStartA("Parallel Region 1");
+  nvtxRangeId_t NVTX_PR11 = nvtxRangeStartA("Parallel Region 1");
 
-  // spawn source_coordinates 
-  // {
-  // nvtxRangeId_t NVTX_SC1 = nvtxRangeStartA("Source Coords");
-  // create_coordinates_gpu(source_coordinates_kit, nx, ny, x_max, y_max, 0., 0.,
-  //                    "source_coordinates gpu",
-  //                    shuffle ? &shuffle_source_nodes : nullptr,
-  //                    2 * nx * ny);
-  // nvtxRangeEnd(NVTX_SC1);                 
-  // }
+  spawn source_coordinates 
+  {
+  nvtxRangeId_t NVTX_SC1 = nvtxRangeStartA("Source Coords");
+  create_coordinates_gpu(source_coordinates_kit, nx, ny, x_max, y_max, 0., 0.,
+                     "source_coordinates gpu",
+                     shuffle ? &shuffle_source_nodes : nullptr,
+                     2 * nx * ny);
+  nvtxRangeEnd(NVTX_SC1);                 
+  }
 
-  // spawn target_coordinates
-  // {
-  // nvtxRangeId_t NVTX_TC1 = nvtxRangeStartA("Target Coords");
-  // create_coordinates_gpu(target_coordinates_kit, nx, ny, x_max, y_max, shift_x,
-  //                    shift_y, "target_coordinates gpu",
-  //                    shuffle ? &shuffle_target_nodes : nullptr,
-  //                    2 * nx * ny);
-  // nvtxRangeEnd(NVTX_TC1);                 
-  // }
+  spawn target_coordinates
+  {
+  nvtxRangeId_t NVTX_TC1 = nvtxRangeStartA("Target Coords");
+  create_coordinates_gpu(target_coordinates_kit, nx, ny, x_max, y_max, shift_x,
+                     shift_y, "target_coordinates gpu",
+                     shuffle ? &shuffle_target_nodes : nullptr,
+                     2 * nx * ny);
+  nvtxRangeEnd(NVTX_TC1);                 
+  }
   
-  // spawn source_cell_nodes 
-  // {
-  // nvtxRangeId_t NVTX_SC2N1 = nvtxRangeStartA("Source C2N");
-  // create_cell_nodes_gpu(source_cell_nodes_kit, nx, ny, "source_cell_nodes",
-  //                   shuffle ? &shuffle_source_nodes : nullptr,
-  //                   shuffle ? &shuffle_source_cells : nullptr);
-  // nvtxRangeEnd(NVTX_SC2N1);                 
-  // }
+  spawn source_cell_nodes 
+  {
+  nvtxRangeId_t NVTX_SC2N1 = nvtxRangeStartA("Source C2N");
+  create_cell_nodes_gpu(source_cell_nodes_kit, nx, ny, "source_cell_nodes",
+                    shuffle ? &shuffle_source_nodes : nullptr,
+                    shuffle ? &shuffle_source_cells : nullptr);
+  nvtxRangeEnd(NVTX_SC2N1);                 
+  }
 
-  // spawn target_cell_nodes
-  // {
-  // nvtxRangeId_t NVTX_TC2N1 = nvtxRangeStartA("Target C2N");
-  // // no need to shuffle the target cells
-  // create_cell_nodes_gpu(target_cell_nodes_kit, nx, ny, "target_cell_nodes",
-  //                   shuffle ? &shuffle_target_nodes : nullptr, nullptr);
-  // nvtxRangeEnd(NVTX_TC2N1);                 
-  // }
+  spawn target_cell_nodes
+  {
+  nvtxRangeId_t NVTX_TC2N1 = nvtxRangeStartA("Target C2N");
+  // no need to shuffle the target cells
+  create_cell_nodes_gpu(target_cell_nodes_kit, nx, ny, "target_cell_nodes",
+                    shuffle ? &shuffle_target_nodes : nullptr, nullptr);
+  nvtxRangeEnd(NVTX_TC2N1);                 
+  }
 
-  // source_node_offsets_kit = allocate<size_t>(KITSUNE, nx * ny + 1, "source_node_offsets");
-  // spawn source_node_offsets 
-  // {
-  // nvtxRangeId_t NVTX_SNO1 = nvtxRangeStartA("Source Node Offsets");
-  // forall (size_t i = 0; i < nx * ny + 1; ++i)
-  //   source_node_offsets_kit[i] = 4 * i;
-  // nvtxRangeEnd(NVTX_SNO1);                 
-  // }
+  source_node_offsets_kit = allocate<size_t>(KITSUNE, nx * ny + 1, "source_node_offsets");
+  spawn source_node_offsets 
+  {
+  nvtxRangeId_t NVTX_SNO1 = nvtxRangeStartA("Source Node Offsets");
+  forall (size_t i = 0; i < nx * ny + 1; ++i)
+    source_node_offsets_kit[i] = 4 * i;
+  nvtxRangeEnd(NVTX_SNO1);                 
+  }
 
-  // target_node_offsets_kit = allocate<size_t>(KITSUNE, nx * ny + 1, "target node offsets");
-  // spawn target_node_offsets 
-  // {
-  // nvtxRangeId_t NVTX_TNO1 = nvtxRangeStartA("Target Node Offsets");
-  // forall (size_t i = 0; i < nx * ny + 1; ++i)
-  //   target_node_offsets_kit[i] = 4 * i;
-  // nvtxRangeEnd(NVTX_TNO1);                 
-  // }
+  target_node_offsets_kit = allocate<size_t>(KITSUNE, nx * ny + 1, "target node offsets");
+  spawn target_node_offsets 
+  {
+  nvtxRangeId_t NVTX_TNO1 = nvtxRangeStartA("Target Node Offsets");
+  forall (size_t i = 0; i < nx * ny + 1; ++i)
+    target_node_offsets_kit[i] = 4 * i;
+  nvtxRangeEnd(NVTX_TNO1);                 
+  }
 
-  // spawn create_candidate_offsets 
-  // {
-  // nvtxRangeId_t NVTX_SCO1 = nvtxRangeStartA("Source Candidate Offsets");
-  // create_candidate_offsets(candidate_offsets_kit, nx, ny);
-  // nvtxRangeEnd(NVTX_SCO1);                 
-  // }
+  spawn create_candidate_offsets 
+  {
+  nvtxRangeId_t NVTX_SCO1 = nvtxRangeStartA("Source Candidate Offsets");
+  create_candidate_offsets(candidate_offsets_kit, nx, ny);
+  nvtxRangeEnd(NVTX_SCO1);                 
+  }
 
-  // sync source_coordinates;
-  // sync target_coordinates;
-  // sync source_cell_nodes;
-  // sync target_cell_nodes;
-  // sync source_node_offsets;
-  // sync target_node_offsets;
-  // sync create_candidate_offsets;
+  sync source_coordinates;
+  sync target_coordinates;
+  sync source_cell_nodes;
+  sync target_cell_nodes;
+  sync source_node_offsets;
+  sync target_node_offsets;
+  sync create_candidate_offsets;
   
-  // nvtxRangeEnd(NVTX_PR11);//Parallel Region 1
+  nvtxRangeEnd(NVTX_PR11);//Parallel Region 1
   
-  // // At this point we know the number of candidates so we can allocate. All the syncs
-  // // needed to complete in create_meshes_gpu in order for us to do the allocation here.
-  // // This isn't really what we want, but is the best we can do at the moment.
-  // nvtxRangeId_t NVTX_PR21 = nvtxRangeStartA("Parallel Region 2");
+  // At this point we know the number of candidates so we can allocate. All the syncs
+  // needed to complete in create_meshes_gpu in order for us to do the allocation here.
+  // This isn't really what we want, but is the best we can do at the moment.
+  nvtxRangeId_t NVTX_PR21 = nvtxRangeStartA("Parallel Region 2");
   
-  // spawn allocate_and_compute_candidates {    
-  // nvtxRangeId_t NVTX_CAN1 = nvtxRangeStartA("Computing candidates");
-  // create_candidates_gpu(candidates_kit, candidate_offsets_kit[n_cells], nx, ny, candidate_offsets_kit,
-  //                   "create candidates ",
-  //                   shuffle ? &shuffle_source_cells : nullptr);
-  // nvtxRangeEnd(NVTX_CAN1);
+  spawn allocate_and_compute_candidates {    
+  nvtxRangeId_t NVTX_CAN1 = nvtxRangeStartA("Computing candidates");
+  create_candidates_gpu(candidates_kit, candidate_offsets_kit[n_cells], nx, ny, candidate_offsets_kit,
+                    "create candidates ",
+                    shuffle ? &shuffle_source_cells : nullptr);
+  nvtxRangeEnd(NVTX_CAN1);
 
-  // }
+  }
 
-  // // compute centroids
-  // spawn cuda_centroids{
-  // nvtxRangeId_t NVTX_CEN1 = nvtxRangeStartA("Centroid on mesh defined with UVM");
+  // compute centroids
+  spawn cuda_centroids{
+  nvtxRangeId_t NVTX_CEN1 = nvtxRangeStartA("Centroid on mesh defined with UVM");
 
-  // if constexpr (LOG_LEVEL > 0)
-  //   printf("\nComputing parallel centroids with Cuda managed memory...\n");
-  // nvtxMark("Centroid Kitsune kernel start...");
-  // // raises a runtime KITSUNE WARNING if we use in the centroid kernel as the
-  // // final argument
-  // double *results = &source_coordinates_kit[2 * n_nodes];
-  // [[tapir::target("cuda")]] // DWS
-  // forall(size_t i = 0; i < n_cells; ++i) serial::centroid(
-  //   i, source_node_offsets_kit, source_cell_nodes_kit, source_coordinates_kit,
-  //   &source_coordinates_kit[2 * n_nodes]);
-  // nvtxMark("Centroid kernel end");
+  if constexpr (LOG_LEVEL > 0)
+    printf("\nComputing parallel centroids with Cuda managed memory...\n");
+  nvtxMark("Centroid Kitsune kernel start...");
+  // raises a runtime KITSUNE WARNING if we use in the centroid kernel as the
+  // final argument
+  double *results = &source_coordinates_kit[2 * n_nodes];
+  [[tapir::target("cuda")]] // DWS
+  forall(size_t i = 0; i < n_cells; ++i) serial::centroid(
+    i, source_node_offsets_kit, source_cell_nodes_kit, source_coordinates_kit,
+    &source_coordinates_kit[2 * n_nodes]);
+  nvtxMark("Centroid kernel end");
 
-  // // check centroids
-  // if constexpr (LOG_LEVEL > 0)
-  //   for (size_t i = 0; i < n_cells; ++i)
-  //       printf("cell %3zu centroid: %.4f, %.4f\n", i, results[2 * i],
-  //               results[2 * i + 1]);
-  // if constexpr (CHECK){
-  //   printf("Centroids: ");
-  //   check_equal(results, source_centroids, 2 * n_cells);
-  // }
-  // nvtxRangeEnd(NVTX_CEN1);
-  // }
+  // check centroids
+  if constexpr (LOG_LEVEL > 0)
+    for (size_t i = 0; i < n_cells; ++i)
+        printf("cell %3zu centroid: %.4f, %.4f\n", i, results[2 * i],
+                results[2 * i + 1]);
+  if constexpr (CHECK){
+    printf("Centroids: ");
+    check_equal(results, source_centroids, 2 * n_cells);
+  }
+  nvtxRangeEnd(NVTX_CEN1);
+  }
 
-  // sync cuda_centroids;
-  // sync allocate_and_compute_candidates;
+  sync cuda_centroids;
+  sync allocate_and_compute_candidates;
 
-  // nvtxRangeEnd(NVTX_PR21); // Parallel Region 2
+  nvtxRangeEnd(NVTX_PR21); // Parallel Region 2
 
-  // ///////////////////////////////
-  // // free application heap memory
-  // ///////////////////////////////
+  ///////////////////////////////
+  // free application heap memory
+  ///////////////////////////////
 
-  // nvtxRangeId_t NVTX_FREE1 = nvtxRangeStartA("Free Resources");
-  // dealloc(source_coordinates_kit);
-  // dealloc(source_cell_nodes_kit);
-  // dealloc(source_node_offsets_kit);
+  nvtxRangeId_t NVTX_FREE1 = nvtxRangeStartA("Free Resources");
+  dealloc(source_coordinates_kit);
+  dealloc(source_cell_nodes_kit);
+  dealloc(source_node_offsets_kit);
   
-  // dealloc(target_coordinates_kit);
-  // dealloc(target_cell_nodes_kit);
-  // dealloc(target_node_offsets_kit);
+  dealloc(target_coordinates_kit);
+  dealloc(target_cell_nodes_kit);
+  dealloc(target_node_offsets_kit);
 
-  // dealloc(candidate_offsets_kit);
-  // dealloc(candidates_kit);
-  // nvtxRangeEnd(NVTX_FREE1);
+  dealloc(candidate_offsets_kit);
+  dealloc(candidates_kit);
+  nvtxRangeEnd(NVTX_FREE1);
 
-  // nvtxRangeEnd(NVTX_PMC1); // Parallel Mesh Creation 1 in UVM
+  nvtxRangeEnd(NVTX_PMC1); // Parallel Mesh Creation 1 in UVM
 
 
 
