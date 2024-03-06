@@ -71,9 +71,9 @@ vecadd-kokkos.cuda.${host_arch}: vecadd-kokkos.cpp vecadd-kokkos.cfg
 
 # VPATH := ./forall/:./kokkos/
 
-intersect_lto_src = common.cpp intersect.cpp
+# intersect_lto_src = common.cpp intersect.cpp
 
-# intersect_src = common.cpp intersect.cpp
+intersect_src = common.cpp intersect.cpp
 
 # notdir below is unnecessary if no source subfolder
 intersect_lto_objs := $(patsubst %.cpp, %.lto.o, $(notdir $(intersect_lto_src)))
@@ -88,7 +88,7 @@ intersect_objs := $(patsubst %.cpp, %.o, $(notdir $(intersect_src)))
 # 	/usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -fuse-ld=lld -o $@ ${intersect_objs} \
 # 	-L${CUDA_ROOT}/lib64 -lnvToolsExt
 intersect.${host_arch}: ${intersect_lto_objs} ${intersect_objs} opencilk-cuda.cfg
-	/usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -flto -fuse-ld=lld -o $@ ${intersect_lto_objs} ${intersect_objs} \
+	/usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -Wl,--mllvm=-cuabi-arch=sm_70 -flto -fuse-ld=lld  -o $@ ${intersect_lto_objs} ${intersect_objs} \
 	-L${CUDA_ROOT}/lib64 -lnvToolsExt
 # /usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -flto -fuse-ld=lld -o $@ ${intersect_lto_objs} ${intersect_objs} 
 
