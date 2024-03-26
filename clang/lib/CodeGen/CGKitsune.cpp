@@ -96,33 +96,35 @@ CodeGenFunction::GetTapirStrategyAttr(ArrayRef<const Attr *> Attrs) {
 }
 
 unsigned CodeGenFunction::GetTapirTargetAttr(ArrayRef<const Attr *> Attrs) {
+  
   llvm::TapirTargetID TTID = llvm::TapirTargetID::Last_TapirTargetID;
+
   for (auto curAttr : Attrs) {
     if (curAttr->getKind() == attr::TapirTarget) {
       const TapirTargetAttr::TapirTargetAttrTy TTA =
-	cast<const TapirTargetAttr>(curAttr)->getTapirTargetAttrType();
-      switch(TTA) {
+          cast<const TapirTargetAttr>(curAttr)->getTapirTargetAttrType();
+      switch (TTA) {
       case TapirTargetAttr::None:
-	TTID = llvm::TapirTargetID::None;
-	break;
+        TTID = llvm::TapirTargetID::None;
+        break;
       case TapirTargetAttr::Serial:
-	TTID = llvm::TapirTargetID::Serial;
-	break;
+        TTID = llvm::TapirTargetID::Serial;
+        break;
       case TapirTargetAttr::Cuda:
-	TTID = llvm::TapirTargetID::Cuda;
-	break;	
+        TTID = llvm::TapirTargetID::Cuda;
+        break;
       case TapirTargetAttr::Hip:
-	TTID = llvm::TapirTargetID::Hip;
-	break;	
+        TTID = llvm::TapirTargetID::Hip;
+        break;
       case TapirTargetAttr::OpenMP:
-	TTID = llvm::TapirTargetID::OpenMP;
-	break;	
+        TTID = llvm::TapirTargetID::OpenMP;
+        break;
       case TapirTargetAttr::Qthreads:
-	TTID = llvm::TapirTargetID::Qthreads;
-	break;
+        TTID = llvm::TapirTargetID::Qthreads;
+        break;
       case TapirTargetAttr::Realm:
-	TTID = llvm::TapirTargetID::Realm;
-	break;	
+        TTID = llvm::TapirTargetID::Realm;
+        break;
       default:
         llvm_unreachable("unhandled tapir target attribute!");
       }
@@ -132,7 +134,7 @@ unsigned CodeGenFunction::GetTapirTargetAttr(ArrayRef<const Attr *> Attrs) {
 
   if (TTID == llvm::TapirTargetID::Last_TapirTargetID)
     TTID = CGM.getCodeGenOpts().getTapirTarget();
-  
+
   return unsigned(TTID);
 }
 

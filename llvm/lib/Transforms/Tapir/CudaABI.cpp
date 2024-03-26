@@ -123,14 +123,14 @@ using namespace llvm;
 /// ## CudaABI Transformation Command Line Options ##
 ///
 /// All of the transformation's command line options must be
-/// passed using the the `-mllvm` as the leading flag.  All
-/// transform options should have `-hipabi-` as the leading
-/// string.  A summary of these options is provided below.
+/// passed using `-mllvm` as the leading flag.  All
+/// transform options have `-cuabi-` as the leading
+/// string.  A summary of the options is provided below.
 ///
 ///   * `-cuabi-arch=target`: The target CUDA architecture
 ///     to generate code for.  This directly matches the
-///     [NVPTX backend
-///     targets](https://llvm.org/docs/NVPTXUsage.html).
+///     [NVPTX backend targets]
+///     (https://llvm.org/docs/NVPTXUsage.html).
 ///
 ///   * `-cuabi-opt-level=[0,1,2,3]`: Set the optimization
 ///     level for transformation.  This corresponds directly
@@ -279,6 +279,11 @@ std::string virtualArchForCudaArch(StringRef Arch) {
                              .Case("sm_90", "compute_90") // Hopper
                              .Default("unknown");
   LLVM_DEBUG(dbgs() << "cuabi: compute architecture '" << VirtArch << "'.\n");
+  if (VirtArch == "unknown") {
+    errs() << "cuabi: unsupported cuda architecture target '" << Arch 
+           << "'.\n";
+    report_fatal_error("cuabi: fatal error -- unsupported target.");
+  }
   return VirtArch;
 }
 

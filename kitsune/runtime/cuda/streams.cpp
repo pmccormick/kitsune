@@ -114,7 +114,10 @@ void __kitcuda_sync_thread_stream() {
     CU_SAFE_CALL(cuStreamSynchronize_p(sit->second));
   } else {
     fprintf(stderr,
-            "kitcuda: warning -- unexpected failure finding thread stream!\n");
+            "kitcuda: warning, failure finding thread-stream for sync!\n");
+    fprintf(stderr, 
+            "         calling thread id: %d, using ctx sync.\n", int(tid));
+    CU_SAFE_CALL(cuCtxSynchronize_p());
   }
   KIT_NVTX_POP();
 }
