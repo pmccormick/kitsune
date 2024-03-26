@@ -95,6 +95,8 @@ CUstream __kitcuda_get_thread_stream() {
   if (sit == _kitcuda_stream_map.end()) {
     CU_SAFE_CALL(cuStreamCreate(&stream, CU_STREAM_NON_BLOCKING));
     _kitcuda_stream_map[tid] = stream;
+    if (__kitrt_verbose_mode()) 
+      fprintf(stderr, "kitcuda: created execution stream for thread %d\n", int(tid));
   } else
     stream = sit->second;
   _kitcuda_stream_mutex.unlock();
