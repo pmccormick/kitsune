@@ -285,7 +285,7 @@ void create_cell_nodes_gpu(size_t *&nodes, int nx, int ny,
                        std::vector<size_t> *shuffle_nodes = nullptr,
                        std::vector<size_t> *shuffle_cells = nullptr) {
 
-  nodes = allocate<size_t>(KITSUNE, 4 * nx * nx, "source cell nodes");
+  nodes = allocate<size_t>(KITSUNE, 4 * nx * ny, "source cell nodes");
 
   // create cell to node mapping, just iterating the stencil explicitly
   if constexpr (LOG_LEVEL > 0)

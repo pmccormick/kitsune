@@ -71,9 +71,9 @@ vecadd-kokkos.cuda.${host_arch}: vecadd-kokkos.cpp vecadd-kokkos.cfg
 
 # VPATH := ./forall/:./kokkos/
 
-# intersect_lto_src = common.cpp intersect.cpp
+intersect_lto_src = common.cpp intersect.cpp
 
-intersect_src = common.cpp intersect.cpp
+# intersect_src = common.cpp intersect.cpp
 
 # notdir below is unnecessary if no source subfolder
 intersect_lto_objs := $(patsubst %.cpp, %.lto.o, $(notdir $(intersect_lto_src)))
