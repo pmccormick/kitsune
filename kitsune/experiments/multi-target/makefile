@@ -49,6 +49,9 @@ nested-launch.cuda.${host_arch}: nested-launch.cpp opencilk-cuda.cfg
 	@${FILE_SIZE}
 
 
+bug.cuda.${host_arch}: bug.cpp opencilk-cuda.cfg 
+	@${TIME_CMD} $(KIT_CXX)  $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -o $@ $< 
+
 # hip 
 nested-launch.hip.${host_arch}: nested-launch.cpp opencilk-hip.cfg
 	@echo $@
