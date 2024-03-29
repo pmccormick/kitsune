@@ -94,6 +94,17 @@ intersect.${host_arch}: ${intersect_lto_objs} ${intersect_objs} opencilk-cuda.cf
 
 
 
+repro_lto_src = common.cpp repro.cpp
+
+# notdir below is unnecessary if no source subfolder
+repro_lto_objs := $(patsubst %.cpp, %.lto.o, $(notdir $(repro_lto_src)))
+
+repro.${host_arch}: ${repro_lto_objs}  opencilk-cuda.cfg
+	/usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -Wl,--mllvm=-cuabi-arch=sm_70 -flto -fuse-ld=lld  -o $@ ${repro_lto_objs} ${intersect_objs} \
+	-L${CUDA_ROOT}/lib64 -lnvToolsExt
+
+
+
 
 
 
