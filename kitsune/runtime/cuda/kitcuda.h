@@ -235,7 +235,7 @@ extern void __kitcuda_mem_destroy(void *ptr);
  * **NOTE**: See `__kitcuda_mem_host_prefetch()` for host-side
  * prefetch requests.
  */
-extern void __kitcuda_mem_gpu_prefetch(void *ptr);
+extern void* __kitcuda_mem_gpu_prefetch(void *ptr, void *opaque_stream);
 
 /**
  * Request that the memory allocation associated with the given
@@ -250,7 +250,7 @@ extern void __kitcuda_mem_gpu_prefetch(void *ptr);
  * **NOTE**: See `__kitcuda_mem_gpu_prefetch()` for GPU prefetch
  * requests.
  */
-extern void __kitcuda_mem_host_prefetch(void *ptr);
+extern void* __kitcuda_mem_host_prefetch(void *ptr, void *opaque_stream);
 
 /**
  * Find the named symbol in the given CUDA module represented by
@@ -307,9 +307,10 @@ typedef struct _kitcuda_inst_mix_info  {
  * @param trip_count - Total size of the work to execution (aka trip count).
  * @param threads_per_blk - threads per block (set to zero for auto determination).
  */
-extern void __kitcuda_launch_kernel(const void *fat_bin, const char *kern_name,
-                                    void **kern_args, uint64_t trip_count, 
-                                    int threads_per_blk, const KitCudaInstMix *inst_mix);
+extern void* __kitcuda_launch_kernel(const void *fat_bin, const char *kern_name,
+                                     void **kern_args, uint64_t trip_count, 
+                                     int threads_per_blk, const KitCudaInstMix *inst_mix,
+                                     void *opaque_stream);
 
 /**
  * Enable/Disable the use of occupancy calculations for the
@@ -380,16 +381,14 @@ extern void __kitcuda_set_custom_launch_params(unsigned blks_per_grid,
                                                unsigned threads_per_blk);
 
 /**
- * Return the stream that is assocaited with the calling thread.
- * If a stream has not yet been created and associated with the
- * calling thread it will be created and returned.
+ * Return a thread-aware stream. 
  */
-extern CUstream __kitcuda_get_thread_stream();
+extern void* __kitcuda_get_thread_stream();
 
 /**
- * Synchronize the calling thread with its assocaited stream.
+ * Synchronize the associated stream.
  */
-extern void __kitcuda_sync_thread_stream();
+extern void __kitcuda_sync_thread_stream(void *opaque_stream);
 
 /**
  * Synchronize the host-side with **all** underlying streams in the
@@ -406,7 +405,7 @@ extern void __kitcuda_sync_context();
  * If a stream has not been assigned to the thread this call will
  * simply return and function as a no-op.
  */
-extern void __kitcuda_delete_thread_stream();
+extern void __kitcuda_delete_thread_stream(void *opaque_stream);
 
 /**
  * Destroy all the thread-associated streams that are being managed

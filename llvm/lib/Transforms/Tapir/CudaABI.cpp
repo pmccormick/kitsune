@@ -406,17 +406,19 @@ CudaLoop::CudaLoop(Module &M, Module &KernelModule, const std::string &KN,
                                     Int64Ty); // number of integer ops.
   KitCudaLaunchFn = M.getOrInsertFunction(
       "__kitcuda_launch_kernel",
-      VoidTy,                           // no return
+      VoidPtrTy,                        // return an opaque stream
       VoidPtrTy,                        // fat-binary
       VoidPtrTy,                        // kernel name
       VoidPtrPtrTy,                     // arguments
       Int64Ty,                          // trip count
       Int32Ty,                          // threads-per-block
-      KernelInstMixTy->getPointerTo()); // instruction mix info
+      KernelInstMixTy->getPointerTo(),  // instruction mix info
+      VoidPtrTy);                       // opaque cuda stream
   KitCudaMemPrefetchFn =
       M.getOrInsertFunction("__kitcuda_mem_gpu_prefetch",
-                            VoidTy,     // no return.
-                            VoidPtrTy); // pointer to prefetch
+                            VoidPtrTy,  // return an opaque stream
+                            VoidPtrTy,  // pointer to prefetch
+                            VoidPtrTy); // opaque stream
   KitCudaGetGlobalSymbolFn =
       M.getOrInsertFunction("__kitcuda_get_global_symbol",
                             Int64Ty,    // return the device pointer for symbol.
@@ -1025,6 +1027,9 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
   ArrayType *ArrayTy = ArrayType::get(VoidPtrTy, OrderedInputs.size());
   Value *ArgArray = EntryBuilder.CreateAlloca(ArrayTy);
+  AllocaInst *CudaStream = EntryBuilder.CreateAlloca(VoidPtrTy);
+  EntryBuilder.CreateStore(ConstantPointerNull::get(VoidPtrTy), CudaStream);
+  bool StreamAssigned = false;
   unsigned int i = 0;
   for (Value *V : OrderedInputs) {
     Value *VP = EntryBuilder.CreateAlloca(V->getType());
@@ -1038,9 +1043,16 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     if (CodeGenPrefetch && V->getType()->isPointerTy()) {
       LLVM_DEBUG(dbgs() << "\t\t- code gen prefetch for arg " << i << "\n");
       Value *VoidPP = NewBuilder.CreateBitCast(V, VoidPtrTy);
-      NewBuilder.CreateCall(KitCudaMemPrefetchFn, {VoidPP});
+      LLVM_DEBUG(dbgs() << "\t\t\t+ prefetch stream is: " << *CudaStream << "\n");
+      Value *SPtr = NewBuilder.CreateLoad(VoidPtrTy, CudaStream);
+      Value *NewSPtr = NewBuilder.CreateCall(KitCudaMemPrefetchFn, {VoidPP, SPtr});
+      if (not StreamAssigned) {
+        NewBuilder.CreateStore(NewSPtr, CudaStream);
+        StreamAssigned = true;
+      }
     }
   }
+
 
   // The next step is prep for the actual kernel launch call via
   // the kitsune runtime.  We have to add some extra levels of
@@ -1120,8 +1132,20 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   StoreInst *SI = NewBuilder.CreateStore(InstructionMix, AI);
 
   LLVM_DEBUG(dbgs() << "\t*- code gen kernel launch....\n");
-  NewBuilder.CreateCall(KitCudaLaunchFn, {DummyFBPtr, KNameParam, argsPtr,
-                                          CastTripCount, TPBlockValue, AI});
+  Value *KSPtr = NewBuilder.CreateLoad(VoidPtrTy, CudaStream);
+  CallInst *LaunchStream = NewBuilder.CreateCall(KitCudaLaunchFn, 
+                                            {DummyFBPtr, KNameParam, argsPtr,
+                                            CastTripCount, TPBlockValue, AI,
+                                            KSPtr});
+  //if (not StreamAssigned)
+  NewBuilder.CreateStore(LaunchStream, CudaStream);
+
+  LLVM_DEBUG(dbgs() << "\t\t+- registering launch stream:\n" 
+                    << "\t\t\tcall: " << *LaunchStream << "\n"
+                    << "\t\t\tstream: " << *CudaStream << "\n");
+
+  TTarget->registerLaunchStream(LaunchStream, CudaStream);
+
   TOI.ReplCall->eraseFromParent();
   LLVM_DEBUG(dbgs() << "*** finished processing outlined call.\n");
 }
@@ -1250,14 +1274,16 @@ void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
   if (OutliningTapirLoops) {
     LLVMContext &Ctx = M.getContext();
     Type *VoidTy = Type::getVoidTy(Ctx);
+    PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
+    Value *CudaStream = ConstantPointerNull::get(VoidPtrTy);
     FunctionCallee KitCudaSyncFn =
         M.getOrInsertFunction("__kitcuda_sync_thread_stream",
-                              VoidTy); // no return & no parameters
+                              VoidTy, VoidPtrTy);
 
     for (Value *SR : SyncRegList) {
       for (Use &U : SR->uses()) {
         if (auto *SyncI = dyn_cast<SyncInst>(U.getUser()))
-          CallInst::Create(KitCudaSyncFn, "",
+          CallInst::Create(KitCudaSyncFn, {CudaStream}, "",
                            &*SyncI->getSuccessor(0)->begin());
       }
     }
@@ -1448,6 +1474,7 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
   // launch finalization.
   CallInst *ThreadsPerBlockCI = nullptr;
   std::list<CallInst *> DummyCIList;
+  CallInst *SavedLaunchCI = nullptr;
 
   for (auto &Fn : FnList) {
     for (auto &BB : Fn) {
@@ -1460,8 +1487,24 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
                                    "placeholder call.\n");
               assert(ThreadsPerBlockCI == nullptr && "expected null pointer!");
               ThreadsPerBlockCI = CI;
+            } else if (CFn->getName().startswith("__kitcuda_sync_thread_stream")) {
+              LLVM_DEBUG(dbgs() << "\t\t\t* patching sync call: " << *CI << "\n");
+              if (SavedLaunchCI != nullptr) {
+                AllocaInst *StreamAI = getLaunchStream(SavedLaunchCI);
+                assert(StreamAI != nullptr && "unexpected null launch stream!");
+                LLVM_DEBUG(dbgs() << "\t\t\t\t* stream alloca: " << *StreamAI << "\n");
+                IRBuilder<> SyncBuilder(CI);
+                Value *CudaStream = SyncBuilder.CreateLoad(VoidPtrTy, StreamAI, "custreamh");
+                LLVM_DEBUG(dbgs() << "\t\t\t\t* cuda stream: " << *CudaStream << "\n");
+                CI->setArgOperand(0, CudaStream);
+                SavedLaunchCI = nullptr;
+                LLVM_DEBUG(dbgs() << "\t\t\t* patched call: " << *CI << "\n");
+              } else {
+                LLVM_DEBUG(dbgs() << "\t\t\t- note, matching launch not found!\n");
+              }
             } else if (CFn->getName().startswith("__kitcuda_launch_kernel")) {
               LLVM_DEBUG(dbgs() << "\t\t\t* patching launch: " << *CI << "\n");
+              SavedLaunchCI = CI;
               Value *CFatbin;
               CFatbin = CastInst::CreateBitOrPointerCast(Fatbin, VoidPtrTy,
                                                          "_cubin.fatbin", CI);

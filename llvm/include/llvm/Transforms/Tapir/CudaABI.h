@@ -55,6 +55,7 @@
 #ifndef TapirCuda_ABI_H_
 #define TapirCuda_ABI_H_
 
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/Transforms/Tapir/LoweringUtils.h"
 #include "llvm/Transforms/Tapir/TapirLoopInfo.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -121,6 +122,20 @@ public:
     SyncRegList.insert(SR);
   }
 
+  void registerLaunchStream(CallInst *CI, AllocaInst *AI) {
+    KernelLaunchToStreamMap.insert(std::pair<CallInst*,AllocaInst*>(CI,AI));
+  }
+
+  AllocaInst* getLaunchStream(CallInst *CI) {
+    LaunchToStreamMapTy::iterator it;
+    it = KernelLaunchToStreamMap.find(CI);
+    if (it != KernelLaunchToStreamMap.end())
+      return it->second;
+    else 
+      return nullptr;
+  }
+
+
   private:
     CudaABIOutputFile generatePTX();
     CudaABIOutputFile assemblePTXFile(CudaABIOutputFile &PTXFile);
@@ -141,6 +156,9 @@ public:
 
     typedef std::set<Value*> SyncRegionListTy;
     SyncRegionListTy SyncRegList;
+
+    typedef llvm::DenseMap<CallInst*,AllocaInst*>  LaunchToStreamMapTy;
+    LaunchToStreamMapTy   KernelLaunchToStreamMap;
 
     Module   KernelModule;
     TargetMachine *PTXTargetMachine;
