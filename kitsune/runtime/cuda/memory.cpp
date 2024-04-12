@@ -293,7 +293,7 @@ void* __kitcuda_mem_gpu_prefetch(void *vp, void *opaque_stream) {
 void* __kitcuda_mem_host_prefetch(void *vp, void *opaque_stream) {
   assert(vp && "unexpected null pointer!");
 
-  KIT_NVTX_PUSH("kitrt:mem_host_prefetch", KIT_NVTX_MEM);
+  KIT_NVTX_PUSH("kitcuda:mem_host_prefetch", KIT_NVTX_MEM);
 
   // TODO: Prefetching details and approaches need to be further
   // explored.  In particular, in concert with compiler analysis and

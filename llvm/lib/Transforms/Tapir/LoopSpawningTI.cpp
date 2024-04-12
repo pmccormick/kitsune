@@ -905,6 +905,8 @@ LoopOutlineProcessor *LoopSpawningImpl::getOutlineProcessor(TapirLoopInfo *TL) {
   Loop *L = TL->getLoop();
   TapirLoopHints Hints(L);
   TapirTargetID TLTID = (TapirTargetID)Hints.getLoopTarget();
+    
+  
   unsigned int ThreadsPerBlock = Hints.getThreadsPerBlock();
 
   // get the LoopTarget from set of Targets if it exists, otherwise create it

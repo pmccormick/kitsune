@@ -717,14 +717,15 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
 
 void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
                                   ValueToValueMapTy &VMap) {
-
   // addSyncToOutlineReturns(TLI, Out, VMap);
 
   LLVMContext &Ctx = M.getContext();
   Task *T = TLI.getTask();
   Loop *TL = TLI.getLoop();
 
-  TapirLoopHints Hints(TL);
+  //TapirLoopHints Hints(TL);
+  //TapirTargetID TLTID = (TapirTargetID)Hints.getLoopTarget();
+  //assert(TLTID == Cuda && "Internal error!  CudaABI processing non-CUDA loop!");
 
   BasicBlock *Entry = cast<BasicBlock>(VMap[TL->getLoopPreheader()]);
   BasicBlock *Header = cast<BasicBlock>(VMap[TL->getHeader()]);
@@ -1271,6 +1272,7 @@ void CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
 }
 
 void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
+  
   if (OutliningTapirLoops) {
     LLVMContext &Ctx = M.getContext();
     Type *VoidTy = Type::getVoidTy(Ctx);

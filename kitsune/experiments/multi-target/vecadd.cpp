@@ -3,84 +3,88 @@
 #include <chrono>
 #include <kitsune.h>
 
-using namespace std;
 
-const size_t ARRAY_SIZE = 1024 * 1024 * 256;
-
-void cpu_fill(float *data, size_t N, int inc) {
+template<typename T>
+void random_fill(T *data, size_t N) {
+  T base_value = rand() / (T)RAND_MAX;
   forall(size_t i = 0; i < N; ++i)
-    data[i] = float(i+inc);
+    data[i] = base_value + i;
 }
 
-void gpu_fill(float *data, size_t N, int inc) {
-  [[tapir::target("cuda")]]
+template<typename T>
+void random_gpu_fill(T *data, size_t N) {
+  T base_value = rand() / (T)RAND_MAX;
+  [[tapir::target("cuda")]]  
   forall(size_t i = 0; i < N; ++i)
-    data[i] = float(i+inc);
+    data[i] = base_value + i;
 }
-
-void foo(float *A, float *B, float *C, size_t N) {
-  [[tapir::target("cuda")]]
-  forall(size_t i = 0; i < N/2; i++)
-    C[i] = A[i] + B[i];
-}
-
 
 int main (int argc, char* argv[]) {
   using namespace std;
-  size_t size = ARRAY_SIZE;
+  const size_t ARRAY_SIZE = 1024 * 1024 * 256;
   unsigned int iterations = 10;
-  if (argc >= 2)
-    size = atol(argv[1]);
-  if (argc == 3)
-    iterations = atoi(argv[2]);  
+
+  double elapsed_time;
 
   cout << setprecision(5);
   cout << "---- multi-target vector addition (forall) ----\n"
-       << "  Vector size: " << size << " elements.\n\n";
-  cout << "  Allocating arrays..."   
-       << std::flush;
-  float *A = alloc<float>(size);
-  float *B = alloc<float>(size);
-  float *C = alloc<float>(size);
+       << "  Vector size: " << ARRAY_SIZE << " elements.\n\n";
+  cout << "  Allocating arrays..." << std::flush;
+  float *A = alloc<float>(ARRAY_SIZE);
+  float *B = alloc<float>(ARRAY_SIZE);
+  float *C = alloc<float>(ARRAY_SIZE);
   cout << "  done.\n\n";
 
-  size_t error_count;
-  bool found_error = false;
-  for(int t = 0; t < iterations; t++) {
-    spawn fill_a {
-      cpu_fill(A, size, t);
-    }
-    spawn fill_b {
-      gpu_fill(B, size, t);  
-    }
-    sync fill_a;
-    sync fill_b;
-    
-    spawn add_gpu {
-      forall(size_t i = 0; i < size/2; i++)
-        C[i] = A[i] + B[i];
-    }
+  cout << "running back-to-back (sequential) parallel fills...";
+  auto start_time = chrono::steady_clock::now();
+  random_fill(A, ARRAY_SIZE);
+  random_fill(B, ARRAY_SIZE);
+  auto end_time = chrono::steady_clock::now();
+  elapsed_time = chrono::duration<double>(end_time-start_time).count();  
+  cout << "  done.\n";
+  cout << "elapsed time: " << elapsed_time << " seconds.\n";
 
-    spawn add_cpu {
-      forall(size_t i = size/2; i < size; i++)
-        C[i] = A[i] + B[i];
-    }
-    sync add_cpu;
-    sync add_gpu;
-
-    cout << "  checking result..." << std::flush;
-    error_count = 0;
-    for(size_t i = 0; i < size; i++) {
-      float sum = A[i] + B[i];
-      if (C[i] != sum)
-	error_count++;
-    }
-    if (error_count > 0) {
-      cout << "  incorrect result found!\n";
-      found_error = true;
-    } else
-      cout << "  ok\n";
+  cout << "running concurrent gpu parallel fills...";
+  start_time = chrono::steady_clock::now();  
+  spawn fill_a {
+    random_gpu_fill(A, ARRAY_SIZE);
   }
+  spawn fill_b {
+    random_gpu_fill(B, ARRAY_SIZE);    
+  }
+  sync fill_a; sync fill_b;
+  end_time = chrono::steady_clock::now();
+
+  elapsed_time = chrono::duration<double>(end_time-start_time).count();  
+  cout << "  done.\n";
+  cout << "elapsed time: " << elapsed_time << " seconds.\n";  
+
+  cout << "running vector addition...";
+  start_time = chrono::steady_clock::now();    
+  [[tapir::target("cuda")]]
+  forall(size_t i = 0; i < ARRAY_SIZE; i++)
+      C[i] = A[i] + B[i];
+  end_time = chrono::steady_clock::now();
+  elapsed_time = chrono::duration<double>(end_time-start_time).count();  
+  cout << "  done.\n";
   
-  return int(found_error);
+  cout << "Checking final result..." << std::flush;
+  size_t error_count = 0;
+  for(size_t i = 0; i < ARRAY_SIZE; i++) {
+    float sum = A[i] + B[i];
+    if (C[i] != sum)
+      error_count++;
+  }
+  if (error_count) {
+    cout << "  incorrect result found! (" 
+         << error_count << " errors found)\n\n";
+    return 1;
+  } else {
+    cout << "  pass (answers match).\n\n"
+         << "  Total time: " << elapsed_time
+         << " seconds. (" << ARRAY_SIZE / elapsed_time << " elements/sec.)\n"
+         << "----\n\n";
+  }
+
+  return 0;
 }

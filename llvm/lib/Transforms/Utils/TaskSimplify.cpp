@@ -186,10 +186,10 @@ bool llvm::simplifySyncs(Task *T, MaybeParallelTasks &MPTasks) {
   // Remove redundant syncs.  This optimization might not be necessary here,
   // because SimplifyCFG seems to do a good job removing syncs that cannot sync
   // anything.
-  Changed |= removeRedundantSyncs(MPTasks, T);
+  //Changed |= removeRedundantSyncs(MPTasks, T);
 
   // Remove redundant sync regions.
-  Changed |= removeRedundantSyncRegions(MPTasks, T);
+  //Changed |= removeRedundantSyncRegions(MPTasks, T);
 
   return Changed;
 }

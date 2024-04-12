@@ -56,7 +56,8 @@ if (KITRT_ENABLE_CUDA)
   
   option(KITCUDA_ENABLE_NVTX "Enable NVTX profiling within the runtime" OFF)
   if (KITCUDA_ENABLE_NVTX)
-    add_definitions(-DKITCUDA_ENABLE_NVTX)
+    message(STATUS "  enabling NVTX profiling.")
+    add_compile_definitions(-DKITCUDA_ENABLE_NVTX)
   endif()
   add_definitions(-DKITRT_CUDA_ENABLED)
 
