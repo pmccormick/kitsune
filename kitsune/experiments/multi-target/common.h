@@ -110,9 +110,9 @@ template <class T> int check_equal(T *v1, T *v2, size_t n) {
   for (size_t i = 0; i < n; ++i) {
     if (v1[i] != v2[i]) {
       if constexpr (LOG_LEVEL > 0) {
-        if constexpr (std::is_same<T, double *>::value)
+        if constexpr (std::is_same<T, double >::value)
           printf("Vectors not equal at %lu: %f %f\n", i, v1[i], v2[i]);
-        else if constexpr (std::is_same<T, size_t *>::value)
+        else if constexpr (std::is_same<T, size_t >::value)
           printf("Vectors not equal at %lu: %lu %lu\n", i, v1[i], v2[i]);
       }
       ++n_unequal;
