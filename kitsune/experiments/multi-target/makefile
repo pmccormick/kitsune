@@ -4,6 +4,7 @@ ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
   targets += vecadd.cuda.${host_arch}
   targets += nested-launch.cuda.${host_arch}
   targets += vecadd-kokkos.cuda.${host_arch}
+  targets += intersect.cuda.${host_arch}
 endif
 
 ifeq ($(BUILD_HIP_EXPERIMENTS),true)
@@ -73,8 +74,6 @@ vecadd-kokkos.cuda.${host_arch}: vecadd-kokkos.cpp vecadd-kokkos.cfg
 
 intersect_lto_src = common.cpp intersect.cpp
 
-# intersect_src = common.cpp intersect.cpp
-
 # notdir below is unnecessary if no source subfolder
 intersect_lto_objs := $(patsubst %.cpp, %.lto.o, $(notdir $(intersect_lto_src)))
 intersect_objs := $(patsubst %.cpp, %.o, $(notdir $(intersect_src)))
@@ -84,15 +83,9 @@ intersect_objs := $(patsubst %.cpp, %.o, $(notdir $(intersect_src)))
 %.o: %.cpp opencilk-cuda.cfg
 	/usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -I ${CUDA_PATH}/targets/x86_64-linux/include -c -o $@ $<
 
-# intersect.${host_arch}: ${intersect_objs} opencilk-cuda.cfg
-# 	/usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -fuse-ld=lld -o $@ ${intersect_objs} \
-# 	-L${CUDA_ROOT}/lib64 -lnvToolsExt
-intersect.${host_arch}: ${intersect_lto_objs} ${intersect_objs} opencilk-cuda.cfg
-	/usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -Wl,--mllvm=-cuabi-arch=sm_70 -flto -fuse-ld=lld  -o $@ ${intersect_lto_objs} ${intersect_objs} \
+intersect.cuda.${host_arch}: ${intersect_lto_objs} ${intersect_objs} opencilk-cuda.cfg
+	/usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -Wl,--mllvm=-cuabi-arch=$(CUDA_ARCH) -flto -fuse-ld=lld -o $@ ${intersect_lto_objs} ${intersect_objs} \
 	-L${CUDA_ROOT}/lib64 -lnvToolsExt
-# /usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -flto -fuse-ld=lld -o $@ ${intersect_lto_objs} ${intersect_objs} 
-
-
 
 repro_lto_src = common.cpp repro.cpp
 
@@ -102,19 +95,6 @@ repro_lto_objs := $(patsubst %.cpp, %.lto.o, $(notdir $(repro_lto_src)))
 repro.${host_arch}: ${repro_lto_objs}  opencilk-cuda.cfg
 	/usr/bin/time ${KIT_CXX} $(TAPIR_OPENCILK_FLAGS) --config=./opencilk-cuda.cfg -Wl,--mllvm=-cuabi-arch=sm_70 -flto -fuse-ld=lld  -o $@ ${repro_lto_objs} ${intersect_objs} \
 	-L${CUDA_ROOT}/lib64 -lnvToolsExt
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #####
 define newline 
