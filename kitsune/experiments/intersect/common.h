@@ -11,15 +11,15 @@
 #pragma once
 
 #include <cstdio>
-#include <nvToolsExt.h>
 #include <string>
 #include <vector>
-
-#ifdef _KITSUNE_
 #include <kitsune.h>
-#include "kitsune/kitrt/llvm-gpu.h"
-#include "kitsune/kitrt/kitrt-cuda.h"
-#endif
+// #include "kitrt/cuda.h"
+#include "nvToolsExt.h"
+
+// #include <kitsune.h>
+// #include "kitsune/kitrt/llvm-gpu.h"
+// #include "kitsune/kitrt/kitrt-cuda.h"
 
 const int LOG_LEVEL = 0;
 
@@ -31,9 +31,7 @@ enum PrefetchKinds {
 
 enum MemoryType {
   HOST = 0,    // Allocate on the host
-  KITSUNE = 1, // Let Kitsune do the memory management
-  CUDA = 2,    // Allocate on the device
-  MANAGED = 3  // Use UVM
+  KITSUNE = 1 // Let Kitsune do the memory management
 };
 
 // parse the command line arguments
@@ -67,7 +65,44 @@ void create_meshes(MemoryType memory_type, int nx, int ny, double x_max,
                    size_t *&source_node_offsets, double *&target_coordinates,
                    size_t *&target_cell_nodes, size_t *&target_node_offsets,
                    size_t *&candidates, size_t *&candidate_offsets,
-                   bool shuffle, size_t extra_bytes = 0);
+                   bool shuffle, std::vector<size_t> &shuffle_source_nodes, 
+                   std::vector<size_t> &shuffle_source_cells, std::vector<size_t> &shuffle_target_nodes, size_t extra_bytes = 0);
+
+
+
+
+// create the node coordinates of a rectangular structured mesh
+void create_coordinates_gpu(double *&coordinates, int nx,
+                        int ny, double x_max, double y_max, double shift_x,
+                        double shift_y, const char *label,
+                        std::vector<size_t> *shuffle_nodes, size_t extra_bytes);
+
+// create the cell to node topology
+void create_cell_nodes_gpu(size_t *&cell_nodes, int nx,
+                       int ny, const char *label,
+                       std::vector<size_t> *shuffle_nodes,
+                       std::vector<size_t> *shuffle_cells);
+
+// return sizes so that the candidates can be allocated
+size_t create_candidate_offsets(size_t *&offsets, int nx, int ny);
+
+// two pass algorithm so compact sparse data representation
+void create_candidates_gpu(size_t *&candidates, size_t n_candidates, int nx, int ny,
+                       size_t *offsets, const char *label,
+                       std::vector<size_t> *shuffle_cells);
+
+// create source and target mesh as well as intersection candidates
+void create_meshes_gpu(int nx, int ny, double x_max,
+                   double y_max, double shift_x, double shift_y,
+                   double *&source_coordinates, size_t *source_cell_nodes,
+                   size_t *source_node_offsets, double *&target_coordinates,
+                   size_t *target_cell_nodes, size_t *target_node_offsets,
+                   /*size_t *&candidates,*/ size_t *candidate_offsets,
+                   bool shuffle, std::vector<size_t> &shuffle_source_nodes, 
+                   std::vector<size_t> &shuffle_source_cells, std::vector<size_t> &shuffle_target_nodes);
+
+
+
 
 // check results
 template <class T> int check_equal(T *v1, T *v2, size_t n) {
@@ -75,9 +110,9 @@ template <class T> int check_equal(T *v1, T *v2, size_t n) {
   for (size_t i = 0; i < n; ++i) {
     if (v1[i] != v2[i]) {
       if constexpr (LOG_LEVEL > 0) {
-        if constexpr (std::is_same<T, double *>::value)
+        if constexpr (std::is_same<T, double >::value)
           printf("Vectors not equal at %lu: %f %f\n", i, v1[i], v2[i]);
-        else if constexpr (std::is_same<T, size_t *>::value)
+        else if constexpr (std::is_same<T, size_t >::value)
           printf("Vectors not equal at %lu: %lu %lu\n", i, v1[i], v2[i]);
       }
       ++n_unequal;
@@ -101,35 +136,12 @@ T *allocate(MemoryType memory_type, size_t n, const char *label) {
     message = std::string("malloc ") + label;
     nvtxMark(message.c_str());
     return (T *)malloc(sizeof(T) * n);
-#ifdef _KITSUNE_
   case KITSUNE:
     message = std::string("__kitrt_cuMemAllocManaged ") + label;
     nvtxMark(message.c_str());
-    return (T *)__kitrt_cuMemAllocManaged(sizeof(T) * n);
-  case CUDA:
-  case MANAGED:
-    return nullptr;
-#else
-  case KITSUNE:
-    return nullptr;
-  case CUDA:
-    message = std::string("cudaMalloc ") + label;
-    nvtxMark(message.c_str());
-    if (cudaMalloc(&device_buffer, sizeof(T) * n) != cudaSuccess) {
-      fprintf(stderr, "failed to allocate memory for array %s!\n", label);
-      exit(1);
-    }
-    return device_buffer;
-  case MANAGED:
-    message = std::string("cudaMallocManaged ") + label;
-    nvtxMark(message.c_str());
-    if (cudaMallocManaged(&device_buffer, sizeof(T) * n) != cudaSuccess) {
-      fprintf(stderr, "failed to allocate managed memory for array %s!\n",
-              label);
-      exit(1);
-    }
-    return device_buffer;
-#endif
+    // fprintf(stderr, "Allocating %s\n", message.c_str());
+    return (T *) alloc<T>(n);
+    // return (T *)__kitrt_cuMemAllocManaged(sizeof(T) * n);
   }
   return nullptr;
 }
@@ -151,24 +163,6 @@ void fill(MemoryType memory_type, T *device_buffer, T *host_buffer,
     nvtxMark(message.c_str());
     memcpy(device_buffer, host_buffer, sizeof(T) * n_copy);
     break;
-#ifdef _KITSUNE_
-  case CUDA:
-  case MANAGED:
-    break;
-#else
-  case CUDA:
-    message = std::string("cudaMemcpy ") + label + " to device";
-    nvtxMark(message.c_str());
-    cudaMemcpy(device_buffer, host_buffer, sizeof(T) * n_copy,
-               cudaMemcpyHostToDevice);
-    break;
-  case MANAGED:
-    message = std::string("memcopy ") + label + " to UVM";
-    nvtxMark(message.c_str());
-    memcpy(device_buffer, host_buffer, sizeof(T) * n_copy);
-    if (PFKind == EXPLICIT)
-      cudaMemPrefetchAsync(device_buffer, sizeof(T) * n_copy, 0);
-#endif
   }
 }
 
