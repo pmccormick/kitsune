@@ -87,7 +87,7 @@ bool __kitcuda_load_symbols() {
     fprintf(stderr, "kitcuda: unable to open '%s'!\n", CUDA_DSO_LIBNAME);
     fprintf(stderr, "  -- Make sure it can be found in your "
                     "shared library path.\n");
-    return false;  // this will force an abort() during runtime intialization
+    return false;  // this will force an abort() during runtime initialization
   }
 
   if (__kitrt_verbose_mode()) {

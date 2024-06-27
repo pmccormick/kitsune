@@ -52,6 +52,10 @@
 #ifndef __KITRT_HIP_DL_H__
 #define __KITRT_HIP_DL_H__
 
+#define __HIP_DISABLE_CPP_FUNCTIONS__
+#define __HIP_PLATFORM_HCC__ 1
+#include <hip/hip_runtime.h>
+
 #include "dlutils.h"
 
 /**

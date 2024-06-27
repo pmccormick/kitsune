@@ -3946,7 +3946,7 @@ public:
   llvm::Value *EmitSEHAbnormalTermination();
 
   LoopAttributes::LSStrategy GetTapirStrategyAttr(ArrayRef<const Attr*> Attrs);
-  unsigned GetTapirTargetAttr(ArrayRef<const Attr*> Attrs);
+  llvm::TapirTargetID GetTapirTargetAttr(ArrayRef<const Attr*> Attrs);
   llvm::Value* GetKitsuneLaunchAttr(ArrayRef<const Attr*> Attrs);
 
   // Kitsune support for Kokkos.

@@ -74,16 +74,14 @@ int _kitcuda_device_id = -1;
 CUdevice _kitcuda_device = -1;
 CUcontext _kitcuda_context;
 
-// TODO: We currently don't use these values within the runtime but
-// need to do so!
 static int _kitcuda_driver_version;
-static int _kitcuda_max_threads_per_blk;
 static int _kitcuda_warp_size;
 static int _kitcuda_supports_gpu_overlap;
 static int _kitcuda_supports_concurrent_kerns;
 static int _kitcuda_max_regs_per_blk;
 static int _kitcuda_major_compute_capability;
 static int _kitcuda_minor_compute_capability;
+
 
 #ifdef KITCUDA_ENABLE_NVTX
 const int KIT_NVTX_INIT = 0;
@@ -108,7 +106,7 @@ bool __kitcuda_initialize() {
   __kitrt_initialize();
 
   if (not __kitcuda_load_symbols()) {
-    // TODO: This error block is repetative in the runtime...  Probably best
+    // TODO: This error block is repetitive in the runtime...  Probably best
     // to collapse them down to a call so that we can get consistent messages
     // and mechanisms across the runtime...
     fprintf(stderr, "kitrt: FATAL ERROR - "
@@ -150,9 +148,12 @@ bool __kitcuda_initialize() {
   CU_SAFE_CALL(cuCtxSetCurrent_p(_kitcuda_context));
   _kitcuda_initialized = true;
 
-  CU_SAFE_CALL(cuDeviceGetAttribute_p(&_kitcuda_max_threads_per_blk,
+  int max_threads_per_blk = 0;
+  CU_SAFE_CALL(cuDeviceGetAttribute_p(&max_threads_per_blk,
                                       CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_BLOCK,
                                       _kitcuda_device));
+  __kitcuda_set_max_threads_per_blk(max_threads_per_blk);
+
   CU_SAFE_CALL(cuDeviceGetAttribute_p(
       &_kitcuda_warp_size, CU_DEVICE_ATTRIBUTE_WARP_SIZE, _kitcuda_device));
   CU_SAFE_CALL(cuDeviceGetAttribute_p(&_kitcuda_supports_gpu_overlap,
@@ -187,7 +188,7 @@ bool __kitcuda_initialize() {
             _kitcuda_minor_compute_capability);
     fprintf(stderr, "             warp size:        %d\n", _kitcuda_warp_size);
     fprintf(stderr, "             max threads/blk:  %d\n",
-            _kitcuda_max_threads_per_blk);
+            max_threads_per_blk);
     fprintf(stderr, "             max regs/blk:     %d\n",
             _kitcuda_max_regs_per_blk);
     fprintf(stderr, "             concurrent kerns: %d\n",
@@ -200,14 +201,12 @@ bool __kitcuda_initialize() {
   // goes.  The remainder of the initialization checks to see if any
   // environment variables are set that tweak the runtime behavior.
 
-  int threads_per_block = 256;
-  if (__kitrt_get_env_value("KITCUDA_THREADS_PER_BLOCK", threads_per_block)) {
-    if (threads_per_block > _kitcuda_max_threads_per_blk)
-      threads_per_block = _kitcuda_max_threads_per_blk;
+  int threads_per_block;
+  if (__kitrt_get_env_value("KITCUDA_THREADS_PER_BLOCK", threads_per_block))
     __kitcuda_set_default_threads_per_blk(threads_per_block);
-
-    if (__kitrt_verbose_mode())
-      fprintf(stderr, "  kitcuda: threads/block: %d\n", threads_per_block);
+  else {
+    threads_per_block = KITRT_DEFAULT_THREADS_PER_BLOCK;
+    __kitcuda_set_default_threads_per_blk(threads_per_block);
   }
 
   bool enable_occupancy_launch;

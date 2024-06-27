@@ -291,8 +291,8 @@ bool CodeGenFunction::EmitKokkosParallelFor(const CallExpr *CE,
   // Code Modifications necessary for implementing parallel loops not required
   // by serial loops.
 
-  int TT = GetTapirTargetAttr(KokkosAttrs);
-  LoopStack.setLoopTarget(TT);
+  llvm::TapirTargetID TT = GetTapirTargetAttr(KokkosAttrs);
+  LoopStack.setLoopTarget(int(TT));
 
   // New basic blocks and jump destinations with Tapir terminators
   // Note that we only need one of each of these regardless of the number of

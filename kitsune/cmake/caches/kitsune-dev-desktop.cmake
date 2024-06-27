@@ -29,11 +29,11 @@ set(LLVM_PARALLEL_LINK_JOBS 5 CACHE STRING "")
 
 # note: hip requires lld... 
 set(LLVM_ENABLE_PROJECTS
-  clang;clang-tools-extra;lld;lldb;mlir 
+  clang;clang-tools-extra;compiler-rt;lld;lldb;mlir 
   CACHE STRING "")
 # note: hip requires compiler-rt
 set(LLVM_ENABLE_RUNTIMES 
-    cheetah;cilktools;compiler-rt;kitsune;openmp
+    cheetah;kitsune;openmp
     CACHE STRING "")
 set(LLVM_TARGETS_TO_BUILD 
     X86;NVPTX;AMDGPU 
@@ -42,7 +42,7 @@ set(LLVM_TARGETS_TO_BUILD
 set(COMPILER_RT_BUILD_MEMPROF OFF CACHE STRING "")
 set(COMPILER_RT_BUILD_XRAY OFF CACHE STRING "")
 set(COMPILER_RT_BUILD_LIBFUZZER OFF CACHE STRING "")
-set(COMPILER_RT_DEFAULT_TARGET_ONLY ON CACHE STRING "")
+# set(COMPILER_RT_DEFAULT_TARGET_ONLY ON CACHE STRING "")
 set(LIBOMPTARGET_NVPTX_COMPUTE_CAPABILITIES 80 CACHE STRING "")
 set(CLANG_OPENMP_NVPTX_DEFAULT_ARCH sm_80 CACHE STRING "")
 set(CUDA_HOST_COMPILER "$ENV{CUDA_PATH}/bin/gcc" CACHE STRING "")

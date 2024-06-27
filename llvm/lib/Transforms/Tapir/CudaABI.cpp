@@ -280,8 +280,7 @@ std::string virtualArchForCudaArch(StringRef Arch) {
                              .Default("unknown");
   LLVM_DEBUG(dbgs() << "cuabi: compute architecture '" << VirtArch << "'.\n");
   if (VirtArch == "unknown") {
-    errs() << "cuabi: unsupported cuda architecture target '" << Arch 
-           << "'.\n";
+    errs() << "cuabi: unsupported cuda architecture target '" << Arch << "'.\n";
     report_fatal_error("cuabi: fatal error -- unsupported target.");
   }
   return VirtArch;
@@ -320,6 +319,8 @@ std::string PTXVersionFromCudaVersion() {
           .Case("12.1", "+ptx78")
           .Case("12.2", "+ptx78")
           .Case("12.3", "+ptx78")
+          .Case("12.4", "+ptx78")
+          .Case("12.5", "+ptx78")
           .Default("");
 
   if (PTXVersionStr == "") {
@@ -406,14 +407,14 @@ CudaLoop::CudaLoop(Module &M, Module &KernelModule, const std::string &KN,
                                     Int64Ty); // number of integer ops.
   KitCudaLaunchFn = M.getOrInsertFunction(
       "__kitcuda_launch_kernel",
-      VoidPtrTy,                        // return an opaque stream
-      VoidPtrTy,                        // fat-binary
-      VoidPtrTy,                        // kernel name
-      VoidPtrPtrTy,                     // arguments
-      Int64Ty,                          // trip count
-      Int32Ty,                          // threads-per-block
-      KernelInstMixTy->getPointerTo(),  // instruction mix info
-      VoidPtrTy);                       // opaque cuda stream
+      VoidPtrTy,                       // return an opaque stream
+      VoidPtrTy,                       // fat-binary
+      VoidPtrTy,                       // kernel name
+      VoidPtrPtrTy,                    // arguments
+      Int64Ty,                         // trip count
+      Int32Ty,                         // threads-per-block
+      KernelInstMixTy->getPointerTo(), // instruction mix info
+      VoidPtrTy);                      // opaque cuda stream
   KitCudaMemPrefetchFn =
       M.getOrInsertFunction("__kitcuda_mem_gpu_prefetch",
                             VoidPtrTy,  // return an opaque stream
@@ -723,9 +724,10 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   Task *T = TLI.getTask();
   Loop *TL = TLI.getLoop();
 
-  //TapirLoopHints Hints(TL);
-  //TapirTargetID TLTID = (TapirTargetID)Hints.getLoopTarget();
-  //assert(TLTID == Cuda && "Internal error!  CudaABI processing non-CUDA loop!");
+  // TapirLoopHints Hints(TL);
+  // TapirTargetID TLTID = (TapirTargetID)Hints.getLoopTarget();
+  // assert(TLTID == Cuda && "Internal error!  CudaABI processing non-CUDA
+  // loop!");
 
   BasicBlock *Entry = cast<BasicBlock>(VMap[TL->getLoopPreheader()]);
   BasicBlock *Header = cast<BasicBlock>(VMap[TL->getHeader()]);
@@ -758,11 +760,14 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   SmallVector<Metadata *, 6> AV;
   AV.push_back(ValueAsMetadata::get(KernelF));
   AV.push_back(MDString::get(Ctx, "kernel"));
-  AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
+  AV.push_back(
+      ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
   // AV.push_back(MDString::get(Ctx, "maxntidx"));
-  // AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 160))); 
-  //AV.push_back(MDString::get(Ctx, "maxnreg"));
-  //AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 63)));
+  // AV.push_back(ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx),
+  // 160)));
+  AV.push_back(MDString::get(Ctx, "maxnreg"));
+  AV.push_back(
+      ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 40)));
   Annotations->addOperand(MDNode::get(Ctx, AV));
 
   // Verify that the Thread ID corresponds to a valid iteration.  Because
@@ -1044,16 +1049,17 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     if (CodeGenPrefetch && V->getType()->isPointerTy()) {
       LLVM_DEBUG(dbgs() << "\t\t- code gen prefetch for arg " << i << "\n");
       Value *VoidPP = NewBuilder.CreateBitCast(V, VoidPtrTy);
-      LLVM_DEBUG(dbgs() << "\t\t\t+ prefetch stream is: " << *CudaStream << "\n");
+      LLVM_DEBUG(dbgs() << "\t\t\t+ prefetch stream is: " << *CudaStream
+                        << "\n");
       Value *SPtr = NewBuilder.CreateLoad(VoidPtrTy, CudaStream);
-      Value *NewSPtr = NewBuilder.CreateCall(KitCudaMemPrefetchFn, {VoidPP, SPtr});
+      Value *NewSPtr =
+          NewBuilder.CreateCall(KitCudaMemPrefetchFn, {VoidPP, SPtr});
       if (not StreamAssigned) {
         NewBuilder.CreateStore(NewSPtr, CudaStream);
         StreamAssigned = true;
       }
     }
   }
-
 
   // The next step is prep for the actual kernel launch call via
   // the kitsune runtime.  We have to add some extra levels of
@@ -1134,14 +1140,13 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   LLVM_DEBUG(dbgs() << "\t*- code gen kernel launch....\n");
   Value *KSPtr = NewBuilder.CreateLoad(VoidPtrTy, CudaStream);
-  CallInst *LaunchStream = NewBuilder.CreateCall(KitCudaLaunchFn, 
-                                            {DummyFBPtr, KNameParam, argsPtr,
-                                            CastTripCount, TPBlockValue, AI,
-                                            KSPtr});
-  //if (not StreamAssigned)
+  CallInst *LaunchStream = NewBuilder.CreateCall(
+      KitCudaLaunchFn, {DummyFBPtr, KNameParam, argsPtr, CastTripCount,
+                        TPBlockValue, AI, KSPtr});
+  // if (not StreamAssigned)
   NewBuilder.CreateStore(LaunchStream, CudaStream);
 
-  LLVM_DEBUG(dbgs() << "\t\t+- registering launch stream:\n" 
+  LLVM_DEBUG(dbgs() << "\t\t+- registering launch stream:\n"
                     << "\t\t\tcall: " << *LaunchStream << "\n"
                     << "\t\t\tstream: " << *CudaStream << "\n");
 
@@ -1272,15 +1277,14 @@ void CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
 }
 
 void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-  
+
   if (OutliningTapirLoops) {
     LLVMContext &Ctx = M.getContext();
     Type *VoidTy = Type::getVoidTy(Ctx);
     PointerType *VoidPtrTy = Type::getInt8PtrTy(Ctx);
     Value *CudaStream = ConstantPointerNull::get(VoidPtrTy);
-    FunctionCallee KitCudaSyncFn =
-        M.getOrInsertFunction("__kitcuda_sync_thread_stream",
-                              VoidTy, VoidPtrTy);
+    FunctionCallee KitCudaSyncFn = M.getOrInsertFunction(
+        "__kitcuda_sync_thread_stream", VoidTy, VoidPtrTy);
 
     for (Value *SR : SyncRegList) {
       for (Use &U : SR->uses()) {
@@ -1430,7 +1434,7 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
 // details out of the fat binary (CUDA module).
 void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
 
-  LLVM_DEBUG(dbgs() << "\t- finalizing kernel launch calls...\n");
+  LLVM_DEBUG(dbgs() << "** STAGE: Finalizing host-side kernel launches...\n");
 
   LLVMContext &Ctx = M.getContext();
   const DataLayout &DL = M.getDataLayout();
@@ -1439,11 +1443,8 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
   PointerType *CharPtrTy = Type::getInt8PtrTy(Ctx);
   Type *Int64Ty = Type::getInt64Ty(Ctx);
 
-  // Look up a global (device-side) symbol via a module
-  // created from the fat binary.
-  // TODO: Move these callees to the constructor -- no need
-  // to build and destory each time... Perhaps speed us up a
-  // tidbit...
+  // Look up a global (device-side) symbol via a module created from the fat binary.
+  // TODO: Move these callees to the constructor?
   FunctionCallee KitCudaGetGlobalSymbolFn =
       M.getOrInsertFunction("__kitcuda_get_global_symbol",
                             Int64Ty,    // device pointer
@@ -1460,110 +1461,96 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
   // Search for kernel launch calls that we built prior to the creation
   // of the fat binary -- which we now have.  Replace the first parameter
   // in each call (which is currently null) with the fat binary pointer.
-  LLVM_DEBUG(dbgs() << "\t\tsearching...\n");
-  auto &FnList = M.getFunctionList();
+  LLVM_DEBUG(dbgs() << "\t* Searching for launch calling sequence...\n");
 
-  // If we have encountered any attributed launches (forall loops) we
-  // will have a call to a dummy runtime entry point
-  // (_kitrt_dummy_threads_per_blk) that we use to keep the
-  // threads-per-block expression from getting DCE'ed.  When lowered
-  // from clang, this call was inserted and we need to use its sole
-  // parameter in place of the threads-per-block parameter in the
-  // kernel launch call.  These dummy calls should be paired with
-  // launch calls, so as we look for a launch we *should* first
-  // encounter the threads-per-block call to pair with it.  We keep
-  // track of the dummy calls so they can removed at the end of the
-  // launch finalization.
+  std::list<CallInst*> AttrCIList;
+  std::list<CallInst*> LaunchCIList;
+  std::list<CallInst*> SyncCIList;
   CallInst *ThreadsPerBlockCI = nullptr;
-  std::list<CallInst *> DummyCIList;
-  CallInst *SavedLaunchCI = nullptr;
 
+  auto &FnList = M.getFunctionList();
   for (auto &Fn : FnList) {
     for (auto &BB : Fn) {
       for (auto &I : BB) {
+
         if (CallInst *CI = dyn_cast<CallInst>(&I)) {
           if (Function *CFn = CI->getCalledFunction()) {
-
-            if (CFn->getName().startswith("__kitrt_dummy_threads_per_blk")) {
-              LLVM_DEBUG(dbgs() << "\t\t\t* discovered a threads-per-block "
-                                   "placeholder call.\n");
-              assert(ThreadsPerBlockCI == nullptr && "expected null pointer!");
+            if (CFn->getName().startswith("__kitrt_attr_threads_per_blk")) {
+              assert(ThreadsPerBlockCI == nullptr && "expected a null pointer!");
+              LLVM_DEBUG(dbgs() << "\t\t-found attribute call:\n\t\t\t"
+                                  << *CI << "\n");
               ThreadsPerBlockCI = CI;
-            } else if (CFn->getName().startswith("__kitcuda_sync_thread_stream")) {
-              LLVM_DEBUG(dbgs() << "\t\t\t* patching sync call: " << *CI << "\n");
-              if (SavedLaunchCI != nullptr) {
-                AllocaInst *StreamAI = getLaunchStream(SavedLaunchCI);
-                assert(StreamAI != nullptr && "unexpected null launch stream!");
-                LLVM_DEBUG(dbgs() << "\t\t\t\t* stream alloca: " << *StreamAI << "\n");
-                IRBuilder<> SyncBuilder(CI);
-                Value *CudaStream = SyncBuilder.CreateLoad(VoidPtrTy, StreamAI, "custreamh");
-                LLVM_DEBUG(dbgs() << "\t\t\t\t* cuda stream: " << *CudaStream << "\n");
-                CI->setArgOperand(0, CudaStream);
-                SavedLaunchCI = nullptr;
-                LLVM_DEBUG(dbgs() << "\t\t\t* patched call: " << *CI << "\n");
-              } else {
-                LLVM_DEBUG(dbgs() << "\t\t\t- note, matching launch not found!\n");
-              }
+              AttrCIList.push_back(ThreadsPerBlockCI);
             } else if (CFn->getName().startswith("__kitcuda_launch_kernel")) {
-              LLVM_DEBUG(dbgs() << "\t\t\t* patching launch: " << *CI << "\n");
-              SavedLaunchCI = CI;
-              Value *CFatbin;
-              CFatbin = CastInst::CreateBitOrPointerCast(Fatbin, VoidPtrTy,
-                                                         "_cubin.fatbin", CI);
-              CI->setArgOperand(0, CFatbin);
-
+              LaunchCIList.push_back(CI);
               if (ThreadsPerBlockCI) {
-                LLVM_DEBUG(dbgs()
-                           << "\t\t\t\t replacing thread-per-block arg.\n");
-                Value *TBPParam = ThreadsPerBlockCI->getArgOperand(0);
-                assert(TBPParam && "unexpected null arg operand!");
-                CI->setArgOperand(4, TBPParam);
-                DummyCIList.push_back(ThreadsPerBlockCI);
+                LLVM_DEBUG(dbgs() << "\t\t-found attributed launch:\n\t\t\t"
+                                  << *ThreadsPerBlockCI << "\n\t\t\t"
+                                  << *CI << "\n");
                 ThreadsPerBlockCI = nullptr;
+              } else {
+                LLVM_DEBUG(dbgs() << "\t\t-found unattributed launch:\n\t\t\t"
+                                  << *CI << "\n");
+                AttrCIList.push_back(nullptr);
               }
-
-              Instruction *NI = CI->getNextNonDebugInstruction();
-              // Unless someting else has monkeyed with our generated code
-              // NI should be the launch call.  We need the following code
-              // to go between the call instruction and the launch.
-              assert(NI && "unexpected null instruction!");
-
-              // We need to explicitly add code to sync up host- and
-              // device-side global values prior to launching kernels.
-              // We only have a complete awareness of this now so insert
-              // the supporting runtime calls.
-              //
-              // TODO: This is overdone -- we copy *all* globals and not
-              // just those that the kernel we're launching is using.
-              //
-              for (auto &HostGV : GlobalVars) {
-                std::string DevVarName = HostGV->getName().str() + "_devvar";
-                LLVM_DEBUG(dbgs() << "\t\t\t  processing global: '"
-                                  << HostGV->getName() << "'\n");
-                Value *SymName =
-                    tapir::createConstantStr(DevVarName, M, DevVarName);
-                Value *DevPtr =
-                    CallInst::Create(KitCudaGetGlobalSymbolFn,
-                                     {CFatbin, SymName}, ".cuabi_devptr", NI);
-                Value *VGVPtr =
-                    CastInst::CreatePointerCast(HostGV, VoidPtrTy, "", NI);
-                uint64_t NumBytes = DL.getTypeAllocSize(HostGV->getValueType());
-                CallInst::Create(
-                    KitCudaMemcpyToDeviceFn,
-                    {VGVPtr, DevPtr, ConstantInt::get(Int64Ty, NumBytes)}, "",
-                    NI);
-              }
-            }
+            } else if (CFn->getName().startswith("__kitcuda_sync_thread_stream")) {
+              LLVM_DEBUG(dbgs() << "\t\t-found sync:\n\t\t\t"
+                                << *CI << "\n");
+              SyncCIList.push_back(CI);
+              assert(AttrCIList.size() == LaunchCIList.size() &&
+                     SyncCIList.size() == LaunchCIList.size() && 
+                     "inconsistent list sizes!");
+            } 
           }
         }
       }
     }
   }
 
-  for (auto I : DummyCIList) {
-    LLVM_DEBUG(dbgs() << "\t\t\t erasing dummy threads-per-block call.\n");
-    I->eraseFromParent();
+  for (auto LCI : LaunchCIList) {
+    LLVM_DEBUG(dbgs() << "\t* Processing discovered launch calls...\n");
+    LCI->setArgOperand(0, Fatbin);
+    CallInst *AttrCI = AttrCIList.front();
+    AttrCIList.pop_front();
+    if (AttrCI) {
+      // There is a valid attribute call, we need to tweak the launch 
+      // call parameters...
+      Value *TBPParam = AttrCI->getArgOperand(0);
+      assert(TBPParam && "unexpected null arg operand!");
+      LCI->setArgOperand(4, TBPParam);
+      LLVM_DEBUG(dbgs() << "\t\tmodified launch call to use attributes.\n\t\t\t"
+                        << *LCI << "\n\t\tremoving attribute call...\n\t\t\t"
+                        << *AttrCI << "\n");
+      AttrCI->eraseFromParent();
+    }
+
+    // Update the sync to use the launch stream... 
+    CallInst *SyncCI = SyncCIList.front();
+    SyncCIList.pop_front();
+    LLVM_DEBUG(dbgs() << "\t\tmodifying sync to use launch stream.\n\t\t\t"
+                      << *SyncCI << "\n");
+    AllocaInst *StreamAI = getLaunchStream(LCI);
+    assert(StreamAI != nullptr && "unexpected null launch stream!");
+    IRBuilder<> SyncBuilder(SyncCI);
+    Value *CudaStream = SyncBuilder.CreateLoad(VoidPtrTy, StreamAI, "custreamh");
+    SyncCI->setArgOperand(0, CudaStream);
+    LLVM_DEBUG(dbgs() << "\t\t\t--> " << *SyncCI << "\n");
+
+    for (auto &HostGV : GlobalVars) {
+      std::string DevVarName = HostGV->getName().str() + "_devvar";
+      Value *SymName = tapir::createConstantStr(DevVarName, M, DevVarName);
+      Value *DevPtr = CallInst::Create(KitCudaGetGlobalSymbolFn,
+                        {Fatbin, SymName}, ".cuabi_devptr", LCI);
+      Value *VGVPtr = CastInst::CreatePointerCast(HostGV, VoidPtrTy, "", LCI);
+      uint64_t NumBytes = DL.getTypeAllocSize(HostGV->getValueType());
+      CallInst::Create(KitCudaMemcpyToDeviceFn,
+            {VGVPtr, DevPtr, ConstantInt::get(Int64Ty, NumBytes)}, "", LCI);
+    }
   }
+
+  assert(AttrCIList.empty() && "unexpected items left on attr list!");
+  assert(SyncCIList.empty() && "unexpected items left on sync list!");
+
 
   GlobalVariable *ProxyFB = M.getGlobalVariable("_cuabi.dummy_fatbin", true);
   if (ProxyFB) {
@@ -2008,7 +1995,7 @@ CudaABIOutputFile CudaABI::generatePTX() {
     mpm.run(KernelModule, mam);
     LLVM_DEBUG(dbgs() << "\t\tpasses complete.\n");
     LLVM_DEBUG(saveModuleToFile(&KernelModule, KernelModule.getName().str() +
-                                                 ".postopt.LTO.ll"));
+                                                   ".postopt.LTO.ll"));
   }
 
   // Setup the passes and request that the output goes to the

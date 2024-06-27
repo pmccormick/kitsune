@@ -100,6 +100,8 @@ struct LoopAttributes {
 
   /// Value for tapir.loop.target metadata.
   unsigned LoopTarget;
+
+  llvm::Value *ThreadsPerBlock = nullptr;
 };
 
 /// Information used when generating a structured loop.
@@ -324,6 +326,10 @@ public:
     StagedAttrs.LoopTarget=LT;
   }
   
+   /// Set the Tapir threads per block.
+  void setThreadsPerBlock(llvm::Value *TPB) {
+    StagedAttrs.ThreadsPerBlock=TPB;
+  }
 private:
   /// Returns true if there is LoopInfo on the stack.
   bool hasInfo() const { return !Active.empty(); }

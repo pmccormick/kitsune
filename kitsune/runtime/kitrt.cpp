@@ -60,7 +60,7 @@ extern "C" {
 #endif
 
 void __kitrt_initialize() {
-  // Call will auto-set the verbose state.
+  // Call will auto-set the verbose state. 
   (void)__kitrt_get_env_value("KITRT_VERBOSE", _kitrt_verbose_mode);
   if (__kitrt_verbose_mode()) {
     fprintf(stderr, "kitrt: verbose mode enabled by environment.\n");

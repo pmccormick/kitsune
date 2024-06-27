@@ -4,16 +4,17 @@
  * Copyright (c) 2021, 2023 Los Alamos National Security, LLC.
  * All rights reserved.
  *
- *  Copyright 2021. Los Alamos National Security, LLC. This software was
- *  produced under U.S. Government contract DE-AC52-06NA25396 for Los
- *  Alamos National Laboratory (LANL), which is operated by Los Alamos
- *  National Security, LLC for the U.S. Department of Energy. The
- *  U.S. Government has rights to use, reproduce, and distribute this
- *  software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY,
- *  LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY
- *  FOR THE USE OF THIS SOFTWARE.  If software is modified to produce
- *  derivative works, such modified software should be clearly marked,
- *  so as not to confuse it with the version available from LANL.
+ *  Copyright 2021, 2023. Los Alamos National Security, LLC. This
+ *  software was produced under U.S. Government contract
+ *  DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which
+ *  is operated by Los Alamos National Security, LLC for the
+ *  U.S. Department of Energy. The U.S. Government has rights to use,
+ *  reproduce, and distribute this software.  NEITHER THE GOVERNMENT
+ *  NOR LOS ALAMOS NATIONAL SECURITY, LLC MAKES ANY WARRANTY, EXPRESS
+ *  OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.
+ *  If software is modified to produce derivative works, such modified
+ *  software should be clearly marked, so as not to confuse it with
+ *  the version available from LANL.
  *
  *  Additionally, redistribution and use in source and binary forms,
  *  with or without modification, are permitted provided that the
@@ -99,7 +100,7 @@ extern "C" {
 extern bool __kitcuda_initialize();
 
 /**
- * Load the requried CUDA dynamic symbols for use by the runtime.
+ * Load the required CUDA dynamic symbols for use by the runtime.
  */
 extern bool __kitcuda_load_dlsyms();
 
@@ -277,11 +278,11 @@ extern void __kitcuda_memcpy_sym_to_device(void *host_sym, uint64_t dev_sym,
  * the runtime.  It is a quick set of details regarding the particular
  * instruction mix of a kernel and any device-side functions it calls.
  * It is gathered from the LLVM form of the code (not ptx/s-code) and
- * at this point is limited.  In general we are using to explore
- * impacts on launch parameters.
+ * at this point is limited in terms of valuable details.  In general, 
+ * we are using it to explore impacts on launch parameters.
  * NOTE: Changing this structure has implications on code generation
- * inside the CudaABI component of the compiler -- both must be kept
- * up-to-date. 
+ * inside the Cuda and Hip transforms in the compiler -- both runtime 
+ * and compiler must be kept up-to-date.
  */
 typedef struct _kitcuda_inst_mix_info  {
   uint64_t  num_memory_ops;  // load+store (reads/write memory) ops count.
@@ -352,7 +353,7 @@ extern void __kitcuda_set_default_threads_per_blk(int nthreads);
  * is not critical for CUDA -- given differences in the LLVM backends
  * for each target...
  */
-extern void __kitcuda_set_default_max_threads_per_blk(int nthreads);
+extern void __kitcuda_set_max_threads_per_blk(int nthreads);
 
 /**
  * Provide a set of set of launch parameters to use for subsequent

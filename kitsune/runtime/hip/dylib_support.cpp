@@ -76,7 +76,15 @@ bool __kithip_load_symbols() {
     fprintf(stderr, "kithip: unable to open '%s'!\n", HIP_DSO_LIBNAME);
     fprintf(stderr, "  -- Make sure it can be found in your "
                     "shared library path.\n");
-    return false; // this will force an abort() during runtime intialization
+    return false; // this will force an abort() during runtime initialization
+  }
+
+  if (__kitrt_verbose_mode()) {
+    char dl_path[1025];
+    fprintf(stderr, "\tkithip: successfully opened '%s'\n", HIP_DSO_LIBNAME);
+    if (dlinfo(kitrt_dl_handle, RTLD_DI_ORIGIN, dl_path) != -1) {
+      fprintf(stderr, "\t\tfull path: %s/%s\n", dl_path, HIP_DSO_LIBNAME);
+    }
   }
 
   // NOTE: Try to keep the ordering and grouping here sync'ed

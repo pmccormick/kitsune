@@ -1605,6 +1605,7 @@ bool LoopSpawningImpl::run() {
   if (TI.isSerial())
     return false;
 
+
   // Discover all Tapir loops and record them.
   for (Loop *TopLevelLoop : LI)
     for (Loop *L : post_order(TopLevelLoop))
@@ -1701,6 +1702,8 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
   auto GetORE = [&FAM](Function &F) -> OptimizationRemarkEmitter & {
     return FAM.getResult<OptimizationRemarkEmitterAnalysis>(F);
   };
+  
+  llvm::saveModuleToFile(&M, "foobar-bug", ".ll");
 
   SmallVector<Function *, 8> WorkList;
   bool Changed = false;

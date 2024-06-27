@@ -46,7 +46,8 @@ set(KITRT_SRCS
   kitrt.cpp
   debug.cpp
   memory.cpp
-  memory_map.cpp)
+  memory_map.cpp
+  utils.cpp)
 
 set(KITRT_LINK_LIBS "")
 
@@ -74,7 +75,7 @@ if (KITRT_ENABLE_CUDA)
   include_directories(${CUDAToolkit_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/cuda)
   list(APPEND KITRT_LINK_LIBS
-	  "-lnvptxcompiler_static -lcudart -lcuda -lnvToolsExt")
+	  "-lnvptxcompiler_static -lcuda -lnvToolsExt")
 
   #add_subdirectory(cuda/numpy)
 

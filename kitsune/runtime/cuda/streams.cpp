@@ -142,6 +142,7 @@ void __kitcuda_destroy_thread_streams() {
   KIT_NVTX_PUSH("kitrt:delete_thread_streams", KIT_NVTX_STREAM);
   _kitcuda_stream_mutex.lock();
  
+  // TODO: deprecated -- can be a no-op... 
   for (auto &entry : _kitcuda_streams)
     CU_SAFE_CALL(cuStreamDestroy_v2_p(entry));
   _kitcuda_streams.clear();

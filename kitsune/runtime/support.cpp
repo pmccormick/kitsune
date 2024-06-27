@@ -150,4 +150,16 @@ bool __kitrt_runtimesInit() {
   return true;
 }
 
+int __kitrt_next_lowest_factor(int n, int m) {
+  if (n > m) {
+    for (int i = n - 1; i != 0; i--) {
+      int r = i % m;
+      if (r == 0)
+        return i;
+    }
+  }
+  return m;
+}
+  
+
 } // extern

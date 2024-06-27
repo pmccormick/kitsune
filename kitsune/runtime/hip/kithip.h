@@ -99,17 +99,7 @@ extern "C" {
 extern bool __kithip_initialize();
 
 /**
- * Enable the use of XNACK for an executing program.  This call should
- * be made prior to runtime initialization.  It has a side effect of 
- * setting the XNACK environment variable that is specific to the 
- * HIP/ROCm feature set.
- *
- * TODO: document more about this as it is opaque.
- */
-extern void __kithip_enable_xnack();
-
-/**
- * Load the requried HIP dynamic symbols for use by the runtime.
+ * Load the required HIP dynamic symbols for use by the runtime.
  */
 extern bool __kithip_load_dlsyms();
 
@@ -246,7 +236,7 @@ extern void __kithip_mem_destroy(void *ptr);
  * **NOTE**: See `__kithip_mem_host_prefetch()` for host-side
  * prefetch requests.
  */
-extern void __kithip_mem_gpu_prefetch(void *ptr);
+extern void __kithip_mem_gpu_prefetch(void *ptr, void *opaque_stream);
 
 /**
  * Request that the memory allocation associated with the given
@@ -261,7 +251,7 @@ extern void __kithip_mem_gpu_prefetch(void *ptr);
  * **NOTE**: See `__kithip_mem_gpu_prefetch()` for GPU prefetch
  * requests.
  */
-extern void __kithip_mem_host_prefetch(void *ptr);
+extern void __kithip_mem_host_prefetch(void *ptr, void *opaque_stream);
 
 /**
  * Find the named symbol in the given module represented by the
@@ -284,6 +274,23 @@ extern void __kithip_memcpy_sym_to_device(void *host_sym, void *dev_sym,
                                           size_t nbytes);
 
 /**
+ * *** EXPERIMENTAL: This is a new interface between the compiler and
+ * the runtime.  It is a quick set of details regarding the particular
+ * instruction mix of a kernel and any device-side functions it calls.
+ * It is gathered from the LLVM form of the code and at this point is 
+ * limited in terms of valuable details.  In general, we are using it 
+ * to explore impacts on launch parameters.
+ * NOTE: Changing this structure has implications on code generation
+ * inside the Cuda and HIP transforms in the compiler -- both runtime 
+ * and compiler must be kept up-to-date. 
+ */
+typedef struct _kithip_inst_mix_info  {
+  uint64_t  num_memory_ops;  // load+store (reads/write memory) ops count.
+  uint64_t  num_flops;       // floating point ops count. 
+  uint64_t  num_iops;        // integer ops count.
+} KitHipInstMix;
+
+/**
  * Given a pointer to a fat binary, launch the named kernel with the
  * given arguments, and trip count.  For the current Kitsune use cases
  * the compiler will embed the fat binary into the final executable
@@ -301,7 +308,9 @@ extern void __kithip_memcpy_sym_to_device(void *host_sym, void *dev_sym,
  * @param trip_count - Total size of the work to execution (aka trip count).
  */
 extern void __kithip_launch_kernel(const void *fat_bin, const char *kern_name,
-                                   void **kern_args, size_t trip_count);
+                                   void **kern_args, size_t trip_count, 
+                                   int threads_per_blk, const KitHipInstMix *inst_mix,
+                                   void *opaque_stream);
 
 /**
  * Enable/Disable the use of occupancy calculations for the
@@ -314,6 +323,18 @@ extern void __kithip_launch_kernel(const void *fat_bin, const char *kern_name,
  * @param enable - enable/disable occupancy-based launches
  */
 extern void __kithip_use_occupancy_launch(bool enable);
+
+/** 
+ * Enable/Disable the tuning of occupancy-based calculations for
+ * the determination of kernel launch parameters.  If the `enable`
+ * parameter is set to `true` both occupancy-based launches and 
+ * the refinement of the occupancy-driven results will be used. 
+ * `enable == true` will enable occupancy_launches. 
+ *
+ * @param enable - enable/disable tuned occupancy launches.
+ */
+ extern void __kithip_refine_occupancy_launches(bool enable);
+
 
 /**
  * Set the runtime's value for the number of threads-per-block used
@@ -369,7 +390,7 @@ extern hipStream_t __kithip_get_thread_stream();
 /**
  * Synchronize the calling thread with its assocaited stream.
  */
-extern void __kithip_sync_thread_stream();
+extern void __kithip_sync_thread_stream(void *opaque_stream);
 
 /**
  * Synchronize the host-side with **all** underlying streams in the
@@ -386,7 +407,7 @@ extern void __kithip_sync_context();
  * If a stream has not been assigned to the thread this call will
  * simply return and function as a no-op.
  */
-extern void __kithip_delete_thread_stream();
+extern void __kithip_delete_thread_stream(void *opaque_stream);
 
 /**
  * Destroy all the thread-associated streams that are being managed
@@ -395,6 +416,18 @@ extern void __kithip_delete_thread_stream();
  * runtime.
  */
 extern void __kithip_destroy_thread_streams();
+
+
+/**
+ * Enable the use of XNACK for an executing program.  This call should
+ * be made prior to runtime initialization.  It has a side effect of 
+ * setting the XNACK environment variable that is specific to the 
+ * HIP/ROCm feature set.
+ *
+ * TODO: document more about this as it is opaque.
+ */
+extern void __kithip_enable_xnack();
+
 
 /*
  * The following global state lives within the runtime to avoid

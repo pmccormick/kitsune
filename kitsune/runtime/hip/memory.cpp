@@ -63,18 +63,29 @@ __attribute__((malloc)) void *__kithip_mem_alloc_managed(size_t size) {
   if (not _kithip_initialized)
     __kithip_initialize();
   
-  void *alloced_ptr;
   HIP_SAFE_CALL(hipSetDevice(__kithip_get_device_id()));
-  HIP_SAFE_CALL(hipMallocManaged_p(&alloced_ptr, size, hipMemAttachGlobal));
+
+  void *devp;
+  HIP_SAFE_CALL(hipMallocManaged_p(&devp, size, hipMemAttachGlobal));
+
+  HIP_SAFE_CALL(hipMemAdvise_p(devp, size, hipMemAdviseSetPreferredLocation, 
+                               __kithip_get_device_id()));
+  HIP_SAFE_CALL(hipMemAdvise_p(devp, size, hipMemAdviseSetAccessedBy,
+                               __kithip_get_device_id()));
+  HIP_SAFE_CALL(hipMemAdvise_p(devp, size, hipMemAdviseSetCoarseGrain,
+                               __kithip_get_device_id()));                               
+
+  // Register this allocation so the runtime can help track the
+  // locality (and affinity) of data.
   _kithip_mem_alloc_mutex.lock();
-  __kitrt_register_mem_alloc(alloced_ptr, size);
+  __kitrt_register_mem_alloc(devp, size);
   _kithip_mem_alloc_mutex.unlock();
-  // Cheat a tad and just go ahead and issue a prefetch at allocation
-  // time.  Could bite us but what the heck...
-  HIP_SAFE_CALL(hipMemPrefetchAsync_p(alloced_ptr, size,
-                                      __kithip_get_device_id(),
-                                      __kithip_get_thread_stream()));
-  return alloced_ptr;
+
+  // NOTE: We can no longer do this in a thread-safe manner... 
+  //HIP_SAFE_CALL(hipMemPrefetchAsync_p(devp, size,
+  //                                    __kithip_get_device_id(),
+  //                                    __kithip_get_thread_stream()));
+  return devp;
 }
 
 __attribute__((malloc)) void *__kithip_mem_calloc_managed(size_t count,
@@ -86,6 +97,13 @@ __attribute__((malloc)) void *__kithip_mem_calloc_managed(size_t count,
   void *memp = __kithip_mem_alloc_managed(nbytes);
 
   // TODO: Is there a risk of a race here?
+  // 
+  //  Does hip follow cuda here and execute the memset operations in a 
+  //  non-blocking manner?  Given our use of managed memory could we use
+  //  a straight memset() call?  Of course, that would fault pages to the
+  //  host (cpu) side.
+  // 
+  // Memset calls are not set to run anywhere but the default stream... 
   HIP_SAFE_CALL(
       hipMemsetD8Async_p(memp, 0, nbytes, __kithip_get_thread_stream()));
   return (void *)memp;
@@ -129,6 +147,9 @@ __attribute__((malloc)) void *__kithip__mem_realloc_managed(void *ptr,
 
 void __kithip_mem_free(void *vp) {
   assert(vp && "unexpected null pointer!");
+
+  // We first remove the allocation from the runtime's 
+  // map and then release (free) it via HIP. 
   _kithip_mem_alloc_mutex.lock();
   __kitrt_unregister_mem_alloc(vp);
   _kithip_mem_alloc_mutex.unlock();
@@ -156,7 +177,7 @@ bool __kithip_is_mem_managed(void *vp) {
 
 // NOTE: See within the code below for notes about the prefetching
 // semantics.
-void __kithip_mem_gpu_prefetch(void *vp) {
+void __kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
   assert(vp && "unexpected null pointer!");
   size_t size = 0;
 
@@ -174,6 +195,8 @@ void __kithip_mem_gpu_prefetch(void *vp) {
   // while also maintaining correctness.
   if (not __kitrt_is_mem_prefetched(vp, &size)) {
     if (size > 0) {
+      hipStream_t h_stream = (hipStream_t)opaque_stream;
+
       HIP_SAFE_CALL(hipMemAdvise_p(vp, size, hipMemAdviseSetPreferredLocation,
                                    __kithip_get_device_id()));
       HIP_SAFE_CALL(hipMemAdvise_p(vp, size, hipMemAdviseSetAccessedBy,
@@ -181,13 +204,13 @@ void __kithip_mem_gpu_prefetch(void *vp) {
       HIP_SAFE_CALL(hipMemAdvise_p(vp, size, hipMemAdviseSetCoarseGrain,
                                    __kithip_get_device_id()));
       HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, __kithip_get_device_id(),
-                                          __kithip_get_thread_stream()));
+                                          h_stream));
       __kitrt_mark_mem_prefetched(vp);
     }
   }
 }
 
-void __kithip_mem_host_prefetch(void *vp) {
+void __kithip_mem_host_prefetch(void *vp, void *opaque_stream) {
   assert(vp && "unexpected null pointer!");
   // TODO: Prefetching details and approaches need to be further
   // explored.  In particular, in concert with compiler analysis and
@@ -219,8 +242,9 @@ void __kithip_mem_host_prefetch(void *vp) {
       // no long being prefetched to the device/GPU.  This "mark" does
       // not guarantee prefetching is complete it simply flags that
       // the "instruction" has been issued by the runtime.
+      hipStream_t h_stream = (hipStream_t)opaque_stream;
       HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, __kithip_get_device_id(),
-                                          __kithip_get_thread_stream()));
+                                          h_stream));
       __kitrt_set_mem_prefetch(vp, false);
     }
   }

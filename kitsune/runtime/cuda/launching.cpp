@@ -55,116 +55,133 @@
 #include <string>
 #include <unordered_map>
 
-// *** EXPERIMENTAL: The runtime maintains a map from fatbinary images
-// to a supporting CUDA module.  The primary reason for this is
-// exploring reducing runtime overheads.
 //
-// TODO: Finish exploration of map vs. CUDA call overheads.
-typedef std::unordered_map<const void *, CUmodule> KitCudaModuleMap;
-static KitCudaModuleMap _kitcuda_module_map;
-static std::mutex _kitcuda_module_map_mutex;
+// *** EXPERIMENTAL: In kitsune the details of picking launch parameters 
+// are not entirely aligned with the general high-level model of parallelism.  
+// In general, the challenge it that many approaches focus on occupancy as 
+// the primary factor for selecting launch parameters but that can lead to 
+// under-utilization of the GPU (e.g., idle SMs) so occupancy isn not the sole
+// parameter to optimize for launching any given kernel.
+// 
+// From a CUDA-terminology viewpoint, occupancy is defined as the ratio
+// of the number of active warps per multiprocessor to the maximum number 
+// of active warps supported by the target architecture. Importantly,
+// having a higher occupancy does not guarantee better performance. It is
+// simply a reasonable metric for the latency hiding ability of a particular
+// kernel.  
+//
+// The runtime has the following modes when it comes to launch parameters: 
+//
+//   1. Occupancy-based launches: This uses CUDA's heuristics for 
+//      determination of the parameters.  Given it tries to maximize 
+//      occupancy it can also significantly under-utilize the GPU (e.g,
+//      a small number of active SMs).
+// 
+//   2. Refined occupancy launches: This uses the same occupancy 
+//      details in #1 but then attempts to adjust the parameters 
+//      to provide better overall utilization of the GPU's SMs. 
+//
+//   3. Custom launches: This uses runtime specific parameters to 
+//      set the launch parameters.  These can be specified by the 
+//      compiler, via direct runtime calls, or via the environment 
+//      (variables). 
+// 
+//   4. Default launches: This uses a set of hard-coded parameters 
+//      that are built into the runtime. These can be set at build
+//      time. 
+// 
 
-// *** EXPERIMENTAL: The runtime maintains a map from kernel names to
-// kernel functions.  This avoids searching a module repeatedly at
-// kernel launch time and is primiarly focused on reducing runtime
-// overheads.  The savings here still need to explored in more detail;
-// it is not clear how map overheads compare to the runtime lookup...
-//
-// TODO: Finish exploration of map vs. CUDA call overheads.
-typedef std::unordered_map<const char *, CUfunction> KitCudaKernelMap;
-static KitCudaKernelMap _kitcuda_kernel_map;
+
+
+namespace {
+  // TODO: Need to evaluate the overall advantage (or disadvantage) for
+  // the runtime in terms of the benefits provided by the given experimental
+  // code below... 
+
+  // *** EXPERIMENTAL: The runtime maintains a map from fat-binary images
+  // to a supporting CUDA module.  The primary goal for this is to avoid 
+  // rebuilding modules (or creating too many modules).  Early benefits 
+  // showed a minor reduction in overheads but the details need to be 
+  // quantified to see if the long-term use makes a lot of sense... 
+  typedef std::unordered_map<const void *, CUmodule> KitCudaModuleMap;
+  KitCudaModuleMap module_map;
+  std::mutex module_map_mutex;
+
+  // *** EXPERIMENTAL: The runtime maintains a map from kernel names to
+  // kernel functions.  This avoids searching a module repeatedly at
+  // kernel launch time and is primarily focused on reducing runtime
+  // overheads.  The savings here still need to explored in more detail;
+  // it is not clear how map overheads compare to the runtime lookup...
+  typedef std::unordered_map<const char *, CUfunction> KitCudaKernelMap;
+  KitCudaKernelMap kernel_map;
+
+  // Runtime state for CUDA launch configuration and modes of operation.
+  bool use_occupancy_launch = KITRT_USE_OCCUPANCY_LAUNCH;
+  bool refine_occupancy_launch = KITRT_USE_REFINED_OCCUPANCY_LAUNCH;
+  int  default_threads_per_blk = KITRT_DEFAULT_THREADS_PER_BLOCK;
+  int  max_threads_per_blk = KITRT_DEFAULT_THREADS_PER_BLOCK;
+}
 
 extern "C" {
 
-// *** EXPERIMENTAL: First some background. In general, the details of
-// picking launch parameters can be a challenge and occupancy is often
-// one of the driving factors.  Occupancy is defined as the ratio of
-// the number of active warps per multiprocessor to the maximum number
-// of active warps. Importantly, having a higher occupancy does not
-// guarantee better performance. It is simply a reasonable metric for
-// the latency hiding ability of a particular kernel.
-//
-// This section of calls all deal with different approaches to
-// trying to determine launch parameters.  If the
-// `_kitcuda_use_occupancy_calc` flag is set to `true` the runtime
-// will use CUDA's support for estimating occupancy for a kernel
-// function and setting associated launch parameters.  If the flag
-// is `false` the runtime will fall back to using either custom
-// parameters (set externally) or use a very simple default
-// computation that will be hit-or-miss based on the kernel.
-//
-static bool _kitcuda_use_occupancy_calc = true;
-static bool _kitcuda_refine_occupancy_calc = true;
-static int _kitcuda_default_max_threads_per_blk = 1024;
-static int _kitcuda_default_threads_per_blk =
-    _kitcuda_default_max_threads_per_blk;
-
+/* 
+ * Enable the use of CUDA's heuristic-based launch parameter selection.
+ */
 void __kitcuda_use_occupancy_launch(bool enable) {
 
   int threads_per_block = 0;
+  use_occupancy_launch = enable;
+  
   if (__kitrt_get_env_value("KITCUDA_THREADS_PER_BLOCK", threads_per_block)) {
-    if (enable)
-      fprintf(stderr, "kitcuda: note - setting 'KITCUDA_THREADS_PER_BLOCK' "
-                      "overrides occupancy launch.\n");
-    _kitcuda_use_occupancy_calc = false;
-  } else
-    _kitcuda_use_occupancy_calc = enable;
-
-  if (__kitrt_verbose_mode()) {
-    if (enable)
-      fprintf(stderr,
-              "kitcuda: enabling occupancy-computed launch parameters.\n");
-    else
-      fprintf(stderr,
-              "kitcuda: disabling occupancy-computed launch parameters.\n");
+    if (enable) {
+      fprintf(stderr, "kitcuda: note - environment setting "
+                      "of 'KITCUDA_THREADS_PER_BLOCK' (%d) "
+                      "overrides occupancy launch.\n", threads_per_block);
+      use_occupancy_launch = false;
+    }
   }
+
+  if (__kitrt_verbose_mode()) 
+    fprintf(stderr, "kitcuda: %s occupancy-computed launch parameters.\n", 
+            enable ? "enabled" : "disabled");
 }
 
 void __kitcuda_refine_occupancy_launches(bool enable) {
   if (enable) {
-    __kitcuda_use_occupancy_launch(true);
-    if (_kitcuda_use_occupancy_calc)
-      // occupancy calculations can be overridden via
-      // the environment so only enable the refinement
-      // mode when occupancy calculations are successfully
-      // enabled.
-      _kitcuda_refine_occupancy_calc = true;
-    else {
-      fprintf(stderr, "kitcuda: warning, can't use occupancy refinement when "
-                      "occupancy calculations are disabled.\n");
-      _kitcuda_refine_occupancy_calc = false;
-    }
+    // refined occupancy launches requires occupancy 
+    // launches to be enabled.  Yep, logic is ugly but
+    // was a bit more minimalistic here... 
+    __kitcuda_use_occupancy_launch(enable);
+    // occupancy launch can be overridden by the environment 
+    // so follow suit with our refinement setting... 
+    refine_occupancy_launch = use_occupancy_launch;
   } else
-    _kitcuda_refine_occupancy_calc = false;
+    refine_occupancy_launch = false;
+
+  if (__kitrt_verbose_mode())
+    fprintf(stderr, "kitcuda: runtime '%s' refine occupancy launches.\n", 
+            refine_occupancy_launch ? "will" : "will not");
 }
 
-void __kitcuda_set_default_max_threads_per_blk(int num_threads) {
-  _kitcuda_default_max_threads_per_blk = num_threads;
+void __kitcuda_set_max_threads_per_blk(int num_threads) {
+  // TODO: This value should be clamped to hardware-specific limits. 
+  max_threads_per_blk = num_threads;
+  if (__kitrt_verbose_mode()) 
+    fprintf(stderr, "kitcuda: setting maximum threads-per-block -- %d\n", 
+            max_threads_per_blk);
 }
 
 void __kitcuda_set_default_threads_per_blk(int threads_per_blk) {
-  if (threads_per_blk > _kitcuda_default_max_threads_per_blk)
-    threads_per_blk = _kitcuda_default_max_threads_per_blk;
-  _kitcuda_default_threads_per_blk = threads_per_blk;
+  if (threads_per_blk > max_threads_per_blk)
+    threads_per_blk = max_threads_per_blk;
+  default_threads_per_blk = threads_per_blk;
+  if (__kitrt_verbose_mode())
+    fprintf(stderr, "kitcuda: setting default threads-per-block -- %d\n", 
+            threads_per_blk);
 }
 
 typedef std::unordered_map<std::string, int> KitCudaLaunchParamMap;
 static KitCudaLaunchParamMap _kitcuda_launch_param_map;
-
-namespace {
-
-int next_lowest_factor(int n, int m) {
-  if (n > m) {
-    for (int i = n - 1; i != 0; i--) {
-      int r = i % m;
-      if (r == 0)
-        return i;
-    }
-  }
-  return m;
-}
-
-} // namespace
 
 /**
  * Get the launch parameters for a given kernel and trip count based
@@ -184,7 +201,7 @@ int next_lowest_factor(int n, int m) {
 void __kitcuda_get_occ_launch_params(size_t trip_count, CUfunction cu_func,
                                      int &threads_per_blk, int &blks_per_grid,
                                      const KitCudaInstMix *inst_mix) {
-  assert(_kitcuda_use_occupancy_calc && "called when occupancy mode is false!");
+  assert(use_occupancy_launch && "called when occupancy mode is false!");
   KIT_NVTX_PUSH("kitcuda:get_occupancy_launch_params", KIT_NVTX_LAUNCH);
 
   // As a default starting point, use CUDA's occupancy heuristic to get
@@ -193,7 +210,7 @@ void __kitcuda_get_occ_launch_params(size_t trip_count, CUfunction cu_func,
   CU_SAFE_CALL(cuOccupancyMaxPotentialBlockSize_p(
       &min_grid_size, &threads_per_blk, cu_func, 0, 0, 0));
 
-  if (_kitcuda_refine_occupancy_calc) {
+  if (refine_occupancy_launch) {
     extern int _kitcuda_device_id;
 
     int num_multiprocs = 0;
@@ -216,9 +233,9 @@ void __kitcuda_get_occ_launch_params(size_t trip_count, CUfunction cu_func,
     if (__kitrt_verbose_mode()) {
       fprintf(stderr,
               "kitcuda: Kernel Launch SM Load Details --------------\n");
-      fprintf(stderr, "  Number of SMs:        %d\n", num_multiprocs);
-      fprintf(stderr, "  Kernel trip count:    %ld\n", trip_count);
-      fprintf(stderr, "  Occupancy-driven TPB: %d\n", threads_per_blk);
+      fprintf(stderr, "  number of SMs:        %d\n", num_multiprocs);
+      fprintf(stderr, "  kernel trip count:    %ld\n", trip_count);
+      fprintf(stderr, "  occupancy-driven TPB: %d\n", threads_per_blk);
       fprintf(stderr, "  SM utilization:  %3.2f%%\n", sm_load);
     }
     // If we are under-utilizing the available SMs on the GPU we reduce the
@@ -239,7 +256,7 @@ void __kitcuda_get_occ_launch_params(size_t trip_count, CUfunction cu_func,
       CU_SAFE_CALL(cuDeviceGetAttribute_p(
           &warp_size, CU_DEVICE_ATTRIBUTE_WARP_SIZE, _kitcuda_device_id));
       while (block_count < num_multiprocs && threads_per_blk > warp_size) {
-        threads_per_blk = next_lowest_factor(threads_per_blk, warp_size);
+        threads_per_blk = __kitrt_next_lowest_factor(threads_per_blk, warp_size);
         block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
         sm_load = ((float)block_count / num_multiprocs) * 100.0;
       }
@@ -298,13 +315,13 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
     // use previously determined parameters.
     threads_per_blk = lpit->second;
   else {
-    if (_kitcuda_use_occupancy_calc)
+    if (use_occupancy_launch)
       // EXPERIMENTAL: use an occupancy-based path to setting the launch
       // parameters.
       __kitcuda_get_occ_launch_params(trip_count, cu_func, threads_per_blk,
                                       blks_per_grid, inst_mix);
     else
-      threads_per_blk = _kitcuda_default_threads_per_blk;
+      threads_per_blk = default_threads_per_blk;
     _kitcuda_launch_param_map[map_entry_name] = threads_per_blk;
   }
 
@@ -333,35 +350,39 @@ void *__kitcuda_launch_kernel(const void *fat_bin, const char *kernel_name,
     CU_SAFE_CALL(cuCtxSetCurrent_p(_kitcuda_context));
 
   CUfunction cu_func;
-  _kitcuda_module_map_mutex.lock();
-  KitCudaKernelMap::iterator kernit = _kitcuda_kernel_map.find(kernel_name);
-  if (kernit == _kitcuda_kernel_map.end()) {
+  module_map_mutex.lock();
+  KitCudaKernelMap::iterator kernit = kernel_map.find(kernel_name);
+  if (kernit == kernel_map.end()) {
     // We have not yet encountered this kernel function...  Check to see
     // if we already have a supporting module for the fat binary.
     CUmodule cu_module;
-    KitCudaModuleMap::iterator modit = _kitcuda_module_map.find(fat_bin);
-    if (modit == _kitcuda_module_map.end()) {
+    KitCudaModuleMap::iterator modit = module_map.find(fat_bin);
+    if (modit == module_map.end()) {
       // Create a supporting CUDA module and "register" the fat binary
       // image in the map...
       CU_SAFE_CALL(cuModuleLoadData_p(&cu_module, fat_bin));
-      _kitcuda_module_map[fat_bin] = cu_module;
+      module_map[fat_bin] = cu_module;
     } else
       cu_module = modit->second;
 
     // Look up the kernel function.
     CU_SAFE_CALL(cuModuleGetFunction_p(&cu_func, cu_module, kernel_name));
-    _kitcuda_kernel_map[kernel_name] = cu_func;
+    kernel_map[kernel_name] = cu_func;
   } else
     cu_func = kernit->second;
 
-  _kitcuda_module_map_mutex.unlock();
+  module_map_mutex.unlock();
 
   int blks_per_grid;
   if (threads_per_blk == 0)
     __kitcuda_get_launch_params(trip_count, cu_func, threads_per_blk,
                                 blks_per_grid, inst_mix);
-  else
+  else {
+    if (__kitrt_verbose_mode())
+      fprintf(stderr, "kitcuda: threads per block provided by compiler -- %d\n", 
+             threads_per_blk);
     blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
+  }
 
   if (__kitrt_verbose_mode()) {
     fprintf(stderr, "kitcuda: kernel '%s' launch parameters:\n", kernel_name);
@@ -410,13 +431,13 @@ uint64_t __kitcuda_get_global_symbol(void *fat_bin, const char *sym_name) {
   if (ctx == NULL)
     CU_SAFE_CALL(cuCtxSetCurrent_p(_kitcuda_context));
   CUmodule cu_module;
-  _kitcuda_module_map_mutex.lock();
-  KitCudaModuleMap::iterator modit = _kitcuda_module_map.find(fat_bin);
-  if (modit == _kitcuda_module_map.end()) {
+  module_map_mutex.lock();
+  KitCudaModuleMap::iterator modit = module_map.find(fat_bin);
+  if (modit == module_map.end()) {
     // Create a supporting CUDA module and "register" the fat binary
     // image in the map...
     CU_SAFE_CALL(cuModuleLoadData_p(&cu_module, fat_bin));
-    _kitcuda_module_map[fat_bin] = cu_module;
+    module_map[fat_bin] = cu_module;
   } else
     cu_module = modit->second;
 

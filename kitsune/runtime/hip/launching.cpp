@@ -52,75 +52,237 @@
 #include "kithip.h"
 #include "kithip_dylib.h"
 #include <mutex>
+#include <string>
 #include <unordered_map>
 
-// TODO: There is some inclination to want to share some code here
-// with the CUDA runtime implementation.  However, the benefits are
-// really not significant and given some difference in behaviors
-// and maturity between CUDA and HIP we've currently decided to
-// keep them separated. Right now the most apparent difference is
-// primarily the types used in map entries (see below) -- until we
-// get HIP a bit more stable we've punted thinking any harder about
-// a more common code base.
-
-// *** EXPERIMENTAL: The runtime maintains a map from fatbinary images
-// to a supporting HIP module.  The primary reason for this is
-// exploring reducing runtime overheads.
 //
-// TODO: Finish exploration of map vs. HIP call overheads.
-typedef std::unordered_map<const void *, hipModule_t> KitHipModuleMap;
-static KitHipModuleMap _kithip_module_map;
-static std::mutex _kithip_module_map_mutex;
-
-// *** EXPERIMENTAL: The runtime maintains a map from kernel names to
-// kernel functions.  This avoids searching a module repeatedly at
-// kernel launch time and is primarily focused on reducing runtime
-// overheads.
+// TODO: Needs to be brought into line with HIP/AMDGPU architecture specifics... 
+// 
+// *** EXPERIMENTAL: In kitsune the details of picking launch parameters 
+// are not entirely aligned with the general high-level model of parallelism.  
+// In general, the challenge it that many approaches focus on occupancy as 
+// the primary factor for selecting launch parameters but that can lead to 
+// under-utilization of the GPU (e.g., idle SMs) so occupancy isn not the sole
+// parameter to optimize for launching any given kernel.
+// 
+// The HIP approach mirrors that of the current CUDA version, occupancy is 
+// defined as the ratio of the number of active warps per multiprocessor to 
+// the maximum number of active warps supported by the target architecture. 
+// Importantly, having a higher occupancy does not guarantee better performance. 
+// It is simply a reasonable metric for the latency hiding ability of a particular
+// kernel.  
 //
-// TODO: Finish exploration of map vs. CUDA call overheads.
-typedef std::unordered_map<const char *, hipFunction_t> KitHipKernelMap;
-static KitHipKernelMap _kithip_kernel_map;
+// The runtime has the following modes when it comes to launch parameters: 
+//
+//   1. Occupancy-based launches: This uses HIP's heuristics for 
+//      determination of the parameters.  Given it tries to maximize 
+//      occupancy it can also significantly under-utilize the GPU (e.g,
+//      a small number of active SMs).
+// 
+//   2. Refined occupancy launches: This uses the same occupancy 
+//      details in #1 but then attempts to adjust the parameters 
+//      to provide better overall utilization of the GPU's SMs. 
+//
+//   3. Custom launches: This uses runtime specific parameters to 
+//      set the launch parameters.  These can be specified by the 
+//      compiler, via direct runtime calls, or via the environment 
+//      (variables). 
+// 
+//   4. Default launches: This uses a set of hard-coded parameters 
+//      that are built into the runtime. These can be set at build
+//      time. 
+// 
+
+
+namespace {
+  // TODO: Need to figure out if the experimental pieces below actually
+  // provide any significant wins...
+
+  // *** EXPERIMENTAL: The runtime maintains a map from fat-binary images
+  // to a supporting HIP module.  The primary reason for this is
+  // exploring reducing runtime overheads.
+  typedef std::unordered_map<const void *, hipModule_t> KitHipModuleMap;
+  KitHipModuleMap module_map;
+  std::mutex module_map_mutex;
+
+  // *** EXPERIMENTAL: The runtime maintains a map from kernel names to
+  // kernel functions.  This avoids searching a module repeatedly at
+  // kernel launch time and is primarily focused on reducing runtime
+  // overheads.
+  typedef std::unordered_map<const char *, hipFunction_t> KitHipKernelMap;
+  KitHipKernelMap kernel_map;
+
+  // Runtime state for HIP launch configuration and modes of operation.
+  bool use_occupancy_launch = KITRT_USE_OCCUPANCY_LAUNCH;
+  bool refine_occupancy_launch = KITRT_USE_REFINED_OCCUPANCY_LAUNCH;
+  int  default_threads_per_blk = KITRT_DEFAULT_THREADS_PER_BLOCK;
+  int  max_threads_per_blk = KITRT_DEFAULT_THREADS_PER_BLOCK;
+}
 
 extern "C" {
 
-// *** EXPERIMENTAL: The details of picking launch parameters can be a
-// challenge and occupancy is often one of the driving factors.  Occupancy
-// is defined, in "CUDA-ese", as the ratio of the number of active warps
-// per multiprocessor to the maximum number of active warps. Importantly,
-// having a higher occupancy does not guarantee better performance. It is
-// simply a reasonable metric for the latency hiding ability of a particular
-// kernel.
-//
-// TODO: Would it behoove us to keep a record of launch parameters
-// for each kernel based on `trip_count`?  This might be the case
-// if the details of computing the parameters grows costly -- it is
-// unlikely to hurt us on the HIP side at present.
-
-// Without any tweaks from the environment or other runtime calls,
-// this is the default number of threads we'll launch per block (in
-// CUDA speak).
-static bool _kithip_use_occupancy_calc = true;
-static int _kithip_default_max_threads_per_blk = 1024;
-static int _kithip_default_threads_per_blk = _kithip_default_max_threads_per_blk;
+  // *** EXPERIMENTAL: The details of picking launch parameters can be a
+  // challenge and many approaches push occupancy as the primary factor.
+  // From a CUDA-terminology viewpoint, occupancy is defined as the ratio
+  // of the number of active warps per multiprocessor to the maximum number
+  // of active warps supported by the target architecture. Importantly,
+  // having a higher occupancy does not guarantee better performance. It is
+  // simply a reasonable metric for the latency hiding ability of a particular
+  // kernel.  We are actively looking to address this with a different approach
+  // for supporting Kitsune.
+  //
+  // The runtime has the following modes when it comes to launch parameters:
+  //
+  //   1. Occupancy-based launches: This uses CUDA's heuristics for
+  //      determination of the parameters.  Given it tries to maximize
+  //      occupancy it can also significantly under-utilize the GPU (e.g,
+  //      a small number of active SMs).
+  //
+  //   2. Refined occupancy launches: This uses the same occupancy
+  //      details in #1 but then attempts to adjust the parameters
+  //      to provide better overall utilization of the GPU's SMs.
+  //
+  //   3. Custom launches: This uses runtime specific parameters to
+  //      set the launch parameters.  These can be specified by the
+  //      compiler, via direct runtime calls, or via the environment
+  //      (variables).
+  //
+  //   4. Default launches: This uses a set of hard-coded parameters
+  //      that are built into the runtime. These can be set at build
+  //      time.
+  //
 
 void __kithip_use_occupancy_launch(bool enable) {
-  _kithip_use_occupancy_calc = enable;
+  int threads_per_block = 0;
+  use_occupancy_launch = enable;
+  if (__kitrt_get_env_value("KITHIP_THREADS_PER_BLOCK", threads_per_block)) {
+    if (enable) {
+      fprintf(stderr, "kithip: note - environment setting "
+                      "of 'KITHIP_THREADS_PER_BLOCK' (%d) "
+                      "overrides occupancy launch.\n", threads_per_block);
+      use_occupancy_launch = false;
+    }
+  }
+  
+  if (__kitrt_verbose_mode()) 
+    fprintf(stderr, "kithip: %s occupancy-computed launch parameters.\n", 
+            use_occupancy_launch ? "enabled" : "disabled");
+}
+
+void __kithip_refine_occupancy_launches(bool enable) {
+  if (enable) {
+    // refined occupancy launches requires occupancy 
+    // launches to be enabled.  Yep, logic is ugly but
+    // was a bit more minimalistic here... 
+    use_occupancy_launch = enable;
+    // occupancy launch can be overridden by the environment 
+    // so follow suit with our refinement setting... 
+    refine_occupancy_launch = use_occupancy_launch;
+  } else
+    refine_occupancy_launch = false;
+
+  if (__kitrt_verbose_mode())
+    fprintf(stderr, "kithip: runtime '%s' refine occupancy launches.\n", 
+            refine_occupancy_launch ? "will" : "will not");
 }
 
 void __kithip_set_default_max_threads_per_blk(int num_threads) {
-  _kithip_default_max_threads_per_blk = num_threads;
+  // TODO: This value should be clamped to hardware-specific limits. 
+  max_threads_per_blk = num_threads;
 }
 
 void __kithip_set_default_threads_per_blk(int threads_per_blk) {
-  if (threads_per_blk > _kithip_default_max_threads_per_blk) 
-    threads_per_blk = _kithip_default_max_threads_per_blk;
-  _kithip_default_threads_per_blk = threads_per_blk;
+  if (threads_per_blk > max_threads_per_blk)
+    threads_per_blk = max_threads_per_blk;
+  default_threads_per_blk = threads_per_blk;
+}
+
+typedef std::unordered_map<std::string, int> KitHipLaunchParamMap;
+static KitHipLaunchParamMap _kithip_launch_param_map;
+
+void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
+                                    int &threads_per_blk, int &blks_per_grid,
+                                    const KitHipInstMix *inst_mix) {
+  assert(use_occupancy_launch &&
+         "called when occupancy mode is false!");
+  // HIP frustratingly uses a bunch of inlined template-based calls and that
+  // makes it difficult to weed out actual (dylib) friendly entry points.
+  // Eventually chasing the details down the entry point we need (to match the
+  // overall runtime design) is the 'ModuleOccupancy' call used below.  Of
+  // course this is orthogonal to the HIP documentation details...
+  int min_grid_size; // currently ignored...
+  HIP_SAFE_CALL(hipModuleOccupancyMaxPotentialBlockSize_p(
+      &min_grid_size, &threads_per_blk, kfunc, 0, 0));
+
+  if (refine_occupancy_launch) {
+    extern int _kithip_device_id;
+
+    int num_multiprocs = 0;
+    HIP_SAFE_CALL(hipDeviceGetAttribute_p(&num_multiprocs,
+                                          hipDeviceAttributeMultiprocessorCount,
+                                          _kithip_device_id));
+
+    // The occupancy measure isn't the only aspect of launch performance
+    // to consider...  Specifically, the heuristic ignores trip counts
+    // and therefore can lead to an under-subscription of GPU resources.
+    // In these cases performance can suffer.  To address this we start
+    // by looking at an estimate based on the number of multi-processors
+    // that can be kept busy by the calculated threads per block value.
+    int block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
+    float mp_load = ((float)block_count / num_multiprocs) * 100;
+
+    if (__kitrt_verbose_mode()) {
+      fprintf(stderr,
+              "kithip: Kernel launch multi-processor load details -------\n");
+      fprintf(stderr, "  number of multi-processors:  %d\n", num_multiprocs);
+      fprintf(stderr, "  trip count:                  %ld\n", trip_count);
+      fprintf(stderr, "  occupancy-driven TPB:        %d\n", threads_per_blk);
+      fprintf(stderr, "  multi-processor utilization: %f3.2f%%\n", mp_load);
+    }
+    // EXPERIMENTAL:
+    // If we are under-utilizing the available multi-processors on the GPU we
+    // reduce the threads-per-block count until we hit a "decent" utilization
+    // (i.e., we increase the block count to fill up the multi-processors).
+    // The determination of when to make this adjustment is based on the
+    // percentage of multi-processors that would be used and it must be
+    // adjusted such that the resulting block count does not exceed the
+    // number of multi-processors available.
+    if (mp_load < 75) { // TODO: stop hard-coding 75...
+      if (__kitrt_verbose_mode())
+        fprintf(stderr,
+                "    --*-GPU is underutilized -- tuning block count...\n");
+
+      int warp_size = 0;
+      HIP_SAFE_CALL(hipDeviceGetAttribute_p(
+          &warp_size, hipDeviceAttributeWarpSize, _kithip_device_id));
+      while (block_count < num_multiprocs && threads_per_blk > warp_size) {
+        threads_per_blk =
+            __kitrt_next_lowest_factor(threads_per_blk, warp_size);
+        block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
+        mp_load = ((float)block_count / num_multiprocs) * 100.0;
+      }
+
+      if (__kitrt_verbose_mode()) {
+        fprintf(stderr,
+                "    --*-GPU is underutilized -- tuning block count...\n");
+        fprintf(stderr, "      updated launch parameters:");
+        fprintf(stderr, "        threads-per-block:      %d\n",
+                threads_per_blk);
+        fprintf(stderr, "        numer of blocks:        %d\n", block_count);
+        fprintf(stderr, "        multi-proc utilization: %3.2f%%\n", mp_load);
+        fprintf(stderr,
+                "----------------------------------------------------------\n");
+      }
+    }
+  }
+
+  blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 }
 
 void __kithip_get_launch_params(size_t trip_count, hipFunction_t kfunc,
                                 int &threads_per_blk, int &blks_per_grid) {
 
-  if (_kithip_use_occupancy_calc) {
+  if (use_occupancy_launch) {
     // Frustratingly there are a bunch of inlined type templated calls lurking
     // behind HIP's occupancy calls.  This makes it difficult here with the
     // dynamic loading and other details where we are a bit more accustomed to a
@@ -131,7 +293,7 @@ void __kithip_get_launch_params(size_t trip_count, hipFunction_t kfunc,
     HIP_SAFE_CALL(hipModuleOccupancyMaxPotentialBlockSize_p(
         &min_grid_size, &threads_per_blk, kfunc, 0, 0));
   } else {
-    threads_per_blk = _kithip_default_threads_per_blk;
+    threads_per_blk = default_threads_per_blk;
   }
 
   // Need to round-up based on array size/trip count.
@@ -139,7 +301,9 @@ void __kithip_get_launch_params(size_t trip_count, hipFunction_t kfunc,
 }
 
 void __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
-                            void **kern_args, uint64_t trip_count) {
+                            void **kern_args, uint64_t trip_count,
+                            int threads_per_blk, const KitHipInstMix *inst_mix,
+                            void *opaque_stream) {
 
   assert(fat_bin && "kithip: launch with null fat binary!");
   assert(kernel_name && "kithip: launch with null name!");
@@ -152,30 +316,30 @@ void __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
   // thread enters without having previously set the device the runtime
   // becomes unhappy with us.  Make sure we're following the rules.
   hipFunction_t kern_func;
-  _kithip_module_map_mutex.lock();
-  KitHipKernelMap::iterator kernit = _kithip_kernel_map.find(kernel_name);
-  if (kernit == _kithip_kernel_map.end()) {
+  module_map_mutex.lock();
+  KitHipKernelMap::iterator kernit = kernel_map.find(kernel_name);
+  if (kernit == kernel_map.end()) {
     // We have not yet encountered this kernel function...  Check to see
     // if we already have a supporting module for the fat binary.
     hipModule_t hip_module;
-    KitHipModuleMap::iterator modit = _kithip_module_map.find(fat_bin);
-    if (modit == _kithip_module_map.end()) {
+    KitHipModuleMap::iterator modit = module_map.find(fat_bin);
+    if (modit == module_map.end()) {
       // Create a supporting module and "register" the fat binary
       // image in the map...
       HIP_SAFE_CALL(hipModuleLoadData_p(&hip_module, fat_bin));
-      _kithip_module_map[fat_bin] = hip_module;
+      module_map[fat_bin] = hip_module;
     } else
       hip_module = modit->second;
 
     // Look up the kernel function in the module.
     HIP_SAFE_CALL(hipModuleGetFunction_p(&kern_func, hip_module, kernel_name));
-    _kithip_kernel_map[kernel_name] = kern_func;
+    kernel_map[kernel_name] = kern_func;
   } else
     kern_func = kernit->second;
 
-  _kithip_module_map_mutex.unlock();
+  module_map_mutex.unlock();
 
-  int threads_per_blk, blks_per_grid;
+  int blks_per_grid;
   __kithip_get_launch_params(trip_count, kern_func, threads_per_blk,
                              blks_per_grid);
 
@@ -187,7 +351,7 @@ void __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
     fprintf(stderr, "  args address: %p\n", kern_args);
   }
 
-  hipStream_t hip_stream = __kithip_get_thread_stream();
+  hipStream_t hip_stream = (hipStream_t)opaque_stream;
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(kern_func, blks_per_grid, 1, 1,
                                         threads_per_blk, 1, 1,
                                         0, // shared mem size
@@ -199,11 +363,11 @@ void *__kithip_get_global_symbol(void *fat_bin, const char *sym_name) {
   assert(sym_name && "null symbol name!");
 
   hipModule_t hip_module;
-  _kithip_module_map_mutex.lock();
-  KitHipModuleMap::iterator modit = _kithip_module_map.find(fat_bin);
-  if (modit == _kithip_module_map.end()) {
+  module_map_mutex.lock();
+  KitHipModuleMap::iterator modit = module_map.find(fat_bin);
+  if (modit == module_map.end()) {
     HIP_SAFE_CALL(hipModuleLoadData_p(&hip_module, fat_bin));
-    _kithip_module_map[fat_bin] = hip_module;
+    module_map[fat_bin] = hip_module;
   } else
     hip_module = modit->second;
 

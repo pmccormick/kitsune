@@ -169,7 +169,7 @@ void __kitcuda_mem_free(void *vp) {
 
   KIT_NVTX_PUSH("kitcuda:mem_free", KIT_NVTX_MEM);
   // We first remove the allocation from the runtime's
-  // map, and then actually release it via CUDA...
+  // map and then actually release (free) it via CUDA.
   // Note that the versioned free calls are important
   // here -- a non-v2 version will actually result in
   // crashes...

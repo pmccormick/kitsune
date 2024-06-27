@@ -121,11 +121,30 @@ extern "C" {
    */
   extern void __kitrt_print_stack_trace();
 
+
+  // GPU kernel launch parameter settings that are shared across targets.
+  #ifdef KITRT_USE_REFINED_OCCUPANCY_LAUNCH
+  #define KITRT_USE_OCCUPANCY_LAUNCH true
+  #else
+  #define KITRT_USE_OCCUPANCY_LAUNCH false
+  #endif
+
+  #ifndef KITRT_USE_REFINED_OCCUPANCY_LAUNCH 
+  #define KITRT_USE_REFINED_OCCUPANCY_LAUNCH false
+  #endif
+
+  #ifndef KITRT_DEFAULT_THREADS_PER_BLOCK
+  #define KITRT_DEFAULT_THREADS_PER_BLOCK (256)
+  #endif 
+
   extern unsigned __kitrt_getNumPrefetchStreams();
   extern bool __kitrt_prefetchEnabled();
   extern void __kitrt_enablePrefetching();
   extern bool __kitrt_prefetchStreamsEnabled();
   extern void __kitrt_enablePrefetchStreams();
+
+  
+  extern int __kitrt_next_lowest_factor(int n, int m);
 
 #ifdef __cplusplus
 } // extern "C"

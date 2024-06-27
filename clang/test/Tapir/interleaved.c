@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -fsyntax-only -std=c99 %s -ftapir=cilk
+// RUN: %clang_cc1 -fsyntax-only -std=c99 %s -ftapir=opencilk
 #include <kitsune.h>
 
 int bar();

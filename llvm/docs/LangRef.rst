@@ -26737,3 +26737,43 @@ This intrinsic is assumed to execute in the default :ref:`floating-point
 environment <floatenv>` *except* for the rounding mode.
 This intrinsic is not supported on all targets. Some targets may not support
 all rounding modes.
+
+
+
+
+'``llvm.kitsune.launch_attr``' Intrinsic
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Syntax:
+"""""""
+
+::
+
+      declare <ty2>
+      @llvm.kitsune.attr.launch(int threads_per_blk)
+
+Overview:
+"""""""""
+
+The '``llvm.kitsune.attr.launch``' intrinsic provides a 
+mechanism for specifying *launch* parameters for parallel
+regions of code.  This most commonly is used for targeting
+GPU-specific regions of code but code generation details 
+can support additional meanings for the supplied parameters.
+
+Arguments:
+""""""""""
+
+The '``llvm.kitsune.attr.launch``' intrinsic takes a single :ref:`integer<t_integer>` 
+value that provides the number of threads to run per block of work.  This 
+value may have restrictions based on the final code gen target for a parallel 
+region of code.  
+
+Semantics:
+""""""""""
+The '``llvm.kitsune.attr.launch``' intrinsic suggests the number of threads 
+used to execute a paritcular parallel region of code (typically executed of a 
+block of data).  The exact interpretation of threads and the model of 
+execution used by any particular target is unspecified by the intrinsic and is 
+left up to the code generation and/or runtime components to interpret the 
+exact definition of the intrinsic.

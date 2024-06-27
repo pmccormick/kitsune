@@ -94,6 +94,11 @@ static KitHipStreamMap _kithip_stream_map;
 
 static std::mutex _kithip_stream_mutex;
 
+static bool _kithip_use_occupancy_calc = true;
+static bool _kithip_refine_occupancy_calc = true;
+static int _kithip_default_max_threads_per_blk = 1024;
+static int _kithip_default_threads_per_blk =
+                  _kithip_default_max_threads_per_blk;
 
 #ifdef __cplusplus
 extern "C" {
@@ -131,28 +136,18 @@ extern "C" {
     return stream;
   }
 
-  void __kithip_sync_thread_stream() {
-    pid_t tid = gettid();
-    _kithip_stream_mutex.lock();
-    KitHipStreamMap::iterator sit = _kithip_stream_map.find(tid);
-    _kithip_stream_mutex.unlock();
-    if (sit != _kithip_stream_map.end())
-      HIP_SAFE_CALL(hipStreamSynchronize_p(sit->second));
+  void __kithip_sync_thread_stream(void *stream) {
+    hipStream_t hstream = (hipStream_t)stream;
+    HIP_SAFE_CALL(hipStreamSynchronize_p(hstream));
   }
 
   void __kithip_sync_context() {
     HIP_SAFE_CALL(hipDeviceSynchronize_p());
   }
 
-  void __kithip_delete_thread_stream() {
-    pid_t tid = gettid();
-    _kithip_stream_mutex.lock();
-    KitHipStreamMap::iterator sit = _kithip_stream_map.find(tid);
-    if (sit != _kithip_stream_map.end()) {
-      HIP_SAFE_CALL(hipStreamDestroy_p(sit->second));
-      _kithip_stream_map.erase(sit);
-    }
-    _kithip_stream_mutex.unlock();
+  void __kithip_delete_thread_stream(void *stream) {
+    hipStream_t hstream = (hipStream_t)stream;
+    HIP_SAFE_CALL(hipStreamDestroy_p(hstream));
   }
 
   void __kithip_destroy_thread_streams() {

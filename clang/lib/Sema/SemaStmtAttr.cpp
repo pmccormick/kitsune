@@ -611,6 +611,7 @@ static Attr *handleKitsuneLaunchAttr(Sema &S, Stmt *St, const ParsedAttr &A,
         return nullptr;
       }
     }
+
     return ::new (S.Context)
         KitsuneLaunchAttr(S.Context, A, TPBExpr);
   } else

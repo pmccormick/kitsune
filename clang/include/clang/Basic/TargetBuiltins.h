@@ -347,12 +347,23 @@ namespace clang {
     };
   }
 
+  /// Kitsune builtins
+  namespace Kitsune {
+  enum {
+    LastTIBuiltin = clang::Builtin::FirstTSBuiltin - 1,
+#define BUILTIN(ID, TYPE, ATTRS) BI##ID,
+#include "clang/Basic/BuiltinsKitsune.def"
+      LastTSBuiltin
+    };
+  }
+
   static constexpr uint64_t LargestBuiltinID = std::max<uint64_t>(
       {ARM::LastTSBuiltin, AArch64::LastTSBuiltin, BPF::LastTSBuiltin,
        PPC::LastTSBuiltin, NVPTX::LastTSBuiltin, AMDGPU::LastTSBuiltin,
        X86::LastTSBuiltin, VE::LastTSBuiltin, RISCV::LastTSBuiltin,
        Hexagon::LastTSBuiltin, Mips::LastTSBuiltin, XCore::LastTSBuiltin,
-       SystemZ::LastTSBuiltin, WebAssembly::LastTSBuiltin});
+       SystemZ::LastTSBuiltin, WebAssembly::LastTSBuiltin, 
+       Kitsune::LastTSBuiltin});
 
 } // end namespace clang.
 
