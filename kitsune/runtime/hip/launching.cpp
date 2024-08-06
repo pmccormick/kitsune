@@ -50,19 +50,20 @@
  *===----------------------------------------------------------------------===
  */
 #include "kithip.h"
-#include "kithip_dylib.h"
 #include <mutex>
-#include <unordered_map>
+#include <stdint.h>
+#include <stdio.h>
 #include <string>
+#include <unordered_map> // IWYU pragma: keep (clang-tidy+tempaltes == bad???)
 
-// TODO: There is some inclination to want to share some code here
-// with the CUDA runtime implementation.  However, the benefits are
-// really not significant and given some difference in behaviors
-// and maturity between CUDA and HIP we've currently decided to
-// keep them separated. Right now the most apparent difference is
-// primarily the types used in map entries (see below) -- until we
-// get HIP a bit more stable we've punted thinking any harder about
-// a more common code base.
+// TODO: The hip runtime shares common implementation details 
+// with cuda.  At present we have decided to keep them separated
+// given the potential differences in the underlying runtimes 
+// and stability issues w/ hip; further down the road, it might be 
+// possible to share common code between the two.
+
+//   TODO: The experimental features below have not yet been 
+//   validated to actually reduce overheads.  
 
 // *** EXPERIMENTAL: The runtime maintains a map from fatbinary images
 // to a supporting HIP module.  The primary reason for this is
@@ -89,13 +90,10 @@ extern "C" {
 // is defined, in "CUDA-ese", as the ratio of the number of active warps
 // per multiprocessor to the maximum number of active warps. Importantly,
 // having a higher occupancy does not guarantee better performance. It is
-// simply a reasonable metric for the latency hiding ability of a particular
-// kernel.
+// simply a metric of the latency hiding ability of a particular kernel.
 //
 // TODO: Would it behoove us to keep a record of launch parameters
-// for each kernel based on `trip_count`?  This might be the case
-// if the details of computing the parameters grows costly -- it is
-// unlikely to hurt us on the HIP side at present.
+// for each kernel based on `trip_count`?
 
 // Without any tweaks from the environment or other runtime calls,
 // this is the default number of threads we'll launch per block (in
@@ -124,6 +122,7 @@ static KitHipLaunchParamMap _kithip_launch_param_map;
 
 namespace {
 
+// we "borrow" this from cuda... 
 extern int next_lowest_factor(int n, int m);
 
 /**
@@ -147,12 +146,17 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
   assert(_kithip_use_occupancy_calc && "called when occupancy mode is false!");
 
   // As a default starting point, the hip occupancy heuristic to get
-  // an initial occupancy.
+  // an initial occupancy-driven threads-per-block figure.
   int min_grid_size;
   HIP_SAFE_CALL(hipModuleOccupancyMaxPotentialBlockSize_p(
       &min_grid_size, &threads_per_blk, kfunc, 0, 0));
 
   if (_kithip_refine_occupancy_calc) {
+    // Assume that the occupancy heuristic is flawed and look to refine 
+    // its threads-per-block result such that it utilizes the full GPU
+    // (i.e., it is not uncommon for the heuristic to return values 
+    // that only use a limited number of available resources -- most 
+    // often under-utilizing the number of available multi-processors).
     extern int _kithip_device_id;
 
     int num_multiprocs = 0;
@@ -160,39 +164,37 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
         &num_multiprocs, hipDeviceAttributeMultiprocessorCount,
         _kithip_device_id));
 
-    // The occupancy measure isn't the only aspect of launch performance
-    // to consider.  Specifically, the heuristic ignores trip counts that
-    // that can lead to an under-subscription of GPU resources.  In these
-    // cases performance can significantly suffer.
-    //
-    // To address trip count impacts we start by looking at an estimate of
-    // the number of SM's that can be kept busy by the provided
-    // threads-per-block value.  We do this by getting a block count and looking
-    // at that number in comparison to the number of SMs.
+    // Estimate how many multi-processors we are using with the provided 
+    // threads-per-block value.. 
     int block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
     float sm_load = ((float)block_count / num_multiprocs) * 100.0;
 
     if (__kitrt_verbose_mode()) {
-      fprintf(stderr,
-              "kithip: kernel workload details --------------\n");
-      fprintf(stderr, "  Number of SMs:        %d\n", num_multiprocs);
-      fprintf(stderr, "  Kernel trip count:    %ld\n", trip_count);
-      fprintf(stderr, "  Occupancy-driven TPB: %d\n", threads_per_blk);
-      fprintf(stderr, "  SM utilization:  %3.2f%%\n", sm_load);
+      fprintf(stderr, "kithip: kernel workload --------------\n");
+      fprintf(stderr, "  Number of multi-procs:  %d\n", num_multiprocs);
+      fprintf(stderr, "  Trip count:             %ld\n", trip_count);
+      fprintf(stderr, "  Occupancy-driven TPB:   %d\n", threads_per_blk);
+      fprintf(stderr, "  Multi-proc utilization: %3.2f%%\n", sm_load);
     }
-    // If we are under-utilizing the available SMs on the GPU we reduce the
-    // threads-per-block count until we hit a decent utilization (i.e., we
-    // increase the block count). The determination of when to make this
-    // adjustment is based on the percentage of SMs used (`sm_usage`) and
-    // must be adjusted such that the resulting block count does not exceed
-    // the number of SMs available.
+
+    // If the multi-proc load is low, reduce the threads-per-block until 
+    // we reach a point of better utilization (which we loosely define
+    // as >= 75% load).
+    // 
+    // TODO: There is a lot of work to do here:
     //
-    // As a starting point we will adjust launch parameters if we are utilizing
-    // less than 75% of the GPU's SMs.  TODO: Make this a tweak-able parameter?
+    //   * 75% could be a parameter (runtime or build time). 
+    //   * The compiler is handing us details on the instruction 
+    //     mix but it doesn't accurately account for code structure 
+    //     (e.g. inner loops).
+    //   * A more comprehensive model of performance/hardware costs 
+    //     could help but we'd have to balance runtime costs vs. accuracy. 
     if (sm_load < 75) {
+
       if (__kitrt_verbose_mode())
         fprintf(stderr,
-                "  ***-GPU is underutilized -- adjusting thread block size...\n");
+                "  ***-GPU multi-processors are underutilized "
+                "-- adjusting threads-per-block.\n");
 
       int warp_size = 0;
       HIP_SAFE_CALL(hipDeviceGetAttribute_p(
@@ -207,9 +209,8 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
         fprintf(stderr, "  ***-new launch parameters:");
         fprintf(stderr, "\tthreads-per-block: %d\n", threads_per_blk);
         fprintf(stderr, "\tnumer of blocks:   %d\n", block_count);
-        fprintf(stderr, "\tSM utilization:    %3.2f%%\n", sm_load);
-        fprintf(stderr,
-                "-----------------------------------------------------\n\n");
+        fprintf(stderr, "\tmulti-proc load:   %3.2f%%\n", sm_load);
+        fprintf(stderr, "---------------------------------------\n\n");
       }
     }
   }
@@ -217,7 +218,7 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
   blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 }
 
-} // namespace... 
+} // namespace
 
 void __kithip_get_launch_params(size_t trip_count, hipFunction_t kfunc,
 				const char *kfunc_name, 
@@ -337,4 +338,5 @@ void *__kithip_get_global_symbol(void *fat_bin, const char *sym_name) {
   HIP_SAFE_CALL(hipModuleGetGlobal_p(&sym_ptr, &bytes, hip_module, sym_name));
   return sym_ptr;
 }
-}
+
+} // extern C

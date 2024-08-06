@@ -7,6 +7,7 @@ set(LLVM_LINK_COMPONENTS
   ProfileData
   Support
   TargetParser
+  TapirOpts
   )
 
 add_clang_library(clangFrontend

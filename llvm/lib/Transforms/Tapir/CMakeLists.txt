@@ -45,6 +45,7 @@ add_llvm_component_library(LLVMTapirOpts
   Support
   TransformUtils
   Vectorize
+  Passes
   )
 
 if (CUDAToolkit_FOUND)

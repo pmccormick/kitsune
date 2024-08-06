@@ -62,6 +62,8 @@
 #define __HIP_PLATFORM_AMD__ 1
 #include <hip/hip_runtime.h>
 
+#include "kithip_dylib.h" // IWYU pragma: keep (clang-tidy misreports. ???)
+
 #ifdef __cplusplus
 extern "C" {
 #else

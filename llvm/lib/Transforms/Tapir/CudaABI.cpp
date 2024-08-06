@@ -414,7 +414,7 @@ CudaLoop::CudaLoop(Module &M, Module &KernelModule, const std::string &KN,
       Int32Ty,                         // threads-per-block
       KernelInstMixTy->getPointerTo(), // instruction mix info
       VoidPtrTy);                      // opaque cuda stream
-      
+
   KitCudaMemPrefetchFn =
       M.getOrInsertFunction("__kitcuda_mem_gpu_prefetch",
                             VoidPtrTy,  // return an opaque stream
@@ -1030,6 +1030,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   // TODO: There is some potential here to share this code across both
   // the hip and cuda transforms... 
+  // the hip and cuda transforms...
   LLVM_DEBUG(dbgs() << "\t*- code gen packing of " << OrderedInputs.size()
                     << " kernel args.\n");
   PointerType *VoidPtrTy = PointerType::getUnqual(Ctx);
@@ -2005,7 +2006,7 @@ CudaABIOutputFile CudaABI::generatePTX() {
     FunctionAnalysisManager fam;
     CGSCCAnalysisManager cgam;
     ModuleAnalysisManager mam;
-    
+
     PassBuilder pb(PTXTargetMachine, pto);
     pb.registerModuleAnalyses(mam);
     pb.registerCGSCCAnalyses(cgam);
@@ -2013,7 +2014,7 @@ CudaABIOutputFile CudaABI::generatePTX() {
     pb.registerLoopAnalyses(lam);
     PTXTargetMachine->registerPassBuilderCallbacks(pb, false);
     pb.crossRegisterProxies(lam, fam, cgam, mam);
-    
+
     ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
     mpm.addPass(VerifierPass());
     LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");

@@ -140,13 +140,13 @@ endif()
 # kitsune/CMakeLists.txt). They are passed in via CMake because the Kitsune
 # runtime is treated as an "ExternalProject".
 #
-# Note on AMD HIP CMake details...  When is HIP not HIP?  When it is HIP... 
+# Note on AMD HIP CMake details...  When is HIP not HIP?  When it is HIP...
 # It is easy to confuse requirements for HIP as the HIP "language" vs. the
 # HIP runtime.   The language has tangled dependencies within a LLVM context
-# as they build around LLVM and Clang too.  Using some of the 'hip::host' 
+# as they build around LLVM and Clang too.  Using some of the 'hip::host'
 # targets are actually intended for the language and not runtime libraries.
-# Unfortunately, these details seem to be a moving target with ecah release 
-# of rocm/hip... 
+# Unfortunately, these details seem to be a moving target with ecah release
+# of rocm/hip...
 if (KITSUNE_HIP_ENABLE)
 
   if (NOT DEFINED ROCM_PATH)
@@ -154,7 +154,7 @@ if (KITSUNE_HIP_ENABLE)
     if (DEFINED $ENV{ROCM_PATH})
       message(STATUS "  using ROCM_PATH environment variable.")
       set(ROCM_PATH $ENV{ROCM_PATH} CACHE PATH "AMD ROCM/HIP installation directory.")
-    else() 
+    else()
       message(STATUS "  selecting a common default install location.")
       set(ROCM_PATH "/opt/rocm" CACHE PATH "AMD ROCM/HIP installation directory.")
     endif()
@@ -177,7 +177,7 @@ if (KITSUNE_HIP_ENABLE)
 
   message(STATUS "hip include dir: ${hip_INCLUDE_DIR}")
   message(STATUS "hip library dir: ${hip_LIB_INSTALL_DIR}")
-  
+
   target_compile_definitions(${KITRT} PUBLIC KITRT_HIP_ENABLED)
   target_compile_definitions(${KITRT} PUBLIC __HIP_PLATFORM_AMD__)
   target_include_directories(${KITRT} PUBLIC ${hip_INCLUDE_DIR})
@@ -190,18 +190,24 @@ if (KITSUNE_HIP_ENABLE)
     BUILD_RPATH ${HIP_LIB_INSTALL_DIR})
 endif()
 
+# ${KITRT_INSTALL_PREFIX} will be set to ${CMAKE_INSTALL_PREFIX} for the broader
+# LLVM project that is being built. On the other hand, ${CMAKE_INSTALL_PREFIX}
+# will be set to some directory within the build directory into which this is
+# "installed" at build time (all this because libkitrt is treated as an
+# "external project". There is probably a better way of handling all this, but
+# this is what we are doing for now).
 set_target_properties(${KITRT} PROPERTIES
-  INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib)
+  INSTALL_RPATH ${KITRT_INSTALL_PREFIX}/lib)
 
 install(TARGETS kitrt
-  DESTINATION ${CLANG_RESOURCE_DIR}/lib)
+  DESTINATION ${CLANG_RESOURCE_SUBDIR}/lib)
 
 # KITSUNE FIXME: Do we really need to install the runtime headers? Do we intend
 # this to be used by third-parties?
 install(FILES ${KITRT_HDRS}
-  DESTINATION ${CLANG_RESOURCE_DIR}/include/kitrt)
+  DESTINATION ${CLANG_RESOURCE_SUBDIR}/include/kitrt)
 
 # KITSUNE FIXME: Do we really need to install the headers for the targets?
 install(DIRECTORY cuda hip realm
-  DESTINATION ${CLANG_RESOURCE_DIR}/include/kitrt
+  DESTINATION ${CLANG_RESOURCE_SUBDIR}/include/kitrt
   FILES_MATCHING PATTERN "*.h")
