@@ -213,13 +213,32 @@ void __kitcuda_get_occ_launch_params(size_t trip_count, CUfunction cu_func,
     int block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
     float sm_load = ((float)block_count / num_multiprocs) * 100.0;
 
+    if (threads_per_blk > 512) {
+      threads_per_blk = 256;
+      block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
+      sm_load = ((float)block_count / num_multiprocs) * 100.0;
+    }
+
     if (__kitrt_verbose_mode()) {
+      int num_regs, const_size, local_size;
+      CU_SAFE_CALL(cuFuncGetAttribute_p(&num_regs, 
+              CU_FUNC_ATTRIBUTE_NUM_REGS,
+              cu_func));
+      CU_SAFE_CALL(cuFuncGetAttribute_p(&const_size, 
+              CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES,
+              cu_func));
+      CU_SAFE_CALL(cuFuncGetAttribute_p(&local_size, 
+              CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES,
+              cu_func));
       fprintf(stderr,
               "kitcuda: Kernel Launch SM Load Details --------------\n");
-      fprintf(stderr, "  Number of SMs:        %d\n", num_multiprocs);
-      fprintf(stderr, "  Kernel trip count:    %ld\n", trip_count);
-      fprintf(stderr, "  Occupancy-driven TPB: %d\n", threads_per_blk);
-      fprintf(stderr, "  SM utilization:  %3.2f%%\n", sm_load);
+      fprintf(stderr, "  Register usage count:  %d\n", num_regs);
+      fprintf(stderr, "  Constant memory usage: %d\n", const_size);
+      fprintf(stderr, "  Local memory usage:    %d\n", local_size);
+      fprintf(stderr, "  Number of SMs:         %d\n", num_multiprocs);
+      fprintf(stderr, "  Kernel trip count:     %ld\n", trip_count);
+      fprintf(stderr, "  Occupancy-driven TPB:  %d\n", threads_per_blk);
+      fprintf(stderr, "  SM utilization:        %3.2f%%\n", sm_load);
     }
     // If we are under-utilizing the available SMs on the GPU we reduce the
     // threads-per-block count until we hit a decent utilization (i.e., we
@@ -281,6 +300,8 @@ void __kitcuda_get_launch_params(size_t trip_count, CUfunction cu_func,
   // EXPERIMENTAL: Our 'forall' kernels have zero shared memory usage so
   // tweak the kernel's cache configuration to prefer L1 usage vs. shared
   // or 'split' usage of the local memory.
+  // 
+  // TODO: Check kernel shared memory usage and tweak this call accordingly. 
   CU_SAFE_CALL(cuFuncSetCacheConfig_p(cu_func, CU_FUNC_CACHE_PREFER_L1));
 
   // EXPERIMENTAL: To reduce some overheads the runtime caches launch
@@ -344,10 +365,15 @@ void *__kitcuda_launch_kernel(const void *fat_bin, const char *kernel_name,
     if (modit == _kitcuda_module_map.end()) {
       // Create a supporting CUDA module and "register" the fat binary
       // image in the map...
+      if (__kitrt_verbose_mode())
+        fprintf(stderr, "kitcuda: create kernel module and save in the map.\n");
       CU_SAFE_CALL(cuModuleLoadData_p(&cu_module, fat_bin));
       _kitcuda_module_map[fat_bin] = cu_module;
-    } else
+    } else {
+      if (__kitrt_verbose_mode())
+        fprintf(stderr, "kitcuda: module already loaded...\n");
       cu_module = modit->second;
+    }
 
     // Look up the kernel function.
     CU_SAFE_CALL(cuModuleGetFunction_p(&cu_func, cu_module, kernel_name));
@@ -374,19 +400,19 @@ void *__kitcuda_launch_kernel(const void *fat_bin, const char *kernel_name,
   CUstream cu_stream = nullptr;
   if (opaque_stream == nullptr) {
     // create a stream for this launch...
-    cu_stream = (CUstream)__kitcuda_get_thread_stream();
     if (__kitrt_verbose_mode())
-      fprintf(stderr,
-              "kitcuda: launch stream is null, requested a new stream.\n");
+      fprintf(stderr,"kitcuda: launch stream null, asking for a stream.\n");
+    cu_stream = (CUstream)__kitcuda_get_thread_stream();
+ 
   } else {
     // use the provided stream for this launch...
-    cu_stream = (CUstream)opaque_stream;
     if (__kitrt_verbose_mode())
       fprintf(stderr, "kitcuda: launch stream is non-null.\n");
+    cu_stream = (CUstream)opaque_stream;
   }
 
   CU_SAFE_CALL(cuLaunchKernel_p(cu_func, blks_per_grid, 1, 1,
-				threads_per_blk, 1, 1,
+                        			  threads_per_blk, 1, 1,
                                 0, // shared mem size
                                 cu_stream, kern_args, NULL));
   KIT_NVTX_POP();

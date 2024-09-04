@@ -80,6 +80,7 @@ DECLARE_DLSYM(cuDriverGetVersion);
 DECLARE_DLSYM(cuFuncSetCacheConfig);
 DECLARE_DLSYM(cuFuncGetName);
 DECLARE_DLSYM(cuFuncGetAttribute);
+DECLARE_DLSYM(cuKernelGetAttribute);
 
 /* Context management */
 DECLARE_DLSYM(cuCtxCreate_v3);

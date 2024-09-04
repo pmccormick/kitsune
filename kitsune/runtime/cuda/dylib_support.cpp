@@ -112,6 +112,7 @@ bool __kitcuda_load_symbols() {
   DLSYM_LOAD(cuFuncSetCacheConfig);
   DLSYM_LOAD(cuFuncGetName);
   DLSYM_LOAD(cuFuncGetAttribute);
+  DLSYM_LOAD(cuKernelGetAttribute);
 
   /* Context management */
   DLSYM_LOAD(cuCtxCreate_v3);

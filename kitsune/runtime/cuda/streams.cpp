@@ -79,11 +79,10 @@ void *__kitcuda_get_thread_stream() {
   KIT_NVTX_PUSH("kitcuda:get_thread_stream", KIT_NVTX_STREAM);
 
   CUstream cu_stream;
+  _kitcuda_stream_mutex.lock();
   if (not _kitcuda_streams.empty()) {
-    _kitcuda_stream_mutex.lock();
     cu_stream = _kitcuda_streams.front();
     _kitcuda_streams.pop_front();
-    _kitcuda_stream_mutex.unlock();
     if (__kitrt_verbose_mode())
        fprintf(stderr, "reusing thread stream.\n");
   } else {
@@ -91,9 +90,11 @@ void *__kitcuda_get_thread_stream() {
        fprintf(stderr, "creating new thread stream.\n");
     CU_SAFE_CALL(cuStreamCreate(&cu_stream, CU_STREAM_NON_BLOCKING));
   }
-  KIT_NVTX_POP();
+  _kitcuda_stream_mutex.unlock();
+
   if (__kitrt_verbose_mode())
     fprintf(stderr, "returning thread stream: %p\n", cu_stream);
+  KIT_NVTX_POP();
   return (void *)cu_stream;
 }
 

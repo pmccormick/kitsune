@@ -194,6 +194,10 @@ bool __kitcuda_initialize() {
             _kitcuda_supports_concurrent_kerns);
     fprintf(stderr, "             gpu overlap:      %d\n",
             _kitcuda_supports_gpu_overlap);
+
+#ifdef KITCUDA_ENABLE_NVTX    
+      fprintf(stderr, "kitcuda: NVTX profiling support is enabled!\n");
+#endif 
   }
 
   // At this point we're ready to go as far as CUDA initialization

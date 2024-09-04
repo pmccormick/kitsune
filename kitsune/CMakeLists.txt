@@ -192,17 +192,18 @@ if (KITSUNE_KOKKOS_ENABLE)
 endif()
 
 if (KITSUNE_CUDA_ENABLE)
-  message(STATUS "kitsune: CUDA enabled.")
-  find_package(CUDAToolkit ${KITSUNE_CUDA_VERSION_MIN} REQUIRED)
+  find_package(CUDAToolkit ${KITSUNE_CUDA_VERSION_MIN}
+     REQUIRED)
 
-  set(KITSUNE_CUDA_PREFIX $ENV{CUDA_HOME})
+  set(KITSUNE_CUDA_PREFIX ${CUDAToolkit_LIBRARY_ROOT})
   set(KITSUNE_CUDA_INCLUDE_DIR ${CUDAToolkit_INCLUDE_DIRS})
   set(KITSUNE_CUDA_BINARY_DIR ${CUDAToolkit_BIN_DIR})
   set(KITSUNE_CUDA_LIBRARY_DIR ${CUDAToolkit_LIBRARY_DIR})
   set(KITSUNE_CUDA_STUBS_DIR "${KITSUNE_CUDA_LIBRARY_DIR}/stubs")
   set(KITSUNE_CUDA_LIBDEVICE_DIR "${KITSUNE_CUDA_PREFIX}/nvvm/libdevice")
 
-  message(STATUS "CUDA prefix: ${KITSUNE_CUDA_PREFIX}")
+  message("kitsune: cuda toolkit found.")
+  message("   Toolkit library root: ${KITSUNE_CUDA_PREFIX}")
 
   find_library(KITSUNE_CUDA_LIB_CUDART cudart REQUIRED
     PATHS ${KITSUNE_CUDA_LIBRARY_DIR}
@@ -222,6 +223,8 @@ if (KITSUNE_CUDA_ENABLE)
   find_file(KITSUNE_CUDA_LIBDEVICE_BC libdevice.10.bc REQUIRED
     PATHS ${KITSUNE_CUDA_LIBDEVICE_DIR}
     NO_DEFAULT_PATH)
+
+  message("   Device library: ${KITSUNE_CUDA_LIBDEVICE_BC}")
 
   find_program(KITSUNE_CUDA_PTXAS ptxas REQUIRED
     PATHS ${KITSUNE_CUDA_BINARY_DIR}
@@ -267,16 +270,6 @@ if (KITSUNE_HIP_ENABLE)
 
   find_library(LIB_AMDHIP64 amdhip64 REQUIRED
     PATHS ${HIP_LIBRARY_INSTALL_DIR}
-    ${ROCM_PATH}/lib)
-
-  message(STATUS "ROCm/HIP path: ${ROCM_PATH}")
-  list(APPEND CMAKE_MODULE_PATH "${ROCM_PATH}/lib/cmake/hip")
-  message(STATUS "   updated cmake module search path: ${CMAKE_MODULE_PATH}")
-  find_package(HIP MODULE REQUIRED)
-  include(${ROCM_PATH}/lib/cmake/hip/hip-config.cmake)
-
-  find_library(LIB_AMDHIP64 amdhip64 REQUIRED
-    PATHS ${HIP_LIB_INSTALL_DIR}
     ${ROCM_PATH}/lib)
 
   set(KITSUNE_HIP_PREFIX ${HIP_LIBRARY_INSTALL_DIR})
@@ -600,7 +593,7 @@ ExternalProject_Add(kitrt
              -DKITRT_ENABLE_DEBUG=${KITRT_ENABLE_DEBUG}
              -DKITRT_ENABLE_VERBOSE=${KITRT_ENABLE_VERBOSE}
              -DKITRT_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}
-             -DKITCUDA_ENABLE_NVTX=${KITCUDA_ENABLE_NVTX}
+	     -DKITCUDA_ENABLE_NVTX=OFF
              -DCLANG_RESOURCE_INTDIR=${CLANG_RESOURCE_INTDIR}
              -DCLANG_RESOURCE_DIR=${CLANG_RESOURCE_INSTALL_DIR}
              -DCLANG_RESOURCE_SUBDIR=${CLANG_RESOURCE_SUBDIR}

@@ -7,7 +7,8 @@ subdirs := \
   saxpy \
   srad \
   raytracer \
-  euler3d 
+  euler3d \
+  matmult 
 #  multi-target \
 #  intersect \
 #  lto-tests

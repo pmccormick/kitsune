@@ -41,7 +41,7 @@ euler3d-kokkos.kitsune.hip.${host_arch}: euler3d-kokkos-no-view.cpp
 # kokkos-based tests (using views -- currently not compatible w/ kitsune)
 euler3d-kokkos.nvcc.${host_arch}: euler3d-kokkos.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+	@$(TIME_CMD) $(KOKKOS_NVCC) -ccbin /usr/bin/g++-11 $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
 	@$(FILE_SIZE)
 euler3d-kokkos.hipcc.${host_arch}: euler3d-kokkos.cpp 
 	@echo $@

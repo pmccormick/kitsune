@@ -83,8 +83,8 @@ __attribute__((malloc)) void *__kitcuda_mem_alloc_managed(size_t size) {
                              _kitcuda_device));
 
   int enable = 1;
-  CU_SAFE_CALL(
-      cuPointerSetAttribute_p(&enable, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, devp));
+  CU_SAFE_CALL(cuPointerSetAttribute_p(&enable, 
+          CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, devp));
 
   // Register this allocation so the runtime can help track the
   // locality (and affinity) of data.
@@ -210,8 +210,6 @@ bool __kitcuda_is_mem_managed(void *vp) {
 void* __kitcuda_mem_gpu_prefetch(void *vp, void *opaque_stream) {
   assert(vp && "unexpected null pointer!");
 
-  KIT_NVTX_PUSH("kitcuda:mem_gpu_prefetch", KIT_NVTX_MEM);
-
   size_t size = 0;
   // TODO: Prefetching details and approaches need to be further
   // explored.  In particular, in concert with compiler analysis
@@ -227,6 +225,7 @@ void* __kitcuda_mem_gpu_prefetch(void *vp, void *opaque_stream) {
   // while also maintaining correctness.
   if (not __kitrt_is_mem_prefetched(vp, &size)) {
     if (size > 0) {
+      KIT_NVTX_PUSH("kitcuda:mem_gpu_prefetch", KIT_NVTX_MEM);
       CUcontext cu_context;
       CU_SAFE_CALL(cuCtxGetCurrent_p(&cu_context));
       if (cu_context == NULL)
@@ -282,11 +281,12 @@ void* __kitcuda_mem_gpu_prefetch(void *vp, void *opaque_stream) {
       CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitcuda_device,
                                         cu_stream));
       __kitrt_mark_mem_prefetched(vp);
+      KIT_NVTX_POP();      
       return (void*)cu_stream;
     }
   }
-  KIT_NVTX_POP();
-  // no prefetch, no bound stream to bound it to... 
+
+  // no prefetch, no stream to bind... 
   return nullptr;
 }
 

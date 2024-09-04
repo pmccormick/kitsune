@@ -1,5 +1,6 @@
 # Kitsune support 
 kitsune_install_prefix:=${CMAKE_INSTALL_PREFIX}
+kitsune_build_prefix:=${CMAKE_LL_PREFIX}
 
 # Cuda support 
 kitsune_cuda_enable:="${KITSUNE_CUDA_ENABLE}"

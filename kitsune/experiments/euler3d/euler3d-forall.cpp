@@ -558,7 +558,6 @@ int main(int argc, char** argv)
     }
   }
   
-  dump(variables, nel, nelr);
 
   auto end_time = chrono::steady_clock::now();
   double elapsed_time = chrono::duration<double>(end_time-start_time).count();
@@ -580,14 +579,6 @@ int main(int argc, char** argv)
        << "*** " << elapsed_time << ", " << elapsed_time << "\n"                
        << "----\n\n";
 
-  dealloc(ff_variable);
-  dealloc(areas);
-  dealloc(elements_surrounding_elements);
-  dealloc(normals);
-  dealloc(variables);
-  dealloc(old_variables);
-  dealloc(fluxes);
-  dealloc(step_factors);
-
+  //dump(variables, nel, nelr);
   return 0;
 }
