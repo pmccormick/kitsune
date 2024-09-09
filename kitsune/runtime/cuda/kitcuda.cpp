@@ -214,14 +214,14 @@ bool __kitcuda_initialize() {
       fprintf(stderr, "  kitcuda: threads/block: %d\n", threads_per_block);
   }
 
-  bool enable_occupancy_launch;
+  bool enable_occupancy_launch = true;
   __kitrt_get_env_value("KITCUDA_USE_OCCUPANCY_LAUNCH",
                         enable_occupancy_launch);
   __kitcuda_use_occupancy_launch(enable_occupancy_launch);
   if (__kitrt_verbose_mode())
     fprintf(stderr, "  kitcuda: occupancy-based launches enabled.\n");
 
-  bool enable_refine_occ_launch;
+  bool enable_refine_occ_launch = true;
   __kitrt_get_env_value("KITCUDA_REFINE_OCCUPANCY_LAUNCH",
                         enable_refine_occ_launch);
   __kitcuda_refine_occupancy_launches(enable_refine_occ_launch);

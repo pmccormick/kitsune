@@ -1020,6 +1020,10 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // Create two builders -- one inserts code into the entry block
   // (e.g. new "up-front" allocas) and the other is for generating
   // new code into a split BB.
+  // 
+  // README!: If you are going to code gen an alloca in the code 
+  // below it is most likely (100%?) you really should use the 
+  // EntryBuilder vs. the NewBuilder.
   Function *Parent = TOI.ReplCall->getFunction();
   BasicBlock &EntryBB = Parent->getEntryBlock();
   IRBuilder<> EntryBuilder(&EntryBB.front());
@@ -1030,7 +1034,6 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   // TODO: There is some potential here to share this code across both
   // the hip and cuda transforms... 
-  // the hip and cuda transforms...
   LLVM_DEBUG(dbgs() << "\t*- code gen packing of " << OrderedInputs.size()
                     << " kernel args.\n");
   PointerType *VoidPtrTy = PointerType::getUnqual(Ctx);
@@ -1137,7 +1140,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
       ConstantInt::get(Int64Ty, InstMix.num_flops),
       ConstantInt::get(Int64Ty, InstMix.num_iops));
 
-  AllocaInst *AI = NewBuilder.CreateAlloca(KernelInstMixTy);
+  AllocaInst *AI = EntryBuilder.CreateAlloca(KernelInstMixTy);
   NewBuilder.CreateStore(InstructionMix, AI);
 
   LLVM_DEBUG(dbgs() << "\t*- code gen kernel launch....\n");

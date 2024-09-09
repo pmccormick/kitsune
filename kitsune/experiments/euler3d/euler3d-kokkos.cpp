@@ -604,7 +604,6 @@ int main(int argc, char** argv)
       rk_total += time;
     }
 
-    //dump(variables, nel, nelr);
 
     auto end_time = chrono::steady_clock::now();
     double elapsed_time = chrono::duration<double>(end_time-start_time).count();
@@ -626,6 +625,7 @@ int main(int argc, char** argv)
          << "*** " << elapsed_time << ", " << elapsed_time << "\n"
          << "----\n\n";
 
+    dump(variables, nel, nelr);
   } Kokkos::finalize();
 
   return 0;

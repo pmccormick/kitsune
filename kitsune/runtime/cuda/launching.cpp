@@ -390,27 +390,20 @@ void *__kitcuda_launch_kernel(const void *fat_bin, const char *kernel_name,
   else
     blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 
+  CUstream cu_stream = nullptr;
+  if (opaque_stream == nullptr) 
+    cu_stream = (CUstream)__kitcuda_get_thread_stream();
+  else
+    cu_stream = (CUstream)opaque_stream;
+
   if (__kitrt_verbose_mode()) {
     fprintf(stderr, "kitcuda: kernel '%s' launch parameters:\n", kernel_name);
-    fprintf(stderr, "  blocks: %d, 1, 1\n", blks_per_grid);
-    fprintf(stderr, "  threads: %d, 1, 1\n", threads_per_blk);
-    fprintf(stderr, "  trip count: %ld\n\n", trip_count);
+    fprintf(stderr, "  blocks:          %d, 1, 1\n", blks_per_grid);
+    fprintf(stderr, "  threads:         %d, 1, 1\n", threads_per_blk);
+    fprintf(stderr, "  trip count:      %ld\n", trip_count);
+    fprintf(stderr, "  kernel func ptr: %p\n", cu_func);
+    fprintf(stderr, "  stream ptr:      %p\n\n", cu_stream);
   }
-
-  CUstream cu_stream = nullptr;
-  if (opaque_stream == nullptr) {
-    // create a stream for this launch...
-    if (__kitrt_verbose_mode())
-      fprintf(stderr,"kitcuda: launch stream null, asking for a stream.\n");
-    cu_stream = (CUstream)__kitcuda_get_thread_stream();
- 
-  } else {
-    // use the provided stream for this launch...
-    if (__kitrt_verbose_mode())
-      fprintf(stderr, "kitcuda: launch stream is non-null.\n");
-    cu_stream = (CUstream)opaque_stream;
-  }
-
   CU_SAFE_CALL(cuLaunchKernel_p(cu_func, blks_per_grid, 1, 1,
                         			  threads_per_blk, 1, 1,
                                 0, // shared mem size

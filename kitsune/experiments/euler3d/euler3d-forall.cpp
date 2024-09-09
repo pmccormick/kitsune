@@ -579,6 +579,6 @@ int main(int argc, char** argv)
        << "*** " << elapsed_time << ", " << elapsed_time << "\n"                
        << "----\n\n";
 
-  //dump(variables, nel, nelr);
+  dump(variables, nel, nelr);
   return 0;
 }
