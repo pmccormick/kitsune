@@ -1020,10 +1020,11 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // Create two builders -- one inserts code into the entry block
   // (e.g. new "up-front" allocas) and the other is for generating
   // new code into a split BB.
-  // 
-  // README!: If you are going to code gen an alloca in the code 
-  // below it is most likely (100%?) you really should use the 
-  // EntryBuilder vs. the NewBuilder.
+
+  // *** LOOKOUT: If you are going to code gen an alloca in the code 
+  // below it is most likely (100%?) you should use the EntryBuilder 
+  // vs. the NewBuilder.  If you find yourself with stack issues for
+  // longer running code this is a likely bug to check... 
   Function *Parent = TOI.ReplCall->getFunction();
   BasicBlock &EntryBB = Parent->getEntryBlock();
   IRBuilder<> EntryBuilder(&EntryBB.front());
