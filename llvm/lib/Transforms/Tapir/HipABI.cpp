@@ -1463,7 +1463,7 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
       ConstantInt::get(Int64Ty, InstMix.num_flops),
       ConstantInt::get(Int64Ty, InstMix.num_iops));
 
-  AllocaInst *AI = NewBuilder.CreateAlloca(KernelInstMixTy);
+  AllocaInst *AI = EntryBuilder.CreateAlloca(KernelInstMixTy);
   NewBuilder.CreateStore(InstructionMix, AI);
 
   LLVM_DEBUG(dbgs() << "\t*- code gen kernel launch...\n");

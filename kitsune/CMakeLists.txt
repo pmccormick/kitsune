@@ -195,7 +195,7 @@ if (KITSUNE_CUDA_ENABLE)
   find_package(CUDAToolkit ${KITSUNE_CUDA_VERSION_MIN}
      REQUIRED)
 
-  set(KITSUNE_CUDA_PREFIX ${CUDAToolkit_LIBRARY_ROOT})
+  set(KITSUNE_CUDA_PREFIX $ENV{CUDA_HOME})
   set(KITSUNE_CUDA_INCLUDE_DIR ${CUDAToolkit_INCLUDE_DIRS})
   set(KITSUNE_CUDA_BINARY_DIR ${CUDAToolkit_BIN_DIR})
   set(KITSUNE_CUDA_LIBRARY_DIR ${CUDAToolkit_LIBRARY_DIR})
@@ -203,7 +203,8 @@ if (KITSUNE_CUDA_ENABLE)
   set(KITSUNE_CUDA_LIBDEVICE_DIR "${KITSUNE_CUDA_PREFIX}/nvvm/libdevice")
 
   message("kitsune: cuda toolkit found.")
-  message("   Toolkit library root: ${KITSUNE_CUDA_PREFIX}")
+  message("   library root: ${KITSUNE_CUDA_PREFIX}")
+  message("   bitcode library root: ${KITSUNE_CUDA_LIBDEVICE_DIR}")
 
   find_library(KITSUNE_CUDA_LIB_CUDART cudart REQUIRED
     PATHS ${KITSUNE_CUDA_LIBRARY_DIR}

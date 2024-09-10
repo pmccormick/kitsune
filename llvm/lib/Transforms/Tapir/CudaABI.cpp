@@ -1380,13 +1380,16 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
     break;
   case 3:
     PTXASArgList.push_back("3");
-    // PTXASArgList.push_back("--extensible-whole-program");
+    PTXASArgList.push_back("--extensible-whole-program");
     break;
   default:
     llvm_unreachable_internal("unhandled/unexpected optimization level",
                               __FILE__, __LINE__);
     break;
   }
+
+  //PTXASArgList.push_back("--maxrregcount");
+  //PTXASArgList.push_back("50");
 
   PTXASArgList.push_back("--output-file");
   std::string SCodeFilename = AsmFile->getFilename().str();
