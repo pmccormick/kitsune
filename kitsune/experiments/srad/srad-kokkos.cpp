@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
     c1 = 0;
     c2 = 127;
     lambda = 0.5;
-    niter = 100;
+    niter = 2000;
   } else {
     usage(argc, argv);
   }
