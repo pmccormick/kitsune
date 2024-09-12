@@ -20,7 +20,7 @@ ifeq ($(kitsune_kokkos_enable),"ON")
 
   ifeq ($(BUILD_HIP_EXPERIMENTS),true)
     KOKKOS_HIP_PREFIX?=$(KITSUNE_PREFIX)/opt/kokkos/hip
-    KOKKOS_HIP_LIBS=-L$(KOKKOS_HIP_PREFIX)/lib -lkokkoscore -ldl
+    KOKKOS_HIP_LIBS=-L$(KOKKOS_HIP_PREFIX)/lib64 -lkokkoscore -ldl
     KOKKOS_HIPCC=$(ROCM_PATH)/bin/hipcc 
     KOKKOS_HIP_FLAGS?=$(HIPCC_CXX_FLAGS) -std=c++17 -fno-exceptions \
 				-I$(KOKKOS_HIP_PREFIX)/include/ -ffp-contract=off

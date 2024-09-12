@@ -64,6 +64,7 @@ __attribute__((malloc)) void *__kithip_mem_alloc_managed(size_t size) {
     __kithip_initialize();
   
   void *alloced_ptr;
+  
   HIP_SAFE_CALL(hipSetDevice(__kithip_get_device_id()));
   HIP_SAFE_CALL(hipMallocManaged_p(&alloced_ptr, size, hipMemAttachGlobal));
   _kithip_mem_alloc_mutex.lock();
@@ -147,6 +148,7 @@ bool __kithip_is_mem_managed(void *vp) {
   assert(vp && "unexpected null pointer!");
   assert(__kithip_is_initialized() && "kithip: runtime not initialized!");
   unsigned int is_managed;
+  HIP_SAFE_CALL(hipSetDevice(__kithip_get_device_id()));  
   // NOTE: We don't wrap in a HIP-safe call here as we could be
   // passing in a bogus pointer -- if we get a HIP error we will
   // assume the pointer is unmanaged and return false accordingly.
@@ -174,6 +176,8 @@ void* __kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
   // has lead to the best general performance and reduced complexity,
   // while also maintaining correctness.
   if (not __kitrt_is_mem_prefetched(vp, &size)) {
+    HIP_SAFE_CALL(hipSetDevice(__kithip_get_device_id()));
+  
     if (size > 0) {
       HIP_SAFE_CALL(hipMemAdvise_p(vp, size, hipMemAdviseSetPreferredLocation,
                                    __kithip_get_device_id()));
@@ -236,8 +240,10 @@ void __kithip_mem_host_prefetch(void *vp) {
       //
       // TODO: A lot of work needs to go into seeing if we can be
       // smarter about device- and host-side prefetching.
-      HIP_SAFE_CALL(hipMemAdvise_p(vp, size, hipMemAdviseSetPreferredLocation,
-                                   __kithip_get_device_id()));
+      //HIP_SAFE_CALL(hipMemAdvise_p(vp, size,
+      //			   hipMemAdviseSetPreferredLocation,
+      //                           __kithip_get_device_id()));
+
       // Issue a prefetch request on the stream associated with the
       // calling thread. Once issued go ahead and mark the memory as
       // no long being prefetched to the device/GPU.  This "mark" does

@@ -254,8 +254,8 @@ cl::opt<bool> Use64ElementWavefront(
     "hipabi-wavefront64", cl::init(true), cl::Hidden,
     cl::desc("Use 64 element wavefronts. (default: enabled)"));
 
-cl::opt<bool> EnableXnack("hipabi-xnack", cl::init(false), cl::NotHidden,
-                          cl::desc("Enable/disable xnack. (default: false)"));
+cl::opt<bool> EnableXnack("hipabi-xnack", cl::init(true), cl::NotHidden,
+                          cl::desc("Enable/disable xnack. (default: true)"));
 
 cl::opt<bool>
     EnableSRAMECC("hipabi-sramecc", cl::init(true), cl::NotHidden,
@@ -1159,7 +1159,7 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   std::string target_feature_str = "";
   switch (llvm::AMDGPU::parseArchAMDGCN(GPUArch)) {
   case GK_GFX90A:
-    target_feature_str = "+gfx90a-insts,";
+    target_feature_str = "+gfx90a-insts,+xnack,";
     [[fallthrough]];
   case GK_GFX908:
     target_feature_str += "+dot3-insts,+dot4-insts,+dot5-insts,"
@@ -1201,15 +1201,16 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   default:
     llvm_unreachable("Unhandled GPU!");
   }
+  
   // TODO: Need to build target-specific string... and decide if we
   // really need this...
   KernelF->addFnAttr("target-cpu", GPUArch);
+  KernelF->addFnAttr("target-features", target_feature_str.c_str());  
   KernelF->addFnAttr("uniform-work-group-size", "true");
   std::string AttrVal = llvm::utostr(MinWarpsPerExecUnit) + std::string(",") +
                         llvm::utostr(MaxThreadsPerBlock);
   KernelF->addFnAttr("amdgpu-flat-work-group-size", AttrVal);
   KernelF->addFnAttr("amdgpu-waves-per-eu", AttrVal);
-  KernelF->addFnAttr("target-features", target_feature_str.c_str());
   KernelF->addFnAttr("no-trapping-math", "true");
   KernelF->setVisibility(GlobalValue::VisibilityTypes::ProtectedVisibility);
   KernelF->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
@@ -1235,7 +1236,6 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   }
 
   IRBuilder<> Builder(Entry->getTerminator());
-
   // Get the thread ID for this invocation of Helper.
   //
   // This is the classic thread ID calculation:
@@ -1554,16 +1554,20 @@ HipABI::HipABI(Module &InputModule)
   // fatbinary.   Calling the runtime _kitrt_hipEnableXnack() will
   // auto-set the environment variable (now done via the global ctor).
   if (EnableXnack)
-    Features += "+xnack,+xnack-support,";
+    Features += "+xnack,+xnack-support";
+  else
+    Features += "-xnack,-xnack-support";
+  
 
   if (EnableSRAMECC) // TODO: feature is arch specific. need to cross-check.
-    Features += ",+sramecc,";
-
-  if (Use64ElementWavefront) // TODO: feature is arch specific. need to cross
-                             // check.
-    Features += "-wavefrontsize16,-wavefrontsize32,+wavefrontsize64";
+    Features += ",+sramecc";
   else
-    Features += "-wavefrontsize16,+wavefrontsize32,-wavefrontsize64";
+    Features += ",-sramecc";    
+
+  if (Use64ElementWavefront)
+    Features += ",-wavefrontsize16,-wavefrontsize32,+wavefrontsize64";
+  else
+    Features += ",-wavefrontsize16,+wavefrontsize32,-wavefrontsize64";
 
   AMDTargetMachine = AMDGPUTarget->createTargetMachine(
       TargetTriple.getTriple(), GPUArch, Features.c_str(), TargetOptions(),
@@ -1885,7 +1889,7 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   }
   LinkedObjFile->keep();
 
-  // TODO: The lld invocation below is unix-specific...
+  // TODO: The lld invocation below is install prefix and unix-specific...
   auto LLD = sys::findProgramByName("/projects/kitsune/x86_64/18.x/bin/lld");
   if ((EC = LLD.getError()))
     report_fatal_error("executable 'lld' not found! "
@@ -1898,11 +1902,11 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("elf64_amdgpu");
   LDDArgList.push_back("--no-undefined");
   LDDArgList.push_back("-shared");
-  // LDDArgList.push_back("--eh-frame-hdr");
+  LDDArgList.push_back("--eh-frame-hdr");
   LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
   LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
-  LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=false");
-  std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch;
+  LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
+  std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch + std::string(":xnack+:sramecc+");
   LDDArgList.push_back(mcpu_arg.c_str());
   std::string optlevel_arg = "--plugin-opt=O" + std::to_string(OptLevel);
   LDDArgList.push_back(optlevel_arg.c_str());
@@ -2339,7 +2343,8 @@ void HipABI::postProcessModule() {
                       << "host-side (re)optimization passes.\n");
 
     PipelineTuningOptions pto;
-    pto.LoopVectorization = HostOptLevel > 2;
+    //pto.LoopVectorization = HostOptLevel > 2;
+    pto.LoopVectorization = false;
     pto.SLPVectorization = HostOptLevel > 2;
     pto.LoopUnrolling = HostOptLevel > 1;
     pto.LoopInterleaving = HostOptLevel > 1;

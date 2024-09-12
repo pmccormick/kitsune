@@ -158,8 +158,11 @@ bool __kithip_initialize() {
          " of devices.");
 
   HIP_SAFE_CALL(hipSetDevice_p(_kithip_device_id));
-  HIP_SAFE_CALL(
-      hipGetDeviceProperties_p(&_kithip_device_props, _kithip_device_id));
+  HIP_SAFE_CALL(hipGetDeviceProperties_p(&_kithip_device_props, 
+                _kithip_device_id));
+  fprintf(stderr, "managed memory: %d ", 
+          _kithip_device_props.managedMemory);
+
 
   // For ease of code generation on part of the compiler and humans
   // (mostly writing the runtime and compiler support) we currently
@@ -255,6 +258,8 @@ bool __kithip_initialize() {
             _kithip_num_async_engines);
     fprintf(stderr, "        can map host mem:     %s\n",
             _kithip_can_map_host_mem ? "yes" : "no");
+    fprintf(stderr, "        managed mem:          %s\n",
+            has_managed_memory ? "yes" : "no");
     fprintf(stderr, "        uses host page table: %s\n",
             _kithip_uses_host_page_table ? "yes" : "no");
     fprintf(stderr, "        concurrent kernels:   %s\n",
@@ -281,6 +286,7 @@ bool __kithip_initialize() {
 }
 
 void __kithip_enable_xnack() {
+  fprintf(stderr, "enabling xnack!\n");
   _kithip_use_xnack = true;
 }
 

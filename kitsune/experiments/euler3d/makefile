@@ -24,8 +24,8 @@ euler3d-forall.cuda.${host_arch}: euler3d-forall.cpp
 	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 euler3d-forall.hip.${host_arch}: euler3d-forall.cpp 
-	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@echo $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) -ffp-contract=off $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)

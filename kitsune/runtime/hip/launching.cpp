@@ -148,8 +148,9 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
   // As a default starting point, the hip occupancy heuristic to get
   // an initial occupancy-driven threads-per-block figure.
   int min_grid_size;
-  HIP_SAFE_CALL(hipModuleOccupancyMaxPotentialBlockSize_p(
-      &min_grid_size, &threads_per_blk, kfunc, 0, 0));
+  HIP_SAFE_CALL(hipModuleOccupancyMaxPotentialBlockSize_p(&min_grid_size,
+							  &threads_per_blk,
+							  kfunc, 0, 0));
 
   if (_kithip_refine_occupancy_calc) {
     // Assume that the occupancy heuristic is flawed and look to refine 
@@ -215,7 +216,7 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
     }
   }
 
-  blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
+  blks_per_grid = (trip_count + (threads_per_blk - 1)) / threads_per_blk;
 }
 
 } // namespace
@@ -289,6 +290,17 @@ void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
   else
     blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 
+  /*if (threads_per_blk > 512) {
+    int num_multiprocs = 0;
+    extern int _kithip_device_id;
+    HIP_SAFE_CALL(hipDeviceGetAttribute_p(&num_multiprocs, 
+        hipDeviceAttributeMultiprocessorCount,
+        _kithip_device_id));
+    threads_per_blk = 512;
+    blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
+  }
+  */
+
   if (__kitrt_verbose_mode()) {
     fprintf(stderr, "kithip: '%s' launch parameters:\n", kernel_name);
     fprintf(stderr, "  blocks:     %d, 1, 1\n", blks_per_grid);
@@ -297,17 +309,10 @@ void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
   }
 
   hipStream_t hip_stream = nullptr;
-  if (opaque_stream == nullptr) {
+  if (opaque_stream == nullptr)
     hip_stream = (hipStream_t)__kithip_get_thread_stream();
-    if (__kitrt_verbose_mode())
-      fprintf(stderr,
-              "kithip: launch stream is null, creating a new stream.\n");
-  } else {
+  else
     hip_stream = (hipStream_t)opaque_stream;    
-    if (__kitrt_verbose_mode())
-      fprintf(stderr,
-              "kithip: launch stream is non-null.\n");
-  }
 
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(kern_func, blks_per_grid, 1, 1,
                                         threads_per_blk, 1, 1,
@@ -320,6 +325,8 @@ void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
 void *__kithip_get_global_symbol(void *fat_bin, const char *sym_name) {
   assert(fat_bin && "null fat binary!");
   assert(sym_name && "null symbol name!");
+  
+  HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));    
 
   hipModule_t hip_module;
   _kithip_module_map_mutex.lock();

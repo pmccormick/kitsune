@@ -160,6 +160,7 @@ int main(int argc, char* argv[])
     iS.sync_device();
     jE.sync_device();
     jW.sync_device();
+
     for (int iter=0; iter < niter; iter++) {
       sum=0; sum2=0;
 
