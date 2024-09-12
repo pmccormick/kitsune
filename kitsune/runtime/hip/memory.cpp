@@ -72,9 +72,9 @@ __attribute__((malloc)) void *__kithip_mem_alloc_managed(size_t size) {
   _kithip_mem_alloc_mutex.unlock();
   // Cheat a tad and just go ahead and issue a prefetch at allocation
   // time.  Could bite us but what the heck...
-  HIP_SAFE_CALL(hipMemPrefetchAsync_p(alloced_ptr, size,
-                     __kithip_get_device_id(),
-                     (hipStream_t)__kithip_get_thread_stream()));
+  //HIP_SAFE_CALL(hipMemPrefetchAsync_p(alloced_ptr, size,
+  //                   __kithip_get_device_id(),
+  //                   (hipStream_t)__kithip_get_thread_stream()));
   return alloced_ptr;
 }
 

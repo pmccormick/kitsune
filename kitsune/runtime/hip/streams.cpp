@@ -102,7 +102,9 @@ extern "C" {
 #endif
 
 void *__kithip_get_thread_stream() {
-
+  #ifdef KITHIP_USE_DEFAULT_STREAM
+  return (void*)0;
+  #else
   hipStream_t hip_stream;
   _kithip_stream_mutex.lock();
   if (not _kithip_streams.empty()) {
@@ -117,28 +119,23 @@ void *__kithip_get_thread_stream() {
   }
   _kithip_stream_mutex.unlock();
   return (void*)hip_stream;
+  #endif
 }
 
- void __kithip_sync_thread_stream(void *opaque_stream) {
-   assert(opaque_stream != nullptr && "unexpected null stream pointer!");
-   hipStream_t hip_stream = (hipStream_t)opaque_stream;
-   //HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
-   HIP_SAFE_CALL(hipStreamSynchronize_p(hip_stream));
-   //HIP_SAFE_CALL(hipDeviceSynchronize_p());   
-   // In our current model a synchronized stream is done doing useful
-   // work.  Recycle it for later use.
-  _kithip_stream_mutex.lock();
-  fprintf(stderr, "\tsave sttream for reuse...\n");  
-  _kithip_streams.push_back(hip_stream);
-  _kithip_stream_mutex.unlock();
-  fprintf(stderr, "\tdone.\n");    
-  if (__kitrt_verbose_mode()) 
-    fprintf(stderr, "kithip: recycling execution stream at sync point [stream=%p, poolsize=%zu].\n",
-            opaque_stream, _kithip_streams.size());
- }
+void __kithip_sync_thread_stream(void *opaque_stream) {
+  HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
+  if (opaque_stream) {
+    hipStream_t hip_stream = (hipStream_t)opaque_stream;
+    HIP_SAFE_CALL(hipStreamSynchronize_p(hip_stream));
+    _kithip_stream_mutex.lock();
+    _kithip_streams.push_back(hip_stream);
+    _kithip_stream_mutex.unlock();
+  } else // null streams sync to full device
+    HIP_SAFE_CALL(hipDeviceSynchronize_p()); 
+}
 
 void __kithip_sync_context() {
-  //HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));            
+  HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));            
   HIP_SAFE_CALL(hipDeviceSynchronize_p());
 }
 
