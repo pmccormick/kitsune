@@ -109,7 +109,7 @@ bool __kithip_initialize() {
     (void)setenv("HSA_XNACK", "1", 1);
     if (__kitrt_verbose_mode()) {
       fprintf(stderr, "kithip: xnack enabled.\n");
-      fprintf(stderr, "        HSA_XNACK automatically set in running environment.\n");
+      fprintf(stderr, "        HSA_XNACK automatically set.\n");
     }
   }
 
@@ -124,12 +124,11 @@ bool __kithip_initialize() {
     abort();
   }
 
-  // NOTE: Even though the HIP docs suggest that, "most HIP [calls]
+  // NOTE: The HIP documentation suggest that, "most HIP [calls]
   // implicitly initialize the runtime. This [call] provides control
-  // over the timing of the initialization."  Instead of relying on
-  // HIP to deal with initialization we prefer to be explicit about
-  // it -- given we're a code gen target, do some funny things via a
-  // global ctor, and "most" is undefined/unclarified in the HIP docs.
+  // over the timing of the initialization."  Given the runtime
+  // initialization is managed via a codegen'ed global ctor we use
+  // this direct initialization path. 
   HIP_SAFE_CALL(hipInit_p(0));
 
   int device_count;
@@ -142,42 +141,29 @@ bool __kithip_initialize() {
     abort();
   }
 
-  // Note that instead of sharing a common device id across runtime
-  // components (e.g., with CUDA and HIP) we instead isolate them
-  // within each sub-component.  This isolation provides some
-  // flexibility, future-proofing of details, and a possibility of
-  // keeping support isolated for bizarre cases where multiple
-  // devices from different vendors are available on a single
-  // system.
-
-  if (!__kitrt_get_env_value("KITHIP_DEVICE_ID", _kithip_device_id))
+  // For systems with multiple GPUs we can use the following
+  // environment variable to tweak the default behavior of the
+  // runtime.
+  if (not __kitrt_get_env_value("KITHIP_DEVICE_ID", _kithip_device_id))
     _kithip_device_id = 0;
 
   assert(_kithip_device_id < device_count &&
-         "kithip: KITHIP_DEVICE_ID value exceeds available number"
+         "kithip: FATAL ERROR -- "
+	 "KITHIP_DEVICE_ID environment value exceeds available number"
          " of devices.");
 
   HIP_SAFE_CALL(hipSetDevice_p(_kithip_device_id));
   HIP_SAFE_CALL(hipGetDeviceProperties_p(&_kithip_device_props, 
                 _kithip_device_id));
-  fprintf(stderr, "managed memory: %d ", 
-          _kithip_device_props.managedMemory);
 
-
-  // For ease of code generation on part of the compiler and humans
-  // (mostly writing the runtime and compiler support) we currently
-  // require managed memory support.  While this can introduce
-  // performance problems, it significantly reduces explicit
-  // requirements to manage data movement at the program level as
-  // well as trying to track these details within the runtime.
+  // Both the compiler and the runtime assume availability of
+  // managed memory.  Make sure we have adequate support from
+  // HIP and the selected device... 
   //
-  // HIP is somewhat challenging on this front as we have found
-  // some details to be inconsistent in terms of what is documented
-  // and how it actually behaves in practice.  Given this has touch
-  // points all the way into the kernel's page management it is not
-  // entirely straightforward to debug and analyze -- work needs to
-  // be on the HIP side here to better understand what's going on...
-  //
+  // HIP is somewhat challenging on this front as some details
+  // have been a bit inconsistent as the implementation has
+  // matured... 
+  // 
   // From AMD's documentation:
   //
   //   "Managed memory [snip] is supported in the HIP combined
@@ -196,56 +182,50 @@ bool __kithip_initialize() {
   HIP_SAFE_CALL(hipDeviceGetAttribute(
       &has_managed_memory, hipDeviceAttributeManagedMemory, _kithip_device_id));
   if (!has_managed_memory) {
-    fprintf(stderr, "kithip: device does not support managed memory!\n");
-    fprintf(stderr, "kithip: aborting...\n");
+    fprintf(stderr, "kithip: FATAL ERROR -- "
+	    "device does not support managed memory!\n");
     __kitrt_print_stack_trace();
     abort();
   }
 
-  // AMD's example code suggests this is a preferred (additional?
-  // required?) check that should be done prior to using managed
-  // memory.  TODO: It is unclear why there is a disagreement
-  // between docs and code samples.  We could possibly clarify or
-  // simplify code here by looking at this in more detail.
+  // Some of AMD's example code uses (suggests?) this is an additional
+  // check that should be done prior to using managed memory.
+  // It is unclear why there is a disagreement between docs and code
+  // samples...
   int has_concurrent_access = 0;
   HIP_SAFE_CALL(hipDeviceGetAttribute_p(
       &has_concurrent_access, hipDeviceAttributeConcurrentManagedAccess,
       _kithip_device_id));
 
   if (!has_concurrent_access) {
-    fprintf(stderr, "kithip: device does not have support for concurrent"
-                    " managed memory accesses!\n");
-    fprintf(stderr, "kithip: aborting...\n");
+    fprintf(stderr, "kithip: FATAL ERROR -- "
+	    "device does not have support for concurrent"
+	    " managed memory accesses!\n");
     __kitrt_print_stack_trace();
     abort();
   }
 
-  // At this point we're ready to go as far as the basic HIP
-  // initialization requirements go.  Let's consider this a success.
   _kithip_initialized = true;
 
-  // Grab some device-specific details that we will need either at
-  // runtime or to provide some verbose feedback during execution to
-  // help provide platform-/target-specific details for performance,
-  // debugging, etc.
+  // Grab some device-specific details that we use at runtime.
   HIP_SAFE_CALL(hipDeviceGetAttribute_p(&_kithip_max_threads_per_blk,
-                                        hipDeviceAttributeMaxThreadsPerBlock,
-                                        _kithip_device_id));
-  HIP_SAFE_CALL(hipDeviceGetAttribute_p(
-      &_kithip_ecc_enabled, hipDeviceAttributeEccEnabled, _kithip_device_id));
-  //HIP_SAFE_CALL(hipDeviceGetAttribute_p(&_kithip_num_async_engines,
-  //                                      hipDeviceAttributeAsyncEngineCount,
-  //                                      _kithip_device_id));
+                hipDeviceAttributeMaxThreadsPerBlock,
+                _kithip_device_id));
+  HIP_SAFE_CALL(hipDeviceGetAttribute_p(&_kithip_ecc_enabled,
+                hipDeviceAttributeEccEnabled,
+                _kithip_device_id));
   HIP_SAFE_CALL(hipDeviceGetAttribute_p(&_kithip_can_map_host_mem,
-                                        hipDeviceAttributeCanMapHostMemory,
-                                        _kithip_device_id));
+                hipDeviceAttributeCanMapHostMemory,
+                _kithip_device_id));
   HIP_SAFE_CALL(hipDeviceGetAttribute_p(&_kithip_concurrent_kernels,
-                                        hipDeviceAttributeConcurrentKernels,
-                                        _kithip_device_id));
-  HIP_SAFE_CALL(hipDeviceGetAttribute_p(
-      &_kithip_uses_host_page_table,
-      hipDeviceAttributePageableMemoryAccessUsesHostPageTables,
-      _kithip_device_id));
+                hipDeviceAttributeConcurrentKernels,
+                _kithip_device_id));
+  HIP_SAFE_CALL(hipDeviceGetAttribute_p(&_kithip_uses_host_page_table,
+                hipDeviceAttributePageableMemoryAccessUsesHostPageTables,
+                _kithip_device_id));
+  //HIP_SAFE_CALL(hipDeviceGetAttribute_p(&_kithip_num_async_engines,
+  //              hipDeviceAttributeAsyncEngineCount,
+  //              _kithip_device_id));
 
   if (__kitrt_verbose_mode()) {
     fprintf(stderr, "kithip: found %d devices.\n", device_count);

@@ -21,7 +21,8 @@ raytracer-forall.opencilk.${host_arch}: raytracer-forall.cpp
 	@$(FILE_SIZE)
 raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(KITSUNE_FAST_MATH) $(TAPIR_CUDA_FLAGS) -o $@ $<
+	@echo $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $<
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $<
 	@$(FILE_SIZE)
 
 raytracer-forall.hip.${host_arch}: raytracer-forall.cpp 

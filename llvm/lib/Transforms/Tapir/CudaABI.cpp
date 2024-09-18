@@ -625,7 +625,7 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
         // If GV is non-constant we will need to
         // create a device-side version that will
         // have the host-side value copied over
-        // prior to launching the cooresponding
+        // prior to launching the corresponding
         // kernel...
         NewGV = new GlobalVariable(
             KernelModule, GV->getValueType(), /* isConstant*/ false,
@@ -745,6 +745,7 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   // occurred before outlining.
   Function *KernelF = Out.Outline;
   KernelF->setName(KernelName);
+
   KernelF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
   KernelF->removeFnAttr("target-cpu");
   KernelF->removeFnAttr("target-features");
@@ -986,14 +987,14 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // supported) we can end up with multiple calls to the outlined
   // loop (which has been setup for dead code elimination) but can
   // cause invalid IR that trips us up when handling the GPU module
-  // code generation. This is a challenge in the Tapir design that 
-  // was not geared to handle some of the nuances of GPU target 
-  // transformations (and code gen).  To address this, we need to 
+  // code generation. This is a challenge in the Tapir design that
+  // was not geared to handle some of the nuances of GPU target
+  // transformations (and code gen).  To address this, we need to
   // do some clean up to keep the IR correct (or the verifier will
-  // fail on us...).  Specifically, we can no longer depend upon 
+  // fail on us...).  Specifically, we can no longer depend upon
   // DCE as it runs too late in the GPU transformation process...
   //
-  // TODO: This code can be shared between the cuda and hip targets... 
+  // TODO: This code can be shared between the cuda and hip targets...
   //
   Function *TargetKF = KernelModule.getFunction(KernelName);
   std::list<Instruction *> RemoveList;
@@ -1021,10 +1022,10 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // (e.g. new "up-front" allocas) and the other is for generating
   // new code into a split BB.
 
-  // *** LOOKOUT: If you are going to code gen an alloca in the code 
-  // below it is most likely (100%?) you should use the EntryBuilder 
+  // *** LOOKOUT: If you are going to code gen an alloca in the code
+  // below it is most likely (100%?) you should use the EntryBuilder
   // vs. the NewBuilder.  If you find yourself with stack issues for
-  // longer running code this is a likely bug to check... 
+  // longer running code this is a likely bug to check...
   Function *Parent = TOI.ReplCall->getFunction();
   BasicBlock &EntryBB = Parent->getEntryBlock();
   IRBuilder<> EntryBuilder(&EntryBB.front());
@@ -1034,15 +1035,16 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   IRBuilder<> NewBuilder(&NewBB->front());
 
   // TODO: There is some potential here to share this code across both
-  // the hip and cuda transforms... 
+  // the hip and cuda transforms...
   LLVM_DEBUG(dbgs() << "\t*- code gen packing of " << OrderedInputs.size()
                     << " kernel args.\n");
   PointerType *VoidPtrTy = PointerType::getUnqual(Ctx);
   ArrayType *ArrayTy = ArrayType::get(VoidPtrTy, OrderedInputs.size());
   Value *ArgArray = EntryBuilder.CreateAlloca(ArrayTy);
-  AllocaInst *CudaStream = EntryBuilder.CreateAlloca(VoidPtrTy);
-  EntryBuilder.CreateStore(ConstantPointerNull::get(VoidPtrTy), CudaStream);
-  bool StreamAssigned = false;
+
+  Value *NullPtr = ConstantPointerNull::get(PointerType::getUnqual(Ctx));
+  Value *CudaStream = ConstantPointerNull::get(PointerType::getUnqual(Ctx));
+
   unsigned int i = 0;
   for (Value *V : OrderedInputs) {
     Value *VP = EntryBuilder.CreateAlloca(V->getType());
@@ -1054,16 +1056,9 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     i++;
 
     if (CodeGenPrefetch && V->getType()->isPointerTy()) {
-      LLVM_DEBUG(dbgs() << "\t\t- code gen prefetch for kernel arg #" 
-                        << i << "\n");
-      Value *VoidPP = NewBuilder.CreateBitCast(V, VoidPtrTy);
-      Value *SPtr = NewBuilder.CreateLoad(VoidPtrTy, CudaStream);
-      Value *NewSPtr =
-          NewBuilder.CreateCall(KitCudaMemPrefetchFn, {VoidPP, SPtr});
-      if (not StreamAssigned) {
-        NewBuilder.CreateStore(NewSPtr, CudaStream);
-        StreamAssigned = true;
-      }
+      LLVM_DEBUG(dbgs() << "\t\t- code gen prefetch for kernel arg #" << i
+                        << "\n");
+      CudaStream = NewBuilder.CreateCall(KitCudaMemPrefetchFn, {V, CudaStream});
     }
   }
 
@@ -1094,9 +1089,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // current loop so we use a 'dummy' (null) fat binary for code gen at
   // this point -- we'll post-process the module to clean this up after
   // we've processed all tapir loops.
-  Constant *DummyFBGV =
-      tapir::getOrInsertFBGlobal(M, "_cuabi.dummy_fatbin", VoidPtrTy);
-  Value *DummyFBPtr = NewBuilder.CreateLoad(VoidPtrTy, DummyFBGV);
+  (void)tapir::getOrInsertFBGlobal(M, "_cuabi.dummy_fatbin", VoidPtrTy);
 
   // Deal with type mismatches for the trip count. A difference
   // introduced via the input source details and the runtime's
@@ -1145,17 +1138,13 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   NewBuilder.CreateStore(InstructionMix, AI);
 
   LLVM_DEBUG(dbgs() << "\t*- code gen kernel launch....\n");
-  Value *KSPtr = NewBuilder.CreateLoad(VoidPtrTy, CudaStream);
-  CallInst *LaunchStream = NewBuilder.CreateCall(
-      KitCudaLaunchFn, {DummyFBPtr, KNameParam, argsPtr, CastTripCount,
-                        TPBlockValue, AI, KSPtr});
-  // if (not StreamAssigned)
-  NewBuilder.CreateStore(LaunchStream, CudaStream);
-  LLVM_DEBUG(dbgs() << "\t\t+- registering launch stream:\n"
-                    << "\t\t\tcall: " << *LaunchStream << "\n"
-                    << "\t\t\tstream: " << *CudaStream << "\n");
-  TTarget->registerLaunchStream(LaunchStream, CudaStream);
-
+  CudaStream = NewBuilder.CreateCall(
+      KitCudaLaunchFn, {NullPtr, KNameParam, argsPtr, CastTripCount,
+                        TPBlockValue, AI, CudaStream});
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  FunctionCallee KitCudaSyncFn = M.getOrInsertFunction(
+        "__kitcuda_sync_thread_stream", VoidTy, VoidPtrTy);
+  (void)NewBuilder.CreateCall(KitCudaSyncFn, { CudaStream});      
   TOI.ReplCall->eraseFromParent();
   LLVM_DEBUG(dbgs() << "*** finished processing outlined call.\n");
 }
@@ -1164,6 +1153,8 @@ CudaABI::CudaABI(Module &M)
     : TapirTarget(M),
       KernelModule(Twine(CUABI_PREFIX + sys::path::filename(M.getName())).str(),
                    M.getContext()) {
+
+  LLVM_DEBUG(saveModuleToFile(&M, M.getName().str() + ".cuabi-ctor"));
 
   // A helping hand for invocation of the transform from a JIT-driven
   // environment where it can be a bit painful to get to
@@ -1235,7 +1226,6 @@ std::unique_ptr<Module> &CudaABI::getLibDeviceModule() {
   if (not LibDeviceModule) {
     LLVMContext &Ctx = KernelModule.getContext();
     llvm::SMDiagnostic SMD;
-    llvm::errs() << "libdevice: " << KITSUNE_CUDA_LIBDEVICE_BC << "\n";
     // KITSUNE FIXME: It might be useful during development to override the
     // libdevice.10.bc function. We could do this with a command-line argument
     // that gets passed to this transform.
@@ -1283,27 +1273,12 @@ void CudaABI::addHelperAttributes(Function &F) { /* no-op */ }
 
 bool CudaABI::preProcessFunction(Function &F, TaskInfo &TI,
                                  bool OutliningTapirLoops) {
+  LLVM_DEBUG(saveModuleToFile(&M, M.getName().str() + ".prefunction.ll"));
   return false;
 }
 
 void CudaABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-  if (OutliningTapirLoops) {
-    LLVMContext &Ctx = M.getContext();
-    Type *VoidTy = Type::getVoidTy(Ctx);
-    PointerType *VoidPtrTy = PointerType::getUnqual(Ctx);
-    Value *CudaStream = ConstantPointerNull::get(VoidPtrTy);
-    FunctionCallee KitCudaSyncFn = M.getOrInsertFunction(
-        "__kitcuda_sync_thread_stream", VoidTy, VoidPtrTy);
-
-    for (Value *SR : SyncRegList) {
-      for (Use &U : SR->uses()) {
-        if (auto *SyncI = dyn_cast<SyncInst>(U.getUser()))
-          CallInst::Create(KitCudaSyncFn, {CudaStream}, "",
-                           &*SyncI->getSuccessor(0)->begin());
-      }
-    }
-    SyncRegList.clear();
-  }
+  // no-op 
 }
 
 void CudaABI::postProcessHelper(Function &F) { /* no-op */ }
@@ -1353,12 +1328,9 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
 
   // TODO: Do we need/want to add support for generating relocatable code?
 
-  // --gpu-name <gpu name>: Specify name of GPU to generate code for.
-  // (e.g., 'sm_70','sm_72','sm_75','sm_80','sm_86', 'sm_87')
-  PTXASArgList.push_back("--gpu-name"); // target gpu architecture.
+  PTXASArgList.push_back("--gpu-name"); // target gpu architecture (e.g., sm_86)
   PTXASArgList.push_back(GPUArch.c_str());
-
-  // For now let's always warn if we spill registers...
+  // Warn if we spill registers and provide feedback on kernel stats. 
   PTXASArgList.push_back("--warn-on-spills");
   PTXASArgList.push_back("--verbose");
 
@@ -1380,16 +1352,13 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
     break;
   case 3:
     PTXASArgList.push_back("3");
-    PTXASArgList.push_back("--extensible-whole-program");
+    //PTXASArgList.push_back("--extensible-whole-program");
     break;
   default:
     llvm_unreachable_internal("unhandled/unexpected optimization level",
                               __FILE__, __LINE__);
     break;
   }
-
-  //PTXASArgList.push_back("--maxrregcount");
-  //PTXASArgList.push_back("50");
 
   PTXASArgList.push_back("--output-file");
   std::string SCodeFilename = AsmFile->getFilename().str();
@@ -1423,10 +1392,6 @@ CudaABIOutputFile CudaABI::assemblePTXFile(CudaABIOutputFile &PTXFile) {
   if (ExecStat != 0)
     // 'ptxas' ran but returned an error state.
     report_fatal_error("fatal error: 'ptxas' failure: " + StringRef(ErrMsg));
-
-  // TODO: Not sure we need to force 'keep' here as we return
-  // the output file but will keep it here for now just to play it
-  // safe.
   AsmFile->keep();
   return AsmFile;
 }
@@ -1487,43 +1452,18 @@ void CudaABI::finalizeLaunchCalls(Module &M, GlobalVariable *Fatbin) {
   // launch finalization.
   CallInst *ThreadsPerBlockCI = nullptr;
   std::list<CallInst *> DummyCIList;
-  CallInst *SavedLaunchCI = nullptr;
-
   for (auto &Fn : FnList) {
     for (auto &BB : Fn) {
       for (auto &I : BB) {
         if (CallInst *CI = dyn_cast<CallInst>(&I)) {
           if (Function *CFn = CI->getCalledFunction()) {
-
             if (CFn->getName().starts_with("__kitrt_dummy_threads_per_blk")) {
               LLVM_DEBUG(dbgs() << "\t\t\t* discovered a threads-per-block "
                                    "placeholder call.\n");
               assert(ThreadsPerBlockCI == nullptr && "expected null pointer!");
               ThreadsPerBlockCI = CI;
-            } else if (CFn->getName().starts_with(
-                           "__kitcuda_sync_thread_stream")) {
-              LLVM_DEBUG(dbgs()
-                         << "\t\t\t* patching sync call: " << *CI << "\n");
-              if (SavedLaunchCI != nullptr) {
-                AllocaInst *StreamAI = getLaunchStream(SavedLaunchCI);
-                assert(StreamAI != nullptr && "unexpected null launch stream!");
-                LLVM_DEBUG(dbgs()
-                           << "\t\t\t\t* stream alloca: " << *StreamAI << "\n");
-                IRBuilder<> SyncBuilder(CI);
-                Value *CudaStream =
-                    SyncBuilder.CreateLoad(VoidPtrTy, StreamAI, "custreamh");
-                LLVM_DEBUG(dbgs()
-                           << "\t\t\t\t* cuda stream: " << *CudaStream << "\n");
-                CI->setArgOperand(0, CudaStream);
-                SavedLaunchCI = nullptr;
-                LLVM_DEBUG(dbgs() << "\t\t\t* patched call: " << *CI << "\n");
-              } else {
-                LLVM_DEBUG(dbgs()
-                           << "\t\t\t- note, matching launch not found!\n");
-              }
             } else if (CFn->getName().starts_with("__kitcuda_launch_kernel")) {
               LLVM_DEBUG(dbgs() << "\t\t\t* patching launch: " << *CI << "\n");
-              SavedLaunchCI = CI;
               Value *CFatbin;
               CFatbin = CastInst::CreateBitOrPointerCast(Fatbin, VoidPtrTy,
                                                          "_cubin.fatbin", CI);

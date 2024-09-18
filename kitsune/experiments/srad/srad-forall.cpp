@@ -18,7 +18,7 @@ void random_matrix(float *I, unsigned int rows, unsigned int cols) {
   auto end_time = chrono::steady_clock::now();
   double elapsed_time = chrono::duration<double>(end_time-start_time).count();
   cout << "  random matrix creation time " << elapsed_time << "\n";
-  /*
+
   cout << "  initial input data:\n";  
   for(unsigned int i = 0; i < 10; i++) {
     cout << "   ";        
@@ -27,7 +27,6 @@ void random_matrix(float *I, unsigned int rows, unsigned int cols) {
     cout << "...\n";
   }
   cout << "   ...\n";  
-  */
 }
 
 void usage(int argc, char **argv)
@@ -214,7 +213,7 @@ int main(int argc, char* argv[])
     auto loop2_end_time = chrono::steady_clock::now();
     etime = chrono::duration<double>
       (loop2_end_time - loop2_start_time).count();
-    fprintf(stderr, "loop 2 time: %lf\n", etime); 
+
     loop2_total_time += etime;
     if (etime > loop2_max_time)
       loop2_max_time = etime;

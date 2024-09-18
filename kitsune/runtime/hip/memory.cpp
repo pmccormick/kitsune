@@ -58,7 +58,8 @@ static std::mutex _kithip_mem_alloc_mutex;
 
 extern "C" {
 
-__attribute__((malloc)) void *__kithip_mem_alloc_managed(size_t size) {
+__attribute__((malloc))
+void *__kithip_mem_alloc_managed(size_t size) {
   extern bool _kithip_initialized;
   if (not _kithip_initialized)
     __kithip_initialize();
@@ -78,8 +79,9 @@ __attribute__((malloc)) void *__kithip_mem_alloc_managed(size_t size) {
   return alloced_ptr;
 }
 
-__attribute__((malloc)) void *__kithip_mem_calloc_managed(size_t count,
-                                                          size_t element_size) {
+__attribute__((malloc))
+void *__kithip_mem_calloc_managed(size_t count,
+				  size_t element_size) {
   assert(count != 0 && "zero-valued item count!");
   assert(element_size != 0 && "zero-valued element size!");
 
@@ -93,8 +95,9 @@ __attribute__((malloc)) void *__kithip_mem_calloc_managed(size_t count,
   return (void *)memp;
 }
 
-__attribute__((malloc)) void *__kithip__mem_realloc_managed(void *ptr,
-                                                            size_t size) {
+__attribute__((malloc))
+void *__kithip__mem_realloc_managed(void *ptr,
+				    size_t size) {
   assert(size != 0 && "zero-valued size!");
   void *memptr = nullptr;
   size_t alloced_nbytes = 0;
@@ -221,8 +224,7 @@ void __kithip_mem_host_prefetch(void *vp) {
   // explored.  In particular, in concert with compiler analysis and
   // code generation.
   //
-  // The semantics here are tricky and we don't have enough
-  // information to guarantee "smart" behavior.  If we have ever
+  // The semantics here are simple and error prone...  If we have ever
   // issued a prefetch to the device (gpu) it will show here as
   // prefetched.  In this case we assume a prefetch back to the host
   // is preferred and will let it proceed.  There are obviously cases

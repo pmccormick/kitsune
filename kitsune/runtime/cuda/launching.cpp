@@ -349,6 +349,7 @@ void *__kitcuda_launch_kernel(const void *fat_bin, const char *kernel_name,
   // thread enters without having previously set the context the CUDA
   // runtime becomes unhappy with us.  Make sure we're following the
   // rules.
+  // TODO: Is this still necessary?
   CUcontext ctx;
   CU_SAFE_CALL(cuCtxGetCurrent_p(&ctx));
   if (ctx == NULL)
@@ -365,16 +366,11 @@ void *__kitcuda_launch_kernel(const void *fat_bin, const char *kernel_name,
     if (modit == _kitcuda_module_map.end()) {
       // Create a supporting CUDA module and "register" the fat binary
       // image in the map...
-      if (__kitrt_verbose_mode())
-        fprintf(stderr, "kitcuda: create kernel module and save in the map.\n");
       CU_SAFE_CALL(cuModuleLoadData_p(&cu_module, fat_bin));
       _kitcuda_module_map[fat_bin] = cu_module;
-    } else {
-      if (__kitrt_verbose_mode())
-        fprintf(stderr, "kitcuda: module already loaded...\n");
+    } else 
       cu_module = modit->second;
-    }
-
+      
     // Look up the kernel function.
     CU_SAFE_CALL(cuModuleGetFunction_p(&cu_func, cu_module, kernel_name));
     _kitcuda_kernel_map[kernel_name] = cu_func;

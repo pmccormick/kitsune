@@ -167,7 +167,7 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
 int main(int argc, char **argv) {
   using namespace std;
 
-  unsigned int sampleCount = 1 << 7;
+  unsigned int sampleCount = 128;
   unsigned int imageWidth = 1280;
   unsigned int imageHeight = 1024;
 
@@ -188,14 +188,12 @@ int main(int argc, char **argv) {
   cout << "---- Raytracer benchmark (forall) ----\n"
        << "  Image size    : " << imageWidth << "x" << imageHeight << "\n"
        << "  Samples/pixel : " << sampleCount << "\n\n";
-
   cout << "  Allocating image..." << std::flush;
   unsigned int totalPixels = imageWidth * imageHeight;
   Pixel *img = alloc<Pixel>(totalPixels);
   cout << "  done.\n\n";
 
   cout << "  Starting benchmark..." << std::flush;
-
   auto start_time = chrono::steady_clock::now();
   forall(unsigned int i = 0; i < totalPixels; ++i) { 
     int x = i % imageWidth;

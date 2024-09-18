@@ -19,6 +19,7 @@ srad-forall.opencilk.${host_arch}: srad-forall.cpp
 	@$(FILE_SIZE)
 srad-forall.cuda.${host_arch}: srad-forall.cpp 
 	@echo $@
+	@echo $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 srad-forall.hip.${host_arch}: srad-forall.cpp 

@@ -113,11 +113,10 @@
 #include "llvm/Transforms/Tapir/Outline.h"
 #include "llvm/Transforms/Tapir/TapirGPUUtils.h"
 #include "llvm/Transforms/Tapir/TapirLoopInfo.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Transforms/Utils/TapirUtils.h"
 #include "llvm/Transforms/Utils/AMDGPUEmitPrintf.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
+#include "llvm/Transforms/Utils/TapirUtils.h"
 
 using namespace llvm;
 
@@ -638,7 +637,7 @@ void HipABI::transformConstants(Function *Fn) {
         LLVM_DEBUG(dbgs() << "\t\t\t\tnew gep:\n\t\t\t\t  " << *GEP << "\n");
       } else {
         LLVM_DEBUG(dbgs() << U->get());
-        LLVM_DEBUG(dbgs() << U->getUser()); 
+        LLVM_DEBUG(dbgs() << U->getUser());
         assert(false && "unexpected use/user of gep.");
       }
     }
@@ -1201,11 +1200,11 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   default:
     llvm_unreachable("Unhandled GPU!");
   }
-  
+
   // TODO: Need to build target-specific string... and decide if we
   // really need this...
   KernelF->addFnAttr("target-cpu", GPUArch);
-  KernelF->addFnAttr("target-features", target_feature_str.c_str());  
+  KernelF->addFnAttr("target-features", target_feature_str.c_str());
   KernelF->addFnAttr("uniform-work-group-size", "true");
   std::string AttrVal = llvm::utostr(MinWarpsPerExecUnit) + std::string(",") +
                         llvm::utostr(MaxThreadsPerBlock);
@@ -1364,9 +1363,10 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   PointerType *VoidPtrTy = PointerType::getUnqual(Ctx);
   ArrayType *ArrayTy = ArrayType::get(VoidPtrTy, OrderedInputs.size());
   Value *ArgArray = EntryBuilder.CreateAlloca(ArrayTy);
-  AllocaInst *HipStream = EntryBuilder.CreateAlloca(VoidPtrTy);
-  EntryBuilder.CreateStore(ConstantPointerNull::get(VoidPtrTy), HipStream);
-  bool StreamAssigned = false;
+
+  Value *NullPtr = ConstantPointerNull::get(PointerType::getUnqual(Ctx));
+  Value *HipStream = ConstantPointerNull::get(PointerType::getUnqual(Ctx));
+
   unsigned int i = 0;
   for (Value *V : OrderedInputs) {
     Value *VP = EntryBuilder.CreateAlloca(V->getType());
@@ -1380,14 +1380,7 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     if (CodeGenPrefetch && V->getType()->isPointerTy()) {
       LLVM_DEBUG(dbgs() << "\t\t- code gen prefetch for kernel arg #" << i
                         << "\n");
-      Value *VoidPP = NewBuilder.CreateBitCast(V, VoidPtrTy);
-      Value *SPtr = NewBuilder.CreateLoad(VoidPtrTy, HipStream);
-      Value *NewSPtr =
-          NewBuilder.CreateCall(KitHipMemPrefetchFn, {VoidPP, SPtr});
-      if (not StreamAssigned) {
-        NewBuilder.CreateStore(NewSPtr, HipStream);
-        StreamAssigned = true;
-      }
+      HipStream = NewBuilder.CreateCall(KitHipMemPrefetchFn, {V, HipStream});
     }
   }
 
@@ -1416,9 +1409,7 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // current loop so we use a 'dummy' (null) fat binary for code gen at
   // this point -- we'll post-process the module to clean this up after
   // we've processed all tapir loops.
-  Constant *DummyFBGV =
-      tapir::getOrInsertFBGlobal(M, HIPAPI_DUMMY_FATBIN_NAME, VoidPtrTy);
-  Value *DummyFBPtr = NewBuilder.CreateLoad(VoidPtrTy, DummyFBGV);
+    (void)tapir::getOrInsertFBGlobal(M, "_hipabi.dummy_fatbin", VoidPtrTy);
 
   // Deal with type mismatches for the trip count.  A difference
   // introduced via the input source details and the runtime's
@@ -1467,16 +1458,13 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   NewBuilder.CreateStore(InstructionMix, AI);
 
   LLVM_DEBUG(dbgs() << "\t*- code gen kernel launch...\n");
-  Value *KSPtr = NewBuilder.CreateLoad(VoidPtrTy, HipStream);
-  CallInst *LaunchStream = NewBuilder.CreateCall(
-      KitHipLaunchFn, {DummyFBPtr, KNameParam, argsPtr, CastTripCount,
-                       TPBlockValue, AI, KSPtr});
-
-  NewBuilder.CreateStore(LaunchStream, HipStream);
-  LLVM_DEBUG(dbgs() << "\t\t+- registering launch stream:\n"
-                    << "\t\t\tcall: " << *LaunchStream << "\n"
-                    << "\t\t\tstream: " << *HipStream << "\n");
-  TTarget->registerLaunchStream(LaunchStream, HipStream);
+  Type *VoidTy = Type::getVoidTy(Ctx);
+  HipStream = NewBuilder.CreateCall(
+      KitHipLaunchFn, {NullPtr, KNameParam, argsPtr, CastTripCount,
+                       TPBlockValue, AI, HipStream});
+  FunctionCallee KitHipSyncFn = M.getOrInsertFunction(
+        "__kithip_sync_thread_stream", VoidTy, VoidPtrTy);                       
+  (void)NewBuilder.CreateCall(KitHipSyncFn, {HipStream});
 
   TOI.ReplCall->eraseFromParent();
   LLVM_DEBUG(dbgs() << "*** finished processing outlined call.\n");
@@ -1557,12 +1545,11 @@ HipABI::HipABI(Module &InputModule)
     Features += "+xnack,+xnack-support";
   else
     Features += "-xnack,-xnack-support";
-  
 
   if (EnableSRAMECC) // TODO: feature is arch specific. need to cross-check.
     Features += ",+sramecc";
   else
-    Features += ",-sramecc";    
+    Features += ",-sramecc";
 
   if (Use64ElementWavefront)
     Features += ",-wavefrontsize16,-wavefrontsize32,+wavefrontsize64";
@@ -1700,20 +1687,7 @@ bool HipABI::preProcessFunction(Function &F, TaskInfo &TI,
 }
 
 void HipABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-  if (OutliningTapirLoops) {
-    LLVMContext &Ctx = M.getContext();
-    Type *VoidTy = Type::getVoidTy(Ctx);
-    PointerType *VoidPtrTy = PointerType::getUnqual(Ctx);
-    Value *HipStream = ConstantPointerNull::get(VoidPtrTy);
-    for (Value *SR : SyncRegList) {
-      for (Use &U : SR->uses()) {
-        if (auto *SyncI = dyn_cast<SyncInst>(U.getUser()))
-          CallInst::Create(KitHipSyncFn, {HipStream}, "",
-                           &*SyncI->getSuccessor(0)->begin());
-      }
-    }
-    SyncRegList.clear();
-  }
+  // no-op 
 }
 
 // We can't create a correct launch sequence until all the kernels
@@ -1732,27 +1706,14 @@ void HipABI::finalizeLaunchCalls(Module &M, GlobalVariable *BundleBin) {
   PointerType *VoidPtrTy = PointerType::getUnqual(Ctx);
   Type *Int64Ty = Type::getInt64Ty(Ctx);
   auto &FnList = M.getFunctionList();
-  CallInst *SavedLaunchCI = nullptr;
 
   for (auto &Fn : FnList) {
     for (auto &BB : Fn) {
       for (auto &I : BB) {
         if (CallInst *CI = dyn_cast<CallInst>(&I)) {
           if (Function *CFn = CI->getCalledFunction()) {
-            if (CFn->getName().starts_with("__kithip_sync_thread_stream")) {
-              if (SavedLaunchCI != nullptr) {
-                AllocaInst *StreamAI = getLaunchStream(SavedLaunchCI);
-                assert(StreamAI != nullptr && "unexpected null launch stream!");
-                IRBuilder<> SyncBuilder(CI);
-
-                Value *HipStream =
-                    SyncBuilder.CreateLoad(VoidPtrTy, StreamAI, "hipstreamh");
-                CI->setArgOperand(0, HipStream);
-                SavedLaunchCI = nullptr;
-              }
-            } else if (CFn->getName().starts_with("__kithip_launch_kernel")) {
+            if (CFn->getName().starts_with("__kithip_launch_kernel")) {
               LLVM_DEBUG(dbgs() << "\t\t\t* patching launch: " << *CI << "\n");
-              SavedLaunchCI = CI;
               Value *HipFatbin;
               HipFatbin = CastInst::CreateBitOrPointerCast(
                   BundleBin, VoidPtrTy, "_hipbin.fatbin", CI);
@@ -1906,7 +1867,8 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
   LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
   LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
-  std::string mcpu_arg = "-plugin-opt=mcpu=" + GPUArch + std::string(":xnack+:sramecc+");
+  std::string mcpu_arg =
+      "-plugin-opt=mcpu=" + GPUArch + std::string(":xnack+:sramecc+");
   LDDArgList.push_back(mcpu_arg.c_str());
   std::string optlevel_arg = "--plugin-opt=O" + std::to_string(OptLevel);
   LDDArgList.push_back(optlevel_arg.c_str());
@@ -2343,7 +2305,7 @@ void HipABI::postProcessModule() {
                       << "host-side (re)optimization passes.\n");
 
     PipelineTuningOptions pto;
-    //pto.LoopVectorization = HostOptLevel > 2;
+    // pto.LoopVectorization = HostOptLevel > 2;
     pto.LoopVectorization = false;
     pto.SLPVectorization = HostOptLevel > 2;
     pto.LoopUnrolling = HostOptLevel > 1;
