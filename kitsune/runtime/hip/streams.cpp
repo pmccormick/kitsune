@@ -51,6 +51,7 @@
 
 #include "kithip.h"
 #include "kithip_dylib.h"
+#include <chrono>
 #include <mutex>
 #include <deque>
 #include <algorithm>
@@ -102,36 +103,47 @@ extern "C" {
 #endif
 
 void *__kithip_get_thread_stream() {
-  #ifdef KITHIP_USE_DEFAULT_STREAM
-  return (void*)0;
-  #else
-  hipStream_t hip_stream;
+  hipStream_t hip_stream = nullptr;
   _kithip_stream_mutex.lock();
   if (not _kithip_streams.empty()) {
+    if (__kitrt_verbose_mode())
+      fprintf(stderr, "kithip: recycled streams available [poolsize=%zu].\n",
+	      _kithip_streams.size());    
     hip_stream = _kithip_streams.front();
     _kithip_streams.pop_front();
     if (__kitrt_verbose_mode())
-      fprintf(stderr, "kithip: use recycled stream [stream=%p, poolsize=%zu].\n",
+      fprintf(stderr, "kithip: ***** using recycled stream [stream=%p, poolsize=%zu].\n",
             (void*)hip_stream, _kithip_streams.size());
   } else {
     HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));          
     HIP_SAFE_CALL(hipStreamCreate(&hip_stream));
+    if (__kitrt_verbose_mode())
+      fprintf(stderr, "kithip: ++++ created a new stream (%p).\n", hip_stream);
   }
   _kithip_stream_mutex.unlock();
   return (void*)hip_stream;
-  #endif
 }
 
 void __kithip_sync_thread_stream(void *opaque_stream) {
+  using namespace std;
   HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
   if (opaque_stream) {
+    fprintf(stderr, "kithip: sync'ing stream [stream=%p, poolsize=%zu)\n",
+	      opaque_stream, _kithip_streams.size());    
     hipStream_t hip_stream = (hipStream_t)opaque_stream;
+    _kithip_stream_mutex.lock();    
     HIP_SAFE_CALL(hipStreamSynchronize_p(hip_stream));
-    _kithip_stream_mutex.lock();
     _kithip_streams.push_back(hip_stream);
+    if (__kitrt_verbose_mode()) 
+      fprintf(stderr, "kithip: saving stream for later (re)use...[stream=%p, poolsize=%zu)\n\n\n",
+	      opaque_stream, _kithip_streams.size());
     _kithip_stream_mutex.unlock();
-  } else // null streams sync to full device
-    HIP_SAFE_CALL(hipDeviceSynchronize_p()); 
+  } else {
+    // null stream syncs full device
+    if (__kitrt_verbose_mode()) 
+      fprintf(stderr, "kithip: default (null) stream, sync'ing full device...\n");
+    HIP_SAFE_CALL(hipDeviceSynchronize_p());
+  }
 }
 
 void __kithip_sync_context() {
@@ -153,8 +165,8 @@ void __kithip_delete_thread_stream(void *opaque_stream) {
 
 void __kithip_destroy_thread_streams() {
   _kithip_stream_mutex.lock();
-  for(auto &entry : _kithip_streams)
-    HIP_SAFE_CALL(hipStreamDestroy_p(entry));
+  //for(auto &entry : _kithip_streams)
+  //  HIP_SAFE_CALL(hipStreamDestroy_p(entry));
   _kithip_streams.clear();
   _kithip_stream_mutex.unlock();
 }

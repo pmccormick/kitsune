@@ -137,11 +137,11 @@ public:
 
   void pushSR(Value *SR) { SyncRegList.insert(SR); }
 
-  void registerLaunchStream(CallInst *CI, AllocaInst *AI) {
-    KernelLaunchToStreamMap.insert(std::pair<CallInst*,AllocaInst*>(CI,AI));
+  void registerLaunchStream(CallInst *CI, Value *Stream) {
+    KernelLaunchToStreamMap.insert(std::pair<CallInst*,Value*>(CI,Stream));
   }
 
-  AllocaInst* getLaunchStream(CallInst *CI) {
+  Value* getLaunchStream(CallInst *CI) {
     LaunchToStreamMapTy::iterator it;
     it = KernelLaunchToStreamMap.find(CI);
     if (it != KernelLaunchToStreamMap.end())
@@ -251,7 +251,7 @@ public:
   typedef std::list<Function*> KernelListTy;
   KernelListTy KernelFunctions;
 
-  typedef llvm::DenseMap<CallInst*,AllocaInst*>  LaunchToStreamMapTy;
+  typedef llvm::DenseMap<CallInst*,Value*>  LaunchToStreamMapTy;
   LaunchToStreamMapTy   KernelLaunchToStreamMap;
   
 

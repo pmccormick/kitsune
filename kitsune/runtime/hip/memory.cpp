@@ -190,17 +190,20 @@ void* __kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
   // lead to page faults and evictions of pages...  At present this
   // has lead to the best general performance and reduced complexity,
   // while also maintaining correctness.
+<<<<<<< HEAD
   if (not __kitrt_is_mem_prefetched(vp, &size)) {
   
     if (size > 0) {
       hipStream_t hip_stream;
       if (opaque_stream) {
-        if (__kitrt_verbose_mode())
         hip_stream = (hipStream_t)opaque_stream;
+        if (__kitrt_verbose_mode())
+          fprintf(stderr, "kithip: continue prefetch-driven execution stream [stream=%p].\n",
+                  (void*)hip_stream);		
       } else {
         hip_stream = (hipStream_t)__kithip_get_thread_stream();
         if (__kitrt_verbose_mode())
-          fprintf(stderr, "kithip: executing prefetch-driven execution stream [stream=%p].\n",
+          fprintf(stderr, "kithip: initiate prefetch-driven execution stream [stream=%p].\n",
                   (void*)hip_stream);	
       }
 

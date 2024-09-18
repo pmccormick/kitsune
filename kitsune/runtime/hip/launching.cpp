@@ -240,6 +240,7 @@ void __kithip_get_launch_params(size_t trip_count, hipFunction_t kfunc,
       threads_per_blk = _kithip_default_threads_per_blk;
     _kithip_launch_param_map[map_entry_name] = threads_per_blk;
   }
+  threads_per_blk = 256;
   blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 }
 
@@ -301,6 +302,7 @@ void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
     fprintf(stderr, "  blocks:     %d, 1, 1\n", blks_per_grid);
     fprintf(stderr, "  threads:    %d, 1, 1\n", threads_per_blk);
     fprintf(stderr, "  trip count: %ld\n", trip_count);
+    fprintf(stderr, "  stream ptr: %p\n", opaque_stream);
   }
 
   HIP_SAFE_CALL(hipModuleLaunchKernel_p(kern_func, blks_per_grid, 1, 1,

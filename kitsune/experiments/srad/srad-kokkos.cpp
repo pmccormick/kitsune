@@ -27,7 +27,6 @@ void random_matrix(FloatDualView &I, int rows, int cols) {
   auto end_time = chrono::steady_clock::now();
   double elapsed_time = chrono::duration<double>(end_time-start_time).count();
   cout << "random matrix creation time " << elapsed_time << "\n";
-
   cout << "  initial input data:\n";  
   for(unsigned int i = 0; i < 10; i++) {
     cout << "   ";        
@@ -225,7 +224,7 @@ int main(int argc, char* argv[])
       loop1_total_time += etime;
       if (etime > loop1_max_time)
 	loop1_max_time = etime;
-      else if (etime < loop1_min_time)
+      if (etime < loop1_min_time)
 	loop1_min_time = etime;      
 
       auto loop2_start_time = chrono::steady_clock::now();
@@ -254,7 +253,7 @@ int main(int argc, char* argv[])
       loop2_total_time += etime;
       if (etime > loop2_max_time)
 	loop2_max_time = etime;
-      else if (etime < loop2_min_time)
+      if (etime < loop2_min_time)
 	loop2_min_time = etime;      
     }
     auto end_time = chrono::steady_clock::now();

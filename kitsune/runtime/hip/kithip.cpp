@@ -83,7 +83,7 @@ bool _kithip_initialized = false;
 int _kithip_device_id = -1;
 static hipDeviceProp_t _kithip_device_props;
 static int _kithip_max_threads_per_blk;
-static bool _kithip_use_xnack = false;
+static bool _kithip_use_xnack = true;
 
 // TODO: These don't need to be global -- we're not using them elsewhere beyond
 // the initialization code for verbose feedback durring runtime...
@@ -280,10 +280,11 @@ void __kithip_enable_xnack() {
 void __kithip_destroy() {
   if (not _kithip_initialized)
     return;
-
-  __kithip_destroy_thread_streams();
+  HIP_SAFE_CALL(hipSetDevice_p(_kithip_device_id));  
   __kitrt_destroy_memory_map(__kithip_mem_destroy);
-  HIP_SAFE_CALL(hipDeviceReset_p());
+  HIP_SAFE_CALL(hipDeviceReset_p());  
+  __kithip_destroy_thread_streams();
+
   _kithip_initialized = false;
 }
 

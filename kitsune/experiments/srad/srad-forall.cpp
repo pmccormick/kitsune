@@ -139,6 +139,7 @@ int main(int argc, char* argv[])
   double loop2_max_time = 0.0, loop2_min_time = 1000.0;
   
   for (int iter=0; iter < niter; iter++) {
+    fprintf(stderr, "####### trip #%d\n", iter);
     float sum=0, sum2=0;
 
     for(int i=r1; i <= r2; i++) {
@@ -184,15 +185,17 @@ int main(int argc, char* argv[])
           c[k] = 1.0;
       }
     }
+    
     auto loop1_end_time = chrono::steady_clock::now();
     double etime = chrono::duration<double>
       (loop1_end_time - loop1_start_time).count();
     loop1_total_time += etime;
-    
     if (etime > loop1_max_time)
       loop1_max_time = etime;
-    else if (etime < loop1_min_time)
+    if (etime < loop1_min_time)
       loop1_min_time = etime;
+    fprintf(stderr, "loop 1 time: %lf, min: %lf, max: %lf\n", 
+            etime, loop1_min_time, loop1_max_time);
 
     auto loop2_start_time = chrono::steady_clock::now();
     forall(int i = 0; i < rows; i++) {
@@ -210,14 +213,14 @@ int main(int argc, char* argv[])
         J[k] = J[k] + 0.25*lambda*D;
       }
     }
+
     auto loop2_end_time = chrono::steady_clock::now();
     etime = chrono::duration<double>
       (loop2_end_time - loop2_start_time).count();
-
     loop2_total_time += etime;
     if (etime > loop2_max_time)
       loop2_max_time = etime;
-    else if (etime < loop2_min_time)
+    if (etime < loop2_min_time)
       loop2_min_time = etime;
   }
   auto end_time = chrono::steady_clock::now();

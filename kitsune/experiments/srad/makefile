@@ -46,11 +46,12 @@ srad-kokkos.clang.cuda.${host_arch}: srad-kokkos.cpp
 
 srad-kokkos.hipcc.${host_arch}: srad-kokkos.cpp 
 	@echo $@
+	@echo $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 	@$(TIME_CMD) $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 	@$(FILE_SIZE)
 srad-kokkos.clang.hip.${host_arch}: srad-kokkos.cpp 
 	@echo $@
-	@$(TIME_CMD) $(kitclangxx) -fPIC --language=hip $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) $(HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64
+	$(TIME_CMD) $(kitclangxx) -fPIC --language=hip $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) $(HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64
 	@$(FILE_SIZE)
 #####
 

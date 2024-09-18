@@ -89,7 +89,6 @@ void *__kitcuda_get_thread_stream() {
     CU_SAFE_CALL(cuStreamCreate(&cu_stream, CU_STREAM_NON_BLOCKING));    
     if (__kitrt_verbose_mode())
       fprintf(stderr, "created new stream (%p).\n", cu_stream);
-
   }
   _kitcuda_stream_mutex.unlock();
 

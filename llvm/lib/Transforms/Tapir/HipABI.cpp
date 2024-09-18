@@ -1047,27 +1047,16 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
           LLVM_DEBUG(dbgs() << "\t\t\t(remove target attributes from clone)\n");
           DeviceF->removeFnAttr("target-cpu");
           DeviceF->removeFnAttr("target-features");
-
           // Exceptions are not supported on the device side, so remove any
           // related attributes...
-          LLVM_DEBUG(dbgs()
-                     << "\t\t\t(remove exception attributes from clone)\n");
           DeviceF->removeFnAttr(Attribute::UWTable);
           DeviceF->addFnAttr(Attribute::NoUnwind);
 
           if (OptLevel > 1 &&
               not DeviceF->hasFnAttribute(Attribute::NoInline)) {
-            // Try to encourage inlining at high optimization levels.
+            // Try to encourage inlining at higher optimization levels.
             DeviceF->addFnAttr(Attribute::AlwaysInline);
-            LLVM_DEBUG(dbgs()
-                       << "\t\t\t(optimization: mark as always-inline)\n");
           }
-
-          // LLVM_DEBUG(dbgs() << "\t\t\t(target for '" << GPUArch << "')\n");
-          // DeviceF->addFnAttr("target-cpu", GPUArch);
-          // DeviceF->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
-          // LLVM_DEBUG(dbgs() << "\t\t\t(target for fast calling
-          // convention\n");
           DeviceF->setCallingConv(CallingConv::Fast);
         }
       }
@@ -1365,15 +1354,18 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
     Value *VP = EntryBuilder.CreateAlloca(V->getType());
     NewBuilder.CreateStore(V, VP);
     Value *VoidVPtr = NewBuilder.CreateBitCast(VP, VoidPtrTy);
-    Value *ArgPtr =
-        NewBuilder.CreateConstInBoundsGEP2_32(ArrayTy, ArgArray, 0, i);
+    Value *ArgPtr = NewBuilder.CreateConstInBoundsGEP2_32(ArrayTy,
+							  ArgArray,
+							  0, i);
     NewBuilder.CreateStore(VoidVPtr, ArgPtr);
     i++;
 
     if (CodeGenPrefetch && V->getType()->isPointerTy()) {
       LLVM_DEBUG(dbgs() << "\t\t- code gen prefetch for kernel arg #" << i
                         << "\n");
-      HipStream = NewBuilder.CreateCall(KitHipMemPrefetchFn, {V, HipStream});
+      Value *VoidPP = NewBuilder.CreateBitCast(V, VoidPtrTy);
+      HipStream = NewBuilder.CreateCall(KitHipMemPrefetchFn,
+                                        {VoidPP, HipStream});
     }
   }
 
@@ -1385,6 +1377,8 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   const DataLayout &DL = M.getDataLayout();
   Value *argsPtr =
       NewBuilder.CreateConstInBoundsGEP2_32(ArrayTy, ArgArray, 0, 0);
+
+  // Generate a call to launch the kernel. 
   Constant *KNameCS = ConstantDataArray::getString(Ctx, KernelName);
   GlobalVariable *KNameGV =
       new GlobalVariable(M, KNameCS->getType(), true,
@@ -1458,7 +1452,6 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   FunctionCallee KitHipSyncFn =
       M.getOrInsertFunction("__kithip_sync_thread_stream", VoidTy, VoidPtrTy);
   (void)NewBuilder.CreateCall(KitHipSyncFn, {HipStream});
-
   TOI.ReplCall->eraseFromParent();
   LLVM_DEBUG(dbgs() << "*** finished processing outlined call.\n");
 }

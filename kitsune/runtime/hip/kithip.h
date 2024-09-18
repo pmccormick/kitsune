@@ -70,6 +70,8 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
+  //#define KITHIP_USE_DEFAULT_STREAM
+
 /**
  * Initialize the HIP portion of the Kitsune runtime library.  The
  * initialization process will load a number of dynamic entry points,

@@ -871,6 +871,10 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
       FnName += "exp";
     else if (Fn->getName() == "llvm.expf.f32")
       FnName += "expf";
+    else if (Fn->getName() == "llvm.smax")
+      FnName += "smax";
+    else if (Fn->getName() == "llvm.smin")
+      FnName += "smin";
     else {
       // errs() << "cuabi: transforming intrinsic call " << Fn->getName() <<
       // "()\n"; report_fatal_error("cuabi: no transform for llvm intrinsic!");
@@ -1145,6 +1149,7 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   FunctionCallee KitCudaSyncFn = M.getOrInsertFunction(
         "__kitcuda_sync_thread_stream", VoidTy, VoidPtrTy);
   (void)NewBuilder.CreateCall(KitCudaSyncFn, { CudaStream});      
+
   TOI.ReplCall->eraseFromParent();
   LLVM_DEBUG(dbgs() << "*** finished processing outlined call.\n");
 }
