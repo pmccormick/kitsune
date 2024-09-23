@@ -69,7 +69,6 @@ void *__kithip_mem_alloc_managed(size_t size) {
   
   void *alloced_ptr;
   
-  HIP_SAFE_CALL(hipSetDevice(__kithip_get_device_id()));
   HIP_SAFE_CALL(hipMallocManaged_p(&alloced_ptr, size, hipMemAttachGlobal));
   if (_kithip_mem_advise) {
     HIP_SAFE_CALL(hipMemAdvise_p(alloced_ptr, size, hipMemAdviseSetPreferredLocation,
@@ -82,11 +81,6 @@ void *__kithip_mem_alloc_managed(size_t size) {
   _kithip_mem_alloc_mutex.lock();
   __kitrt_register_mem_alloc(alloced_ptr, size);
   _kithip_mem_alloc_mutex.unlock();
-  // Cheat a tad and just go ahead and issue a prefetch at allocation
-  // time.  Could bite us but what the heck...
-  //HIP_SAFE_CALL(hipMemPrefetchAsync_p(alloced_ptr, size,
-  //                   __kithip_get_device_id(),
-  //                   (hipStream_t)__kithip_get_thread_stream()));
   return alloced_ptr;
 }
 
@@ -190,42 +184,30 @@ void* __kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
   // lead to page faults and evictions of pages...  At present this
   // has lead to the best general performance and reduced complexity,
   // while also maintaining correctness.
-<<<<<<< HEAD
+  hipStream_t hip_stream = (hipStream_t)opaque_stream;
+  HIP_SAFE_CALL(hipSetDevice(__kithip_get_device_id()));
   if (not __kitrt_is_mem_prefetched(vp, &size)) {
-  
-    if (size > 0) {
-      hipStream_t hip_stream;
-      if (opaque_stream) {
-        hip_stream = (hipStream_t)opaque_stream;
-        if (__kitrt_verbose_mode())
-          fprintf(stderr, "kithip: continue prefetch-driven execution stream [stream=%p].\n",
-                  (void*)hip_stream);		
-      } else {
-        hip_stream = (hipStream_t)__kithip_get_thread_stream();
-        if (__kitrt_verbose_mode())
-          fprintf(stderr, "kithip: initiate prefetch-driven execution stream [stream=%p].\n",
-                  (void*)hip_stream);	
-      }
-
-      if (__kitrt_verbose_mode()) 
-        fprintf(stderr, "\tkithip: issue prefetch [address=%p, size=%ld, stream=%p].\n", 
-                vp, size, (void*)hip_stream);
-      
-      HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, __kithip_get_device_id(),
-                                          hip_stream));
-      if (_kithip_reduce_prefetch) 
-	__kitrt_mark_mem_prefetched(vp);
-      
-      return (void*)hip_stream;
+    if (hip_stream) {
+      if (__kitrt_verbose_mode())
+        fprintf(stderr, "kithip: continue prefetch-driven execution stream [stream=%p].\n",
+                (void*)hip_stream);		
+    } else {
+      hip_stream = (hipStream_t)__kithip_get_thread_stream();
+      if (__kitrt_verbose_mode())
+        fprintf(stderr, "kithip: initiate prefetch-driven execution stream [stream=%p].\n",
+                (void*)hip_stream);	
     }
-  } else {
+    
     if (__kitrt_verbose_mode()) 
-      fprintf(stderr, 
-              "\tkithip: skipping previously prefetched data [address=%p, size=%ld].\n", 
-              vp, size);
+      fprintf(stderr, "\tkithip: issue prefetch [address=%p, size=%ld, stream=%p, device=%d].\n", 
+	      vp, size, (void*)hip_stream, __kithip_get_device_id());
+      
+    HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, __kithip_get_device_id(),
+					hip_stream));
+    __kitrt_mark_mem_prefetched(vp);
   }
-
-  return nullptr;
+  
+  return (void*)hip_stream;
 }
 
 void __kithip_mem_host_prefetch(void *vp) {

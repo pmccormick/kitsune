@@ -92,9 +92,6 @@ __attribute__((malloc)) void *__kitcuda_mem_alloc_managed(size_t size) {
   __kitrt_register_mem_alloc((void *)devp, size);
   _kitcuda_mem_alloc_mutex.unlock();
 
-  // NOTE: We can no longer do this in a thread-safe manner... 
-  //CU_SAFE_CALL(cuMemPrefetchAsync_p(devp, size, _kitcuda_device,
-  //                                  __kitcuda_get_thread_stream()));
   KIT_NVTX_POP();
   return (void *)devp;
 }

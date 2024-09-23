@@ -76,6 +76,7 @@ DECLARE_DLSYM(hipDeviceSynchronize);
 /* Stream management */
 DECLARE_DLSYM(hipStreamCreate);
 DECLARE_DLSYM(hipStreamCreateWithFlags);
+DECLARE_DLSYM(hipStreamCreateWithPriority);
 DECLARE_DLSYM(hipStreamDestroy);
 DECLARE_DLSYM(hipStreamSynchronize);
 

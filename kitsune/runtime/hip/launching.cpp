@@ -255,7 +255,7 @@ void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
   assert(kern_args && "kithip: launch with null args!");
   assert(trip_count != 0 && "kithip: launch with zero trips!");
 
-  HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
+  //HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
 
   // Multiple threads can launch kernels in our current design.  If a
   // thread enters without having previously set the device the runtime

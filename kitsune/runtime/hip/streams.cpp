@@ -115,7 +115,8 @@ void *__kithip_get_thread_stream() {
       fprintf(stderr, "kithip: ***** using recycled stream [stream=%p, poolsize=%zu].\n",
             (void*)hip_stream, _kithip_streams.size());
   } else {
-    HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));          
+    HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
+    HIP_SAFE_CALL(hipStreamCreateWithPriority_p(&hip_stream, hipStreamNonBlocking, 0));  
     HIP_SAFE_CALL(hipStreamCreate(&hip_stream));
     if (__kitrt_verbose_mode())
       fprintf(stderr, "kithip: ++++ created a new stream (%p).\n", hip_stream);
@@ -126,12 +127,13 @@ void *__kithip_get_thread_stream() {
 
 void __kithip_sync_thread_stream(void *opaque_stream) {
   using namespace std;
-  HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
+  //HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
   if (opaque_stream) {
-    fprintf(stderr, "kithip: sync'ing stream [stream=%p, poolsize=%zu)\n",
+    if (__kitrt_verbose_mode()) 
+      fprintf(stderr, "kithip: sync'ing stream [stream=%p, poolsize=%zu)\n",
 	      opaque_stream, _kithip_streams.size());    
     hipStream_t hip_stream = (hipStream_t)opaque_stream;
-    _kithip_stream_mutex.lock();    
+    _kithip_stream_mutex.lock();
     HIP_SAFE_CALL(hipStreamSynchronize_p(hip_stream));
     _kithip_streams.push_back(hip_stream);
     if (__kitrt_verbose_mode()) 

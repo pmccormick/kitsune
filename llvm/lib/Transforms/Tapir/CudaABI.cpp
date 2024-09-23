@@ -1972,8 +1972,6 @@ CudaABIOutputFile CudaABI::generatePTX() {
     LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");
     mpm.run(KernelModule, mam);
     LLVM_DEBUG(dbgs() << "\t\tpasses complete.\n");
-    LLVM_DEBUG(saveModuleToFile(&KernelModule, KernelModule.getName().str() +
-                                                   ".postopt.LTO.ll"));
   }
 
   // Setup the passes and request that the output goes to the

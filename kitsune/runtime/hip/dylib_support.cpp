@@ -98,6 +98,7 @@ bool __kithip_load_symbols() {
   /* Stream management */
   DLSYM_LOAD(hipStreamCreate);
   DLSYM_LOAD(hipStreamCreateWithFlags);
+  DLSYM_LOAD(hipStreamCreateWithPriority);
   DLSYM_LOAD(hipStreamDestroy);
   DLSYM_LOAD(hipStreamSynchronize);
 

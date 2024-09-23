@@ -139,7 +139,6 @@ int main(int argc, char* argv[])
   double loop2_max_time = 0.0, loop2_min_time = 1000.0;
   
   for (int iter=0; iter < niter; iter++) {
-    fprintf(stderr, "####### trip #%d\n", iter);
     float sum=0, sum2=0;
 
     for(int i=r1; i <= r2; i++) {
@@ -194,8 +193,6 @@ int main(int argc, char* argv[])
       loop1_max_time = etime;
     if (etime < loop1_min_time)
       loop1_min_time = etime;
-    fprintf(stderr, "loop 1 time: %lf, min: %lf, max: %lf\n", 
-            etime, loop1_min_time, loop1_max_time);
 
     auto loop2_start_time = chrono::steady_clock::now();
     forall(int i = 0; i < rows; i++) {

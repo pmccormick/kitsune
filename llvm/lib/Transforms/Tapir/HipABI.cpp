@@ -247,7 +247,8 @@ enum ROCmABIVersion {
 cl::opt<ROCmABIVersion> ROCmABITarget(
     "hipabi-rocm-abi", cl::init(ROCm_ABI_V4), cl::Hidden,
     cl::desc("Select the targeted ROCm ABI version."),
-    cl::values(clEnumValN(ROCm_ABI_V5, "v5", "Target ROCm v. 5 ABI.")));
+    cl::values(clEnumValN(ROCm_ABI_V4, "v4", "Target ROCm v. 4 ABI.")),
+	       cl::values(clEnumValN(ROCm_ABI_V5, "v5", "Target ROCm v. 5 ABI.")));
 
 cl::opt<bool> Use64ElementWavefront(
     "hipabi-wavefront64", cl::init(true), cl::Hidden,
@@ -1057,6 +1058,7 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
             // Try to encourage inlining at higher optimization levels.
             DeviceF->addFnAttr(Attribute::AlwaysInline);
           }
+          //DeviceF->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
           DeviceF->setCallingConv(CallingConv::Fast);
         }
       }
@@ -1143,58 +1145,61 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   case GK_GFX90A:
     target_feature_str += "+gfx90a-insts,+xnack,";
     [[fallthrough]];
-  case GK_GFX908:
-    target_feature_str += "+dot3-insts,+dot4-insts,+dot5-insts,"
-                          "+dot6-insts,+mai-insts,";
-    [[fallthrough]];
-  case GK_GFX906:
-    target_feature_str += "+dl-insts,+dot1-insts,+dot2-insts,+dot7-insts,";
-    [[fallthrough]];
-  case GK_GFX90C:
-  case GK_GFX909:
-  case GK_GFX904:
-  case GK_GFX902:
-  case GK_GFX900:
+    //case GK_GFX908:
+    //target_feature_str += "+dot3-insts,+dot4-insts,+dot5-insts,"
+    //                      "+dot6-insts,+mai-insts,";
+    //[[fallthrough]];
+    //case GK_GFX906:
+    //target_feature_str += "+dl-insts,+dot1-insts,+dot2-insts,+dot7-insts,";
+    //[[fallthrough]];
+    //case GK_GFX90C:
+    //case GK_GFX909:
+    //case GK_GFX904:
+    //case GK_GFX902:
+    //case GK_GFX900:
     target_feature_str += "+gfx9-insts,";
-    [[fallthrough]];
-  case GK_GFX810:
-  case GK_GFX805:
-  case GK_GFX803:
-  case GK_GFX802:
-  case GK_GFX801:
-    target_feature_str += "+gfx8-insts,+16-bit-insts,+dpp,"
-                          "+s-memrealtime,";
-    [[fallthrough]];
-  case GK_GFX705:
-  case GK_GFX704:
-  case GK_GFX703:
-  case GK_GFX702:
-  case GK_GFX701:
-  case GK_GFX700:
-    target_feature_str += "+ci-insts,";
-    [[fallthrough]];
-  case GK_GFX602:
-  case GK_GFX601:
-  case GK_GFX600:
-    target_feature_str += "+s-memtime-inst";
-    break;
-  case GK_NONE:
+    //[[fallthrough]];
+    //case GK_GFX810:
+    //case GK_GFX805:
+    //case GK_GFX803:
+    //case GK_GFX802:
+    //case GK_GFX801:
+    //target_feature_str += "+gfx8-insts,+16-bit-insts,+dpp,"
+    //                      "+s-memrealtime,";
+    //[[fallthrough]];
+    //case GK_GFX705:
+    //case GK_GFX704:
+    //case GK_GFX703:
+    //case GK_GFX702:
+    //case GK_GFX701:
+    //case GK_GFX700:
+    //target_feature_str += "+ci-insts,";
+    //[[fallthrough]];
+    //case GK_GFX602:
+    //case GK_GFX601:
+    //case GK_GFX600:
+    //target_feature_str += "+s-memtime-inst";
+    //break;
+    //case GK_NONE:
     break;
   default:
     llvm_unreachable("Unhandled GPU!");
   }
 
-  std::string astr = GPUArch + ":xnack+";
   KernelF->addFnAttr("target-cpu", GPUArch);
-  KernelF->addFnAttr("target-features", target_feature_str.c_str());
+  if (EnableXnack) 
+    KernelF->addFnAttr("target-features", "+sramecc,+xnack,+xnack-support,+wavefrontsize64");
+  else 
+    KernelF->addFnAttr("target-features", "+sramecc,-xnack,-xnack-support");
   KernelF->addFnAttr("uniform-work-group-size", "true");
   std::string AttrVal = llvm::utostr(MinWarpsPerExecUnit) + std::string(",") +
                         llvm::utostr(MaxThreadsPerBlock);
   KernelF->addFnAttr("amdgpu-flat-work-group-size", AttrVal);
   KernelF->addFnAttr("amdgpu-waves-per-eu", AttrVal);
-  KernelF->addFnAttr("no-trapping-math", "true");
   KernelF->setVisibility(GlobalValue::VisibilityTypes::ProtectedVisibility);
-  KernelF->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
+  KernelF->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);  
+  //KernelF->addFnAttr("no-trapping-math", "true");
+
   // Verify that the Thread ID corresponds to a valid iteration.  Because
   // Tapir loops use canonical induction variables, valid iterations range
   // from 0 to the loop limit with stride 1.  The End argument encodes the
@@ -1452,6 +1457,7 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   FunctionCallee KitHipSyncFn =
       M.getOrInsertFunction("__kithip_sync_thread_stream", VoidTy, VoidPtrTy);
   (void)NewBuilder.CreateCall(KitHipSyncFn, {HipStream});
+
   TOI.ReplCall->eraseFromParent();
   LLVM_DEBUG(dbgs() << "*** finished processing outlined call.\n");
 }
@@ -1773,10 +1779,9 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
     PipelineTuningOptions pto;
     pto.LoopVectorization = OptLevel > 2;
     pto.SLPVectorization = OptLevel > 2;
-    pto.LoopUnrolling = OptLevel >= 2;
+    pto.LoopUnrolling = OptLevel > 2;
     pto.LoopInterleaving = OptLevel > 2;
     pto.LoopStripmine = OptLevel > 2;
-    pto.ForgetAllSCEVInLoopUnroll = OptLevel > 2;
     OptimizationLevel optLevels[] = {
         OptimizationLevel::O0,
         OptimizationLevel::O1,
@@ -1804,8 +1809,7 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
 
     ModulePassManager mpm = pb.buildPerModuleDefaultPipeline(optLevel);
     mpm.addPass(VerifierPass());
-    LLVM_DEBUG(dbgs() << "\t\t* optimize module: " << KernelModule.getName()
-                      << "\n");
+    LLVM_DEBUG(dbgs() << "\t\t* module: " << KernelModule.getName() << "\n");
     mpm.run(KernelModule, mam);
     LLVM_DEBUG(dbgs() << "\t\tpasses complete.\n");
   }
