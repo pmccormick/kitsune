@@ -14,6 +14,5 @@ ifneq ($(KITSUNE_CUDA_ENABLE),)
   CLANG_CUDA_FLAGS=-x cuda --no-cuda-version-check --cuda-gpu-arch=$(CUDA_ARCH) -O$(KITSUNE_OPTLEVEL) --cuda-path=$(CUDA_PATH)
 
   BUILD_CUDA_EXPERIMENTS=true
-  $(info note: cuda experiments enabled)
 endif 
 

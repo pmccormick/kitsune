@@ -1063,18 +1063,10 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
                        << "\t\t\t(optimization: mark as always-inline)\n");
           }
 
-          LLVM_DEBUG(dbgs() << "\t\t\t(target for '" << GPUArch << "')\n");
-          DeviceF->addFnAttr("target-cpu", GPUArch);
-          const std::string target_feature_str =
-              "+16-bit-insts,+ci-insts,+dl-insts,+dot1-insts,+dot2-insts,+dot3-"
-              "insts,+dot4-insts,+dot5-insts,+dot6-insts,+dot7-insts,+dpp,"
-              "flat-address-space,+gfx8-insts,+gfx9-insts,+gfx90a-insts,+mai-"
-              "insts,+s-memrealtime,+s-memtime-inst";
-          DeviceF->addFnAttr("target-features", target_feature_str.c_str());
-          LLVM_DEBUG(dbgs() << "\t\t\t(add target features: '"
-                            << target_feature_str << "')\n");
-          DeviceF->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
-          LLVM_DEBUG(dbgs() << "\t\t\t(target for fast calling convention\n");
+          //LLVM_DEBUG(dbgs() << "\t\t\t(target for '" << GPUArch << "')\n");
+          //DeviceF->addFnAttr("target-cpu", GPUArch);
+          //DeviceF->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
+          //LLVM_DEBUG(dbgs() << "\t\t\t(target for fast calling convention\n");
           DeviceF->setCallingConv(CallingConv::Fast);
         }
       }
@@ -1155,10 +1147,11 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
       dbgs() << "hipabi: setting kernel's minimum warps per execution unit to: "
              << MinWarpsPerExecUnit << "\n");
   using namespace llvm::AMDGPU;
+  std::string full_arch = GPUArch + ":xnack+";
   std::string target_feature_str = "";
-  switch (llvm::AMDGPU::parseArchAMDGCN(GPUArch)) {
+  switch (llvm::AMDGPU::parseArchAMDGCN(full_arch)) {
   case GK_GFX90A:
-    target_feature_str = "+gfx90a-insts,+xnack,";
+    target_feature_str += "+gfx90a-insts,+xnack,";
     [[fallthrough]];
   case GK_GFX908:
     target_feature_str += "+dot3-insts,+dot4-insts,+dot5-insts,"
@@ -1201,8 +1194,7 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
     llvm_unreachable("Unhandled GPU!");
   }
 
-  // TODO: Need to build target-specific string... and decide if we
-  // really need this...
+  std::string astr = GPUArch + ":xnack+";
   KernelF->addFnAttr("target-cpu", GPUArch);
   KernelF->addFnAttr("target-features", target_feature_str.c_str());
   KernelF->addFnAttr("uniform-work-group-size", "true");
@@ -1862,16 +1854,17 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("-m");
   LDDArgList.push_back("elf64_amdgpu");
   LDDArgList.push_back("--no-undefined");
-  LDDArgList.push_back("-shared");
+  //LDDArgList.push_back("-shared");
   LDDArgList.push_back("--eh-frame-hdr");
-  LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
-  LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
-  LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
-  std::string mcpu_arg =
-      "-plugin-opt=mcpu=" + GPUArch + std::string(":xnack+:sramecc+");
+  //LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
+  // These will be deprecated soon -- let's avoid them...
+  //LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
+  //LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
+  std::string mcpu_arg = "-plugin-opt=-mcpu=" + GPUArch + ":xnack+:sramecc+";
   LDDArgList.push_back(mcpu_arg.c_str());
   std::string optlevel_arg = "--plugin-opt=O" + std::to_string(OptLevel);
   LDDArgList.push_back(optlevel_arg.c_str());
+
   LDDArgList.push_back("-o");
   std::string outfile = LinkedObjFile->getFilename().str();
   LDDArgList.push_back(outfile.c_str());

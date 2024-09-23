@@ -1,6 +1,4 @@
 ifeq ($(kitsune_kokkos_enable),"ON")
-  $(info note: kokkos support enabled)
-
   ifeq ($(BUILD_CUDA_EXPERIMENTS),true)
     KOKKOS_CUDA_PREFIX?=$(KITSUNE_PREFIX)/opt/kokkos/cuda
     KOKKOS_CUDA_LIBS=-L$(KOKKOS_CUDA_PREFIX)/lib \
