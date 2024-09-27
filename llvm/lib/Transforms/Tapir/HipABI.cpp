@@ -1063,10 +1063,11 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
                        << "\t\t\t(optimization: mark as always-inline)\n");
           }
 
-          //LLVM_DEBUG(dbgs() << "\t\t\t(target for '" << GPUArch << "')\n");
-          //DeviceF->addFnAttr("target-cpu", GPUArch);
-          //DeviceF->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
-          //LLVM_DEBUG(dbgs() << "\t\t\t(target for fast calling convention\n");
+          // LLVM_DEBUG(dbgs() << "\t\t\t(target for '" << GPUArch << "')\n");
+          // DeviceF->addFnAttr("target-cpu", GPUArch);
+          // DeviceF->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
+          // LLVM_DEBUG(dbgs() << "\t\t\t(target for fast calling
+          // convention\n");
           DeviceF->setCallingConv(CallingConv::Fast);
         }
       }
@@ -1401,7 +1402,7 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   // current loop so we use a 'dummy' (null) fat binary for code gen at
   // this point -- we'll post-process the module to clean this up after
   // we've processed all tapir loops.
-    (void)tapir::getOrInsertFBGlobal(M, "_hipabi.dummy_fatbin", VoidPtrTy);
+  (void)tapir::getOrInsertFBGlobal(M, "_hipabi.dummy_fatbin", VoidPtrTy);
 
   // Deal with type mismatches for the trip count.  A difference
   // introduced via the input source details and the runtime's
@@ -1454,8 +1455,8 @@ void HipLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
   HipStream = NewBuilder.CreateCall(
       KitHipLaunchFn, {NullPtr, KNameParam, argsPtr, CastTripCount,
                        TPBlockValue, AI, HipStream});
-  FunctionCallee KitHipSyncFn = M.getOrInsertFunction(
-        "__kithip_sync_thread_stream", VoidTy, VoidPtrTy);                       
+  FunctionCallee KitHipSyncFn =
+      M.getOrInsertFunction("__kithip_sync_thread_stream", VoidTy, VoidPtrTy);
   (void)NewBuilder.CreateCall(KitHipSyncFn, {HipStream});
 
   TOI.ReplCall->eraseFromParent();
@@ -1679,7 +1680,7 @@ bool HipABI::preProcessFunction(Function &F, TaskInfo &TI,
 }
 
 void HipABI::postProcessFunction(Function &F, bool OutliningTapirLoops) {
-  // no-op 
+  // no-op
 }
 
 // We can't create a correct launch sequence until all the kernels
@@ -1843,7 +1844,7 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LinkedObjFile->keep();
 
   // TODO: The lld invocation below is install prefix and unix-specific...
-  auto LLD = sys::findProgramByName("/projects/kitsune/x86_64/18.x/bin/lld");
+  auto LLD = sys::findProgramByName("lld");
   if ((EC = LLD.getError()))
     report_fatal_error("executable 'lld' not found! "
                        "check your path?");
@@ -1854,12 +1855,12 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("-m");
   LDDArgList.push_back("elf64_amdgpu");
   LDDArgList.push_back("--no-undefined");
-  //LDDArgList.push_back("-shared");
+  // LDDArgList.push_back("-shared");
   LDDArgList.push_back("--eh-frame-hdr");
-  //LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
-  // These will be deprecated soon -- let's avoid them...
-  //LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
-  //LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
+  // LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
+  //  These will be deprecated soon -- let's avoid them...
+  // LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
+  // LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
   std::string mcpu_arg = "-plugin-opt=-mcpu=" + GPUArch + ":xnack+:sramecc+";
   LDDArgList.push_back(mcpu_arg.c_str());
   std::string optlevel_arg = "--plugin-opt=O" + std::to_string(OptLevel);

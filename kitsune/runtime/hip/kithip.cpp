@@ -94,6 +94,7 @@ static int _kithip_can_map_host_mem;
 static int _kithip_concurrent_kernels;
 static int _kithip_uses_host_page_table;
 
+
 extern "C" {
 
 bool __kithip_initialize() {
@@ -123,6 +124,12 @@ bool __kithip_initialize() {
     __kitrt_print_stack_trace();
     abort();
   }
+
+  extern bool _kithip_reduce_prefetch;
+  (void)__kitrt_get_env_value("KITHIP_REDUCE_PREFETCH", _kithip_reduce_prefetch);
+
+  extern bool _kithip_mem_advise;
+  (void)__kitrt_get_env_value("KITHIP_MEM_ADVISE", _kithip_mem_advise);  
 
   // NOTE: The HIP documentation suggest that, "most HIP [calls]
   // implicitly initialize the runtime. This [call] provides control

@@ -51,7 +51,13 @@ vecadd-kokkos.hipcc.${host_arch}: vecadd-kokkos.cpp
 	@$(TIME_CMD) $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS)
 	@$(FILE_SIZE)
 
+# hip tests 
+vecadd-hip.${host_arch}: vecadd-hip.cpp
+	@echo $@
+	$(TIME_CMD) $(HIPCC) $(HIPCC_CXX_FLAGS) -o $@ $<
+	@$(FILE_SIZE)
 #####
+
 define newline 
 
 endef 

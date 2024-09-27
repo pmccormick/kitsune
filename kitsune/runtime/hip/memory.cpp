@@ -55,6 +55,8 @@
 #include <mutex>
 
 static std::mutex _kithip_mem_alloc_mutex;
+static bool _kithip_reduce_prefetch = true;
+static bool _kithip_mem_advise = true;
 
 extern "C" {
 
@@ -68,6 +70,14 @@ void *__kithip_mem_alloc_managed(size_t size) {
   
   HIP_SAFE_CALL(hipSetDevice(__kithip_get_device_id()));
   HIP_SAFE_CALL(hipMallocManaged_p(&alloced_ptr, size, hipMemAttachGlobal));
+  if (_kithip_mem_advise) {
+    HIP_SAFE_CALL(hipMemAdvise_p(alloced_ptr, size, hipMemAdviseSetPreferredLocation,
+				 __kithip_get_device_id()));
+    HIP_SAFE_CALL(hipMemAdvise_p(alloced_ptr, size, hipMemAdviseSetAccessedBy,
+				 __kithip_get_device_id()));
+    HIP_SAFE_CALL(hipMemAdvise_p(alloced_ptr,  size, hipMemAdviseSetCoarseGrain,
+				 __kithip_get_device_id()));
+  }
   _kithip_mem_alloc_mutex.lock();
   __kitrt_register_mem_alloc(alloced_ptr, size);
   _kithip_mem_alloc_mutex.unlock();
@@ -165,6 +175,7 @@ bool __kithip_is_mem_managed(void *vp) {
 void* __kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
   assert(vp && "unexpected null pointer!");
   size_t size = 0;
+  HIP_SAFE_CALL(hipSetDevice(__kithip_get_device_id()));
 
   // TODO: Prefetching details and approaches need to be further
   // explored.  In particular, in concert with compiler analysis
@@ -179,16 +190,8 @@ void* __kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
   // has lead to the best general performance and reduced complexity,
   // while also maintaining correctness.
   if (not __kitrt_is_mem_prefetched(vp, &size)) {
-    HIP_SAFE_CALL(hipSetDevice(__kithip_get_device_id()));
   
     if (size > 0) {
-      HIP_SAFE_CALL(hipMemAdvise_p(vp, size, hipMemAdviseSetPreferredLocation,
-                                   __kithip_get_device_id()));
-      HIP_SAFE_CALL(hipMemAdvise_p(vp, size, hipMemAdviseSetAccessedBy,
-                                   __kithip_get_device_id()));
-      HIP_SAFE_CALL(hipMemAdvise_p(vp, size, hipMemAdviseSetCoarseGrain,
-                                   __kithip_get_device_id()));
-
       hipStream_t hip_stream;
       if (opaque_stream) {
         if (__kitrt_verbose_mode())
@@ -202,10 +205,13 @@ void* __kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
 
       if (__kitrt_verbose_mode()) 
         fprintf(stderr, "\tkithip: issue prefetch [address=%p, size=%ld, stream=%p].\n", 
-                vp, size, (void*)hip_stream);	
+                vp, size, (void*)hip_stream);
+      
       HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, __kithip_get_device_id(),
                                           hip_stream));
-      __kitrt_mark_mem_prefetched(vp);
+      if (_kithip_reduce_prefetch) 
+	__kitrt_mark_mem_prefetched(vp);
+      
       return (void*)hip_stream;
     }
   } else {
