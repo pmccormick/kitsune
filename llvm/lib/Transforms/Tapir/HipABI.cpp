@@ -1855,12 +1855,12 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("-m");
   LDDArgList.push_back("elf64_amdgpu");
   LDDArgList.push_back("--no-undefined");
-  // LDDArgList.push_back("-shared");
+  LDDArgList.push_back("-shared");
   LDDArgList.push_back("--eh-frame-hdr");
   // LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
   //  These will be deprecated soon -- let's avoid them...
-  // LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
-  // LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
+  LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
+  LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
   std::string mcpu_arg = "-plugin-opt=-mcpu=" + GPUArch + ":xnack+:sramecc+";
   LDDArgList.push_back(mcpu_arg.c_str());
   std::string optlevel_arg = "--plugin-opt=O" + std::to_string(OptLevel);

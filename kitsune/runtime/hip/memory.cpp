@@ -55,8 +55,9 @@
 #include <mutex>
 
 static std::mutex _kithip_mem_alloc_mutex;
-static bool _kithip_reduce_prefetch = true;
-static bool _kithip_mem_advise = true;
+
+bool _kithip_reduce_prefetch = true;
+bool _kithip_mem_advise = true;
 
 extern "C" {
 
