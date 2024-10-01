@@ -1058,7 +1058,7 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
             // Try to encourage inlining at higher optimization levels.
             DeviceF->addFnAttr(Attribute::AlwaysInline);
           }
-          //DeviceF->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
+          DeviceF->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
           DeviceF->setCallingConv(CallingConv::Fast);
         }
       }
@@ -1145,42 +1145,42 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   case GK_GFX90A:
     target_feature_str += "+gfx90a-insts,+xnack,";
     [[fallthrough]];
-    //case GK_GFX908:
-    //target_feature_str += "+dot3-insts,+dot4-insts,+dot5-insts,"
-    //                      "+dot6-insts,+mai-insts,";
-    //[[fallthrough]];
-    //case GK_GFX906:
-    //target_feature_str += "+dl-insts,+dot1-insts,+dot2-insts,+dot7-insts,";
-    //[[fallthrough]];
-    //case GK_GFX90C:
-    //case GK_GFX909:
-    //case GK_GFX904:
-    //case GK_GFX902:
-    //case GK_GFX900:
+  case GK_GFX908:
+    target_feature_str += "+dot3-insts,+dot4-insts,+dot5-insts,"
+                          "+dot6-insts,+mai-insts,";
+    [[fallthrough]];
+  case GK_GFX906:
+    target_feature_str += "+dl-insts,+dot1-insts,+dot2-insts,+dot7-insts,";
+    [[fallthrough]];
+  case GK_GFX90C:
+  case GK_GFX909:
+  case GK_GFX904:
+  case GK_GFX902:
+  case GK_GFX900:
     target_feature_str += "+gfx9-insts,";
-    //[[fallthrough]];
-    //case GK_GFX810:
-    //case GK_GFX805:
-    //case GK_GFX803:
-    //case GK_GFX802:
-    //case GK_GFX801:
-    //target_feature_str += "+gfx8-insts,+16-bit-insts,+dpp,"
-    //                      "+s-memrealtime,";
-    //[[fallthrough]];
-    //case GK_GFX705:
-    //case GK_GFX704:
-    //case GK_GFX703:
-    //case GK_GFX702:
-    //case GK_GFX701:
-    //case GK_GFX700:
-    //target_feature_str += "+ci-insts,";
-    //[[fallthrough]];
-    //case GK_GFX602:
-    //case GK_GFX601:
-    //case GK_GFX600:
-    //target_feature_str += "+s-memtime-inst";
-    //break;
-    //case GK_NONE:
+    [[fallthrough]];
+  case GK_GFX810:
+  case GK_GFX805:
+  case GK_GFX803:
+  case GK_GFX802:
+  case GK_GFX801:
+    target_feature_str += "+gfx8-insts,+16-bit-insts,+dpp,"
+                          "+s-memrealtime,";
+    [[fallthrough]];
+  case GK_GFX705:
+  case GK_GFX704:
+  case GK_GFX703:
+  case GK_GFX702:
+  case GK_GFX701:
+  case GK_GFX700:
+    target_feature_str += "+ci-insts,";
+    [[fallthrough]];
+  case GK_GFX602:
+  case GK_GFX601:
+  case GK_GFX600:
+    target_feature_str += "+s-memtime-inst";
+    break;
+  case GK_NONE:
     break;
   default:
     llvm_unreachable("Unhandled GPU!");
