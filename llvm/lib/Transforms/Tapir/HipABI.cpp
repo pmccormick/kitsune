@@ -1584,11 +1584,9 @@ std::unique_ptr<Module> &HipABI::getLibDeviceModule() {
         //"opencl.bc", // printf lives here...
     };
 
-
+    std::list<std::string> ROCmBCFiles;
     for (std::string BCFile : BaseBCFiles)
       ROCmBCFiles.push_back(BCFile);
-
-
 
     if (Use64ElementWavefront)
       ROCmBCFiles.push_back("oclc_wavefrontsize64_on.bc");

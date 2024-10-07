@@ -50,20 +50,21 @@
  *===----------------------------------------------------------------------===
  */
 #include "kithip.h"
+#include "kithip_dylib.h"
 #include <mutex>
 #include <stdint.h>
 #include <stdio.h>
 #include <string>
 #include <unordered_map> // IWYU pragma: keep (clang-tidy+tempaltes == bad???)
 
-// TODO: The hip runtime shares common implementation details 
+// TODO: The hip runtime shares common implementation details
 // with cuda.  At present we have decided to keep them separated
-// given the potential differences in the underlying runtimes 
-// and stability issues w/ hip; further down the road, it might be 
+// given the potential differences in the underlying runtimes
+// and stability issues w/ hip; further down the road, it might be
 // possible to share common code between the two.
 
-//   TODO: The experimental features below have not yet been 
-//   validated to actually reduce overheads.  
+//   TODO: The experimental features below have not yet been
+//   validated to actually reduce overheads.
 
 // *** EXPERIMENTAL: The runtime maintains a map from fatbinary images
 // to a supporting HIP module.  The primary reason for this is
@@ -112,7 +113,7 @@ void __kithip_set_default_max_threads_per_blk(int num_threads) {
 }
 
 void __kithip_set_default_threads_per_blk(int threads_per_blk) {
-  if (threads_per_blk > _kithip_default_max_threads_per_blk) 
+  if (threads_per_blk > _kithip_default_max_threads_per_blk)
     threads_per_blk = _kithip_default_max_threads_per_blk;
   _kithip_default_threads_per_blk = threads_per_blk;
 }
@@ -122,7 +123,7 @@ static KitHipLaunchParamMap _kithip_launch_param_map;
 
 namespace {
 
-// we "borrow" this from cuda... 
+// we "borrow" this from cuda...
 extern int next_lowest_factor(int n, int m);
 
 /**
@@ -148,25 +149,25 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
   // As a default starting point, the hip occupancy heuristic to get
   // an initial occupancy-driven threads-per-block figure.
   int min_grid_size;
-  HIP_SAFE_CALL(hipModuleOccupancyMaxPotentialBlockSize_p(&min_grid_size,
-							  &threads_per_blk,
-							  kfunc, 0, 0));
+  HIP_SAFE_CALL(hipModuleOccupancyMaxPotentialBlockSize_p(
+      &min_grid_size, &threads_per_blk, kfunc, 0, 0));
+
 
   if (_kithip_refine_occupancy_calc) {
-    // Assume that the occupancy heuristic is flawed and look to refine 
+    // Assume that the occupancy heuristic is flawed and look to refine
     // its threads-per-block result such that it utilizes the full GPU
-    // (i.e., it is not uncommon for the heuristic to return values 
-    // that only use a limited number of available resources -- most 
+    // (i.e., it is not uncommon for the heuristic to return values
+    // that only use a limited number of available resources -- most
     // often under-utilizing the number of available multi-processors).
     extern int _kithip_device_id;
 
     int num_multiprocs = 0;
-    HIP_SAFE_CALL(hipDeviceGetAttribute_p(
-        &num_multiprocs, hipDeviceAttributeMultiprocessorCount,
-        _kithip_device_id));
+    HIP_SAFE_CALL(hipDeviceGetAttribute_p(&num_multiprocs,
+                                          hipDeviceAttributeMultiprocessorCount,
+                                          _kithip_device_id));
 
-    // Estimate how many multi-processors we are using with the provided 
-    // threads-per-block value.. 
+    // Estimate how many multi-processors we are using with the provided
+    // threads-per-block value..
     int block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
     float sm_load = ((float)block_count / num_multiprocs) * 100.0;
 
@@ -178,43 +179,31 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
       fprintf(stderr, "  Multi-proc utilization: %3.2f%%\n", sm_load);
     }
 
-    // If the multi-proc load is low, reduce the threads-per-block until 
-    // we reach a point of better utilization (which we loosely define
-    // as >= 75% load).
-    // 
-    // TODO: There is a lot of work to do here:
-    //
-    //   * 75% could be a parameter (runtime or build time). 
-    //   * The compiler is handing us details on the instruction 
-    //     mix but it doesn't accurately account for code structure 
-    //     (e.g. inner loops).
-    //   * A more comprehensive model of performance/hardware costs 
-    //     could help but we'd have to balance runtime costs vs. accuracy. 
-    if (sm_load < 1000) {
 
-      if (__kitrt_verbose_mode())
-        fprintf(stderr,
-                "  ***-GPU multi-processors are underutilized "
-                "-- adjusting threads-per-block.\n");
-
-      int warp_size = 0;
-      HIP_SAFE_CALL(hipDeviceGetAttribute_p(
-                    &warp_size, hipDeviceAttributeWarpSize, 
-                    _kithip_device_id));
-      fprintf(stderr, "warp size = %d\n", warp_size);
-      
-      while (block_count < num_multiprocs && threads_per_blk > warp_size) {
-        threads_per_blk = next_lowest_factor(threads_per_blk, warp_size);
+    int max_threads_per_blk;
+    HIP_SAFE_CALL(hipDeviceGetAttribute_p(&max_threads_per_blk,
+                                          hipDeviceAttributeMaxThreadsPerBlock,
+                                          _kithip_device_id));
+    if (threads_per_blk == max_threads_per_blk) {
+      // Maxing out the threads per blk is a frequent occurrence when calling 
+      // HIP's occupancy heuristic.  Let's shuffle things downward a bit to try
+      // and avoid a bottleneck.
+      // 
+      // TODO: There is a ton of work to do here!  Need to inject some more sanity
+      // into this process... 
+      do { 
+        threads_per_blk = threads_per_blk - (max_threads_per_blk / 8);
         block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
         sm_load = ((float)block_count / num_multiprocs) * 100.0;
-      }
-      if (__kitrt_verbose_mode()) {
-        fprintf(stderr, "  ***-new launch parameters:");
-        fprintf(stderr, "\tthreads-per-block: %d\n", threads_per_blk);
-        fprintf(stderr, "\tnumer of blocks:   %d\n", block_count);
-        fprintf(stderr, "\tmulti-proc load:   %3.2f%%\n", sm_load);
-        fprintf(stderr, "---------------------------------------\n\n");
-      }
+      } while (sm_load > 1000.0);
+    }
+
+    if (__kitrt_verbose_mode()) {
+      fprintf(stderr, "  ***-new launch parameters:");
+      fprintf(stderr, "\tthreads-per-block: %d\n", threads_per_blk);
+      fprintf(stderr, "\tnumer of blocks:   %d\n", block_count);
+      fprintf(stderr, "\tmulti-proc load:   %3.2f%%\n", sm_load);
+      fprintf(stderr, "---------------------------------------\n\n");
     }
   }
 
@@ -224,13 +213,14 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
 } // namespace
 
 void __kithip_get_launch_params(size_t trip_count, hipFunction_t kfunc,
-				const char *kfunc_name, 
-                                int &threads_per_blk, int &blks_per_grid,
-				const KitRTInstMix *inst_mix) {
+                                const char *kfunc_name, int &threads_per_blk,
+                                int &blks_per_grid,
+                                const KitRTInstMix *inst_mix) {
   std::string map_entry_name(kfunc_name);
   map_entry_name += std::to_string(trip_count);
 
-  KitHipLaunchParamMap::iterator lpit = _kithip_launch_param_map.find(map_entry_name);
+  KitHipLaunchParamMap::iterator lpit =
+      _kithip_launch_param_map.find(map_entry_name);
   if (lpit != _kithip_launch_param_map.end())
     // use previously determined parameters.
     threads_per_blk = lpit->second;
@@ -238,18 +228,17 @@ void __kithip_get_launch_params(size_t trip_count, hipFunction_t kfunc,
     if (_kithip_use_occupancy_calc)
       __kithip_get_occ_launch_params(trip_count, kfunc, threads_per_blk,
                                      blks_per_grid, inst_mix);
-    else 
+    else
       threads_per_blk = _kithip_default_threads_per_blk;
     _kithip_launch_param_map[map_entry_name] = threads_per_blk;
   }
-  threads_per_blk = 768+64;
+  threads_per_blk = 768 + 64;
   blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 }
 
-void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
+void *__kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
                              void **kern_args, uint64_t trip_count,
-                             int threads_per_blk,
-                             const KitRTInstMix *inst_mix,
+                             int threads_per_blk, const KitRTInstMix *inst_mix,
                              void *opaque_stream) {
 
   assert(fat_bin && "kithip: launch with null fat binary!");
@@ -257,7 +246,7 @@ void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
   assert(kern_args && "kithip: launch with null args!");
   assert(trip_count != 0 && "kithip: launch with zero trips!");
 
-  //HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
+  // HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
 
   // Multiple threads can launch kernels in our current design.  If a
   // thread enters without having previously set the device the runtime
@@ -287,9 +276,9 @@ void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
   _kithip_module_map_mutex.unlock();
 
   int blks_per_grid;
-  if (threads_per_blk == 0) 
+  if (threads_per_blk == 0)
     __kithip_get_launch_params(trip_count, kern_func, kernel_name,
-			       threads_per_blk, blks_per_grid, inst_mix);
+                               threads_per_blk, blks_per_grid, inst_mix);
   else
     blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 
@@ -297,7 +286,7 @@ void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
   if (opaque_stream == nullptr)
     hip_stream = (hipStream_t)__kithip_get_thread_stream();
   else
-    hip_stream = (hipStream_t)opaque_stream;    
+    hip_stream = (hipStream_t)opaque_stream;
 
   if (__kitrt_verbose_mode()) {
     fprintf(stderr, "kithip: '%s' launch parameters:\n", kernel_name);
@@ -314,12 +303,11 @@ void* __kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
   return (void *)hip_stream;
 }
 
-  
 void *__kithip_get_global_symbol(void *fat_bin, const char *sym_name) {
   assert(fat_bin && "null fat binary!");
   assert(sym_name && "null symbol name!");
-  
-  HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));    
+
+  HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
 
   hipModule_t hip_module;
   _kithip_module_map_mutex.lock();
