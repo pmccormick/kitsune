@@ -41,7 +41,7 @@ struct Float3 {
 
 inline __attribute__((always_inline))
 void cpy(float* dst, const float* src, int N) {
-  forall(unsigned int i = 0; i < N; i++)
+  forall(int i = 0; i < N; i++)
     dst[i] = src[i];
 }
 
@@ -74,7 +74,7 @@ void dump(float* variables, int nel, int nelr)
 
 }
 
-inline __attribute__((always_inline))
+//inline __attribute__((always_inline))
 void initialize_variables(int nelr,
                           float* variables,
                           float* ff_variable)
@@ -179,7 +179,7 @@ void compute_step_factor(int nelr,
   }
 }
 
-//inline __attribute__((always_inline))
+inline __attribute__((always_inline))
 void compute_flux(int nelr,
                   int* elements_surrounding_elements,
                   float* normals,
@@ -193,11 +193,11 @@ void compute_flux(int nelr,
   using namespace std;
   const float smoothing_coefficient = 0.2f;
 
-  forall(unsigned int blk = 0; blk < nelr/block_length; ++blk) {
-    unsigned int b_start = blk*block_length;
-    unsigned int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
+  forall(int blk = 0; blk < nelr/block_length; ++blk) {
+    int b_start = blk*block_length;
+    int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
 
-    for(unsigned int i = b_start; i < b_end; ++i) {
+    for(int i = b_start; i < b_end; ++i) {
       float density_i = variables[i + VAR_DENSITY*nelr];
       Float3 momentum_i;
       momentum_i.x = variables[i + (VAR_MOMENTUM+0)*nelr];
@@ -215,16 +215,17 @@ void compute_flux(int nelr,
                                           speed_sqd_i);
       float speed_of_sound_i = compute_speed_of_sound(density_i, pressure_i);
       Float3 flux_contribution_i_momentum_x, flux_contribution_i_momentum_y,
-             flux_contribution_i_momentum_z;
+	flux_contribution_i_momentum_z;
 
       Float3 flux_contribution_i_density_energy;
+
       compute_flux_contribution(density_i, momentum_i,
                                 density_energy_i, pressure_i,
                                 velocity_i, flux_contribution_i_momentum_x,
                                 flux_contribution_i_momentum_y,
                                 flux_contribution_i_momentum_z,
                                 flux_contribution_i_density_energy);
-
+      
       float flux_i_density = 0.0f;
       Float3 flux_i_momentum;
       flux_i_momentum.x = 0.0f;
@@ -236,8 +237,8 @@ void compute_flux(int nelr,
       float density_nb, density_energy_nb;
       Float3 momentum_nb;
       Float3 flux_contribution_nb_momentum_x,
-             flux_contribution_nb_momentum_y,
-             flux_contribution_nb_momentum_z;
+	flux_contribution_nb_momentum_y,
+	flux_contribution_nb_momentum_z;
       Float3 flux_contribution_nb_density_energy;
       float speed_sqd_nb, speed_of_sound_nb, pressure_nb;
 
@@ -250,8 +251,8 @@ void compute_flux(int nelr,
         normal.y = normals[i + (j + 1*NNB)*nelr];
         normal.z = normals[i + (j + 2*NNB)*nelr];
         normal_len = sqrtf(normal.x*normal.x +
-                          normal.y*normal.y +
-                          normal.z*normal.z);
+			   normal.y*normal.y +
+			   normal.z*normal.z);
 
         if (nb >= 0) { // a legitimate neighbor
           density_nb = variables[nb + VAR_DENSITY*nelr];
@@ -259,6 +260,7 @@ void compute_flux(int nelr,
           momentum_nb.y = variables[nb + (VAR_MOMENTUM+1)*nelr];
           momentum_nb.z = variables[nb + (VAR_MOMENTUM+2)*nelr];
           density_energy_nb = variables[nb + VAR_DENSITY_ENERGY*nelr];
+
           compute_velocity(density_nb, momentum_nb, velocity_nb);
           speed_sqd_nb = compute_speed_sqd(velocity_nb);
           pressure_nb = compute_pressure(density_nb, density_energy_nb,
@@ -272,48 +274,48 @@ void compute_flux(int nelr,
                                     flux_contribution_nb_density_energy);
 
           // artificial viscosity
-          factor = -normal_len*smoothing_coefficient*0.5f *
-                        (speed_i + sqrtf(speed_sqd_nb) +
-                         speed_of_sound_i + speed_of_sound_nb);
-          flux_i_density += factor*(density_i-density_nb);
-          flux_i_density_energy += factor*(density_energy_i-density_energy_nb);
-          flux_i_momentum.x += factor*(momentum_i.x-momentum_nb.x);
-          flux_i_momentum.y += factor*(momentum_i.y-momentum_nb.y);
-          flux_i_momentum.z += factor*(momentum_i.z-momentum_nb.z);
+          factor = -normal_len * smoothing_coefficient * 0.5f *
+	    (speed_i + sqrtf(speed_sqd_nb) +
+	     speed_of_sound_i + speed_of_sound_nb);
+          flux_i_density += factor*(density_i - density_nb);
+          flux_i_density_energy += factor * (density_energy_i-density_energy_nb);
+          flux_i_momentum.x += factor * (momentum_i.x-momentum_nb.x);
+          flux_i_momentum.y += factor * (momentum_i.y-momentum_nb.y);
+          flux_i_momentum.z += factor * (momentum_i.z-momentum_nb.z);
 
           // accumulate cell-centered fluxes
           factor = 0.5f*normal.x;
           flux_i_density += factor*(momentum_nb.x+momentum_i.x);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.x
-                                    + flux_contribution_i_density_energy.x);
+					   + flux_contribution_i_density_energy.x);
           flux_i_momentum.x += factor*(flux_contribution_nb_momentum_x.x
-                                    + flux_contribution_i_momentum_x.x);
+				       + flux_contribution_i_momentum_x.x);
           flux_i_momentum.y += factor*(flux_contribution_nb_momentum_y.x
-                                    + flux_contribution_i_momentum_y.x);
+				       + flux_contribution_i_momentum_y.x);
           flux_i_momentum.z += factor*(flux_contribution_nb_momentum_z.x
-                                    + flux_contribution_i_momentum_z.x);
+				       + flux_contribution_i_momentum_z.x);
 
           factor = 0.5f*normal.y;
           flux_i_density += factor*(momentum_nb.y+momentum_i.y);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.y
-                                    + flux_contribution_i_density_energy.y);
+					   + flux_contribution_i_density_energy.y);
           flux_i_momentum.x += factor*(flux_contribution_nb_momentum_x.y
-                                    + flux_contribution_i_momentum_x.y);
+				       + flux_contribution_i_momentum_x.y);
           flux_i_momentum.y += factor*(flux_contribution_nb_momentum_y.y
-                                    + flux_contribution_i_momentum_y.y);
+				       + flux_contribution_i_momentum_y.y);
           flux_i_momentum.z += factor*(flux_contribution_nb_momentum_z.y
-                                    + flux_contribution_i_momentum_z.y);
+				       + flux_contribution_i_momentum_z.y);
 
           factor = 0.5f*normal.z;
           flux_i_density += factor*(momentum_nb.z+momentum_i.z);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.z
-                                    + flux_contribution_i_density_energy.z);
+					   + flux_contribution_i_density_energy.z);
           flux_i_momentum.x += factor*(flux_contribution_nb_momentum_x.z
-                                    + flux_contribution_i_momentum_x.z);
+				       + flux_contribution_i_momentum_x.z);
           flux_i_momentum.y += factor*(flux_contribution_nb_momentum_y.z
-                                    + flux_contribution_i_momentum_y.z);
+				       + flux_contribution_i_momentum_y.z);
           flux_i_momentum.z += factor*(flux_contribution_nb_momentum_z.z
-                                    + flux_contribution_i_momentum_z.z);
+				       + flux_contribution_i_momentum_z.z);
         } else if(nb == -1) { // a wing boundary
           flux_i_momentum.x += normal.x*pressure_i;
           flux_i_momentum.y += normal.y*pressure_i;
@@ -322,43 +324,43 @@ void compute_flux(int nelr,
           factor = 0.5f*normal.x;
           flux_i_density += factor * (ff_variable[VAR_MOMENTUM] + momentum_i.x);
           flux_i_density_energy += factor*(ff_flux_contribution_density_energy.x
-                                    + flux_contribution_i_density_energy.x);
+					   + flux_contribution_i_density_energy.x);
           flux_i_momentum.x += factor*(ff_flux_contribution_momentum_x.x
-                                    + flux_contribution_i_momentum_x.x);
+				       + flux_contribution_i_momentum_x.x);
           flux_i_momentum.y += factor*(ff_flux_contribution_momentum_y.x
-                                    + flux_contribution_i_momentum_y.x);
+				       + flux_contribution_i_momentum_y.x);
           flux_i_momentum.z += factor*(ff_flux_contribution_momentum_z.x
-                                    + flux_contribution_i_momentum_z.x);
+				       + flux_contribution_i_momentum_z.x);
 
           factor = float(0.5f)*normal.y;
           flux_i_density += factor*(ff_variable[VAR_MOMENTUM+1]+momentum_i.y);
           flux_i_density_energy += factor*(ff_flux_contribution_density_energy.y
-                                    + flux_contribution_i_density_energy.y);
+					   + flux_contribution_i_density_energy.y);
           flux_i_momentum.x += factor*(ff_flux_contribution_momentum_x.y
-                                    + flux_contribution_i_momentum_x.y);
+				       + flux_contribution_i_momentum_x.y);
           flux_i_momentum.y += factor*(ff_flux_contribution_momentum_y.y
-                                    + flux_contribution_i_momentum_y.y);
+				       + flux_contribution_i_momentum_y.y);
           flux_i_momentum.z += factor*(ff_flux_contribution_momentum_z.y
-                                    + flux_contribution_i_momentum_z.y);
+				       + flux_contribution_i_momentum_z.y);
 
           factor = float(0.5f)*normal.z;
           flux_i_density += factor*(ff_variable[VAR_MOMENTUM+2]+momentum_i.z);
           flux_i_density_energy += factor*(ff_flux_contribution_density_energy.z
-                                    + flux_contribution_i_density_energy.z);
+					   + flux_contribution_i_density_energy.z);
           flux_i_momentum.x += factor*(ff_flux_contribution_momentum_x.z
-                                    + flux_contribution_i_momentum_x.z);
+				       + flux_contribution_i_momentum_x.z);
           flux_i_momentum.y += factor*(ff_flux_contribution_momentum_y.z
-                                    + flux_contribution_i_momentum_y.z);
+				       + flux_contribution_i_momentum_y.z);
           flux_i_momentum.z += factor*(ff_flux_contribution_momentum_z.z
-                                    + flux_contribution_i_momentum_z.z);
+				       + flux_contribution_i_momentum_z.z);
         }
-      }
 
-    fluxes[i + VAR_DENSITY*nelr] = flux_i_density;
-    fluxes[i + (VAR_MOMENTUM+0)*nelr] = flux_i_momentum.x;
-    fluxes[i + (VAR_MOMENTUM+1)*nelr] = flux_i_momentum.y;
-    fluxes[i + (VAR_MOMENTUM+2)*nelr] = flux_i_momentum.z;
-    fluxes[i + VAR_DENSITY_ENERGY*nelr] = flux_i_density_energy;
+      }
+      fluxes[i + VAR_DENSITY*nelr] = flux_i_density;
+      fluxes[i + (VAR_MOMENTUM+0)*nelr] = flux_i_momentum.x;
+      fluxes[i + (VAR_MOMENTUM+1)*nelr] = flux_i_momentum.y;
+      fluxes[i + (VAR_MOMENTUM+2)*nelr] = flux_i_momentum.z;
+      fluxes[i + VAR_DENSITY_ENERGY*nelr] = flux_i_density_energy;
     }
   }
 }
@@ -514,7 +516,6 @@ int main(int argc, char** argv)
   cout << "  done.\n\n";
 
   cout << "  Starting benchmark...\n" << std::flush;
-  auto start_time = chrono::steady_clock::now();
   initialize_variables(nelr, variables, ff_variable);
   float* old_variables = alloc<float>(nelr*NVAR);
   float* fluxes = alloc<float>(nelr*NVAR);
@@ -525,7 +526,9 @@ int main(int argc, char** argv)
   double copy_total = 0.0;
   double sf_total = 0.0;
   double rk_total = 0.0;
+  double flux_time = 0.0, ts_time = 0.0;
 
+  auto start_time = chrono::steady_clock::now();
   for(int i = 0; i < iterations; i++) {
     auto copy_start = chrono::steady_clock::now();
     cpy(old_variables, variables, nelr*NVAR);
@@ -542,27 +545,32 @@ int main(int argc, char** argv)
 
     auto rk_start = chrono::steady_clock::now();
     for(int j = 0; j < RK; j++) {
+      auto cf_start = chrono::steady_clock::now();
       compute_flux(nelr, elements_surrounding_elements, normals, variables,
                    fluxes, ff_variable,
                    ff_flux_contribution_momentum_x,
                    ff_flux_contribution_momentum_y,
                    ff_flux_contribution_momentum_z,
                    ff_flux_contribution_density_energy);
+      auto cf_end = chrono::steady_clock::now();
+      flux_time += chrono::duration<double>(cf_end-cf_start).count();
+
+      auto ts_start = chrono::steady_clock::now();
       time_step(j, nelr, old_variables, variables, step_factors, fluxes);
+      auto ts_end = chrono::steady_clock::now();
+      ts_time += chrono::duration<double>(ts_end-ts_start).count();
     }
     auto rk_end = chrono::steady_clock::now();
     time = chrono::duration<double>(rk_end-rk_start).count();
-    if (i > 0) {
-      rk_times[i] = time;
-      rk_total += time;
-    }
+    rk_times[i] = time;
+    rk_total += time;
   }
   
 
   auto end_time = chrono::steady_clock::now();
   double elapsed_time = chrono::duration<double>(end_time-start_time).count();
   double total_time = chrono::duration<double>(end_time-total_start_time).count();
-  double rk_mean = rk_total / (iterations-1);
+  double rk_mean = rk_total / iterations;
   double sum = 0.0;
   for(int i = 1; i < iterations; i++) {
     double dist = rk_times[i] - rk_mean;
@@ -576,6 +584,8 @@ int main(int argc, char** argv)
        << "            copy : " << copy_total << " seconds (average: " << copy_total / iterations << " seconds).\n"
        << "              sf : " << sf_total << " seconds (average: " << sf_total / iterations << " seconds).\n"
        << "              rk : " << rk_total << " seconds (average: " << rk_mean << " seconds / std dev: " << rk_std_dev << ").\n"
+       << "                   cf : " << flux_time << " seconds.\n"
+       << "                   ts : " <<  ts_time << " seconds.\n"
        << "*** " << elapsed_time << ", " << elapsed_time << "\n"                
        << "----\n\n";
 

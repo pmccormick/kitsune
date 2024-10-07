@@ -127,9 +127,13 @@ bool __kithip_initialize() {
 
   extern bool _kithip_reduce_prefetch;
   (void)__kitrt_get_env_value("KITHIP_REDUCE_PREFETCH", _kithip_reduce_prefetch);
+  if (_kithip_reduce_prefetch)
+    fprintf(stderr, "kithip: prefetch calls will be reduced based on first-fetch request.\n");
 
   extern bool _kithip_mem_advise;
-  (void)__kitrt_get_env_value("KITHIP_MEM_ADVISE", _kithip_mem_advise);  
+  (void)__kitrt_get_env_value("KITHIP_MEM_ADVISE", _kithip_mem_advise);
+  if (_kithip_mem_advise)
+    fprintf(stderr, "kithip: memory usage advise will be provided at alloc time.\n");
 
   // NOTE: The HIP documentation suggest that, "most HIP [calls]
   // implicitly initialize the runtime. This [call] provides control

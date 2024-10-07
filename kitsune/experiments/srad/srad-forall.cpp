@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <kitsune.h>
 
+
+using namespace std;
+
 void random_matrix(float *I, unsigned int rows, unsigned int cols) {
   srand(7);
   using namespace std;
@@ -135,8 +138,8 @@ int main(int argc, char* argv[])
 
   double loop1_total_time = 0.0;
   double loop2_total_time = 0.0;  
-  double loop1_max_time = 0.0, loop1_min_time = 1000.0;
-  double loop2_max_time = 0.0, loop2_min_time = 1000.0;
+  double loop1_max_time = -1000.0, loop1_min_time = 1000.0;
+  double loop2_max_time = -1000.0, loop2_min_time = 1000.0;
   
   for (int iter=0; iter < niter; iter++) {
     float sum=0, sum2=0;
@@ -154,7 +157,6 @@ int main(int argc, char* argv[])
 
     auto loop1_start_time = chrono::steady_clock::now();
     forall(int i = 0 ; i < rows; i++) {
-      
       for(int j = 0; j < cols; j++) {
         int k = i * cols + j;
         float Jc = J[k];
@@ -184,15 +186,17 @@ int main(int argc, char* argv[])
           c[k] = 1.0;
       }
     }
-    
     auto loop1_end_time = chrono::steady_clock::now();
     double etime = chrono::duration<double>
       (loop1_end_time - loop1_start_time).count();
     loop1_total_time += etime;
-    if (etime > loop1_max_time)
+    if (etime > loop1_max_time) {
+      fprintf(stderr, "loop 1: new max=%lf (was %lf), iteration %d\n", etime, loop1_max_time, iter);
       loop1_max_time = etime;
-    if (etime < loop1_min_time)
+    }
+    if (etime < loop1_min_time) {
       loop1_min_time = etime;
+    }
 
     auto loop2_start_time = chrono::steady_clock::now();
     forall(int i = 0; i < rows; i++) {
@@ -210,15 +214,17 @@ int main(int argc, char* argv[])
         J[k] = J[k] + 0.25*lambda*D;
       }
     }
-
     auto loop2_end_time = chrono::steady_clock::now();
     etime = chrono::duration<double>
       (loop2_end_time - loop2_start_time).count();
     loop2_total_time += etime;
-    if (etime > loop2_max_time)
+    if (etime > loop2_max_time) {
+      fprintf(stderr, "loop 2: new max=%lf (was %lf), iteration %d\n", etime, loop2_max_time, iter);
       loop2_max_time = etime;
-    if (etime < loop2_min_time)
+    }
+    if (etime < loop2_min_time) {
       loop2_min_time = etime;
+    }
   }
   auto end_time = chrono::steady_clock::now();
   double elapsed_time = chrono::duration<double>

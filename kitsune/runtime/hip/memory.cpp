@@ -71,12 +71,15 @@ void *__kithip_mem_alloc_managed(size_t size) {
   
   HIP_SAFE_CALL(hipMallocManaged_p(&alloced_ptr, size, hipMemAttachGlobal));
   if (_kithip_mem_advise) {
+    if (__kitrt_verbose_mode())
+      fprintf(stderr, "kithip: providing mem advise suggestions for managed memory allocation.\n");
+      
     HIP_SAFE_CALL(hipMemAdvise_p(alloced_ptr, size, hipMemAdviseSetPreferredLocation,
 				 __kithip_get_device_id()));
     HIP_SAFE_CALL(hipMemAdvise_p(alloced_ptr, size, hipMemAdviseSetAccessedBy,
 				 __kithip_get_device_id()));
     HIP_SAFE_CALL(hipMemAdvise_p(alloced_ptr,  size, hipMemAdviseSetCoarseGrain,
-				 __kithip_get_device_id()));
+                                 __kithip_get_device_id()));
   }
   _kithip_mem_alloc_mutex.lock();
   __kitrt_register_mem_alloc(alloced_ptr, size);
@@ -204,7 +207,12 @@ void* __kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
       
     HIP_SAFE_CALL(hipMemPrefetchAsync_p(vp, size, __kithip_get_device_id(),
 					hip_stream));
-    __kitrt_mark_mem_prefetched(vp);
+    if (_kithip_reduce_prefetch) {
+      if (__kitrt_verbose_mode())
+        fprintf(stderr, "kithip: marking managed memory 'prefetched' [address=%p,stream=%p].\n",
+                vp, (void*)hip_stream);		
+      __kitrt_mark_mem_prefetched(vp);
+    }
   }
   
   return (void*)hip_stream;

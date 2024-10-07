@@ -115,8 +115,8 @@ void *__kithip_get_thread_stream() {
       fprintf(stderr, "kithip: ***** using recycled stream [stream=%p, poolsize=%zu].\n",
             (void*)hip_stream, _kithip_streams.size());
   } else {
-    HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
-    HIP_SAFE_CALL(hipStreamCreateWithPriority_p(&hip_stream, hipStreamNonBlocking, 0));  
+    //HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));
+    //HIP_SAFE_CALL(hipStreamCreateWithPriority_p(&hip_stream, hipStreamNonBlocking, 0));  
     HIP_SAFE_CALL(hipStreamCreate(&hip_stream));
     if (__kitrt_verbose_mode())
       fprintf(stderr, "kithip: ++++ created a new stream (%p).\n", hip_stream);

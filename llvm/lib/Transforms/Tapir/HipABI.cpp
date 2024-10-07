@@ -245,10 +245,10 @@ enum ROCmABIVersion {
 };
 
 cl::opt<ROCmABIVersion> ROCmABITarget(
-    "hipabi-rocm-abi", cl::init(ROCm_ABI_V4), cl::Hidden,
+    "hipabi-rocm-abi", cl::init(ROCm_ABI_V5), cl::Hidden,
     cl::desc("Select the targeted ROCm ABI version."),
     cl::values(clEnumValN(ROCm_ABI_V4, "v4", "Target ROCm v. 4 ABI.")),
-	       cl::values(clEnumValN(ROCm_ABI_V5, "v5", "Target ROCm v. 5 ABI.")));
+    cl::values(clEnumValN(ROCm_ABI_V5, "v5", "Target ROCm v. 5 ABI.")));
 
 cl::opt<bool> Use64ElementWavefront(
     "hipabi-wavefront64", cl::init(true), cl::Hidden,
@@ -1191,13 +1191,17 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
     KernelF->addFnAttr("target-features", "+sramecc,+xnack,+xnack-support,+wavefrontsize64");
   else 
     KernelF->addFnAttr("target-features", "+sramecc,-xnack,-xnack-support");
+  
   KernelF->addFnAttr("uniform-work-group-size", "true");
   std::string AttrVal = llvm::utostr(MinWarpsPerExecUnit) + std::string(",") +
                         llvm::utostr(MaxThreadsPerBlock);
   KernelF->addFnAttr("amdgpu-flat-work-group-size", AttrVal);
   KernelF->addFnAttr("amdgpu-waves-per-eu", AttrVal);
+
+  
   KernelF->setVisibility(GlobalValue::VisibilityTypes::ProtectedVisibility);
-  KernelF->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);  
+  KernelF->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
+
   //KernelF->addFnAttr("no-trapping-math", "true");
 
   // Verify that the Thread ID corresponds to a valid iteration.  Because
@@ -1567,15 +1571,17 @@ std::unique_ptr<Module> &HipABI::getLibDeviceModule() {
     LLVMContext &Ctx = KernelModule.getContext();
     llvm::SMDiagnostic SMD;
 
+    // TODO: should we add flags to control some of these "on"/"off"
+    // bitcode options exposed via command line args?
     std::initializer_list<std::string> BaseBCFiles = {
         "hip.bc",    // hip built-ins
         "ocml.bc",   // open compute math library
         "ockl.bc",   // open compute kernel library
-        "opencl.bc", // printf lives here...
         "oclc_daz_opt_off.bc",
         "oclc_unsafe_math_off.bc",
         "oclc_finite_only_off.bc",
         "oclc_correctly_rounded_sqrt_on.bc",
+        //"opencl.bc", // printf lives here...
     };
 
     std::list<std::string> ROCmBCFiles;
@@ -1781,7 +1787,7 @@ HipABIOutputFile HipABI::createTargetObj(const StringRef &ObjFileName) {
     pto.SLPVectorization = OptLevel > 2;
     pto.LoopUnrolling = OptLevel > 2;
     pto.LoopInterleaving = OptLevel > 2;
-    pto.LoopStripmine = OptLevel > 2;
+    pto.LoopStripmine = false;
     OptimizationLevel optLevels[] = {
         OptimizationLevel::O0,
         OptimizationLevel::O1,
@@ -1854,10 +1860,10 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("--no-undefined");
   LDDArgList.push_back("-shared");
   LDDArgList.push_back("--eh-frame-hdr");
-  // LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
-  //  These will be deprecated soon -- let's avoid them...
-  LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
-  LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
+  LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
+  // AMD will deprecated this flags soon... 
+  //LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
+  //LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
   std::string mcpu_arg = "-plugin-opt=-mcpu=" + GPUArch + ":xnack+:sramecc+";
   LDDArgList.push_back(mcpu_arg.c_str());
   std::string optlevel_arg = "--plugin-opt=O" + std::to_string(OptLevel);
@@ -2296,7 +2302,7 @@ void HipABI::postProcessModule() {
                       << "host-side (re)optimization passes.\n");
 
     PipelineTuningOptions pto;
-    // pto.LoopVectorization = HostOptLevel > 2;
+    pto.LoopVectorization = HostOptLevel > 2;
     pto.LoopVectorization = false;
     pto.SLPVectorization = HostOptLevel > 2;
     pto.LoopUnrolling = HostOptLevel > 1;

@@ -47,7 +47,8 @@ raytracer-kokkos.nvcc.${host_arch}: raytracer-kokkos.cpp
 	@$(FILE_SIZE)
 raytracer-kokkos.hipcc.${host_arch}: raytracer-kokkos.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KOKKOS_HIPCC) -v $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
+	@echo $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
+	@$(TIME_CMD) $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 	@$(FILE_SIZE)
 raytracer-kokkos.hip.${host_arch}: raytracer-kokkos.cpp 
 	@echo $@

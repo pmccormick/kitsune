@@ -190,7 +190,7 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
     //     (e.g. inner loops).
     //   * A more comprehensive model of performance/hardware costs 
     //     could help but we'd have to balance runtime costs vs. accuracy. 
-    if (sm_load < 75) {
+    if (sm_load < 1000) {
 
       if (__kitrt_verbose_mode())
         fprintf(stderr,
@@ -201,6 +201,8 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
       HIP_SAFE_CALL(hipDeviceGetAttribute_p(
                     &warp_size, hipDeviceAttributeWarpSize, 
                     _kithip_device_id));
+      fprintf(stderr, "warp size = %d\n", warp_size);
+      
       while (block_count < num_multiprocs && threads_per_blk > warp_size) {
         threads_per_blk = next_lowest_factor(threads_per_blk, warp_size);
         block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
@@ -240,7 +242,7 @@ void __kithip_get_launch_params(size_t trip_count, hipFunction_t kfunc,
       threads_per_blk = _kithip_default_threads_per_blk;
     _kithip_launch_param_map[map_entry_name] = threads_per_blk;
   }
-  threads_per_blk = 256;
+  threads_per_blk = 768+64;
   blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 }
 

@@ -44,6 +44,7 @@ struct Float3 {
 #define __restrict
 #endif
 
+KOKKOS_FORCEINLINE_FUNCTION
 void cpy(View<float> &dst, View<float> &src, int N) {
   src.sync_device();
   dst.sync_device();
@@ -287,6 +288,7 @@ void compute_flux(int nelr,
           momentum_nb.y = variables.d_view(nb + (VAR_MOMENTUM+1)*nelr);
           momentum_nb.z = variables.d_view(nb + (VAR_MOMENTUM+2)*nelr);
           density_energy_nb = variables.d_view(nb + VAR_DENSITY_ENERGY*nelr);
+	  
           compute_velocity(density_nb, momentum_nb, velocity_nb);
           speed_sqd_nb = compute_speed_sqd(velocity_nb);
           pressure_nb = compute_pressure(density_nb, density_energy_nb,
@@ -300,7 +302,7 @@ void compute_flux(int nelr,
                                     flux_contribution_nb_density_energy);
 
           // artificial viscosity
-          factor = -normal_len*smoothing_coefficient*float(0.5f) *
+          factor = -normal_len*smoothing_coefficient * 0.5f *
                         (speed_i + sqrtf(speed_sqd_nb) +
                          speed_of_sound_i + speed_of_sound_nb);
           flux_i_density += factor*(density_i-density_nb);
@@ -310,7 +312,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(momentum_i.z-momentum_nb.z);
 
           // accumulate cell-centered fluxes
-          factor = float(0.5f)*normal.x;
+          factor = 0.5f * normal.x;
           flux_i_density += factor*(momentum_nb.x+momentum_i.x);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.x
                                     + flux_contribution_i_density_energy.x);
@@ -321,7 +323,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(flux_contribution_nb_momentum_z.x
                                     + flux_contribution_i_momentum_z.x);
 
-          factor = float(0.5f)*normal.y;
+          factor = 0.5f * normal.y;
           flux_i_density += factor*(momentum_nb.y+momentum_i.y);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.y
                                     + flux_contribution_i_density_energy.y);
@@ -332,7 +334,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(flux_contribution_nb_momentum_z.y
                                     + flux_contribution_i_momentum_z.y);
 
-          factor = float(0.5f)*normal.z;
+          factor = 0.5f * normal.z;
           flux_i_density += factor*(momentum_nb.z+momentum_i.z);
           flux_i_density_energy += factor*(flux_contribution_nb_density_energy.z
                                     + flux_contribution_i_density_energy.z);
@@ -347,7 +349,7 @@ void compute_flux(int nelr,
           flux_i_momentum.y += normal.y*pressure_i;
           flux_i_momentum.z += normal.z*pressure_i;
         } else if(nb == -2) { // a far field boundary
-          factor = float(0.5f)*normal.x;
+          factor = 0.5f * normal.x;
           flux_i_density += factor*(ff_variable.d_view(VAR_MOMENTUM+0) +
                               momentum_i.x);
           flux_i_density_energy += factor*(ff_flux_contribution_density_energy.x
@@ -359,7 +361,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(ff_flux_contribution_momentum_z.x
                                     + flux_contribution_i_momentum_z.x);
 
-          factor = float(0.5f)*normal.y;
+          factor = 0.5f * normal.y;
           flux_i_density += factor*(ff_variable.d_view(VAR_MOMENTUM+1) +
                               momentum_i.y);
           flux_i_density_energy += factor*(ff_flux_contribution_density_energy.y
@@ -371,7 +373,7 @@ void compute_flux(int nelr,
           flux_i_momentum.z += factor*(ff_flux_contribution_momentum_z.y
                                     + flux_contribution_i_momentum_z.y);
 
-          factor = float(0.5f)*normal.z;
+          factor = 0.5f * normal.z;
           flux_i_density += factor*(ff_variable.d_view(VAR_MOMENTUM+2) +
                                   momentum_i.z);
           flux_i_density_energy += factor*(ff_flux_contribution_density_energy.z
@@ -561,7 +563,6 @@ int main(int argc, char** argv)
     cout << "  done.\n\n";
 
     cout << "  Starting benchmark...\n" << std::flush;
-    auto start_time = chrono::steady_clock::now();
     initialize_variables(nelr, variables, ff_variable);
     View<float> old_variables = View<float>("old_variables", nelr*NVAR);
     View<float> fluxes = View<float>("fluxes", nelr*NVAR);
@@ -572,6 +573,7 @@ int main(int argc, char** argv)
     double copy_total = 0.0;
     double sf_total = 0.0;
     double rk_total = 0.0;
+    auto start_time = chrono::steady_clock::now();
     for(int i = 0; i < iterations; i++) {
       
       auto copy_start = chrono::steady_clock::now();
