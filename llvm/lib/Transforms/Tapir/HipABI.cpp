@@ -1584,9 +1584,17 @@ std::unique_ptr<Module> &HipABI::getLibDeviceModule() {
         //"opencl.bc", // printf lives here...
     };
 
-    std::list<std::string> ROCmBCFiles;
+
     for (std::string BCFile : BaseBCFiles)
       ROCmBCFiles.push_back(BCFile);
+
+
+
+    if (Use64ElementWavefront)
+      ROCmBCFiles.push_back("oclc_wavefrontsize64_on.bc");
+    else
+      ROCmBCFiles.push_back("oclc_wavefrontsize64_off.bc");
+    
 
     // Pick the corresponding bitcode file for the
     // target architecture.
@@ -1619,10 +1627,6 @@ std::unique_ptr<Module> &HipABI::getLibDeviceModule() {
     else
       llvm_unreachable("unhandled ROCm ABI version!");
 
-    if (Use64ElementWavefront)
-      ROCmBCFiles.push_back("oclc_wavefrontsize64_on.bc");
-    else
-      ROCmBCFiles.push_back("oclc_wavefrontsize64_off.bc");
 
     LLVM_DEBUG(dbgs() << "\tpre-loading AMDGCN device bitcode files.\n");
     for (std::string BCFile : ROCmBCFiles) {
