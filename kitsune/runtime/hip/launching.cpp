@@ -196,6 +196,11 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
     }
 
 
+    int max_threads_per_blk;
+    HIP_SAFE_CALL(hipDeviceGetAttribute_p(&max_threads_per_blk,
+                                          hipDeviceAttributeMaxThreadsPerBlock,
+                                          _kithip_device_id));
+                                          
     if (threads_per_blk == max_threads_per_blk) {
       // Maxing out the threads per blk is a frequent occurrence when calling 
       // HIP's occupancy heuristic.  Let's shuffle things downward a bit to try
@@ -204,7 +209,7 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
       // TODO: There is a ton of work to do here!  Need to inject some more sanity
       // into this process... 
       do { 
-        threads_per_blk = threads_per_blk - (max_threads_per_blk / 32);
+        threads_per_blk = threads_per_blk - (max_threads_per_blk / 64);
         block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
         sm_load = ((float)block_count / num_multiprocs) * 100.0f;
 	HIP_SAFE_CALL(hipModuleOccupancyMaxActiveBlocksPerMultiprocessor(&active_blks,
@@ -219,6 +224,7 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
                 active_blks, threads_per_blk);	
 	
       } while (active_blks < 3 && threads_per_blk > 896);
+
     }
 
     if (__kitrt_verbose_mode()) {
@@ -231,7 +237,6 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
     }
   }
   //threads_per_blk = 1024;
-
   blks_per_grid = (trip_count + (threads_per_blk - 1)) / threads_per_blk;
 }
 

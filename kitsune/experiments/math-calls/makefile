@@ -1,39 +1,35 @@
-include ../experiments.mk 
+include ../experiments.mk
 
-cxx_flags += -I${kitsune_prefix}/include  -fPIC
+targets = exp.${host_arch}
 
-targets = math-calls.opencilk.${host_arch}
+all: ${targets}
 
-ifeq ($(KITSUNE_ENABLE_CUDA), TRUE)
-  targets += math-calls.cuda.${host_arch}
-  targets += math-calls-kokkos.nvcc.${host_arch}
-  targets += math-calls-kokkos.clang.${host_arch}
-endif 
+# forall-based tests
+exp.cuda.${host_arch}: exp.cpp
+	@echo $@
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< 
+	@$(FILE_SIZE)
+#####
 
-ifeq ($(KITSUNE_ENABLE_HIP), TRUE)
-  targets += math-calls.hip.${host_arch}
-endif 
+define newline 
 
-all: ${targets} 
+endef 
 
-#############################
-# Kitsune+Tapir versions.
-#
-math-calls.opencilk.${host_arch}: math-calls.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_opencilk_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-math-calls.cuda.${host_arch}: math-calls.cpp
-	/usr/bin/time ${clangxx} ${cxx_flags} ${kitflags} ${tapir_cu_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-math-calls.hip.${host_arch}: math-calls.cpp
-	/usr/bin/time ${clangxx} -mllvm -debug-only=hipabi ${cxx_flags} ${kitflags} ${tapir_hip_flags} -o $@ $< -Xlinker -rpath=${kitsune_prefix}/lib
-#
-#############################
+define RUN_test
+	$$(./$(1) > $(1).log) $(newline) 
+endef
+
+run: $(targets) 
+	@echo "running generated executables..."
+	$(foreach prog,$(targets),$(call RUN_test,$(prog)))
+
+launch_bench: vecadd-forall.cuda.${host_arch}
+	../launch-bench.sh $<
+#####
+
+.PHONY: all clean run
 
 clean:
-	-rm -f *.${host_arch}
-	-rm -f *.fatbin
-	-rm -rf *-cfg-tmp
-	-rm -f *.bc
-	-rm -f *.fatbin *.o *.a 
-	-rm -f *.ppm *.jpg
-	-rm -f *.ll *.ptx *.csv *.log *.s *.fbin *.tapir
+	-rm -f *.${host_arch} *.ll *.o
+	-rm -f *~ core *~ *.log 
 

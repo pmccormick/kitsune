@@ -848,39 +848,38 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
                        "in parallel loops... :-(\n");
   }
 
-  std::string FnName = "";
+  std::string FnName = NVPrefix;
   if (Fn->isIntrinsic()) {
 
-    if (enableFast)
-      FnName = "fast_";
+    //if (enableFast)
+    //  FnName = "fast_";
 
-    if (Fn->getName().str().compare(0, 9, "llvm.nvvm") == 0)
-      return nullptr; // backend can handle these...
-    else if (Fn->getName() == "llvm.cos.f32")
-      FnName += "cosf";
-    else if (Fn->getName() == "llvm.cos.f64")
-      FnName += "cos";
-    else if (Fn->getName() == "llvm.sin.f32")
-      FnName += "sinf";
-    else if (Fn->getName() == "llvm.sin.f64")
-      FnName += "sin";
-    else if (Fn->getName() == "llvm.tan.f32")
-      FnName += "tanf";
-    else if (Fn->getName() == "llvm.tan.f64")
-      FnName += "tan";
-    else if (Fn->getName() == "llvm.exp.f64")
-      FnName += "exp";
-    else if (Fn->getName() == "llvm.expf.f32")
-      FnName += "expf";
-    else if (Fn->getName() == "llvm.smax")
-      FnName += "smax";
-    else if (Fn->getName() == "llvm.smin")
-      FnName += "smin";
-    else {
-      // errs() << "cuabi: transforming intrinsic call " << Fn->getName() <<
-      // "()\n"; report_fatal_error("cuabi: no transform for llvm intrinsic!");
-      return nullptr;
-    }
+    if (Fn->getName().str().compare(0, 9, "llvm.nvvm") != 0)
+      if (Fn->getName() == "llvm.cos.f32")
+        FnName += "cosf";
+      else if (Fn->getName() == "llvm.cos.f64")
+        FnName += "cos";
+      else if (Fn->getName() == "llvm.sin.f32")
+        FnName += "sinf";
+      else if (Fn->getName() == "llvm.sin.f64")
+        FnName += "sin";
+      else if (Fn->getName() == "llvm.tan.f32")
+        FnName += "tanf";
+      else if (Fn->getName() == "llvm.tan.f64")
+        FnName += "tan";
+      else if (Fn->getName() == "llvm.exp.f64")
+        FnName += "exp";
+      else if (Fn->getName() == "llvm.expf.f32")
+        FnName += "expf";
+      else if (Fn->getName() == "llvm.smax")
+        FnName += "smax";
+      else if (Fn->getName() == "llvm.smin")
+        FnName += "smin";
+      else {
+        // errs() << "cuabi: transforming intrinsic call " << Fn->getName() <<
+        // "()\n"; report_fatal_error("cuabi: no transform for llvm intrinsic!");
+        return nullptr;
+      }
   } else {
     if (Fn->getName() == "__sqrtf_finite") {
       FnName = "llvm.nvvm.sqrt.approx.ftz.f";
@@ -916,6 +915,7 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
       return &DF;
     }
   }
+  */
   return nullptr;
 }
 
