@@ -54,19 +54,22 @@
 #ifndef __KITRT_H__
 #define __KITRT_H__
 
-#include <cstdio>
-#include <cassert>
 #include <stdint.h>
 #include <stdlib.h>
-#include <cstring>
 #include <execinfo.h>
-#include <type_traits>
 #include <ctype.h>
 
 #ifdef __cplusplus
+#include <cstdio>
+#include <cassert>
+#include <type_traits>
+#include <cstring>
 extern "C" {
 #else
+#include <stdio.h>
+#include <assert.h>
 #include <stdbool.h>
+#include <string.h>
 #endif
 
  /**
@@ -155,6 +158,7 @@ extern "C" {
  * Otherwise, `true` is returned and the value is returned in
  * the caller provided parameter.
  */
+#ifdef __cplusplus
 template <typename ValueType>
 bool __kitrt_get_env_value(const char *var_name,
 			   ValueType &value) {
@@ -205,6 +209,6 @@ bool __kitrt_get_env_value(const char *var_name,
     
   return found;
 }
-
+#endif // c++ 
 #endif // __KITRT_H__
 

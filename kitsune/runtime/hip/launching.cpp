@@ -200,7 +200,6 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
     HIP_SAFE_CALL(hipDeviceGetAttribute_p(&max_threads_per_blk,
                                           hipDeviceAttributeMaxThreadsPerBlock,
                                           _kithip_device_id));
-                                          
     if (threads_per_blk == max_threads_per_blk) {
       // Maxing out the threads per blk is a frequent occurrence when calling 
       // HIP's occupancy heuristic.  Let's shuffle things downward a bit to try

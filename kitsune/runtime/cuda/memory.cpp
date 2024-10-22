@@ -121,7 +121,7 @@ __kitcuda_mem_calloc_managed(size_t count, size_t element_size) {
   return (void *)memp;
 }
 
-__attribute__((malloc)) void *__kitcuda__mem_realloc_managed(void *ptr,
+__attribute__((malloc)) void *__kitcuda_mem_realloc_managed(void *ptr,
                                                              size_t size) {
   assert(size != 0 && "zero-valued size!");
 
@@ -170,10 +170,12 @@ void __kitcuda_mem_free(void *vp) {
   // Note that the versioned free calls are important
   // here -- a non-v2 version will actually result in
   // crashes...
+  if (__kitrt_verbose_mode())
+    fprintf(stderr, "kitcuda: freeing memory at %p.\n", vp);
   _kitcuda_mem_alloc_mutex.lock();
   __kitrt_unregister_mem_alloc(vp);
-  _kitcuda_mem_alloc_mutex.unlock();
   CU_SAFE_CALL(cuMemFree_v2_p((CUdeviceptr)vp));
+  _kitcuda_mem_alloc_mutex.unlock();
   KIT_NVTX_POP();
 }
 

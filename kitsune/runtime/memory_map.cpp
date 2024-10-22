@@ -52,6 +52,7 @@
 #include <cassert>
 #include <unordered_map>
 #include <map>
+#include <chrono>
 #include "kitrt.h"
 #include "memory_map.h"
 
@@ -59,6 +60,7 @@ typedef std::unordered_map<void *, KitRTAllocMapEntry> KitRTAllocMap;
 static KitRTAllocMap _kitrt_alloc_map;
 
 void __kitrt_register_mem_alloc(void *addr, size_t size) {
+  auto start_time = std::chrono::steady_clock::now();
   assert(addr != nullptr && "unexpected null pointer!");
   KitRTAllocMapEntry entry;
   entry.size = size;
@@ -69,6 +71,9 @@ void __kitrt_register_mem_alloc(void *addr, size_t size) {
   if (__kitrt_verbose_mode())
     fprintf(stderr, "kitrt: registered memory allocation (%p) "
 	    "of %ld bytes.\n", addr, size);
+  auto end_time = std::chrono::steady_clock::now();
+  fprintf(stderr, "kitrt: memory registration time %lf seconds.\n", 
+	  std::chrono::duration<double>(end_time-start_time).count());
 }
 
 void __kitrt_set_mem_prefetch(void *addr, bool prefetched) {

@@ -851,9 +851,6 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
   std::string FnName = NVPrefix;
   if (Fn->isIntrinsic()) {
 
-    //if (enableFast)
-    //  FnName = "fast_";
-
     if (Fn->getName().str().compare(0, 9, "llvm.nvvm") != 0)
       if (Fn->getName() == "llvm.cos.f32")
         FnName += "cosf";
@@ -876,14 +873,14 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
       else if (Fn->getName() == "llvm.smin")
         FnName += "smin";
       else {
-        // errs() << "cuabi: transforming intrinsic call " << Fn->getName() <<
-        // "()\n"; report_fatal_error("cuabi: no transform for llvm intrinsic!");
+         errs() << "cuabi: could not transform intrinsic call "
+		<< Fn->getName()
+		<< "()\n";
         return nullptr;
       }
   } else {
     if (Fn->getName() == "__sqrtf_finite") {
       FnName = "llvm.nvvm.sqrt.approx.ftz.f";
-      // errs() << "\t mapping to " << FnName << "\n";
     } else if (Fn->getName() == "__powf_finite")
       FnName = "fast_powf";
     else if (Fn->getName() == "__fmodf_finite")
@@ -894,6 +891,8 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
       else
         FnName = "__nv_expf";
       errs() << "call for exp: " << FnName << "().\n";
+    } else {
+      // no-op... pass through... 
     }
   }
 
@@ -915,7 +914,7 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
       return &DF;
     }
   }
-  */
+
   return nullptr;
 }
 

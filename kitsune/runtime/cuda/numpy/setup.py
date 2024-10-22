@@ -12,11 +12,12 @@ if not CUDA_PATH:
     CUDA_PATH = os.environ.get("CUDA_HOME")
 if not CUDA_PATH:
     raise RuntimeError('Environment variable CUDA_HOME or CUDA_PATH is not set')
-print(CUDA_PATH)
+print('cuda install prefix: ', CUDA_PATH)
+print('kitsune install lib dir: ', kitsune_lib_dir)
 
 include_path_list = [numpy.get_include(),"../"] + [os.path.join(CUDA_PATH, 'include')]
 print(include_path_list)
-# TODO: This should point at the install path f
+# TODO: This should point at the install path
 def main():
         setup(name="kitrt_numpy_allocator",
               version="0.1.0",
