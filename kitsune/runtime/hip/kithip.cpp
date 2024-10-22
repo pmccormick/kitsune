@@ -135,6 +135,11 @@ bool __kithip_initialize() {
   if (_kithip_mem_advise)
     fprintf(stderr, "kithip: memory usage advise will be provided at alloc time.\n");
 
+  extern bool _kithip_refine_occupancy_calc;
+  (void)__kitrt_get_env_value("KITHIP_REFINE_LAUNCH", _kithip_refine_occupancy_calc);
+  if (_kithip_refine_occupancy_calc) 
+    fprintf(stderr, "kithip: will refine occupancy heuristic launch parameters.\n");
+
   // NOTE: The HIP documentation suggest that, "most HIP [calls]
   // implicitly initialize the runtime. This [call] provides control
   // over the timing of the initialization."  Instead of relying on

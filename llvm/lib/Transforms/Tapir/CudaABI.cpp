@@ -63,6 +63,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/FMF.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -649,8 +650,8 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
     if (Function *F = dyn_cast<Function>(G)) {
       Function *DeviceF = KernelModule.getFunction(F->getName());
       if (not DeviceF) {
-        // LLVM_DEBUG(dbgs() << "\tanalyzing missing (device-side) function '"
-        //                   << F->getName() << "'.\n");
+        LLVM_DEBUG(dbgs() << "\tanalyzing missing (device-side) function '"
+                          << F->getName() << "'.\n");
         Function *LF = resolveLibDeviceFunction(F, false);
         if (LF && not KernelModule.getFunction(LF->getName())) {
           // LLVM_DEBUG(dbgs() << "\ttransformed to libdevice function '"
@@ -922,14 +923,6 @@ void CudaLoop::transformForPTX(Function &F) {
 
   // LLVM_DEBUG(dbgs() << "Transforming function '" << F.getName() << "' "
   //                   << "in preparation for PTX generation.\n");
-
-  // PTX doesn't like .<n> global names, rename them to
-  // replace the '.' with an underscore, '_'.
-  for (GlobalVariable &G : KernelModule.globals()) {
-    auto name = G.getName().str();
-    std::replace(name.begin(), name.end(), '.', '_');
-    G.setName(name);
-  }
 
   // We now need to walk the kernel (outlined loop) and look for
   // unresolved function calls.  In particular we need to check
@@ -2002,6 +1995,22 @@ void CudaABI::postProcessModule() {
                                                  ".post.unoptimized"));
   LLVM_DEBUG(saveModuleToFile(&M, M.getName().str() + ".outline-debug"));
 
+
+  // To correctly handle debug mode we need to make sure any outlined debug
+  // info is removed from the kernel module or it will show up as duplicated
+  // from the host-side module.
+  StripDebugInfo(KernelModule);
+
+  // With the debug info removed we potentailly introduce funny naming
+  // that will trip up ptx codegen.  Specifically, ptx doesn't like
+  // .<n> global names, rename them to replace the '.' with an
+  // underscore, '_'.
+  for (GlobalVariable &G : KernelModule.globals()) {
+    auto name = G.getName().str();
+    std::replace(name.begin(), name.end(), '.', '_');
+    G.setName(name);
+  }
+
   auto L = Linker(KernelModule);
   if (LibDeviceModule) {
     LLVM_DEBUG(dbgs() << "\t- linking in cuda libdevice into kernel module.\n");
@@ -2070,6 +2079,10 @@ CudaABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
   // code.
 
   std::string ModuleName = sys::path::filename(M.getName()).str();
+  // Clean up naming to deal with potential conflicts down the road
+  // with ptx naming convensions. 
+  std::replace(ModuleName.begin(), ModuleName.end(), '.', '_');
+  std::replace(ModuleName.begin(), ModuleName.end(), '-', '_');    
   Loop *TheLoop = TL->getLoop();
   Function *Fn = TheLoop->getHeader()->getParent();
   std::string KernelName = Fn->getName().str();

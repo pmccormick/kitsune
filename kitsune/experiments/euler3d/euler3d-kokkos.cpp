@@ -109,8 +109,7 @@ void compute_flux_contribution(const float density,
                                Float3& fc_momentum_x,
                                Float3& fc_momentum_y,
                                Float3& fc_momentum_z,
-                               Float3& fc_density_energy)
-{
+                               Float3& fc_density_energy) {
   fc_momentum_x.x = velocity.x*momentum.x + pressure;
   fc_momentum_x.y = velocity.x*momentum.y;
   fc_momentum_x.z = velocity.x*momentum.z;
@@ -132,16 +131,14 @@ void compute_flux_contribution(const float density,
 KOKKOS_FORCEINLINE_FUNCTION
 void compute_velocity(float density,
                       const Float3& momentum,
-                      Float3& velocity)
-{
+                      Float3& velocity) {
   velocity.x = momentum.x / density;
   velocity.y = momentum.y / density;
   velocity.z = momentum.z / density;
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
-float compute_speed_sqd(const Float3 &velocity)
-{
+float compute_speed_sqd(const Float3 &velocity) {
   return velocity.x*velocity.x +
          velocity.y*velocity.y +
          velocity.z*velocity.z;
@@ -150,15 +147,13 @@ float compute_speed_sqd(const Float3 &velocity)
 KOKKOS_FORCEINLINE_FUNCTION
 float compute_pressure(float density,
                        float density_energy,
-                       float speed_sqd)
-{
+                       float speed_sqd) {
   return (float(GAMMA)-float(1.0f))*(density_energy -
           float(0.5f)*density*speed_sqd);
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
-float compute_speed_of_sound(float density, float pressure)
-{
+float compute_speed_of_sound(float density, float pressure) {
   return sqrtf(float(GAMMA)*pressure/density);
 }
 
@@ -201,6 +196,7 @@ void compute_step_factor(int nelr,
   step_factors.modify_device();
   Kokkos::fence();
 }
+
 
 void compute_flux(int nelr,
                   View<int>& elements_surrounding_elements,

@@ -75,6 +75,7 @@
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
@@ -1059,7 +1060,7 @@ void HipLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
             DeviceF->addFnAttr(Attribute::AlwaysInline);
           }
           DeviceF->setLinkage(GlobalValue::LinkageTypes::InternalLinkage);
-          DeviceF->setCallingConv(CallingConv::Fast);
+          DeviceF->setCallingConv(CallingConv::AMDGPU_KERNEL);
         }
       }
       //} else if (GlobalVariable *GV = dyn_cast<GlobalVariable>(v)) {
@@ -1178,7 +1179,7 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   case GK_GFX602:
   case GK_GFX601:
   case GK_GFX600:
-    target_feature_str += "+s-memtime-inst";
+    target_feature_str += "+s-memtime-inst,";
     break;
   case GK_NONE:
     break;
@@ -1186,24 +1187,21 @@ void HipLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
     llvm_unreachable("Unhandled GPU!");
   }
 
+  if (EnableXnack)
+    target_feature_str += "+sramecc,+xnack,+xnack-support,+wavefrontsize64";
+  else
+    target_feature_str += "+sramecc,-xnack,-xnack-support,+wavefrontsize64";
+  KernelF->addFnAttr("target-features", target_feature_str);
   KernelF->addFnAttr("target-cpu", GPUArch);
-  if (EnableXnack) 
-    KernelF->addFnAttr("target-features", "+sramecc,+xnack,+xnack-support,+wavefrontsize64");
-  else 
-    KernelF->addFnAttr("target-features", "+sramecc,-xnack,-xnack-support");
-  
-  KernelF->addFnAttr("uniform-work-group-size", "true");
   std::string AttrVal = llvm::utostr(MinWarpsPerExecUnit) + std::string(",") +
                         llvm::utostr(MaxThreadsPerBlock);
-  KernelF->addFnAttr("amdgpu-flat-work-group-size", AttrVal);
-  KernelF->addFnAttr("amdgpu-waves-per-eu", AttrVal);
-
-  
+  KernelF->addFnAttr("uniform-work-group-size", "true");
+  KernelF->addFnAttr("amdgpu-flat-work-group-size", "64,1024");
+  KernelF->addFnAttr("amdgpu-waves-per-eu", "1");
+  KernelF->addFnAttr("no-trapping-math", "true");  
   KernelF->setVisibility(GlobalValue::VisibilityTypes::ProtectedVisibility);
   KernelF->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
-
-  //KernelF->addFnAttr("no-trapping-math", "true");
-
+  
   // Verify that the Thread ID corresponds to a valid iteration.  Because
   // Tapir loops use canonical induction variables, valid iterations range
   // from 0 to the loop limit with stride 1.  The End argument encodes the
@@ -1519,7 +1517,7 @@ HipABI::HipABI(Module &InputModule)
   SmallString<255> NewModuleName(ArchString + KernelModule.getName().str());
   sys::path::replace_extension(NewModuleName, ".amdgcn");
   KernelModule.setSourceFileName(NewModuleName.c_str());
-  llvm::CodeGenOptLevel TMOptLevel = CodeGenOptLevel::None;
+  llvm::CodeGenOptLevel TMOptLevel;
   llvm::CodeModel::Model TMCodeModel = CodeModel::Model::Large;
 
   if (OptLevel == 0)
@@ -1864,9 +1862,9 @@ HipABIOutputFile HipABI::linkTargetObj(const HipABIOutputFile &ObjFile,
   LDDArgList.push_back("--eh-frame-hdr");
   LDDArgList.push_back("--plugin-opt=-amdgpu-internalize-symbols");
   // AMD will deprecated this flags soon... 
-  //LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
-  //LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
-  std::string mcpu_arg = "-plugin-opt=-mcpu=" + GPUArch + ":xnack+:sramecc+";
+  LDDArgList.push_back("--plugin-opt=-amdgpu-early-inline-all=true");
+  LDDArgList.push_back("--plugin-opt=-amdgpu-function-calls=true");
+  std::string mcpu_arg = "--plugin-opt=-mcpu=" + GPUArch + ":xnack+:sramecc+";
   LDDArgList.push_back(mcpu_arg.c_str());
   std::string optlevel_arg = "--plugin-opt=O" + std::to_string(OptLevel);
   LDDArgList.push_back(optlevel_arg.c_str());
@@ -2231,6 +2229,8 @@ void HipABI::postProcessModule() {
                     << "' modules.\n");
   LLVM_DEBUG(saveModuleToFile(&KernelModule, KernelModule.getName().str(),
                               ".hipabi.preopt.ll"));
+
+  StripDebugInfo(KernelModule);
 
   if (Function *puts = KernelModule.getFunction("puts")) {
     Value *printf = KernelModule.getFunction("printf");

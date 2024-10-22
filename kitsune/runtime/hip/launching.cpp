@@ -100,7 +100,7 @@ extern "C" {
 // this is the default number of threads we'll launch per block (in
 // CUDA speak).
 static bool _kithip_use_occupancy_calc = true;
-static bool _kithip_refine_occupancy_calc = true;
+bool _kithip_refine_occupancy_calc = true;
 static int _kithip_default_max_threads_per_blk = 1024;
 static int _kithip_default_threads_per_blk = 256;
 
@@ -151,7 +151,18 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
   int min_grid_size;
   HIP_SAFE_CALL(hipModuleOccupancyMaxPotentialBlockSize_p(
       &min_grid_size, &threads_per_blk, kfunc, 0, 0));
+  int active_blks;
+  HIP_SAFE_CALL(hipModuleOccupancyMaxActiveBlocksPerMultiprocessor(&active_blks,
+								   kfunc,
+								   threads_per_blk,
+								   0));
 
+  if (__kitrt_verbose_mode()) {
+    fprintf(stderr, "kithip: occupancy launch figures -----------------------\n");
+    fprintf(stderr, "   - minimum grid size:       %d\n", min_grid_size);
+    fprintf(stderr, "   - recommended block size:  %d (threads)\n", threads_per_blk);
+    fprintf(stderr, "   - active blocks per mp:    %d\n\n", active_blks);
+  }
 
   if (_kithip_refine_occupancy_calc) {
     // Assume that the occupancy heuristic is flawed and look to refine
@@ -165,25 +176,26 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
     HIP_SAFE_CALL(hipDeviceGetAttribute_p(&num_multiprocs,
                                           hipDeviceAttributeMultiprocessorCount,
                                           _kithip_device_id));
-
+    int max_threads_per_blk = 0;
+    HIP_SAFE_CALL(hipDeviceGetAttribute_p(&max_threads_per_blk,
+                                          hipDeviceAttributeMaxThreadsPerBlock,
+                                          _kithip_device_id));
+    
     // Estimate how many multi-processors we are using with the provided
     // threads-per-block value..
     int block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
     float sm_load = ((float)block_count / num_multiprocs) * 100.0;
 
     if (__kitrt_verbose_mode()) {
-      fprintf(stderr, "kithip: kernel workload --------------\n");
+      fprintf(stderr, "kithip: initial occupancy kernel workload --------------\n");
       fprintf(stderr, "  Number of multi-procs:  %d\n", num_multiprocs);
+      fprintf(stderr, "  Max threads per block:  %d\n", max_threads_per_blk);
       fprintf(stderr, "  Trip count:             %ld\n", trip_count);
       fprintf(stderr, "  Occupancy-driven TPB:   %d\n", threads_per_blk);
       fprintf(stderr, "  Multi-proc utilization: %3.2f%%\n", sm_load);
     }
 
 
-    int max_threads_per_blk;
-    HIP_SAFE_CALL(hipDeviceGetAttribute_p(&max_threads_per_blk,
-                                          hipDeviceAttributeMaxThreadsPerBlock,
-                                          _kithip_device_id));
     if (threads_per_blk == max_threads_per_blk) {
       // Maxing out the threads per blk is a frequent occurrence when calling 
       // HIP's occupancy heuristic.  Let's shuffle things downward a bit to try
@@ -192,18 +204,25 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
       // TODO: There is a ton of work to do here!  Need to inject some more sanity
       // into this process... 
       do { 
-        threads_per_blk = threads_per_blk - (max_threads_per_blk / 8);
+        threads_per_blk = threads_per_blk - (max_threads_per_blk / 32);
         block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
         sm_load = ((float)block_count / num_multiprocs) * 100.0;
-      } while (sm_load > 1000.0);
+	HIP_SAFE_CALL(hipModuleOccupancyMaxActiveBlocksPerMultiprocessor(&active_blks,
+									 kfunc,
+									 threads_per_blk,
+									 0));
+	if (__kitrt_verbose_mode()) 
+	  fprintf(stderr, "\t+ active blocks/mp=%d, threads/block=%d\n", active_blks, threads_per_blk);
+	
+      } while (active_blks < 8 && threads_per_blk > 768);
     }
 
     if (__kitrt_verbose_mode()) {
-      fprintf(stderr, "  ***-new launch parameters:");
+      fprintf(stderr, "+kithip: REFINED launch parameters ---------------------\n");
       fprintf(stderr, "\tthreads-per-block: %d\n", threads_per_blk);
       fprintf(stderr, "\tnumer of blocks:   %d\n", block_count);
       fprintf(stderr, "\tmulti-proc load:   %3.2f%%\n", sm_load);
-      fprintf(stderr, "---------------------------------------\n\n");
+      fprintf(stderr, "--------------------------------------------------------\n\n");
     }
   }
 
@@ -232,7 +251,7 @@ void __kithip_get_launch_params(size_t trip_count, hipFunction_t kfunc,
       threads_per_blk = _kithip_default_threads_per_blk;
     _kithip_launch_param_map[map_entry_name] = threads_per_blk;
   }
-  threads_per_blk = 768 + 64;
+  
   blks_per_grid = (trip_count + threads_per_blk - 1) / threads_per_blk;
 }
 
@@ -293,10 +312,11 @@ void *__kithip_launch_kernel(const void *fat_bin, const char *kernel_name,
     fprintf(stderr, "  blocks:     %d, 1, 1\n", blks_per_grid);
     fprintf(stderr, "  threads:    %d, 1, 1\n", threads_per_blk);
     fprintf(stderr, "  trip count: %ld\n", trip_count);
-    fprintf(stderr, "  stream ptr: %p\n", opaque_stream);
+    fprintf(stderr, "  stream ptr: %p\n", (void*)hip_stream);
   }
 
-  HIP_SAFE_CALL(hipModuleLaunchKernel_p(kern_func, blks_per_grid, 1, 1,
+  HIP_SAFE_CALL(hipModuleLaunchKernel_p(kern_func,
+					blks_per_grid, 1, 1,
                                         threads_per_blk, 1, 1,
                                         0, // shared mem size
                                         hip_stream, kern_args, NULL));
