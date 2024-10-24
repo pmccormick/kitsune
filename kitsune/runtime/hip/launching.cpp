@@ -206,15 +206,19 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
       do { 
         threads_per_blk = threads_per_blk - (max_threads_per_blk / 32);
         block_count = (trip_count + threads_per_blk - 1) / threads_per_blk;
-        sm_load = ((float)block_count / num_multiprocs) * 100.0;
+        sm_load = ((float)block_count / num_multiprocs) * 100.0f;
 	HIP_SAFE_CALL(hipModuleOccupancyMaxActiveBlocksPerMultiprocessor(&active_blks,
 									 kfunc,
 									 threads_per_blk,
 									 0));
 	if (__kitrt_verbose_mode()) 
-	  fprintf(stderr, "\t+ active blocks/mp=%d, threads/block=%d\n", active_blks, threads_per_blk);
+	  fprintf(stderr, "\t+ active blocks/mp=%d, threads/block=%d\n",
+		  active_blks, threads_per_blk);
+
+        fprintf(stderr, "\t+ active blocks/mp=%d, threads/block=%d\n",
+                active_blks, threads_per_blk);	
 	
-      } while (active_blks < 8 && threads_per_blk > 768);
+      } while (active_blks < 3 && threads_per_blk > 896);
     }
 
     if (__kitrt_verbose_mode()) {
@@ -222,9 +226,11 @@ void __kithip_get_occ_launch_params(size_t trip_count, hipFunction_t kfunc,
       fprintf(stderr, "\tthreads-per-block: %d\n", threads_per_blk);
       fprintf(stderr, "\tnumer of blocks:   %d\n", block_count);
       fprintf(stderr, "\tmulti-proc load:   %3.2f%%\n", sm_load);
+      fprintf(stderr, "\tactive blocks:     %d\n", active_blks);
       fprintf(stderr, "--------------------------------------------------------\n\n");
     }
   }
+  //threads_per_blk = 1024;
 
   blks_per_grid = (trip_count + (threads_per_blk - 1)) / threads_per_blk;
 }
