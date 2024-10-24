@@ -17,16 +17,14 @@ all: ${targets}
 # forall-based tests
 raytracer-forall.opencilk.${host_arch}: raytracer-forall.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) -o $@ $<
+	$(TIME_CMD) $(KIT_CXX) $(TAPIR_OPENCILK_FLAGS) -o $@ $<
 	@$(FILE_SIZE)
 raytracer-forall.cuda.${host_arch}: raytracer-forall.cpp 
-	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(KITSUNE_FAST_MATH) $(TAPIR_CUDA_FLAGS) -o $@ $<
-	@$(FILE_SIZE)
+	$(KIT_CXX) $(KITSUNE_FAST_MATH) $(TAPIR_CUDA_FLAGS) -o $@ $<
 
 raytracer-forall.hip.${host_arch}: raytracer-forall.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $<
+	$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $<
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)
@@ -41,9 +39,11 @@ raytracer-kokkos.hip.kitsune.${host_arch}: raytracer-kokkos-no-view.cpp
 
 # kokkos-based tests (using views -- currently not compatible w/ kitsune)
 raytracer-kokkos.nvcc.${host_arch}: raytracer-kokkos.cpp 
-	@echo $@
-	@$(TIME_CMD) $(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
-	@$(FILE_SIZE)
+	$(KOKKOS_NVCC) $(KOKKOS_NVCC_FLAGS) -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+
+raytracer-kokkos.clang.${host_arch}: raytracer-kokkos.cpp 
+	$(KITCXX) -x cuda -O3 -ffp-contract=on -o $@ $< $(KOKKOS_CUDA_LIBS) -Xlinker -rpath=$(KOKKOS_CUDA_PREFIX)/lib64 
+
 raytracer-kokkos.hipcc.${host_arch}: raytracer-kokkos.cpp 
 	@echo $@
 	@$(TIME_CMD) $(KOKKOS_HIPCC) -v $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
@@ -55,9 +55,10 @@ raytracer-kokkos.hip.${host_arch}: raytracer-kokkos.cpp
 
 # cuda version 
 raytracer-cuda.${host_arch}: raytracer.cu
-	@echo $@
-	@$(TIME_CMD) $(NVCC) $(NVCC_CXX_FLAGS) -o $@ $<
-	@$(FILE_SIZE)
+	$(NVCC) $(NVCC_CXX_FLAGS) -o $@ $<
+
+raytracer-cuda.clang.${host_arch}: raytracer.cu
+	$(KIT_CXX) -x cuda -O3 -ffp-contract=on -o $@ $<
 
 # hip version 
 raytracer-hip.${host_arch}: raytracer-hip.cpp

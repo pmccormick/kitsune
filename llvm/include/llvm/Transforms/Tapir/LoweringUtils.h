@@ -19,6 +19,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Passes/OptimizationLevel.h"
 #include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
@@ -346,7 +347,8 @@ public:
 
   /// Get the LoopOutlineProcessor associated with this Tapir target.
   virtual LoopOutlineProcessor *
-  getLoopOutlineProcessor(const TapirLoopInfo *TL) {
+  getLoopOutlineProcessor(const TapirLoopInfo *TL,
+			  OptimizationLevel OptLevel = OptimizationLevel::O2) {
     return nullptr;
   }
 };

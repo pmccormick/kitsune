@@ -59,6 +59,10 @@ bool _kitrt_verbose_mode = false;
 extern "C" {
 #endif
 
+void __kitrt_enable_verbose_mode() {
+  _kitrt_verbose_mode = true;
+}
+
 void __kitrt_initialize() {
   // Call will auto-set the verbose state.
   (void)__kitrt_get_env_value("KITRT_VERBOSE", _kitrt_verbose_mode);

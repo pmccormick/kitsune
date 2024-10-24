@@ -14,15 +14,15 @@ struct Pixel {
 
 struct Vec {
   float x,y,z;
-  __attribute__((always_inline)) Vec(float v = 0) {x = y = z = v;}
-  __attribute__((always_inline)) Vec(float a, float b, float c = 0.0f) {x = a; y = b; z = c;}
-  __attribute__((always_inline)) Vec operator+(const Vec r) const  { return Vec(x + r.x , y + r.y , z + r.z); }
-  __attribute__((always_inline)) Vec operator*(const Vec r) const { return   Vec(x * r.x , y * r.y , z * r.z); }
-  __attribute__((always_inline)) float operator%(const Vec r) const {return     x * r.x + y * r.y + z * r.z;}
-  __attribute__((always_inline)) Vec operator!() { return *this * (1.0/sqrtf(*this % *this)); }
+   __attribute__((always_inline)) Vec(float v = 0) {x = y = z = v;}
+   __attribute__((always_inline)) Vec(float a, float b, float c = 0.0f) {x = a; y = b; z = c;}
+   __attribute__((always_inline)) Vec operator+(const Vec r) const  { return Vec(x + r.x , y + r.y , z + r.z); }
+   __attribute__((always_inline)) Vec operator*(const Vec r) const { return   Vec(x * r.x , y * r.y , z * r.z); }
+   __attribute__((always_inline)) float operator%(const Vec r) const {return     x * r.x + y * r.y + z * r.z;}
+   __attribute__((always_inline)) Vec operator!() { return *this * (1.0/sqrtf(*this % *this)); }
 };
 
-inline __attribute__((always_inline))
+//__attribute__((always_inline))
 float randomVal(unsigned int& x) {
   x = (214013*x+2531011);
   return ((x>>16)&0x7FFF) / 66635.0f;
@@ -31,7 +31,7 @@ float randomVal(unsigned int& x) {
 // Rectangle CSG equation. Returns minimum signed distance from
 // space carved bylowerLeft vertex and opposite rectangle vertex 
 // upperRight.
-inline __attribute__((always_inline))
+//__attribute__((always_inline))
 float BoxTest(const Vec &position, Vec lowerLeft, Vec upperRight) {
   lowerLeft = position + lowerLeft * -1.0f;
   upperRight = upperRight + position * -1.0f;
@@ -46,7 +46,7 @@ float BoxTest(const Vec &position, Vec lowerLeft, Vec upperRight) {
 #define HIT_SUN 3
 
 // Sample the world using Signed Distance Fields.
-inline __attribute__((always_inline))
+//__attribute__((always_inline))
 float QueryDatabase(const Vec& position, int &hitType) {
   float distance = 1e9;//FLT_MAX;
   Vec f = position; // Flattened position (z=0)
@@ -97,7 +97,7 @@ float QueryDatabase(const Vec& position, int &hitType) {
 
 // Perform signed sphere marching
 // Returns hitType 0, 1, 2, or 3 and update hit position/normal
-inline __attribute__((always_inline)) 
+__attribute__((always_inline))
 int RayMarching(const Vec& origin, const Vec& direction, Vec& hitPos, Vec& hitNorm) {
   int hitType = HIT_NONE;
   int noHitCount = 0;
@@ -116,7 +116,7 @@ int RayMarching(const Vec& origin, const Vec& direction, Vec& hitPos, Vec& hitNo
   return HIT_NONE;
 }
 
-inline __attribute__((always_inline)) 
+//__attribute__((always_inline))
 Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
   Vec sampledPosition;
   Vec normal;
@@ -245,3 +245,4 @@ int main(int argc, char **argv) {
   dealloc(img);
   return 0;
 }
+

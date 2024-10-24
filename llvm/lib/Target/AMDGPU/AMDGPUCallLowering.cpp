@@ -880,6 +880,9 @@ bool AMDGPUCallLowering::passSpecialInputs(MachineIRBuilder &MIRBuilder,
   const bool NeedWorkItemIDY = !Info.CB->hasFnAttr("amdgpu-no-workitem-id-y");
   const bool NeedWorkItemIDZ = !Info.CB->hasFnAttr("amdgpu-no-workitem-id-z");
 
+  if (NeedWorkItemIDX)
+    errs() << "we need the work item ID.\n";
+
   // If incoming ids are not packed we need to pack them.
   // FIXME: Should consider known workgroup size to eliminate known 0 cases.
   Register InputReg;

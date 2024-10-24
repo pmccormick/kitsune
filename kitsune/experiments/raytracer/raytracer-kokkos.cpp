@@ -1,5 +1,5 @@
 #include "Kokkos_DualView.hpp"
-
+#include <cassert>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -30,9 +30,9 @@ KOKKOS_FORCEINLINE_FUNCTION float randomVal(unsigned int& x) {
   return ((x>>16)&0x7FFF) / (float)66635;
 }
 
-// Rectangle CSG equation. Returns minimum signed distance from
-// space carved by
-// lowerLeft vertex and opposite rectangle vertex upperRight.
+// Rectangle CSG equation. Returns minimum signed distance from space
+// carved by lowerLeft vertex and opposite rectangle vertex
+// upperRight.
 KOKKOS_FORCEINLINE_FUNCTION float BoxTest(const Vec& position, Vec lowerLeft, Vec upperRight) {
   lowerLeft = position + lowerLeft * -1.0f;
   upperRight = upperRight + position * -1.0f;

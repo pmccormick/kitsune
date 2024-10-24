@@ -4785,6 +4785,6 @@ def KitsuneLaunch : StmtAttr {
   let Spellings = [CXX11<"kitsune","launch">];
   let Subjects = SubjectList<[ForallStmt, CXXForallRangeStmt],
                              ErrorDiag, "'forall' statement">;
-  let Args = [ExprArgument<"ThreadsPerBlock">];
+  let Args = [IntArgument<"ThreadsPerBlock">];
   let Documentation = [KitsuneLaunchDocs];    
 }

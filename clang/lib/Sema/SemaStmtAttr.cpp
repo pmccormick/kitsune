@@ -721,29 +721,28 @@ static Attr *handleTapirStrategyAttr(Sema &S, Stmt *St, const ParsedAttr &A,
 
 static Attr *handleKitsuneLaunchAttr(Sema &S, Stmt *St, const ParsedAttr &A,
                                      SourceRange Range) {
-  Expr *TPBExpr = A.getArgAsExpr(0);
-  QualType QTy = TPBExpr->getType();
+  unsigned ThreadsPerBlock = 0; 
+  if (A.getNumArgs() == 1) {
+    Expr *E = A.getArgAsExpr(0);
+    std::optional<llvm::APSInt> ArgVal;
 
-  if (not QTy->isBuiltinType() || not QTy->isIntegerType()) {
-    S.Diag(TPBExpr->getExprLoc(), diag::err_kitsune_launch_non_integral_type);
-    return nullptr;
+    if (!(ArgVal = E->getIntegerConstantExpr(S.Context))) { 
+      S.Diag(A.getLoc(), diag::err_kitsune_launch_non_integral_type);
+      return nullptr;
+    }
+
+    int Val = ArgVal->getSExtValue();
+    if (Val <= 0) {
+      S.Diag(A.getRange().getBegin(), 
+        diag::err_attribute_requires_positive_integer)
+        << A;
+        return nullptr;
+    }
+
+    ThreadsPerBlock = static_cast<unsigned>(Val);
   }
 
-  llvm::APSInt ValueAPS;
-  ExprResult R = S.VerifyIntegerConstantExpression(TPBExpr, &ValueAPS);
-  if (R.isInvalid()) {
-    // We don't need to issue a diagnostic here because
-    // VerifyIntegerConstantExpression will already have done so.
-    return nullptr;
-  }
-
-  if (not ValueAPS.isStrictlyPositive()) {
-    S.Diag(TPBExpr->getExprLoc(),
-           diag::err_kitsune_launch_tpb_must_be_positive);
-    return nullptr;
-  }
-
-  return ::new (S.Context) KitsuneLaunchAttr(S.Context, A, TPBExpr);
+  return ::new (S.Context) KitsuneLaunchAttr(S.Context, A, ThreadsPerBlock);
 }
 
 static Attr *ProcessStmtAttribute(Sema &S, Stmt *St, const ParsedAttr &A,

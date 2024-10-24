@@ -586,6 +586,10 @@ void EmitAssemblyHelper::CreateTargetMachine(bool MustCreateTM) {
   if (!initTargetOptions(Diags, Options, CodeGenOpts, TargetOpts, LangOpts,
                          HSOpts))
     return;
+
+  // Kitsune note: This can be helpful to look for differences between
+  // Clang and Kitsune configuraiton details for GPU targets. 
+  // Options.dump();
   TM.reset(TheTarget->createTargetMachine(Triple, TargetOpts.CPU, FeaturesStr,
                                           Options, RM, CM, OptLevel));
   TM->setLargeDataThreshold(CodeGenOpts.LargeDataThreshold);
@@ -1065,6 +1069,10 @@ void EmitAssemblyHelper::RunOptimizationPipeline(
       MPM.addPass(PB.buildThinLTOPreLinkDefaultPipeline(Level));
     } else if (PrepareForLTO) {
       MPM.addPass(PB.buildLTOPreLinkDefaultPipeline(Level));
+      //} else if (TLII->hasTapirTarget() && TLII->getTapirTarget() == llvm::TapirTargetID::Hip) {
+      //MPM.addPass(PB.buildPerModuleTapirHipPipeline(Level,
+      //                                              /* LTOPreLink */ false,
+      //                                             TLII->hasTapirTarget()));
     } else {
       MPM.addPass(PB.buildPerModuleDefaultPipeline(Level,
                                                    /* LTOPreLink */ false,

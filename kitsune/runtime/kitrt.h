@@ -54,14 +54,14 @@
 #ifndef __KITRT_H__
 #define __KITRT_H__
 
-#include <cstdio>
 #include <cassert>
+#include <cstdio>
+#include <cstring>
+#include <ctype.h>
+#include <execinfo.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <cstring>
-#include <execinfo.h>
 #include <type_traits>
-#include <ctype.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,86 +69,83 @@ extern "C" {
 #include <stdbool.h>
 #endif
 
- /**
-   * Initialize the core kitsune runtime components that are shared
-   * across all the target runtimes.  Note that this call is typically
-   * invoked by each specific runtime target (e.g., CUDA) vs. having
-   * this call initialization each target runtime.  It can be called
-   * multiple times as it is guarded to avoid repeated initialization.
-   */
-  extern void __kitrt_initialize();
-  
-  /**
-   * Set the runtime system to operate in verbose mode.
-   */
-  inline void __kitrt_enable_verbose_mode() {
-    extern bool _kitrt_verbose_mode;
-    _kitrt_verbose_mode = true;
-  }
+/**
+ * Initialize the core kitsune runtime components that are shared
+ * across all the target runtimes.  Note that this call is typically
+ * invoked by each specific runtime target (e.g., CUDA) vs. having
+ * this call initialization each target runtime.  It can be called
+ * multiple times as it is guarded to avoid repeated initialization.
+ */
+extern void __kitrt_initialize();
 
-  /**
-   * Disable the runtime system's verbose reporting mode.
-   */
-  inline void __kitrt_disable_verbose_mode() {
-    extern bool _kitrt_verbose_mode;
-    _kitrt_verbose_mode = false;
-  }
+/**
+ * Set the runtime system to operate in verbose mode.
+ */
+void __kitrt_enable_verbose_mode();
 
-  /**
-   * Enable/Disable the runtime's verbose mode.  Note that this can
-   * also be enabled at runtime by setting the KITRT_VERBOSE
-   * environment variable.
-   *
-   * @param enable - if `true` enable verbose mode, disable if `false`.
-   */
-  inline void __kitrt_set_verbose_mode(bool enable) {
-    extern bool _kitrt_verbose_mode;
-    _kitrt_verbose_mode = enable;
-  }
+/**
+ * Disable the runtime system's verbose reporting mode.
+ */
+inline void __kitrt_disable_verbose_mode() {
+  extern bool _kitrt_verbose_mode;
+  _kitrt_verbose_mode = false;
+}
 
-  /**
-   * Return the runtime's verbose operating mode.  If `true` the
-   * runtime should provide status details on stderr during execution,
-   * otherwise it is quiet.
-   */
-  inline bool __kitrt_verbose_mode() {
-    extern bool _kitrt_verbose_mode;
-    return _kitrt_verbose_mode;
-  }
+/**
+ * Enable/Disable the runtime's verbose mode.  Note that this can
+ * also be enabled at runtime by setting the KITRT_VERBOSE
+ * environment variable.
+ *
+ * @param enable - if `true` enable verbose mode, disable if `false`.
+ */
+inline void __kitrt_set_verbose_mode(bool enable) {
+  extern bool _kitrt_verbose_mode;
+  _kitrt_verbose_mode = enable;
+}
 
-  /**
-   * Provide a backtrace to stderr to help track down runtime crashes.
-   */
-  extern void __kitrt_print_stack_trace();
+/**
+ * Return the runtime's verbose operating mode.  If `true` the
+ * runtime should provide status details on stderr during execution,
+ * otherwise it is quiet.
+ */
+inline bool __kitrt_verbose_mode() {
+  extern bool _kitrt_verbose_mode;
+  return _kitrt_verbose_mode;
+}
 
-  extern unsigned __kitrt_getNumPrefetchStreams();
-  extern bool __kitrt_prefetchEnabled();
-  extern void __kitrt_enablePrefetching();
-  extern bool __kitrt_prefetchStreamsEnabled();
-  extern void __kitrt_enablePrefetchStreams();
+/**
+ * Provide a backtrace to stderr to help track down runtime crashes.
+ */
+extern void __kitrt_print_stack_trace();
 
+extern unsigned __kitrt_getNumPrefetchStreams();
+extern bool __kitrt_prefetchEnabled();
+extern void __kitrt_enablePrefetching();
+extern bool __kitrt_prefetchStreamsEnabled();
+extern void __kitrt_enablePrefetchStreams();
 
-  /**
-   * *** EXPERIMENTAL: This is a new interface between the compiler and
-   * the runtime.  It is a quick set of details regarding the particular
-   * instruction mix of a kernel and any device-side functions it calls.
-   * It is gathered from the LLVM form of the code (not ptx/s-code) and
-   * at this point is limited.  In general we are using to explore
-   * impacts on launch parameters.
-   * NOTE: Changing this structure has implications on code generation
-   * inside the CudaABI component of the compiler -- both must be kept
-   * up-to-date. 
-   */  
-  typedef struct _kitrt_inst_mix_info {
-    uint64_t     num_memory_ops;
-    uint64_t     num_flops;
-    uint64_t     num_iops;
-  } KitRTInstMix;
+/**
+ * *** EXPERIMENTAL: This is a new interface between the compiler and
+ * the runtime.  It is a quick set of details regarding the particular
+ * instruction mix of a kernel and any device-side functions it calls.
+ * It is gathered from the LLVM form of the code (not ptx/s-code) and
+ * at this point is limited.  In general we are using to explore
+ * impacts on launch parameters.
+ * NOTE: Changing this structure has implications on code generation
+ * inside the CudaABI component of the compiler -- both must be kept
+ * up-to-date.
+ */
+typedef struct _kitrt_inst_mix_info {
+  uint64_t numMemoryOps; // Number of memory (read/write) ops.
+  uint64_t numFlops;     // Floating point operations.
+  uint64_t numIntOps;    // Integer operations.
+  uint64_t numOtherOps;  // Other operations.
+} KitRTInstMix;
 
 #ifdef __cplusplus
 } // extern "C"
 #endif
-  
+
 /**
  * Return the value of the given environment variable. If the
  * variable does not exist in the environment return `false`.
@@ -156,8 +153,7 @@ extern "C" {
  * the caller provided parameter.
  */
 template <typename ValueType>
-bool __kitrt_get_env_value(const char *var_name,
-			   ValueType &value) {
+bool __kitrt_get_env_value(const char *var_name, ValueType &value) {
   assert(var_name && "unexpected null variable name!");
   bool found = false;
   char *value_string;
@@ -171,25 +167,26 @@ bool __kitrt_get_env_value(const char *var_name,
       found = true;
     } else if constexpr (std::is_same_v<ValueType, bool>) {
       found = true;
-      for(int i = 0; value_string[i]; i++) 
+      for (int i = 0; value_string[i]; i++)
         value_string[i] = tolower(value_string[i]);
       if (!strcmp(value_string, "true") || !strcmp(value_string, "1"))
         value = true;
       else if (!strcmp(value_string, "false") || !strcmp(value_string, "0"))
         value = false;
       else {
-        fprintf(stderr, "kitsune_rt: warning, boolean environment variable "
-                        "'%s' not set to true or false.\nTreating presence "
-                        "as an implied true setting.\n", 
-                        var_name);
+        fprintf(stderr,
+                "kitsune_rt: warning, boolean environment variable "
+                "'%s' not set to true or false.\nTreating presence "
+                "as an implied true setting.\n",
+                var_name);
         value = true;
-      } 
+      }
     } else if constexpr (std::is_same_v<ValueType, long>) {
       value = atol(value_string);
       found = true;
     } else if constexpr (std::is_same_v<ValueType, unsigned long>) {
       value = atol(value_string);
-      found = true;	  	
+      found = true;
     } else if constexpr (std::is_same_v<ValueType, float>) {
       value = (float)atof(value_string);
       found = true;
@@ -202,9 +199,25 @@ bool __kitrt_get_env_value(const char *var_name,
       __kitrt_print_stack_trace();
     }
   }
-    
+
   return found;
 }
 
-#endif // __KITRT_H__
+inline void __kitrt_set_env(const char *varname, const char *value) {
+  assert(varname != nullptr && "null variable name parameter!");
+  assert(value != nullptr && "null value parameter!");
+  if (setenv(varname, value, 0) != 0) {
+    fprintf(stderr, "kitrt: failure setting environment variable '%s'!\n",
+            varname);
+  }
+}
 
+inline void __kitrt_unset_env(const char *varname) {
+  assert(varname != nullptr && "null variable name parameter!");
+  if (unsetenv(varname)) {
+    fprintf(stderr, "kitrt: failure unsetting environment variable '%s'!\n",
+            varname);
+  }
+}
+
+#endif // __KITRT_H__

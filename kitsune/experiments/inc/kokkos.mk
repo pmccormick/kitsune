@@ -9,7 +9,7 @@ ifeq ($(kitsune_kokkos_enable),"ON")
     KOKKOS_NVCC=$(KOKKOS_CUDA_PREFIX)/bin/nvcc_wrapper
     KOKKOS_NVCC_FLAGS?= $(NVCC_CXX_FLAGS) -std=c++17 -I$(KOKKOS_CUDA_PREFIX)/include/ \
 				-I$(KOKKOS_CUDA_PREFIX)/include/kokkos
-    KOKKOS_CLANG=$(KITSUNE_PREFIX)/bin/clang
+    KOKKOS_CLANG=$(KITSUNE_PREFIX)/bin/clang++
     KOKKOS_CLANG_CUDA_PREFIX?=$(KITSUNE_PREFIX)/opt/kokkos/clang-cuda
     KOKKOS_CLANG_CUDA_FLAGS?= $(CLANG_CUDA_FLAGS) -fPIC -std=c++17 \
 				-fno-exceptions -I$(KOKKOS_CUDA_PREFIX)/include/ \
@@ -24,6 +24,7 @@ ifeq ($(kitsune_kokkos_enable),"ON")
     KOKKOS_HIPCC=$(ROCM_PATH)/bin/hipcc 
     KOKKOS_HIP_FLAGS?=$(HIPCC_CXX_FLAGS) -std=c++17 -fno-exceptions \
 				-I$(KOKKOS_HIP_PREFIX)/include/ -ffp-contract=off
+    KITSUNE_HIPCC=$(KITSUNE_PREFIX)/bin/clang++ -x hip  
   endif
 
 endif

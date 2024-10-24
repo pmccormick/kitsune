@@ -121,7 +121,7 @@ DECLARE_DLSYM(cuMemAdvise);
 DECLARE_DLSYM(cuPointerGetAttribute);
 DECLARE_DLSYM(cuPointerSetAttribute);
 DECLARE_DLSYM(cuMemcpy);
-DECLARE_DLSYM(cuMemcpyHtoD_v2);
+DECLARE_DLSYM(cuMemcpyHtoD);
 
 /* Error handling */
 DECLARE_DLSYM(cuGetErrorName);

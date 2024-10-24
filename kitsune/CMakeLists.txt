@@ -24,7 +24,7 @@ option(KITSUNE_INCLUDE_TESTS
   "Generate build targets for the Kitsune tests"
   ${LLVM_INCLUDE_TESTS})
 
-option(KITSUNE_KOKKOS_ENABLE
+option(KITSUNE_KOKKOS_ENABLED
   "Enable custom recognition and compilation of Kokkos"
   ON)
 
@@ -91,7 +91,9 @@ get_clang_resource_dir(CLANG_RESOURCE_INTDIR
 get_clang_resource_dir(CLANG_RESOURCE_INSTALL_DIR
   PREFIX ${CMAKE_INSTALL_PREFIX})
 
-if (KITSUNE_KOKKOS_ENABLE)
+set(KITSUNE_LLD ${CMAKE_INSTALL_PREFIX}/bin/ld.lld)
+
+if (KITSUNE_KOKKOS_ENABLED)
   # We currently don't support using a pre-built Kokkos - even if it has been
   # patched the way we need it to be. This could possibly be moved to
   # kitsune/runtime, just so everything that needs to be fetched and built is
@@ -196,10 +198,15 @@ if (KITSUNE_CUDA_ENABLE)
 
   find_package(CUDAToolkit ${KITSUNE_CUDA_VERSION_MIN} REQUIRED)
 
-  # FIXME: There is no guarantee that CUDA_HOME is set in the environment.
-  # Perhaps we should require it? Or does find_package end up adding it to the
-  # environment?
-  set(KITSUNE_CUDA_PREFIX $ENV{CUDA_HOME})
+  # CUDA install locations can vary.  Let's enforce a setting of
+  # CUDA_PATH in the user's environment.  Not perfect but arbitrary 
+  # install choices make this a reasonable path to take...
+  if (NOT DEFINED ENV{CUDA_PATH})
+     message(FATAL_ERROR
+             "Kitsune: CUDA_PATH env must be set to the cuda install path!")
+  endif()
+  
+  set(KITSUNE_CUDA_PREFIX $ENV{CUDA_PATH})
   set(KITSUNE_CUDA_INCLUDE_DIR ${CUDAToolkit_INCLUDE_DIRS})
   set(KITSUNE_CUDA_BINARY_DIR ${CUDAToolkit_BIN_DIR})
   set(KITSUNE_CUDA_LIBRARY_DIR ${CUDAToolkit_LIBRARY_DIR})
@@ -359,7 +366,7 @@ if (KITSUNE_OPENCILK_ENABLE)
   ExternalProject_Add(cheetah
     DEPENDS        clang lld llvm-config llvm-link
     GIT_REPOSITORY https://github.com/OpenCilk/cheetah.git
-    GIT_TAG        opencilk/v2.1
+    GIT_TAG        dev
     SOURCE_DIR     ${KITSUNE_CHEETAH_SOURCE_DIR}
     BINARY_DIR     ${KITSUNE_CHEETAH_BINARY_DIR}
     CMAKE_ARGS     ${KITSUNE_CHEETAH_BUILD_CMAKE_FLAGS})

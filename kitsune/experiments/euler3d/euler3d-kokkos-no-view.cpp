@@ -44,13 +44,14 @@ struct Float3 {
  * Generic functions
  */
 
+
 template <typename T>
-void cpy(T* dst, const T* src, int N)
-{
+KOKKOS_FORCEINLINE_FUNCTION
+void cpy(T* dst, const T* src, int N) {
   Kokkos::parallel_for(N, KOKKOS_LAMBDA(const int i) {
     dst[i] = src[i];
   });
-  Kokkos::fence();
+  //Kokkos::fence();
 }
 
 
@@ -88,13 +89,11 @@ void initialize_variables(int nelr,
                           float* variables,
                           const float* ff_variable)
 {
-  //__kitrt_memNeedsPrefetch((void *)variables);
-  //__kitrt_memNeedsPrefetch((void *)ff_variable);
   Kokkos::parallel_for(nelr, KOKKOS_LAMBDA(const size_t i) {		       
     for(int j = 0; j < NVAR; j++)
       variables[i + j*nelr] = ff_variable[j];
   });
-  Kokkos::fence();
+  //Kokkos::fence();
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
@@ -191,7 +190,7 @@ void compute_step_factor(int nelr,
         (sqrtf(speed_sqd) + speed_of_sound));
     }
   });
-  Kokkos::fence();
+  //Kokkos::fence();
 }
 
 void compute_flux(int nelr,
@@ -375,7 +374,7 @@ void compute_flux(int nelr,
     fluxes[i + VAR_DENSITY_ENERGY*nelr] = flux_i_density_energy;
     }
   });
-  Kokkos::fence();
+  //Kokkos::fence();
 }
 
 void time_step(int j, int nelr, float* old_variables, float* variables,
@@ -403,7 +402,7 @@ void time_step(int j, int nelr, float* old_variables, float* variables,
                   + VAR_DENSITY_ENERGY*nelr];
     }
   });
-  Kokkos::fence();
+  //Kokkos::fence();
 }
 
 /*
@@ -418,7 +417,7 @@ int main(int argc, char** argv)
     return 0;
   }
 
-  int iterations = 2000;
+  int iterations = 4000;
   if (argc > 2)
     iterations = atoi(argv[2]);
 
@@ -430,8 +429,6 @@ int main(int argc, char** argv)
   cout << "---- euler3d benchmark (forall) ----\n\n"
        << "  Input file : " << data_file_name << "\n" 
        << "  Iterations : " << iterations << ".\n\n"; 
-
-      
   cout << "  Reading input data, allocating arrays, initializing data, etc..." 
        << std::flush;
   auto total_start_time = chrono::steady_clock::now();
@@ -535,7 +532,6 @@ int main(int argc, char** argv)
   float* fluxes = alloc<float>(nelr*NVAR);
   float* step_factors = alloc<float>(nelr);
 
-  auto start = chrono::steady_clock::now();
   double copy_total = 0.0;
   double sf_total = 0.0;
   double rk_total = 0.0;
@@ -566,10 +562,12 @@ int main(int argc, char** argv)
     auto rk_end = chrono::steady_clock::now();
     rk_total += chrono::duration<double>(rk_end-rk_start).count();
   }
-  dump(variables, nel, nelr);
-
   auto end_time = chrono::steady_clock::now();
   double elapsed_time = chrono::duration<double>(end_time-start_time).count();
+  
+  dump(variables, nel, nelr);
+  
+  end_time = chrono::steady_clock::now();  
   double total_time = chrono::duration<double>(end_time-total_start_time).count();
 
   cout << "\n"
@@ -578,7 +576,7 @@ int main(int argc, char** argv)
        << "            copy : " << copy_total << " seconds.\n"
        << "              sf : " << sf_total << " seconds.\n"
        << "              rk : " << rk_total << " seconds.\n"
-       << "*** " << total_time << ", " << total_time << "\n"                    
+       << "*** " << elapsed_time << ", " << elapsed_time << "\n"                    
        << "----\n\n";
 
   return 0;

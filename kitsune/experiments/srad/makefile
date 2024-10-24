@@ -19,11 +19,13 @@ srad-forall.opencilk.${host_arch}: srad-forall.cpp
 	@$(FILE_SIZE)
 srad-forall.cuda.${host_arch}: srad-forall.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@echo $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_CUDA_FLAGS) -mllvm --cuabi-keep -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 srad-forall.hip.${host_arch}: srad-forall.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KIT_CXX) $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@echo $(KIT_CXX) -fno-exceptions $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
+	@$(TIME_CMD) $(KIT_CXX) -fno-exceptions $(TAPIR_HIP_FLAGS) -o $@ $< -Xlinker -rpath=$(KITSUNE_PREFIX)/lib
 	@$(FILE_SIZE)
 
 # kokkos-based tests (w/out views)
@@ -45,13 +47,21 @@ srad-kokkos.clang.cuda.${host_arch}: srad-kokkos.cpp
 
 srad-kokkos.hipcc.${host_arch}: srad-kokkos.cpp 
 	@echo $@
-	@$(TIME_CMD) $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
+	@$(TIME_CMD) $(KOKKOS_HIPCC) $(KOKKOS_HIP_FLAGS) -fPIC -o $@ $< $(KOKKOS_HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64 
 	@$(FILE_SIZE)
 srad-kokkos.clang.hip.${host_arch}: srad-kokkos.cpp 
 	@echo $@
 	@$(TIME_CMD) $(kitclangxx) -fPIC --language=hip $(KOKKOS_HIP_FLAGS) -o $@ $< $(KOKKOS_HIP_LIBS) $(HIP_LIBS) -Xlinker -rpath=$(KOKKOS_HIP_PREFIX)/lib64
 	@$(FILE_SIZE)
 #####
+
+srad-cuda.${host_arch}: srad.cu
+	@echo $@
+	$(TIME_CMD) $(NVCC) $(NVCC_CXX_FLAGS) -o $@ $<
+	@$(FILE_SIZE)
+
+#####
+
 
 run: $(targets) 
 	@echo "running generated executables..."

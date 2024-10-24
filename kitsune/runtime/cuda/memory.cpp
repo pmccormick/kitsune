@@ -266,8 +266,6 @@ void* __kitcuda_mem_gpu_prefetch(void *vp, void *opaque_stream) {
                                  CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
                                  _kitcuda_device));
 
-
-
       // Issue a prefetch request on the provided stream.  If the given 
       // stream is null, create a new stream and return it. Once issued 
       // go ahead and mark the memory as having been prefetched.  This 
@@ -281,13 +279,16 @@ void* __kitcuda_mem_gpu_prefetch(void *vp, void *opaque_stream) {
 
       CU_SAFE_CALL(cuMemPrefetchAsync_p((CUdeviceptr)vp, size, _kitcuda_device,
                                         cu_stream));
+      _kitcuda_mem_alloc_mutex.lock();          
       __kitrt_mark_mem_prefetched(vp);
+      _kitcuda_mem_alloc_mutex.unlock();                
       return (void*)cu_stream;
     }
   }
+  
   KIT_NVTX_POP();
-  // no prefetch, no bound stream to bound it to... 
-  return nullptr;
+  // no prefetch, bind inbound stream by default... 
+  return opaque_stream;
 }
 
 void* __kitcuda_mem_host_prefetch(void *vp, void *opaque_stream) {
@@ -349,7 +350,7 @@ void __kitcuda_memcpy_sym_to_device(void *hostPtr, uint64_t devPtr,
   assert(size != 0 && "requested a 0 byte copy!");
 
   KIT_NVTX_PUSH("kitcuda:memcpy_sym_to_device", KIT_NVTX_MEM);
-  CU_SAFE_CALL(cuMemcpyHtoD_v2_p(devPtr, hostPtr, size));
+  CU_SAFE_CALL(cuMemcpyHtoD_p(devPtr, hostPtr, size));
   KIT_NVTX_POP();
 }
 }

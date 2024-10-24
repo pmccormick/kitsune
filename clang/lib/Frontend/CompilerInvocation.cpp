@@ -4901,6 +4901,13 @@ bool CompilerInvocation::CreateFromArgsImpl(
     LangOpts.ObjCExceptions = 1;
 
   ParseKitsuneArgs(LangOpts.KitsuneOpts, Args, Diags, LangOpts);
+  if (LangOpts.KitsuneOpts.isKitsuneEnabled()) {
+    std::optional<llvm::TapirTargetID> TTarget = LangOpts.KitsuneOpts.getTapirTarget();
+    if (TTarget == llvm::TapirTargetID::Hip) {
+      llvm::errs() << "set fast honor pragmas for fp contract.\n";
+      LangOpts.setDefaultFPContractMode(LangOptions::FPM_FastHonorPragmas);
+    }
+  }
 
   for (auto Warning : Res.getDiagnosticOpts().Warnings) {
     if (Warning == "misexpect" &&

@@ -202,26 +202,17 @@ bool __kitcuda_initialize() {
 
   int threads_per_block = 256;
   if (__kitrt_get_env_value("KITCUDA_THREADS_PER_BLOCK", threads_per_block)) {
-    if (threads_per_block > _kitcuda_max_threads_per_blk)
-      threads_per_block = _kitcuda_max_threads_per_blk;
     __kitcuda_set_default_threads_per_blk(threads_per_block);
-
     if (__kitrt_verbose_mode())
       fprintf(stderr, "  kitcuda: threads/block: %d\n", threads_per_block);
   }
 
-  bool enable_occupancy_launch;
-  __kitrt_get_env_value("KITCUDA_USE_OCCUPANCY_LAUNCH",
-                        enable_occupancy_launch);
-  __kitcuda_use_occupancy_launch(enable_occupancy_launch);
-  if (__kitrt_verbose_mode())
-    fprintf(stderr, "  kitcuda: occupancy-based launches enabled.\n");
-
-  bool enable_refine_occ_launch;
-  __kitrt_get_env_value("KITCUDA_REFINE_OCCUPANCY_LAUNCH",
-                        enable_refine_occ_launch);
-  __kitcuda_refine_occupancy_launches(enable_refine_occ_launch);
-
+  bool disable_refined_launches;
+  __kitrt_get_env_value("KITCUDA_DISABLE_LAUNCH_REFINEMENT",
+                        disable_refined_launches);
+  if (disable_refined_launches)
+    __kitcuda_enable_launch_refinement(false);
+  
   KIT_NVTX_POP();
   return _kitcuda_initialized;
 }

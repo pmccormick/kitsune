@@ -58,12 +58,6 @@
 #include <algorithm>
 
 
-// On older systems gettid() is not exposed and the syscall()
-// interface must be used.  It won't hurt us to just use that
-// everywhere as there are still systems in use with older
-// system libraries that are missing the call...
-#define gettid() syscall(SYS_gettid)
-
 // Stream creation can be expensive.  We "recycle" them when possible. 
 typedef std::deque<CUstream> KitCudaStreamList;
 static KitCudaStreamList _kitcuda_streams;
@@ -80,38 +74,39 @@ void *__kitcuda_get_thread_stream() {
 
   CUstream cu_stream;
   if (not _kitcuda_streams.empty()) {
+    // LOCK
     _kitcuda_stream_mutex.lock();
     cu_stream = _kitcuda_streams.front();
     _kitcuda_streams.pop_front();
     _kitcuda_stream_mutex.unlock();
-    if (__kitrt_verbose_mode())
-       fprintf(stderr, "reusing thread stream.\n");
+    // UNLOCK 
   } else {
-    if (__kitrt_verbose_mode())
-       fprintf(stderr, "creating new thread stream.\n");
     CU_SAFE_CALL(cuStreamCreate(&cu_stream, CU_STREAM_NON_BLOCKING));
   }
+  
   KIT_NVTX_POP();
-  if (__kitrt_verbose_mode())
-    fprintf(stderr, "returning thread stream: %p\n", cu_stream);
   return (void *)cu_stream;
 }
 
 void __kitcuda_sync_thread_stream(void *opaque_stream) {
   assert(opaque_stream != nullptr && "unexpected null stream pointer!");
   KIT_NVTX_PUSH("kitcuda:sync_thread_stream", KIT_NVTX_STREAM);
+  
   CUstream stream = (CUstream)opaque_stream;
   CU_SAFE_CALL(cuStreamSynchronize_p(stream));
-  // In our current use case a synchronized stream is done doing
-  // any useful work.  Recycle it for later use... 
+
+  // LOCK
   _kitcuda_stream_mutex.lock();
   _kitcuda_streams.push_back(stream);
   _kitcuda_stream_mutex.unlock();
+  // UNLOCK
+  
   KIT_NVTX_POP();
 }
 
 void __kitcuda_sync_context() {
   KIT_NVTX_PUSH("kitcuda:sync_context", KIT_NVTX_STREAM);
+  
   CUcontext ctx;
   // TODO: We have multiple calls to set the context for the calling
   // thread -- should probably wrap it in a function.
@@ -125,10 +120,8 @@ void __kitcuda_sync_context() {
 void __kitcuda_delete_thread_stream(void *opaque_stream) {
   KIT_NVTX_PUSH("kitrt:delete_thread_stream", KIT_NVTX_STREAM);
   CUstream stream = (CUstream)opaque_stream;
-  // Do a quick check to make sure we don't need to clean up the deque.
-  // We are a bit lazy with the scope of the lock here but we don't expect
-  // this to happen often (if ever).  Streams will be aggressively reused 
-  // vs. explicitly destroyed in the current implementation... 
+
+  // LOCK 
   _kitcuda_stream_mutex.lock();
   auto sit = std::find(_kitcuda_streams.begin(), _kitcuda_streams.end(), stream);
   if (sit != _kitcuda_streams.end()) {
@@ -136,17 +129,24 @@ void __kitcuda_delete_thread_stream(void *opaque_stream) {
   }
   CU_SAFE_CALL(cuStreamDestroy_v2_p(stream));
   _kitcuda_stream_mutex.unlock();
+  // UNLOCK
+  
   KIT_NVTX_POP();
 }
 
 void __kitcuda_destroy_thread_streams() {
   KIT_NVTX_PUSH("kitrt:delete_thread_streams", KIT_NVTX_STREAM);
+
+  // LOCK 
   _kitcuda_stream_mutex.lock();
  
   for (auto &entry : _kitcuda_streams)
     CU_SAFE_CALL(cuStreamDestroy_v2_p(entry));
   _kitcuda_streams.clear();
+
   _kitcuda_stream_mutex.unlock();
+  // UNLOCK
+  
   KIT_NVTX_POP();
 }
 

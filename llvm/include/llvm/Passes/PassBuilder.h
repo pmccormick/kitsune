@@ -271,6 +271,15 @@ public:
   ModulePassManager buildPerModuleDefaultPipeline(OptimizationLevel Level,
                                                   bool LTOPreLink = false,
                                                   bool LowerTapir = false);
+ /// Build a per-module default optimization pipeline.
+  ///
+  /// This provides a good default optimization pipeline for per-module
+  /// optimization and code generation without any link-time optimization. It
+  /// typically correspond to frontend "-O[123]" options for optimization
+  /// levels \c O1, \c O2 and \c O3 resp.
+  ModulePassManager buildPerModuleTapirHipPipeline(OptimizationLevel Level,
+                                                  bool LTOPreLink = false,
+                                                  bool LowerTapir = false);
 
   /// Build a fat object default optimization pipeline.
   ///

@@ -133,7 +133,7 @@ namespace {
       (void) llvm::createPrintModulePass(os);
       (void) llvm::createPrintFunctionPass(os);
       (void) llvm::createSinkingPass();
-      (void) llvm::createLowerAtomicPass();
+
       (void) llvm::createLoadStoreVectorizerPass();
       (void) llvm::createPartiallyInlineLibCallsPass();
       (void) llvm::createSeparateConstOffsetFromGEPPass();

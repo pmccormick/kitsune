@@ -105,8 +105,9 @@ public:
 
   void postProcessModule() override final;
 
-  LoopOutlineProcessor *getLoopOutlineProcessor(const TapirLoopInfo *TL)
-                          override final;
+  LoopOutlineProcessor *getLoopOutlineProcessor(const TapirLoopInfo *TL,
+			OptimizationLevel OptLevel = OptimizationLevel::O2)
+                        override final;
 
   void pushPTXFilename(const std::string &PTXFilename);
 
@@ -136,6 +137,9 @@ public:
       return nullptr;
   }
 
+  OptimizationLevel getOptimizationLevel() const {
+    return Level;
+  }
 
   private:
     CudaABIOutputFile generatePTX();
@@ -163,6 +167,7 @@ public:
 
     Module   KernelModule;
     TargetMachine *PTXTargetMachine;
+    OptimizationLevel  Level;
 };
 
 /// The loop outline process for transforming a Tapir parallel loop
@@ -257,8 +262,11 @@ public:
   void processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo & TOI,
                                DominatorTree &DT) override final;
   void transformForPTX(Function &F);
+  void remapData(ValueToValueMapTy &VMap) override final;
+
 
   Function *resolveLibDeviceFunction(Function *F, bool enableFastMode);
+  
 };
 
 }

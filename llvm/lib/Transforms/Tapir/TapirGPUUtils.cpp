@@ -111,28 +111,29 @@ void appendToGlobalCtors(Module &M, Constant *C, int Priority, Constant *Data) {
 }
 
 void getKernelInstructionMix(const Function *F, KernelInstMixData &InstMix) {
-  InstMix.num_memory_ops = 0;
-  InstMix.num_flops = 0;
-  InstMix.num_iops = 0;
+  InstMix.numMemoryOps = 0;
+  InstMix.numFlops = 0;
+  InstMix.numIntOps = 0;
+  InstMix.numOtherOps = 0;
 
   std::set<const Function *> CalledFuncs;
   for (auto I = inst_begin(F); I != inst_end(F); I++) {
     if (I->mayReadOrWriteMemory()) {
-      InstMix.num_memory_ops++;
+      InstMix.numMemoryOps++;
     } else if (I->isBinaryOp()) {
-      Type *Ty = I->getType();
-      if (Ty->isHalfTy() || Ty->isFloatTy() || Ty->isDoubleTy() ||
-          Ty->isX86_FP80Ty())
-        InstMix.num_flops++;
+      if (I->getType()->isFPOrFPVectorTy())
+        InstMix.numFlops++;
+      else if (I->getType()->isIntegerTy())
+        InstMix.numIntOps++;
       else
-        InstMix.num_iops++;
+        InstMix.numOtherOps++;
     } else if (I->isUnaryOp()) {
-      Type *Ty = I->getType();
-      if (Ty->isHalfTy() || Ty->isFloatTy() || Ty->isDoubleTy() ||
-          Ty->isX86_FP80Ty())
-        InstMix.num_flops++;
+      if (I->getType()->isFPOrFPVectorTy())
+        InstMix.numFlops++;
+      else if (I->getType()->isIntegerTy())
+        InstMix.numIntOps++;
       else
-        InstMix.num_iops++;
+        InstMix.numOtherOps++;
     } else {
       if (auto CI = dyn_cast<CallInst>(&*I)) {
         CalledFuncs.insert(CI->getCalledFunction());
@@ -143,9 +144,10 @@ void getKernelInstructionMix(const Function *F, KernelInstMixData &InstMix) {
   for (auto F : CalledFuncs) {
     KernelInstMixData localInstMix;
     getKernelInstructionMix(F, localInstMix);
-    InstMix.num_memory_ops += localInstMix.num_memory_ops;
-    InstMix.num_flops += localInstMix.num_flops;
-    InstMix.num_iops += localInstMix.num_iops;
+    InstMix.numMemoryOps += localInstMix.numMemoryOps;
+    InstMix.numFlops += localInstMix.numFlops;
+    InstMix.numIntOps += localInstMix.numIntOps;
+    InstMix.numOtherOps += localInstMix.numOtherOps;
   }
 }
 

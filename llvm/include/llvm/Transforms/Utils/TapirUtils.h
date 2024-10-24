@@ -326,7 +326,7 @@ public:
         // Is Serial the right default, here and and in clearHintsMetadata
         LoopTarget("target", static_cast<unsigned int>(TapirTargetID::Serial),
 		   HK_LOOPTARGET),
-	ThreadsPerBlock("kitsune.launch.threads.per.block", 0,
+	ThreadsPerBlock("threads.per.block", 0,
 			HK_THREADS_PER_BLOCK),
 	AutoTune("kitsune.launch.auto.tune", 0, HK_AUTO_TUNE),
         TheLoop(L) {

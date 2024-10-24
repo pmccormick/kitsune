@@ -29,10 +29,14 @@ Constant *createConstantStr(const std::string &Str, Module &M,
 extern void appendToGlobalCtors(llvm::Module &M, llvm::Constant *C,
                                 int Priority, llvm::Constant *Data);
 
+// NOTE: This needs to be kept up to date with the structure in
+// the kitsune runtime!  We currently have avoided including files
+// between the two but perhaps we should...  ????
 struct KernelInstMixData {
-  uint64_t num_memory_ops;
-  uint64_t num_flops;
-  uint64_t num_iops;
+  uint64_t numMemoryOps;
+  uint64_t numFlops;
+  uint64_t numIntOps;
+  uint64_t numOtherOps;
 };
 
 extern void getKernelInstructionMix(const llvm::Function *F,

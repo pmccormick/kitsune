@@ -126,11 +126,11 @@
 #include "llvm/Transforms/Scalar/SpeculativeExecution.h"
 #include "llvm/Transforms/Scalar/TailRecursionElimination.h"
 #include "llvm/Transforms/Scalar/WarnMissedTransforms.h"
+#include "llvm/Transforms/Tapir/DRFScopedNoAliasAA.h"
 #include "llvm/Transforms/Tapir/LoopSpawningTI.h"
 #include "llvm/Transforms/Tapir/LoopStripMinePass.h"
 #include "llvm/Transforms/Tapir/SerializeSmallTasks.h"
 #include "llvm/Transforms/Tapir/TapirToTarget.h"
-#include "llvm/Transforms/Tapir/DRFScopedNoAliasAA.h"
 #include "llvm/Transforms/Utils/AddDiscriminators.h"
 #include "llvm/Transforms/Utils/AssumeBundleBuilder.h"
 #include "llvm/Transforms/Utils/CanonicalizeAliases.h"
@@ -193,9 +193,9 @@ static cl::opt<bool> EnablePostPGOLoopRotation(
     "enable-post-pgo-loop-rotation", cl::init(true), cl::Hidden,
     cl::desc("Run the loop rotation transformation after PGO instrumentation"));
 
-static cl::opt<bool> EnableGlobalAnalyses(
-    "enable-global-analyses", cl::init(true), cl::Hidden,
-    cl::desc("Enable inter-procedural analyses"));
+static cl::opt<bool>
+    EnableGlobalAnalyses("enable-global-analyses", cl::init(true), cl::Hidden,
+                         cl::desc("Enable inter-procedural analyses"));
 
 static cl::opt<bool>
     RunPartialInlining("enable-partial-inlining", cl::init(false), cl::Hidden,
@@ -1164,11 +1164,10 @@ PassBuilder::buildModuleSimplificationPipeline(OptimizationLevel Level,
   // and prior to optimizing globals.
   // FIXME: This position in the pipeline hasn't been carefully considered in
   // years, it should be re-analyzed.
-  MPM.addPass(IPSCCPPass(
-              IPSCCPOptions(/*AllowFuncSpec=*/
-                            Level != OptimizationLevel::Os &&
-                            Level != OptimizationLevel::Oz &&
-                            !isLTOPreLink(Phase))));
+  MPM.addPass(IPSCCPPass(IPSCCPOptions(/*AllowFuncSpec=*/
+                                       Level != OptimizationLevel::Os &&
+                                       Level != OptimizationLevel::Oz &&
+                                       !isLTOPreLink(Phase))));
 
   // Attach metadata to indirect call sites indicating the set of functions
   // they may target at run-time. This should follow IPSCCP.
@@ -1665,16 +1664,15 @@ PassBuilder::buildTapirLoopLoweringPipeline(OptimizationLevel Level,
   MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
 
   // Outline Tapir loops as needed.
-  MPM.addPass(LoopSpawningPass());
+  MPM.addPass(LoopSpawningPass(Level));
   if (VerifyTapirLowering)
     MPM.addPass(VerifierPass());
 
   // The LoopSpawning pass may leave cruft around.  Clean it up using the
   // function simplification pipeline.
   if (Level != OptimizationLevel::O0)
-    MPM.addPass(
-        createModuleToFunctionPassAdaptor(
-            buildFunctionSimplificationPipeline(Level, Phase)));
+    MPM.addPass(createModuleToFunctionPassAdaptor(
+        buildFunctionSimplificationPipeline(Level, Phase)));
 
   return MPM;
 }
@@ -1693,7 +1691,7 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
       C(MPM, Level);
 
     // Lower Tapir constructs to target runtime calls.
-    MPM.addPass(TapirToTargetPass());
+    MPM.addPass(TapirToTargetPass(Level));
     if (VerifyTapirLowering)
       MPM.addPass(VerifierPass());
 
@@ -1713,15 +1711,14 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
   MPM.addPass(createModuleToFunctionPassAdaptor(TaskCanonicalizePass()));
 
   // Lower Tapir to target runtime calls.
-  MPM.addPass(TapirToTargetPass());
+  MPM.addPass(TapirToTargetPass(Level));
   if (VerifyTapirLowering)
     MPM.addPass(VerifierPass());
 
   // The TapirToTarget pass may leave cruft around.  Clean it up using the
   // function simplification pipeline.
-  MPM.addPass(
-      createModuleToFunctionPassAdaptor(
-          buildFunctionSimplificationPipeline(Level, Phase)));
+  MPM.addPass(createModuleToFunctionPassAdaptor(
+      buildFunctionSimplificationPipeline(Level, Phase)));
 
   // Interprocedural constant propagation now that basic cleanup has occurred
   // and prior to optimizing globals.
@@ -1766,7 +1763,7 @@ PassBuilder::buildTapirLoweringPipeline(OptimizationLevel Level,
   // the CGSCC pipeline.
   MPM.addPass(RequireAnalysisPass<GlobalsAA, Module>());
 
-  // Begin the postoder CGSCC pipeline.
+  // Begin the postorder CGSCC pipeline.
   CGSCCPassManager PostLowerCGPipeline;
 
   // Now deduce any function attributes based in the current code.
@@ -1859,6 +1856,55 @@ PassBuilder::buildPerModuleDefaultPipeline(OptimizationLevel Level,
 }
 
 ModulePassManager
+PassBuilder::buildPerModuleTapirHipPipeline(OptimizationLevel Level,
+                                            bool LTOPreLink, bool LowerTapir) {
+  if (Level == OptimizationLevel::O0)
+    return buildO0DefaultPipeline(Level, LTOPreLink, LowerTapir);
+
+  ModulePassManager MPM;
+
+  // Convert @llvm.global.annotations to !annotation metadata.
+  MPM.addPass(Annotation2MetadataPass());
+
+  // Force any function attributes we want the rest of the pipeline to observe.
+  MPM.addPass(ForceFunctionAttrsPass());
+
+  if (PGOOpt && PGOOpt->DebugInfoForProfiling)
+    MPM.addPass(createModuleToFunctionPassAdaptor(AddDiscriminatorsPass()));
+
+  // Apply module pipeline start EP callback.
+  invokePipelineStartEPCallbacks(MPM, Level);
+
+  const ThinOrFullLTOPhase LTOPhase = LTOPreLink
+                                          ? ThinOrFullLTOPhase::FullLTOPreLink
+                                          : ThinOrFullLTOPhase::None;
+  // Add the core simplification pipeline.
+  MPM.addPass(buildModuleSimplificationPipeline(Level, LTOPhase));
+
+  // Now add the optimization pipeline.
+  MPM.addPass(buildModuleOptimizationPipeline(Level, LTOPhase));
+
+  // Emit annotation remarks.
+  addAnnotationRemarksPass(MPM);
+
+  if (LTOPreLink)
+    addRequiredLTOPreLinkPasses(MPM);
+
+  // Add passes to run just before Tapir lowering.
+  invokeTapirLateEPCallbacks(MPM, Level);
+
+  // Lower Tapir if necessary
+  if (LowerTapir)
+    MPM.addPass(buildTapirLoweringPipeline(
+        Level, LTOPreLink ? ThinOrFullLTOPhase::FullLTOPreLink
+                          : ThinOrFullLTOPhase::None));
+  else
+    invokeTapirLoopEndEPCallbacks(MPM, Level);
+
+  return MPM;
+}
+
+ModulePassManager
 PassBuilder::buildFatLTODefaultPipeline(OptimizationLevel Level, bool ThinLTO,
                                         bool EmitSummary) {
   ModulePassManager MPM;
@@ -1884,7 +1930,7 @@ PassBuilder::buildFatLTODefaultPipeline(OptimizationLevel Level, bool ThinLTO,
 ModulePassManager
 PassBuilder::buildThinLTOPreLinkDefaultPipeline(OptimizationLevel Level) {
   if (Level == OptimizationLevel::O0)
-    return buildO0DefaultPipeline(Level, /*LTOPreLink*/true);
+    return buildO0DefaultPipeline(Level, /*LTOPreLink*/ true);
 
   ModulePassManager MPM;
 

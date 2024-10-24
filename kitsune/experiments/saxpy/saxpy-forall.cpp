@@ -58,9 +58,10 @@ int main(int argc, char *argv[]) {
       x[i] = DEFAULT_X_VALUE;
       y[i] = DEFAULT_Y_VALUE;
     }
-
-    forall(size_t i = 0; i < size; i++) 
+    
+    forall(size_t i = 0; i < size; i++) { 
       y[i] = DEFAULT_A_VALUE * x[i] + y[i];
+    }
 
     auto end_time = chrono::steady_clock::now();
 

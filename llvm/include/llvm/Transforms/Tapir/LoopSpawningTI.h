@@ -14,12 +14,18 @@
 #define LLVM_TRANSFORMS_TAPIR_LOOPSPAWNING_H
 
 #include "llvm/IR/PassManager.h"
+#include "llvm/Passes/OptimizationLevel.h"
 
 namespace llvm {
 
 /// The LoopSpawning Pass.
 struct LoopSpawningPass : public PassInfoMixin<LoopSpawningPass> {
+  LoopSpawningPass(OptimizationLevel OptLevel = OptimizationLevel::O2)
+    : Level(OptLevel) { }
+  
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
+
+  OptimizationLevel Level;
 };
 
 } // end namespace llvm

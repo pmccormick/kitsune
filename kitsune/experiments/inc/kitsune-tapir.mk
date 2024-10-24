@@ -2,27 +2,26 @@
 # Kitsune+Tapir specific flags used by all the experiments.
 #
 # 
-KITSUNE_PREFIX?=/projects/kitsune/${host_arch}/18.x
+KITSUNE_PREFIX?=${kitsune_install_prefix}
 KITSUNE_OPTLEVEL?=3
 KITSUNE_ABI_OPTLEVEL?=3
 KITSUNE_OPTFLAGS?=-O$(KITSUNE_OPTLEVEL)
-KITSUNE_FAST_MATH=-ffp-contract=fast
+KITSUNE_FAST_MATH=-ffp-contract=on
 
 # For now we disable stripmining on GPUs.
 GPU_STRIPMINE_FLAGS?=
 
 ##################################
 TAPIR_CUDA_TARGET=-ftapir=cuda 
-TAPIR_CUDA_TARGET_FLAGS?= -O$(KITSUNE_OPTLEVEL) \
+TAPIR_CUDA_TARGET_FLAGS?= \
+ -ffp-contract=on \
+ -O$(KITSUNE_OPTLEVEL) \
  -mllvm -cuabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
  -mllvm -cuabi-arch=$(CUDA_ARCH) \
  $(GPU_STRIPMINE_FLAGS) \
  $(TAPIR_CUDA_EXTRA_FLAGS)
-TAPIR_CUDA_FLAGS=$(TAPIR_CUDA_TARGET) $(TAPIR_CUDA_TARGET_FLAGS)
 
- #-ffast-math -fno-vectorize \
- #-mllvm -cuabi-run-post-opts \
- # -mllvm -cuabi-streams=true \
+TAPIR_CUDA_FLAGS=$(TAPIR_CUDA_TARGET) $(TAPIR_CUDA_TARGET_FLAGS)
 
 TAPIR_CUDA_LTO_FLAGS?=-Wl,--tapir-target=cuda \
 		      -Wl,--threads=1 \
@@ -39,6 +38,7 @@ endif
 ##################################
 TAPIR_HIP_TARGET=-ftapir=hip 
 TAPIR_HIP_TARGET_FLAGS?= -O$(KITSUNE_OPTLEVEL) \
+  -fmath-errno -ffp-contract=off -fno-rounding-math \
   -mllvm -hipabi-opt-level=$(KITSUNE_ABI_OPTLEVEL) \
   -mllvm -hipabi-arch=$(AMDGPU_ARCH) \
   $(TAPIR_HIP_EXTRA_FLAGS) \

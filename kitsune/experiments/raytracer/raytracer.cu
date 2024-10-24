@@ -2,6 +2,7 @@
 #include <fstream>
 #include <chrono>
 #include <iomanip>
+#include <cassert>
 #include <math.h>
 #include <stdint.h>
 #include <float.h>
@@ -23,7 +24,8 @@ struct Vec {
   __forceinline__ __device__ Vec operator!() { return *this * (1.0/sqrtf(*this % *this)); }
 };
 
-__forceinline__ __device__
+//__forceinline__
+__device__
 float randomVal(unsigned int& x) {
   x = (214013*x+2531011);
   return ((x>>16)&0x7FFF) / (float)66635;
@@ -156,8 +158,7 @@ Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
           RayMarching(sampledPosition + normal * 0.1f, lightDirection,
                       sampledPosition, normal) == HIT_SUN)
         color = color + attenuation * Vec(500, 400, 100) * incidence;
-    }
-    else if (hitType == HIT_SUN) { //
+    } else if (hitType == HIT_SUN) { //
       color = color + attenuation * Vec(50, 80, 100);
       break; // Sun Color
     }
@@ -201,7 +202,7 @@ void PathTracer(int sampleCount, Pixel *img, int totalPixels,
 int main(int argc, char **argv) {
   using namespace std;
 
-  unsigned int sampleCount = 1 << 7;
+  unsigned int sampleCount = 128;
   unsigned int imageWidth = 1280;
   unsigned int imageHeight = 1024;
 
@@ -239,7 +240,7 @@ int main(int argc, char **argv) {
 
   cout << "  Starting benchmark..." << std::flush;
   auto start_time = chrono::steady_clock::now();
-  int threadsPerBlock = 32;
+  int threadsPerBlock = 256;
   int blocksPerGrid = (totalPixels + threadsPerBlock - 1) / threadsPerBlock;
   PathTracer<<<blocksPerGrid, threadsPerBlock>>>(sampleCount, img, totalPixels,
                                                  imageWidth, imageHeight);

@@ -128,13 +128,17 @@ int RayMarching(const Vec& origin, const Vec& direction, Vec& hitPos, Vec& hitNo
   return HIT_NONE;
 }
 
-__forceinline__ __device__
-Vec Trace(Vec origin, Vec direction, unsigned int& rn) {
+//__forceinline__
+__attribute__((noinline))
+__device__
+Vec Trace(const Vec& p_origin, const Vec& p_direction, unsigned int& rn) {
   Vec sampledPosition;
   Vec normal;
   Vec color(0.0f, 0.0f, 0.0f);
   Vec attenuation(1.0f);
   Vec lightDirection(!Vec(0.6f, 0.6f, 1.0f)); // Directional light
+  Vec origin(p_origin);
+  Vec direction(p_direction);
 
   for (int bounceCount = 8; bounceCount--;) {
     int hitType = RayMarching(origin, direction, sampledPosition, normal);

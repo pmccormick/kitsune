@@ -488,9 +488,10 @@ public:
       Function &F, DominatorTree &DT, LoopInfo &LI, TaskInfo &TI,
       ScalarEvolution &SE, AssumptionCache &AC, TargetTransformInfo &TTI,
       TapirTargetID Target, OptimizationRemarkEmitter &ORE,
-      std::map<TapirTargetID, std::shared_ptr<TapirTarget>> &Targets)
+      std::map<TapirTargetID, std::shared_ptr<TapirTarget>> &Targets,
+      OptimizationLevel OptLevel)
       : F(F), DT(DT), LI(LI), TI(TI), SE(SE), AC(AC), TTI(TTI), ORE(ORE),
-        Targets(Targets) {}
+        Targets(Targets), Level(OptLevel) {}
 
   ~LoopSpawningImpl() {
     for (TapirLoopInfo *TL : TapirLoops)
@@ -606,7 +607,8 @@ private:
   TargetTransformInfo &TTI;
   OptimizationRemarkEmitter &ORE;
   std::map<TapirTargetID, std::shared_ptr<TapirTarget>> &Targets;
-
+  OptimizationLevel Level;
+  
   std::vector<TapirLoopInfo *> TapirLoops;
   DenseMap<Task *, TapirLoopInfo *> TaskToTapirLoop;
   DenseMap<Loop *, TapirLoopInfo *> LoopToTapirLoop;
@@ -1009,7 +1011,7 @@ LoopOutlineProcessor *LoopSpawningImpl::getOutlineProcessor(TapirLoopInfo *TL) {
 
   // Allow the Tapir target to define a custom loop-outline processor.
   if (LoopOutlineProcessor *TargetLOP =
-          Targets[TLTID]->getLoopOutlineProcessor(TL))
+      Targets[TLTID]->getLoopOutlineProcessor(TL, Level))
     return TargetLOP;
 
   switch (Hints.getStrategy()) {
@@ -1751,8 +1753,8 @@ bool LoopSpawningImpl::run() {
                                                      DT);
   } // end timed region
 
-  // FIXME: The order of target processing here possibly breaks a "inside-out"
-  // contr act (loosely speaking) for ordering.  In nested constructs this
+  // FIXME/TODO??? The order of target processing here possibly breaks a "inside-out"
+  // contract (loosely speaking) for ordering.  In nested constructs this
   // leaves us with a partially completed code transformation when we pop
   // up a level of code nesting.  This is important for nested loops with
   // different targets...
@@ -1834,8 +1836,7 @@ PreservedAnalyses LoopSpawningPass::run(Module &M, ModuleAnalysisManager &AM) {
     std::shared_ptr<TapirTarget> Target(getTapirTargetFromID(M, TargetID));
     HasParallelism |=
         LoopSpawningImpl(*F, GetDT(*F), GetLI(*F), GetTI(*F), GetSE(*F),
-                         GetAC(*F), GetTTI(*F), TargetID, GetORE(*F), Targets)
-            .run();
+            GetAC(*F), GetTTI(*F), TargetID, GetORE(*F), Targets, Level).run();
   }
 
   if (HasParallelism)
@@ -1862,10 +1863,12 @@ namespace {
 struct LoopSpawningTI : public FunctionPass {
   /// Pass identification, replacement for typeid
   static char ID;
-  explicit LoopSpawningTI() : FunctionPass(ID) {
+  OptimizationLevel Level;
+  explicit LoopSpawningTI(OptimizationLevel OptLevel= OptimizationLevel::O2) : FunctionPass(ID) {
+    Level = OptLevel;
     initializeLoopSpawningTIPass(*PassRegistry::getPassRegistry());
   }
-
+  
   bool runOnFunction(Function &F) override {
     if (skipFunction(F))
       return false;
@@ -1890,7 +1893,7 @@ struct LoopSpawningTI : public FunctionPass {
     // different targets...
     std::map<TapirTargetID, std::shared_ptr<TapirTarget>> Targets;
     bool Changed =
-        LoopSpawningImpl(F, DT, LI, TI, SE, AC, TTI, TargetID, ORE, Targets)
+      LoopSpawningImpl(F, DT, LI, TI, SE, AC, TTI, TargetID, ORE, Targets, Level)
             .run();
     return Changed;
   }
@@ -1907,6 +1910,8 @@ struct LoopSpawningTI : public FunctionPass {
     AU.addRequired<TaskInfoWrapperPass>();
     AU.addRequired<OptimizationRemarkEmitterWrapperPass>();
   }
+
+  
 };
 } // namespace
 

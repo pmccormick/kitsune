@@ -5,7 +5,7 @@
 #include <iomanip>
 #include <chrono>
 #include <cmath>
-#include <kitsune.h>
+#include <string>
 
 struct Float3 {
   float x, y, z;
@@ -39,24 +39,25 @@ struct Float3 {
 #define __restrict
 #endif
 
-__attribute__((always_inline))
-void cpy(float* dst, const float* src, int N) {
-  forall(unsigned int i = 0; i < N; i++)
+__global__ void cpy(float* dst, const float* src, int N) {
+  int i = blockDim.x * blockIdx.x + threadIdx.x;
+  if (i < N) 
     dst[i] = src[i];
 }
 
-void dump(float* variables, int nel, int nelr)
+void dump(float* variables, int nel, int nelr, char** argv)
 {
+  std::string fname = argv[0];
   using namespace std;
   {
-    ofstream file("density-forall.dat");
+    ofstream file(fname + "_density.dat");
     file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++)
       file << variables[i + VAR_DENSITY*nelr] << endl;
   }
 
   {
-    ofstream file("momentum-forall.dat");
+    ofstream file(fname + "_momentum.dat");
     file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++) {
     	for(int j = 0; j != NDIM; j++)
@@ -66,7 +67,7 @@ void dump(float* variables, int nel, int nelr)
   }
 
   {
-    ofstream file("density_energy-forall.dat");
+    ofstream file(fname + "_density_energy.dat");
     file << nel << " " << nelr << endl;
     for(int i = 0; i < nel; i++)
       file << variables[i + VAR_DENSITY_ENERGY*nelr] << endl;
@@ -74,19 +75,17 @@ void dump(float* variables, int nel, int nelr)
 
 }
 
-__attribute__((always_inline))
 void initialize_variables(int nelr,
                           float* variables,
                           float* ff_variable)
 {
-  forall(int i = 0; i < nelr; i++) {
+  for(int i = 0; i < nelr; i++) {
     for(int j = 0; j < NVAR; j++)
       variables[i + j*nelr] = ff_variable[j];
   }
 }
 
-__attribute__((always_inline))
-void compute_flux_contribution(const float density,
+__host__ __device__ void compute_flux_contribution(const float density,
                                const Float3& momentum,
                                const float density_energy,
                                const float pressure,
@@ -114,8 +113,7 @@ void compute_flux_contribution(const float density,
 }
 
 
-__attribute__((always_inline))
-void compute_velocity(float density,
+__device__ void compute_velocity(float density,
                       const Float3& momentum,
                       Float3& velocity)
 {
@@ -125,14 +123,12 @@ void compute_velocity(float density,
 }
 
 
-__attribute__((always_inline))
-float compute_speed_sqd(const Float3 &velocity)
+__device__ float compute_speed_sqd(const Float3 &velocity)
 {
   return velocity.x * velocity.x + velocity.y * velocity.y + velocity.z*velocity.z;
 }
 
-__attribute__((always_inline))
-float compute_pressure(float density,
+__device__ float compute_pressure(float density,
                        float density_energy,
                        float speed_sqd)
 {
@@ -140,19 +136,18 @@ float compute_pressure(float density,
 	  float(0.5f)*density*speed_sqd);
 }
 
-__attribute__((always_inline))
-float compute_speed_of_sound(float density, float pressure)
+__device__ float compute_speed_of_sound(float density, float pressure)
 {
   return sqrtf(float(GAMMA)*pressure/density);
 }
 
-
-void compute_step_factor(int nelr,
+__global__ void compute_step_factor(int nelr,
                          const float* __restrict variables,
                          const float* areas,
                          float* __restrict step_factors)
 {
-  forall(int blk = 0; blk < nelr/block_length; ++blk) {
+  int blk = blockDim.x * blockIdx.x + threadIdx.x;
+  if (blk < nelr/block_length) {
     int b_start = blk*block_length;
     int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
 
@@ -181,8 +176,8 @@ void compute_step_factor(int nelr,
 }
 
 
-void compute_flux(const int nelr,
-                  const int* elements_surrounding_elements,
+__global__ void compute_flux(int nelr,
+                  int* elements_surrounding_elements,
                   float* normals,
                   float* variables,
                   float* fluxes,
@@ -194,7 +189,8 @@ void compute_flux(const int nelr,
   using namespace std;
   const float smoothing_coefficient = 0.2f;
 
-  forall(int blk = 0; blk < nelr/block_length; ++blk) {
+  int blk = blockDim.x * blockIdx.x + threadIdx.x;
+  if (blk < nelr/block_length) {
     unsigned int b_start = blk*block_length;
     unsigned int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
 
@@ -364,14 +360,14 @@ void compute_flux(const int nelr,
   }
 }
 
-void time_step(int j, int nelr,
+__global__ void time_step(int j, int nelr,
 	       float* old_variables,
 	       float* variables,
                float* step_factors,
 	       float* fluxes)
 {
-
-  forall(int blk = 0; blk < nelr/block_length; ++blk) {
+  int blk = blockDim.x * blockIdx.x + threadIdx.x;
+  if (blk < nelr/block_length) {
     int b_start = blk*block_length;
     int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
     for(int i = b_start; i < b_end; ++i) {
@@ -406,7 +402,7 @@ int main(int argc, char** argv)
     return 0;
   }
 
-  int iterations = 4000;  
+  int iterations = 4000;
   if (argc > 2)
     iterations = atoi(argv[2]);
 
@@ -414,15 +410,21 @@ int main(int argc, char** argv)
 
   cout << setprecision(5);
   cout << "\n";
-  cout << "---- euler3d benchmark (forall) ----\n\n"
-       << "  Input file : " << data_file_name << "\n" 
-       << "  Iterations : " << iterations << ".\n\n"; 
-  cout << "  Reading input data, allocating arrays, initializing data, etc..." 
+  cout << "---- euler3d benchmark (cuda) ----\n\n"
+       << "  Input file : " << data_file_name << "\n"
+       << "  Iterations : " << iterations << ".\n\n";
+  cout << "  Reading input data, allocating arrays, initializing data, etc..."
        << std::flush;
   auto total_start_time = chrono::steady_clock::now();
 
   // these need to be computed the first time in order to compute time step
-  float *ff_variable = alloc<float>(NVAR);
+  cudaError_t err = cudaSuccess;
+  float *ff_variable;
+  err = cudaMallocManaged(&ff_variable, NVAR * sizeof(float));
+  if (err != cudaSuccess) {
+    fprintf(stderr, "failed to allocate managed memory!\n");
+    return 1;
+  }
   Float3 ff_flux_contribution_momentum_x,
     ff_flux_contribution_momentum_y,
     ff_flux_contribution_momentum_z;
@@ -440,8 +442,8 @@ int main(int argc, char** argv)
   float ff_speed = float(ff_mach)*ff_speed_of_sound;
 
   Float3 ff_velocity;
-  ff_velocity.x = ff_speed*cosf((float)angle_of_attack);
-  ff_velocity.y = ff_speed*sinf((float)angle_of_attack);
+  ff_velocity.x = ff_speed*float(cos((float)angle_of_attack));
+  ff_velocity.y = ff_speed*float(sin((float)angle_of_attack));
   ff_velocity.z = 0.0f;
 
   ff_variable[VAR_MOMENTUM+0] = ff_variable[VAR_DENSITY] * ff_velocity.x;
@@ -477,9 +479,21 @@ int main(int argc, char** argv)
   file >> nel;
   nelr = block_length*((nel / block_length )+ min(1, nel % block_length));
 
-  areas = alloc<float>(nelr);
-  elements_surrounding_elements = alloc<int>(nelr*NNB);
-  normals = alloc<float>(NDIM*NNB*nelr);
+  err = cudaMallocManaged(&areas, nelr * sizeof(float));
+  if (err != cudaSuccess) {
+    fprintf(stderr, "failed to allocate managed memory!\n");
+    return 1;
+  }
+  err = cudaMallocManaged(&elements_surrounding_elements, nelr * NNB * sizeof(int));
+  if (err != cudaSuccess) {
+    fprintf(stderr, "failed to allocate managed memory!\n");
+    return 1;
+  }
+  err = cudaMallocManaged(&normals, NDIM*NNB*nelr * sizeof(float));
+  if (err != cudaSuccess) {
+    fprintf(stderr, "failed to allocate managed memory!\n");
+    return 1;
+  }
 
   // read in data
   for(int i = 0; i < nel; i++) {
@@ -512,65 +526,91 @@ int main(int argc, char** argv)
   }
 
   // Create arrays and set initial conditions
-  float* variables = alloc<float>(nelr*NVAR);
+  float* variables;
+  err = cudaMallocManaged(&variables, nelr * NVAR * sizeof(float));
+  if (err != cudaSuccess) {
+    fprintf(stderr, "failed to allocate managed memory!\n");
+    return 1;
+  }
   cout << "  done.\n\n";
 
   cout << "  Starting benchmark...\n" << std::flush;
   auto start_time = chrono::steady_clock::now();
-  
+  int threadsPerBlock = 256;
+  int blocksPerGrid = (nelr/block_length + threadsPerBlock - 1) / threadsPerBlock;
+
   initialize_variables(nelr, variables, ff_variable);
-  float* old_variables = alloc<float>(nelr*NVAR);
-  float* fluxes = alloc<float>(nelr*NVAR);
-  float* step_factors = alloc<float>(nelr);
+  float* old_variables;
+  err = cudaMallocManaged(&old_variables, nelr * NVAR * sizeof(float));
+  if (err != cudaSuccess) {
+    fprintf(stderr, "failed to allocate managed memory!\n");
+    return 1;
+  }
+  float* fluxes;
+  err = cudaMallocManaged(&fluxes, nelr * NVAR * sizeof(float));
+  if (err != cudaSuccess) {
+    fprintf(stderr, "failed to allocate managed memory!\n");
+    return 1;
+  }
+  float* step_factors;
+  err = cudaMallocManaged(&step_factors, nelr * sizeof(float));
+  if (err != cudaSuccess) {
+    fprintf(stderr, "failed to allocate managed memory!\n");
+    return 1;
+  }
   double *rk_times = new double[iterations];
 
   // Begin iterations
   double copy_total = 0.0;
-  double sf_total = 0.0, sf_min = 1000.0, sf_max = 0.0;;
-  double rk_total = 0.0, rk_min = 1000.0, rk_max = 0.0;
+  double sf_total = 0.0;
+  double rk_total = 0.0;
 
   for(int i = 0; i < iterations; i++) {
     auto copy_start = chrono::steady_clock::now();
-    cpy(old_variables, variables, nelr*NVAR);
+    int cpy_blocksPerGrid = ((nelr*NVAR) + threadsPerBlock - 1) / threadsPerBlock;    
+    cpy<<<cpy_blocksPerGrid, threadsPerBlock>>>(old_variables, variables, nelr*NVAR);
+    cudaDeviceSynchronize();    
     auto copy_end = chrono::steady_clock::now();
     double time = chrono::duration<double>(copy_end-copy_start).count();
     copy_total += time;
 
     // for the first iteration we compute the time step
     auto sf_start = chrono::steady_clock::now();
-    compute_step_factor(nelr, variables, areas, step_factors);
+    compute_step_factor<<<blocksPerGrid, threadsPerBlock>>>(nelr, variables, areas, step_factors);
+    cudaDeviceSynchronize();    
     auto sf_end = chrono::steady_clock::now();
-    time = chrono::duration<double>(sf_end-sf_start).count();    
+    time = chrono::duration<double>(sf_end-sf_start).count();
     sf_total += time;
 
     auto rk_start = chrono::steady_clock::now();
     for(int j = 0; j < RK; j++) {
-      compute_flux(nelr, elements_surrounding_elements, normals, variables,
+      compute_flux<<<blocksPerGrid, threadsPerBlock>>>(nelr, elements_surrounding_elements, normals, variables,
                    fluxes, ff_variable,
                    ff_flux_contribution_momentum_x,
                    ff_flux_contribution_momentum_y,
                    ff_flux_contribution_momentum_z,
                    ff_flux_contribution_density_energy);
-
-      time_step(j, nelr, old_variables, variables, step_factors, fluxes);
+      cudaDeviceSynchronize();
+      time_step<<<blocksPerGrid, threadsPerBlock>>>(j, nelr, old_variables, variables, step_factors, fluxes);
+      cudaDeviceSynchronize();      
     }
     auto rk_end = chrono::steady_clock::now();
     time = chrono::duration<double>(rk_end-rk_start).count();
     rk_times[i] = time;
     rk_total += time;
   }
-  auto end_time = chrono::steady_clock::now();  
+  auto end_time = chrono::steady_clock::now();
   double elapsed_time = chrono::duration<double>(end_time-start_time).count();
-  
-  dump(variables, nel, nelr);
 
-  end_time = chrono::steady_clock::now();    
+  dump(variables, nel, nelr, argv);
+
+  end_time = chrono::steady_clock::now();
   double total_time = chrono::duration<double>(end_time-total_start_time).count();
   double rk_mean = rk_total / (iterations-1);
   double sum = 0.0;
   for(int i = 1; i < iterations; i++) {
     double dist = rk_times[i] - rk_mean;
-    sum += dist * dist; 
+    sum += dist * dist;
   }
   double rk_std_dev = sqrt(sum / iterations);
 
@@ -583,17 +623,17 @@ int main(int argc, char** argv)
        << sf_total / iterations << " seconds).\n"
        << "              rk : " << rk_total << " seconds (average: "
        << rk_mean << " seconds / std dev:" << rk_std_dev << ").\n"
-       << "*** " << elapsed_time << ", " << elapsed_time << "\n"                
+       << "*** " << elapsed_time << ", " << elapsed_time << "\n"
        << "----\n\n";
 
-  dealloc(ff_variable);
-  dealloc(areas);
-  dealloc(elements_surrounding_elements);
-  dealloc(normals);
-  dealloc(variables);
-  dealloc(old_variables);
-  dealloc(fluxes);
-  dealloc(step_factors);
+  // dealloc(ff_variable);
+  // dealloc(areas);
+  // dealloc(elements_surrounding_elements);
+  // dealloc(normals);
+  // dealloc(variables);
+  // dealloc(old_variables);
+  // dealloc(fluxes);
+  // dealloc(step_factors);
 
   return 0;
 }

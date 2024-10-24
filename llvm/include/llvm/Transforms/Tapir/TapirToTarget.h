@@ -14,19 +14,22 @@
 #define LLVM_TRANSFORMS_TAPIR_TAPIRTOTARGET_H
 
 #include "llvm/IR/PassManager.h"
+#include "llvm/Passes/OptimizationLevel.h"
 #include "llvm/Transforms/Tapir/TapirTargetIDs.h"
 
 namespace llvm {
 
 /// The TapirToTarget Pass.
 struct TapirToTargetPass : public PassInfoMixin<TapirToTargetPass> {
-  TapirToTargetPass(TapirTargetID TargetID = TapirTargetID::Last_TapirTargetID)
-      : TargetID(TargetID) {}
+  TapirToTargetPass(OptimizationLevel OptLevel = OptimizationLevel::O2,
+		    TapirTargetID TargetID = TapirTargetID::Last_TapirTargetID)
+    : TargetID(TargetID), Level(OptLevel) {}
 
   /// \brief Run the pass over the module.
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
 
   TapirTargetID TargetID;
+  OptimizationLevel Level;
 };
 
 } // end namespace llvm

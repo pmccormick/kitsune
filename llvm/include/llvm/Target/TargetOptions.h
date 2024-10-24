@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/FloatingPointMode.h"
 #include "llvm/MC/MCTargetOptions.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <memory>
 
@@ -462,6 +463,58 @@ namespace llvm {
     /// debug information. This is used for emitting the CodeView S_OBJNAME
     /// record.
     std::string ObjectFilenameForDebug;
+
+    void dump() const {
+      errs() << "target options:\n"
+             << "UnsafeFPMath(" << (UnsafeFPMath ? "true)\n" : "false)\n")
+             << "NoInfsFPMath(" << (NoInfsFPMath ? "true)\n" : "false)\n")
+             << "NoNaNsFPMath(" << (NoNaNsFPMath ? "true)\n" : "false)\n")
+             << "NoTrappingFPMath(" <<  (NoTrappingFPMath ? "true)\n" : "false)\n")
+             << "NoSignedZerosFPMath(" << (NoSignedZerosFPMath ? "true)\n" : "false)\n")
+             << "ApproxFuncFPMath(" << (ApproxFuncFPMath ? "true)\n" : "false)\n")
+             << "EnableAIXExtendedAltivecABI(" << (EnableAIXExtendedAltivecABI ? "true)\n" : "false)\n")
+             << "HonorSignDependentRoundingFPMathOption(" << (HonorSignDependentRoundingFPMathOption ? "true)\n" : "false)\n")
+             << "NoZerosInBSS(" << (NoZerosInBSS ? "true)\n" : "false)\n")
+             << "GuaranteedTailCallOpt(" << (GuaranteedTailCallOpt ? "true)\n" : "false)\n")
+             << "StackSymbolOrdering(" << (StackSymbolOrdering ? "true)\n" : "false)\n")
+             << "EnableFastISel(" << (EnableFastISel ? "true)\n" : "false)\n")
+             << "EnableGlobalISel(" << (EnableGlobalISel ? "true)\n" : "false)\n")
+             << "UseInitArray(" << (UseInitArray ? "true)\n" : "false)\n")
+             << "DisableIntegratedAS(" << (DisableIntegratedAS ? "true)\n" : "false)\n")
+             << "FunctionSections(" << (FunctionSections ? "true)\n" : "false)\n")
+             << "DataSections(" << (DataSections ? "true)\n" : "false)\n")
+             << "IgnoreXCOFFVisibility(" << (IgnoreXCOFFVisibility ? "true)\n" : "false)\n")
+             << "XCOFFTracebackTable(" << (XCOFFTracebackTable ? "true)\n" : "false)\n")
+             << "UniqueSectionNames(" << (UniqueSectionNames ? "true)\n" : "false)\n")
+             << "UniqueBasicBlockSectionNames("<< (UniqueSectionNames ? "true)\n" : "false)\n")
+             << "SeparateNamedSections(" << (SeparateNamedSections ? "true)\n" : "false)\n")
+             << "TrapUnreachable(" << (TrapUnreachable ? "true)\n" : "false)\n")
+             << "NoTrapAfterNoreturn(" << (NoTrapAfterNoreturn ? "true)\n" : "false)\n")
+             << "TLSSize(" << TLSSize << ")\n"
+             << "EmulatedTLS(" << (EmulatedTLS ? "true)\n" : "false)\n")
+             << "EnableTLSDESC(" << (EnableTLSDESC ? "true)\n" : "false)\n")
+             << "EnableIPRA(" << (EnableIPRA ? "true)\n" : "false)\n")
+             << "EmitStackSizeSection(" << (EmitStackSizeSection ? "true)\n" : "false\n")
+             << "EnableMachineOutliner(" << (EnableMachineOutliner ? "true)\n" : "false\n")
+             << "EnableMachineFunctionSplitter(" << (EnableMachineFunctionSplitter ? "true)\n" : "false\n")
+             << "SupportsDefaultOutlining(" << (SupportsDefaultOutlining ? "true)\n" : "false\n")
+             << "EmitAddrsig(" << (EmitAddrsig ? "true)\n" : "false)\n")
+             << "BBAddrMap(" << (BBAddrMap ? "true)\n" : "false)\n")
+             << "EmitCallSiteInfo(" << (EmitCallSiteInfo ? "true)\n" : "false)\n")
+             << "SupportsDebugEntryValues(" << (SupportsDebugEntryValues ? "true)\n" : "false)\n")
+             << "EnableDebugEntryValues(" << (EnableDebugEntryValues ? "true)\n" : "false)\n")
+             << "ValueTrackingVariableLocations(" << (ValueTrackingVariableLocations ? "true)\n" : "false)\n")
+             << "ForceDwarfFrameSection(" << (ForceDwarfFrameSection ? "true)\n" : "false)\n")
+             << "XRayFunctionIndex(" << (XRayFunctionIndex ? "true)\n" : "false)\n")
+             << "DebugStrictDwarf(" << (DebugStrictDwarf ? "true)\n" : "false)\n")
+             << "Hotpatch(" << (Hotpatch ? "true)\n" : "false)\n")
+             << "PPCGenScalarMASSEntries(" << (PPCGenScalarMASSEntries ? "true)\n" : "false)\n")
+             << "JMCInstrument(" << (JMCInstrument ? "true)\n" : "false)\n")
+             << "EnableCFIFixup(" << (EnableCFIFixup ? "true)\n" : "false)\n")
+             << "MisExpect(" << (MisExpect ? "true)\n" : "false)\n")
+             << "XCOFFReadOnlyPointers(" << (XCOFFReadOnlyPointers ? "true)\n" : "false)\n")
+             << "FPDenormalMode(" << FPDenormalMode << ")\n\n"; 
+    }
   };
 
 } // End llvm namespace

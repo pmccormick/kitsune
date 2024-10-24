@@ -298,27 +298,12 @@ extern void* __kitcuda_launch_kernel(const void *fat_bin, const char *kern_name,
                                      void *opaque_stream);
 
 /**
- * Enable/Disable the use of occupancy calculations for the
- * determination of kernel launch parameters.  If the `enable`
- * parameter is set to `true` occupancy-based launches will be
- * used for *all* kernel launches.  `false` will disable and
- * the runtime will fall-back to either custom or default
- * launch parameters.
+ * Enable/Disable the use of refinement of launch parameters 
+ * in an attempt to maximum use of all SMs on the GPU. 
  *
- * @param enable - enable/disable occupancy-based launches
+ * @param enable - enable/disable refinment of launch parameters.
  */
-extern void __kitcuda_use_occupancy_launch(bool enable);
-
-/**
- * Enable/Disable the tuning of occupancy-based calculations for
- * the determination of kernel launch parameters.  If the `enable`
- * parameter is set to `true` both occupancy-based launches and
- * the refinement of the occupancy-driven results will be used.
- * `enable == true` will enable occupancy_launches.
- *
- * @param enable - enable/disable tuned occupancy launches.
- */
- extern void __kitcuda_refine_occupancy_launches(bool enable);
+extern void __kitcuda_enable_launch_refinement(bool enable);
 
 /**
  * Set the runtime's value for the number of threads-per-block used
@@ -337,7 +322,7 @@ extern void __kitcuda_set_default_threads_per_blk(int nthreads);
  * is not critical for CUDA -- given differences in the LLVM backends
  * for each target...
  */
-extern void __kitcuda_set_default_max_threads_per_blk(int nthreads);
+extern void __kitcuda_set_max_threads_per_blk(int nthreads);
 
 /**
  * Provide a set of set of launch parameters to use for subsequent

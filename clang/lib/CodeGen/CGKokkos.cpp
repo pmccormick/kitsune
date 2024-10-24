@@ -139,7 +139,6 @@ bool CodeGenFunction::ParseAndValidateParallelFor(
             dyn_cast<StringLiteral>(CXXCE->getArg(0)->IgnoreImplicit())) {
       CN = NameExpr->getString().str();
       SE = SimplifyExpr(CE->getArg(++curArgIndex));
-      ;
     };
 
   // Parse a vector of IV bounds, can be either an *Expr or an MDRangePolicy
@@ -289,7 +288,7 @@ void CodeGenFunction::EmitKokkosIncrement(const ParmVarDecl *IV) {
   Builder.CreateStore(IncVal, GetAddrOfLocalVar(IV));
 }
 
-// Emit the whole Kokkos parallel for
+
 bool CodeGenFunction::EmitKokkosParallelFor(
     const CallExpr *CE, ArrayRef<const Attr *> KokkosAttrs) {
   std::optional<llvm::TapirTargetID> TT = GetTapirTargetAttr(KokkosAttrs);

@@ -1,19 +1,20 @@
 //===---- streams.cpp HIP streams support----------------------------------===
 //
-// Copyright (c) 2021, 2023 Los Alamos National Security, LLC.
+// Copyright (c) 2021, 2023, 2025 Los Alamos National Security, LLC.
 //
 // All rights reserved.
 //
-//  Copyright 2021, 2023. Los Alamos National Security, LLC. This software 
-//  was produced under U.S. Government contract DE-AC52-06NA25396 for Los
-//  Alamos National Laboratory (LANL), which is operated by Los Alamos
-//  National Security, LLC for the U.S. Department of Energy. The
-//  U.S. Government has rights to use, reproduce, and distribute this
-//  software.  NEITHER THE GOVERNMENT NOR LOS ALAMOS NATIONAL SECURITY,
-//  LLC MAKES ANY WARRANTY, EXPRESS OR IMPLIED, OR ASSUMES ANY LIABILITY
-//  FOR THE USE OF THIS SOFTWARE.  If software is modified to produce
-//  derivative works, such modified software should be clearly marked,
-//  so as not to confuse it with the version available from LANL.
+//  Copyright 2021, 2023, 2025. Los Alamos National Security,
+//  LLC. This software was produced under U.S. Government contract
+//  DE-AC52-06NA25396 for Los Alamos National Laboratory (LANL), which
+//  is operated by Los Alamos National Security, LLC for the
+//  U.S. Department of Energy. The U.S. Government has rights to use,
+//  reproduce, and distribute this software.  NEITHER THE GOVERNMENT
+//  NOR LOS ALAMOS NATIONAL SECURITY, LLC MAKES ANY WARRANTY, EXPRESS
+//  OR IMPLIED, OR ASSUMES ANY LIABILITY FOR THE USE OF THIS SOFTWARE.
+//  If software is modified to produce derivative works, such modified
+//  software should be clearly marked, so as not to confuse it with
+//  the version available from LANL.
 //
 //  Additionally, redistribution and use in source and binary forms,
 //  with or without modification, are permitted provided that the
@@ -50,20 +51,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "kithip.h"
-#include "kithip_dylib.h"
-#include <mutex>
-#include <deque>
+#include "kithip_rtinfo.h"
 #include <algorithm>
+#include <deque>
+#include <mutex>
 #include <sys/syscall.h>
 #include <unistd.h>
-
-
-// On older systems gettid() is not exposed and the syscall()
-// interface must be used.  It won't hurt us to just use that
-// everywhere as there are still systems in use with older
-// system libraries that are missing the call...
-#define gettid() syscall(SYS_gettid)
-
 
 // NOTE: HIP and streams...  HIP supports a per-thread default stream
 // -- it is implicit that is local to *both* the calling thread and
@@ -77,7 +70,7 @@
 //
 // TODO: It is unclear if HIP's per-thread stream might provide an
 // advantage vs. what we are currently using to create a stream
-// per calling thread...  Details below... 
+// per calling thread...  Details below...
 //
 // TODO: Rethink stream and thread mapping with an eye towards
 // reducing resource usage.
@@ -90,7 +83,7 @@
 // potentially enter similar runtime call sequences over a
 // long-running code and thus every thread will end up with its own
 // stream.
-// Stream creation can be expensive.  We "recycle" them when possible. 
+// Stream creation can be expensive.  We "recycle" them when possible.
 typedef std::deque<hipStream_t> KitHipStreamList;
 static KitHipStreamList _kithip_streams;
 static std::mutex _kithip_stream_mutex;
@@ -102,63 +95,69 @@ extern "C" {
 #endif
 
 void *__kithip_get_thread_stream() {
-
+  using namespace kithip_rt;
   hipStream_t hip_stream;
   if (not _kithip_streams.empty()) {
+    // LOCK
     _kithip_stream_mutex.lock();
     hip_stream = _kithip_streams.front();
     _kithip_streams.pop_front();
     _kithip_stream_mutex.unlock();
-    if (__kitrt_verbose_mode())
-      fprintf(stderr, "kithip: using recycled stream [stream=%p, poolsize=%zu].\n",
-            (void*)hip_stream, _kithip_streams.size());
+    // UNLOCK
   } else {
-    HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));          
+    HIP_SAFE_CALL(hipSetDevice(deviceID()));
     HIP_SAFE_CALL(hipStreamCreateWithFlags(&hip_stream, hipStreamNonBlocking));
   }
-  
-  return (void*)hip_stream;
+
+  return (void *)hip_stream;
 }
 
- void __kithip_sync_thread_stream(void *opaque_stream) {
-   assert(opaque_stream != nullptr && "unexpected null stream pointer!");
+void __kithip_sync_thread_stream(void *opaque_stream) {
+  assert(opaque_stream != nullptr && "kitrt[hip]: unexpected null stream!");
+  using namespace kithip_rt;
+  
+  hipStream_t hip_stream = (hipStream_t)opaque_stream;
+  HIP_SAFE_CALL(hipStreamSynchronize(hip_stream));
 
-   HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));               
-   hipStream_t hip_stream = (hipStream_t)opaque_stream;
-   HIP_SAFE_CALL(hipStreamSynchronize_p(hip_stream));
-   // In our current model a synchronized stream is done doing useful
-   // work.  Recycle it for later use.
+  // LOCK
   _kithip_stream_mutex.lock();
   _kithip_streams.push_back(hip_stream);
-  _kithip_stream_mutex.unlock();   
-  if (__kitrt_verbose_mode()) 
-    fprintf(stderr, "kithip: recycling execution stream at sync point [stream=%p, poolsize=%zu].\n",
-            opaque_stream, _kithip_streams.size());
- }
+  _kithip_stream_mutex.unlock();
+  // UNLOCK
+}
 
 void __kithip_sync_context() {
-  HIP_SAFE_CALL(hipSetDevice_p(__kithip_get_device_id()));            
-  HIP_SAFE_CALL(hipDeviceSynchronize_p());
+  using namespace kithip_rt;
+  HIP_SAFE_CALL(hipSetDevice(deviceID()));
+  HIP_SAFE_CALL(hipDeviceSynchronize());
 }
 
 void __kithip_delete_thread_stream(void *opaque_stream) {
-   assert(opaque_stream != nullptr && "unexpected null stream pointer!");
-   hipStream_t hip_stream = (hipStream_t)opaque_stream;
-   _kithip_stream_mutex.lock();
-   auto sit = std::find(_kithip_streams.begin(), _kithip_streams.end(), hip_stream);
-   if (sit != _kithip_streams.end()) {
-     _kithip_streams.erase(sit);
-   }
-   HIP_SAFE_CALL(hipStreamDestroy_p(hip_stream));
-   _kithip_stream_mutex.unlock();
+  assert(opaque_stream != nullptr && "kitrt[hip]: unexpected null stream!");
+  hipStream_t hip_stream = (hipStream_t)opaque_stream;
+
+  // LOCK
+  _kithip_stream_mutex.lock();
+  auto sit =
+      std::find(_kithip_streams.begin(), _kithip_streams.end(), hip_stream);
+  if (sit != _kithip_streams.end())
+    _kithip_streams.erase(sit);
+
+  HIP_SAFE_CALL(hipStreamDestroy(hip_stream));
+  _kithip_stream_mutex.unlock();
+  // UNLOCK
 }
 
 void __kithip_destroy_thread_streams() {
+  // LOCK
   _kithip_stream_mutex.lock();
-  for(auto &entry : _kithip_streams)
-    HIP_SAFE_CALL(hipStreamDestroy_p(entry));
+
+  for (auto &entry : _kithip_streams)
+    HIP_SAFE_CALL(hipStreamDestroy(entry));
   _kithip_streams.clear();
+
   _kithip_stream_mutex.unlock();
+  // UNLOCK
 }
-  
+
 } // extern "C"

@@ -68,7 +68,8 @@ void GPUABI::processSubTaskCall(TaskOutlineInfo &TOI, DominatorTree &DT) {
 }
 
 LoopOutlineProcessor *
-GPUABI::getLoopOutlineProcessor(const TapirLoopInfo *TL) {
+GPUABI::getLoopOutlineProcessor(const TapirLoopInfo *TL,
+		OptimizationLevel OptLevel = OptimizationLevel=O2) {
   if(!LOP)
     return new LLVMLoop(M);
   return LOP;
