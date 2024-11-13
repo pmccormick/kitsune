@@ -264,8 +264,6 @@ void* __kitcuda_mem_gpu_prefetch(void *vp, void *opaque_stream) {
                                  CU_MEM_ADVISE_SET_PREFERRED_LOCATION,
                                  _kitcuda_device));
 
-
-
       // Issue a prefetch request on the provided stream.  If the given 
       // stream is null, create a new stream and return it. Once issued 
       // go ahead and mark the memory as having been prefetched.  This 
