@@ -57,6 +57,7 @@
 #include "kitsune/Config/config.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/Demangle/Demangle.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/DebugInfoMetadata.h"
@@ -111,7 +112,7 @@ using namespace llvm;
 namespace {
 
 const std::string CUABI_PREFIX = "kitcu";
-const std::string CUABI_KERNEL_NAME_PREFIX = CUABI_PREFIX + "_loop_";
+const std::string CUABI_KERNEL_LOOP_NAME_PREFIX = "kitcu_loop_";
 
 // TO BE DEPRECATED
 #ifndef _CUDAABI_DEFAULT_TARGET_ARCH
@@ -219,9 +220,9 @@ cl::opt<unsigned>
 // and can impact register allocation and other details.  This will impact
 // both code generation and runtime behaviors.
 cl::opt<unsigned> MaxThreadsPerBlock(
-    "cuabi-max-threads-per-block", cl::init(640), cl::Hidden,
+    "cuabi-max-threads-per-block", cl::init(1024), cl::Hidden,
     cl::desc("Set the maximum value for the threads per "
-             "block.  For register allocation tweaks. (default: 640)"));
+             "block.  For register allocation tweaks. (default: 1024)"));
 
 // Enable/Disable flush denorms-to-zero code generation.
 cl::opt<bool>
@@ -340,10 +341,9 @@ CudaLoop::CudaLoop(Module &M, Module &KernelModule, const std::string &KN,
     : LoopOutlineProcessor(M, KernelModule), TTarget(T), KernelName(KN),
       KernelModule(KernelModule) {
 
-  if (MakeUniqueName) {
-    std::string KernelName = KN + "_" + Twine(NextKernelID).str();
-    NextKernelID++;
-  }
+  nonMicrosoftDemangle(KN, KernelName);
+  KernelName +=  "_" + Twine(NextKernelID).str();
+  NextKernelID++;
 
   LLVM_DEBUG(dbgs() << "debug[cuabi]: creating a cuda loop outliner.\n"
                     << "  - target kernel name: " << KernelName << "\n");
@@ -703,9 +703,8 @@ void CudaLoop::preProcessTapirLoop(TapirLoopInfo &TL, ValueToValueMapTy &VMap) {
                           << DeviceF->getName() << "' into kernel module.\n");
 
         // GPU calls are slow, try to force inlining...
-        // if (not DeviceF->hasFnAttribute(Attribute::NoInline))
-        //  DeviceF->addFnAttr(Attribute::AlwaysInline);
-        DeviceF->addFnAttr(Attribute::AlwaysInline);
+        if (OptLevel > 1 && not DeviceF->hasFnAttribute(Attribute::NoInline))
+          DeviceF->addFnAttr(Attribute::AlwaysInline);
       }
     }
   }
@@ -746,6 +745,7 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   KernelF->removeFnAttr("target-features");
   KernelF->removeFnAttr("personality");
   KernelF->removeFnAttr("tune-cpu");
+
   KernelF->addFnAttr("target-cpu", GPUArch);
   KernelF->addFnAttr("target-features",
                      PTXVersionFromCudaVersion() + "," + GPUArch);
@@ -757,9 +757,9 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   AV.push_back(MDString::get(Ctx, "kernel"));
   AV.push_back(
       ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
-  AV.push_back(MDString::get(Ctx, "maxntidx"));
-  AV.push_back(ValueAsMetadata::get(
-      ConstantInt::get(Type::getInt32Ty(Ctx), MaxThreadsPerBlock)));
+  //AV.push_back(MDString::get(Ctx, "maxntidx"));
+  //AV.push_back(ValueAsMetadata::get(
+  //    ConstantInt::get(Type::getInt32Ty(Ctx), MaxThreadsPerBlock)));
   Annotations->addOperand(MDNode::get(Ctx, AV));
 
   // Verify that the Thread ID corresponds to a valid iteration.  Because
@@ -938,9 +938,6 @@ Function *CudaLoop::resolveLibDeviceFunction(Function *Fn, bool enableFast) {
                           .Default("");
 
   if (FnName == NVPrefix) {
-    // errs() << "\t\twarning unable to finding mapping for "
-    //        << "intrinsic function '" << Fn->getName() << "()' to '" << FnName
-    //        << "()'.\n";
     if (Fn->isIntrinsic())
       return Fn;
     else
@@ -1011,15 +1008,16 @@ void CudaLoop::transformForPTX(Function &F) {
   for (auto I : Replaced) {
     CallInst *CI = I.first;
     CallInst *NCI = I.second;
-    NCI->insertAfter(CI);
+    NCI->insertBefore(CI);
     CI->replaceAllUsesWith(NCI);
     CI->eraseFromParent();
   }
 
-  for (auto *Fn : CalledFns)
+  for (auto *Fn : CalledFns) {
     transformForPTX(*Fn);
+  }
 
-  LLVM_DEBUG(saveFunctionToFile(&F, F.getName().str(), ".cuabi.ll"));
+  LLVM_DEBUG(saveFunctionToFile(&F, F.getName().str(), ".cuabi-for-ptx.ll"));
 }
 
 void CudaLoop::remapData(ValueToValueMapTy &VMap) {
@@ -1193,24 +1191,6 @@ void CudaLoop::processOutlinedLoopCall(TapirLoopInfo &TL, TaskOutlineInfo &TOI,
 
   AllocaInst *AI = EntryBuilder.CreateAlloca(KernelInstMixTy);
   NewBuilder.CreateStore(InstructionMix, AI);
-
-  /*
-  int reg_estimate = InstMix.num_flops + InstMix.num_iops;
-  if (reg_estimate > 64)
-    reg_estimate = 60;
-
-  if (reg_estimate < 64) {
-    llvm::Metadata *llvmMetadata[] = {
-        llvm::ValueAsMetadata::get(TargetKF),
-        llvm::MDString::get(Ctx, "nvvm.maxnreg"),
-        llvm::ValueAsMetadata::get(
-            llvm::ConstantInt::get(llvm::Type::getInt32Ty(Ctx), reg_estimate))};
-    llvm::MDNode *llvmMetadataNode = llvm::MDNode::get(Ctx, llvmMetadata);
-    KernelModule.getOrInsertNamedMetadata("nvvm.annotations")
-        ->addOperand(llvmMetadataNode);
-    errs() << "register estimate hack: " << reg_estimate << "\n";
-  }
-  */
 
   LLVM_DEBUG(dbgs() << "\t*- code gen kernel launch....\n");
   CudaStream = NewBuilder.CreateCall(
@@ -2145,9 +2125,13 @@ CudaABI::getLoopOutlineProcessor(const TapirLoopInfo *TL,
     // based naming scheme for kernels.
     unsigned LineNumber = TL->getLoop()->getStartLoc()->getLine();
     KernelName =
-        CUABI_KERNEL_NAME_PREFIX + ModuleName + "_" + Twine(LineNumber).str();
+        CUABI_KERNEL_LOOP_NAME_PREFIX + ModuleName + "_" + Twine(LineNumber).str();
   } else {
-    KernelName = CUABI_KERNEL_NAME_PREFIX + KernelName;
+    std::string DemangledName;
+    if (llvm::nonMicrosoftDemangle(KernelName, DemangledName, false, false))
+      KernelName = CUABI_KERNEL_LOOP_NAME_PREFIX + DemangledName;
+    else 
+      KernelName = CUABI_KERNEL_LOOP_NAME_PREFIX + KernelName;
     LLVM_DEBUG(dbgs() << "\t- kernel function '" << KernelName << "()'.\n");
   }
 

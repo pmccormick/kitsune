@@ -14,11 +14,11 @@ kitsune_hip_enable:="ON"
 ifeq ($(kitsune_hip_enable),"ON")
   $(info config: hip target enabled.)
   KITSUNE_HIP_ENABLE:=true
-  ROCM_PATH:=/opt/rocm-6.3.2
+  ROCM_PATH:=/opt/rocm
 endif  
 
 # Kokkos support 
-kitsune_kokkos_enable:=""
+kitsune_kokkos_enable:="ON"
 ifeq ($(kitsune_kokkos_enable),"ON")
   $(info config: kokkos codegen enabled.)
   KITSUNE_KOKKOS_ENABLE:=true
