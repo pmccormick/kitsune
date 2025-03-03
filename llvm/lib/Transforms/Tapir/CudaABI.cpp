@@ -342,7 +342,7 @@ CudaLoop::CudaLoop(Module &M, Module &KernelModule, const std::string &KN,
       KernelModule(KernelModule) {
 
   nonMicrosoftDemangle(KN, KernelName);
-  KernelName +=  "_" + Twine(NextKernelID).str();
+  KernelName += "_" + Twine(NextKernelID).str();
   NextKernelID++;
 
   LLVM_DEBUG(dbgs() << "debug[cuabi]: creating a cuda loop outliner.\n"
@@ -757,9 +757,9 @@ void CudaLoop::postProcessOutline(TapirLoopInfo &TLI, TaskOutlineInfo &Out,
   AV.push_back(MDString::get(Ctx, "kernel"));
   AV.push_back(
       ValueAsMetadata::get(ConstantInt::get(Type::getInt32Ty(Ctx), 1)));
-  //AV.push_back(MDString::get(Ctx, "maxntidx"));
-  //AV.push_back(ValueAsMetadata::get(
-  //    ConstantInt::get(Type::getInt32Ty(Ctx), MaxThreadsPerBlock)));
+  // AV.push_back(MDString::get(Ctx, "maxntidx"));
+  // AV.push_back(ValueAsMetadata::get(
+  //     ConstantInt::get(Type::getInt32Ty(Ctx), MaxThreadsPerBlock)));
   Annotations->addOperand(MDNode::get(Ctx, AV));
 
   // Verify that the Thread ID corresponds to a valid iteration.  Because
@@ -2124,13 +2124,13 @@ CudaABI::getLoopOutlineProcessor(const TapirLoopInfo *TL,
     // If we have debug info in the module use a line number
     // based naming scheme for kernels.
     unsigned LineNumber = TL->getLoop()->getStartLoc()->getLine();
-    KernelName =
-        CUABI_KERNEL_LOOP_NAME_PREFIX + ModuleName + "_" + Twine(LineNumber).str();
+    KernelName = CUABI_KERNEL_LOOP_NAME_PREFIX + ModuleName + "_" +
+                 Twine(LineNumber).str();
   } else {
     std::string DemangledName;
     if (llvm::nonMicrosoftDemangle(KernelName, DemangledName, false, false))
       KernelName = CUABI_KERNEL_LOOP_NAME_PREFIX + DemangledName;
-    else 
+    else
       KernelName = CUABI_KERNEL_LOOP_NAME_PREFIX + KernelName;
     LLVM_DEBUG(dbgs() << "\t- kernel function '" << KernelName << "()'.\n");
   }
