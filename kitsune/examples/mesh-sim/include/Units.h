@@ -196,6 +196,20 @@ inline double mileToMeter(double mile) { return mile * 1609.34; }
  */
 inline double meterToMile(double meter) { return meter / 1609.34; }
 
+/**
+ * @brief Convert centimeters to meters
+ * @param cm Length in centimeters
+ * @return Length in meters
+ */
+inline double cmToMeter(double cm) { return cm * 0.01; }
+
+/**
+ * @brief Convert meters to centimeters
+ * @param meter Length in meters
+ * @return Length in centimeters
+ */
+inline double meterToCm(double meter) { return meter * 100.0; }
+
 //==============================================================================
 // Velocity conversions
 //==============================================================================
@@ -246,6 +260,34 @@ inline double lbft3ToKgm3(double lbft3) { return lbft3 * 16.0185; }
  */
 inline double kgm3ToLbft3(double kgm3) { return kgm3 / 16.0185; }
 
+/**
+ * @brief Convert grams per cubic centimeter to kilograms per cubic meter
+ * @param gcm3 Density in grams per cubic centimeter
+ * @return Density in kilograms per cubic meter
+ */
+inline double gcm3ToKgm3(double gcm3) { return gcm3 * 1000.0; }
+
+/**
+ * @brief Convert kilograms per cubic meter to grams per cubic centimeter
+ * @param kgm3 Density in kilograms per cubic meter
+ * @return Density in grams per cubic centimeter
+ */
+inline double kgm3ToGcm3(double kgm3) { return kgm3 / 1000.0; }
+
+/**
+ * @brief Convert slugs per cubic foot to kilograms per cubic meter
+ * @param slugft3 Density in slugs per cubic foot
+ * @return Density in kilograms per cubic meter
+ */
+inline double slugft3ToKgm3(double slugft3) { return slugft3 * 515.379; }
+
+/**
+ * @brief Convert kilograms per cubic meter to slugs per cubic foot
+ * @param kgm3 Density in kilograms per cubic meter
+ * @return Density in slugs per cubic foot
+ */
+inline double kgm3ToSlugft3(double kgm3) { return kgm3 / 515.379; }
+
 //==============================================================================
 // Viscosity conversions
 //==============================================================================
@@ -278,6 +320,20 @@ inline double cpToPass(double cp) { return cp * 0.001; }
  */
 inline double passToCp(double pass) { return pass / 0.001; }
 
+/**
+ * @brief Convert lb-s/ft² to Pascal-second
+ * @param lbsft2 Viscosity in lb-s/ft²
+ * @return Viscosity in Pascal-second
+ */
+inline double lbsft2ToPass(double lbsft2) { return lbsft2 * 47.8803; }
+
+/**
+ * @brief Convert Pascal-second to lb-s/ft²
+ * @param pass Viscosity in Pascal-second
+ * @return Viscosity in lb-s/ft²
+ */
+inline double passToLbsft2(double pass) { return pass / 47.8803; }
+
 //==============================================================================
 // Thermal conductivity conversions
 //==============================================================================
@@ -296,6 +352,20 @@ inline double btuToWmk(double btu) { return btu * 1.73073; }
  */
 inline double wmkToBtu(double wmk) { return wmk / 1.73073; }
 
+/**
+ * @brief Convert cal/(s·cm·°C) to W/(m·K)
+ * @param cal Thermal conductivity in cal/(s·cm·°C)
+ * @return Thermal conductivity in W/(m·K)
+ */
+inline double calToWmk(double cal) { return cal * 418.68; }
+
+/**
+ * @brief Convert W/(m·K) to cal/(s·cm·°C)
+ * @param wmk Thermal conductivity in W/(m·K)
+ * @return Thermal conductivity in cal/(s·cm·°C)
+ */
+inline double wmkToCal(double wmk) { return wmk / 418.68; }
+
 //==============================================================================
 // Specific heat conversions
 //==============================================================================
@@ -313,6 +383,20 @@ inline double btuToJkgk(double btu) { return btu * 4186.8; }
  * @return Specific heat in BTU/(lb·°F)
  */
 inline double jkgkToBtu(double jkgk) { return jkgk / 4186.8; }
+
+/**
+ * @brief Convert cal/(g·°C) to J/(kg·K)
+ * @param cal Specific heat in cal/(g·°C)
+ * @return Specific heat in J/(kg·K)
+ */
+inline double calToJkgk(double cal) { return cal * 4186.8; }
+
+/**
+ * @brief Convert J/(kg·K) to cal/(g·°C)
+ * @param jkgk Specific heat in J/(kg·K)
+ * @return Specific heat in cal/(g·°C)
+ */
+inline double jkgkToCal(double jkgk) { return jkgk / 4186.8; }
 
 //==============================================================================
 // Generic unit conversion with unit string identification
@@ -389,6 +473,9 @@ inline UnitConversion getUnitConversion(const std::string &unitStr) {
       {"m",
        {UnitType::LENGTH, "m", [](double v) { return v; },
         [](double v) { return v; }}},
+      {"cm",
+       {UnitType::LENGTH, "m", [](double v) { return cmToMeter(v); },
+        [](double v) { return meterToCm(v); }}},
       {"in",
        {UnitType::LENGTH, "m", [](double v) { return inchToMeter(v); },
         [](double v) { return meterToInch(v); }}},
@@ -414,9 +501,15 @@ inline UnitConversion getUnitConversion(const std::string &unitStr) {
       {"kg/m³",
        {UnitType::DENSITY, "kg/m³", [](double v) { return v; },
         [](double v) { return v; }}},
+      {"g/cm³",
+       {UnitType::DENSITY, "kg/m³", [](double v) { return gcm3ToKgm3(v); },
+        [](double v) { return kgm3ToGcm3(v); }}},
       {"lb/ft³",
        {UnitType::DENSITY, "kg/m³", [](double v) { return lbft3ToKgm3(v); },
         [](double v) { return kgm3ToLbft3(v); }}},
+      {"slug/ft³",
+       {UnitType::DENSITY, "kg/m³", [](double v) { return slugft3ToKgm3(v); },
+        [](double v) { return kgm3ToSlugft3(v); }}},
 
       // Viscosity
       {"Pa·s",
@@ -428,6 +521,9 @@ inline UnitConversion getUnitConversion(const std::string &unitStr) {
       {"cP",
        {UnitType::VISCOSITY, "Pa·s", [](double v) { return cpToPass(v); },
         [](double v) { return passToCp(v); }}},
+      {"lb·s/ft²",
+       {UnitType::VISCOSITY, "Pa·s", [](double v) { return lbsft2ToPass(v); },
+        [](double v) { return passToLbsft2(v); }}},
 
       // Thermal conductivity
       {"W/(m·K)",
@@ -437,6 +533,10 @@ inline UnitConversion getUnitConversion(const std::string &unitStr) {
        {UnitType::THERMAL_CONDUCTIVITY, "W/(m·K)",
         [](double v) { return btuToWmk(v); },
         [](double v) { return wmkToBtu(v); }}},
+      {"cal/(s·cm·°C)",
+       {UnitType::THERMAL_CONDUCTIVITY, "W/(m·K)",
+        [](double v) { return calToWmk(v); },
+        [](double v) { return wmkToCal(v); }}},
 
       // Specific heat
       {"J/(kg·K)",
@@ -445,7 +545,11 @@ inline UnitConversion getUnitConversion(const std::string &unitStr) {
       {"BTU/(lb·°F)",
        {UnitType::SPECIFIC_HEAT, "J/(kg·K)",
         [](double v) { return btuToJkgk(v); },
-        [](double v) { return jkgkToBtu(v); }}}};
+        [](double v) { return jkgkToBtu(v); }}},
+      {"cal/(g·°C)",
+       {UnitType::SPECIFIC_HEAT, "J/(kg·K)",
+        [](double v) { return calToJkgk(v); },
+        [](double v) { return jkgkToCal(v); }}}};
 
   auto it = conversions.find(unitStr);
   if (it != conversions.end()) {

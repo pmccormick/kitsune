@@ -704,41 +704,83 @@ public:
     return [](Cell &, const std::array<Cell *, 4> *) {};
   }
 
-private:
-  Grid *m_grid; ///<    // Reference to the grid this cell belongs to (needed
-                ///<    for boundary conditions)
-  // Boundary condition for this cell (if it's a boundary)
-  std::shared_ptr<BoundaryClass> m_boundaryCondition;
+  /**
+   * @brief Print cell information to an output stream
+   * @param os The output stream
+   * @param verbosity Level of detail (0=minimal, 1=normal, 2=detailed)
+   */
+  void print(std::ostream &os, int verbosity = 1) const;
 
-  CellType m_type = CellType::FLUID; ///< Type of the cell
+  /**
+   * @brief Provide string representation of the cell
+   * @param verbosity Level of detail (0=minimal, 1=normal, 2=detailed)
+   * @return String containing cell information
+   */
+  std::string toString(int verbosity = 1) const;
 
-  double m_temperature = 293.15;    ///< Temperature at cell center (K)
-  double m_pressure = 101325.0;     ///< Pressure at cell center (Pa)
-  double m_density = 1.0;           ///< Density at cell center (kg/m³)
-  std::array<Vertex, 4> m_vertices; ///< Vertices of the cell
-  std::shared_ptr<Material> m_material =
-      nullptr;            ///< Material properties of the cell
-  bool m_isFixed = false; ///< Whether the cell has fixed values
-  bool m_is_obstacle;
-  bool m_is_boundary;
-  // Cell center velocities (for Grid compatibility)
-  double m_velocity_x = 0.0; ///< X-velocity at cell center
-  double m_velocity_y = 0.0; ///< Y-velocity at cell center
+  /**
+   * @brief Serialize cell to a string representation (for saving to file)
+   * @return String containing serialized cell data
+   */
+  std::string serialize() const;
 
-  // Fixed properties for common numerical values (fast access)
-  std::array<double, static_cast<size_t>(PropertyType::COUNT)>
-      m_fixedProperties = {};
+  /**
+   * @brief Deserialize cell from a string representation
+   * @param data String containing serialized cell data
+   * @return True if deserialization was successful
+   */
+  bool deserialize(const std::string &data);
 
-  // Boolean flags packed into bits (fastest access)
-  uint64_t m_flags = 0;
+  /**
+   * @brief Get a human-readable string for a cell type
+   * @param type The cell type
+   * @return String representation
+   */
+  static std::string cellTypeToString(CellType type);
 
-  // Dynamic properties (flexible but slower access)
-  std::unordered_map<std::string, double> m_dynamicProperties;
+  /**
+   * @brief Get a human-readable string for a flag
+   * @param flag The cell flag
+   * @return String representation
+   */
+  static std::string cellFlagToString(CellFlag flag);
 
-  // Hash function for dynamic properties
-  static uint32_t hashName(const std::string &name);
+  std::string toSVG(double scale = 10.0, bool showVelocity = true) const;
 
-  static 
-  std::unordered_map<PropertyType, PropertyComputeFunction>
-      s_propertyComputations;
-};
+  private:
+    Grid *m_grid; ///<    // Reference to the grid this cell belongs to (needed
+                  ///<    for boundary conditions)
+    // Boundary condition for this cell (if it's a boundary)
+    std::shared_ptr<BoundaryClass> m_boundaryCondition;
+
+    CellType m_type = CellType::FLUID; ///< Type of the cell
+
+    double m_temperature = 293.15;    ///< Temperature at cell center (K)
+    double m_pressure = 101325.0;     ///< Pressure at cell center (Pa)
+    double m_density = 1.0;           ///< Density at cell center (kg/m³)
+    std::array<Vertex, 4> m_vertices; ///< Vertices of the cell
+    std::shared_ptr<Material> m_material =
+        nullptr;            ///< Material properties of the cell
+    bool m_isFixed = false; ///< Whether the cell has fixed values
+    bool m_is_obstacle;
+    bool m_is_boundary;
+    // Cell center velocities (for Grid compatibility)
+    double m_velocity_x = 0.0; ///< X-velocity at cell center
+    double m_velocity_y = 0.0; ///< Y-velocity at cell center
+
+    // Fixed properties for common numerical values (fast access)
+    std::array<double, static_cast<size_t>(PropertyType::COUNT)>
+        m_fixedProperties = {};
+
+    // Boolean flags packed into bits (fastest access)
+    uint64_t m_flags = 0;
+
+    // Dynamic properties (flexible but slower access)
+    std::unordered_map<std::string, double> m_dynamicProperties;
+
+    // Hash function for dynamic properties
+    static uint32_t hashName(const std::string &name);
+
+    static std::unordered_map<PropertyType, PropertyComputeFunction>
+        s_propertyComputations;
+  };

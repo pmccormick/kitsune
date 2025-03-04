@@ -211,6 +211,175 @@ Material::createMixture(std::shared_ptr<Material> other, double mixFraction,
   return mixture;
 }
 
+std::shared_ptr<Material>
+Material::createMixture(const std::vector<std::shared_ptr<Material>> &materials,
+                        const std::vector<double> &fractions,
+                        const std::string &mixingRule) {
+
+  // Validate inputs
+  if (materials.size() != fractions.size() || materials.empty()) {
+    throw std::invalid_argument(
+        "Number of materials must match number of fractions");
+  }
+
+  // Ensure fractions sum to 1.0
+  double sum = std::accumulate(fractions.begin(), fractions.end(), 0.0);
+  if (std::abs(sum - 1.0) > 1e-6) {
+    throw std::invalid_argument("Fractions must sum to 1.0");
+  }
+
+  // Create a new material for the mixture
+  auto mixture =
+      std::make_shared<Material>(MaterialType::FLUID, "MultiComponentMixture");
+
+  // Mark as mixture
+  mixture->m_isMixture = true;
+
+  // Add all components directly - no nesting
+  for (size_t i = 0; i < materials.size(); i++) {
+    // For each material, if it's a mixture, add its components with scaled
+    // fractions
+    if (materials[i]->isMixture()) {
+      const auto &subComponents = materials[i]->getMixtureComponents();
+      for (const auto &[subMaterial, subFraction] : subComponents) {
+        // Scale the sub-fraction by the fraction of this material
+        mixture->m_mixtureComponents.push_back(
+            {subMaterial, subFraction * fractions[i]});
+      }
+    } else {
+      // Add pure material directly
+      mixture->m_mixtureComponents.push_back({materials[i], fractions[i]});
+    }
+  }
+
+  // Calculate all properties directly from components for better accuracy
+  for (size_t propIdx = 0;
+       propIdx < static_cast<size_t>(MaterialProperty::COUNT); ++propIdx) {
+    MaterialProperty prop = static_cast<MaterialProperty>(propIdx);
+
+    // Determine mixing rule for this property
+    std::string effectiveRule = mixingRule;
+    if (effectiveRule == "default") {
+      // Assign appropriate default mixing rule based on property
+      switch (prop) {
+      case MaterialProperty::DYNAMIC_VISCOSITY:
+        effectiveRule = "logarithmic";
+        break;
+      case MaterialProperty::THERMAL_CONDUCTIVITY:
+        effectiveRule = "harmonic";
+        break;
+      default:
+        effectiveRule = "linear";
+        break;
+      }
+    }
+
+    // Mix the property using the appropriate rule
+    double mixedValue = 0.0;
+
+    if (effectiveRule == "linear") {
+      // Linear mixing: Σ(fraction_i * value_i)
+      for (size_t i = 0; i < mixture->m_mixtureComponents.size(); i++) {
+        const auto &[material, fraction] = mixture->m_mixtureComponents[i];
+        mixedValue += fraction * material->getProperty(prop);
+      }
+    } else if (effectiveRule == "logarithmic") {
+      // Check if all values are positive (required for logarithmic mixing)
+      bool allPositive = true;
+      for (const auto &[material, _] : mixture->m_mixtureComponents) {
+        if (material->getProperty(prop) <= 0.0) {
+          allPositive = false;
+          break;
+        }
+      }
+
+      if (allPositive) {
+        // Logarithmic mixing: exp(Σ(fraction_i * ln(value_i)))
+        double logSum = 0.0;
+        for (const auto &[material, fraction] : mixture->m_mixtureComponents) {
+          logSum += fraction * std::log(material->getProperty(prop));
+        }
+        mixedValue = std::exp(logSum);
+      } else {
+        // Fall back to linear mixing for non-positive values
+        for (const auto &[material, fraction] : mixture->m_mixtureComponents) {
+          mixedValue += fraction * material->getProperty(prop);
+        }
+      }
+    } else if (effectiveRule == "harmonic") {
+      // Check for zero values (would cause division by zero)
+      bool hasZero = false;
+      for (const auto &[material, _] : mixture->m_mixtureComponents) {
+        if (material->getProperty(prop) == 0.0) {
+          hasZero = true;
+          break;
+        }
+      }
+
+      if (!hasZero) {
+        // Harmonic mixing: 1 / Σ(fraction_i / value_i)
+        double invSum = 0.0;
+        for (const auto &[material, fraction] : mixture->m_mixtureComponents) {
+          invSum += fraction / material->getProperty(prop);
+        }
+        mixedValue = 1.0 / invSum;
+      } else {
+        // If any component has zero value, result is zero
+        mixedValue = 0.0;
+      }
+    } else if (effectiveRule == "geometric") {
+      // Check if all values are positive (required for geometric mixing)
+      bool allPositive = true;
+      for (const auto &[material, _] : mixture->m_mixtureComponents) {
+        if (material->getProperty(prop) <= 0.0) {
+          allPositive = false;
+          break;
+        }
+      }
+
+      if (allPositive) {
+        // Geometric mixing: Π(value_i^fraction_i)
+        mixedValue = 1.0;
+        for (const auto &[material, fraction] : mixture->m_mixtureComponents) {
+          mixedValue *= std::pow(material->getProperty(prop), fraction);
+        }
+      } else {
+        // Fall back to linear mixing for non-positive values
+        for (const auto &[material, fraction] : mixture->m_mixtureComponents) {
+          mixedValue += fraction * material->getProperty(prop);
+        }
+      }
+    } else {
+      // Default to linear mixing for unknown rules
+      for (const auto &[material, fraction] : mixture->m_mixtureComponents) {
+        mixedValue += fraction * material->getProperty(prop);
+      }
+    }
+
+    // Set the calculated property
+    mixture->setProperty(prop, mixedValue);
+  }
+
+  // Set reference temperature to match this material
+  // Calculate reference temperature from component materials
+  double refTemp = 0.0;
+  double totalWeight = 0.0;
+
+  for (size_t i = 0; i < materials.size(); i++) {
+    refTemp += materials[i]->getReferenceTemperature() * fractions[i];
+    totalWeight += fractions[i];
+  }
+
+  if (totalWeight > 0.0) {
+    refTemp /= totalWeight;
+  } else {
+    refTemp = 293.15; // Default to 20°C if no valid weights
+  }
+  mixture->setReferenceTemperature(refTemp);
+
+  return mixture;
+}
+
 void Material::addScaledComponentsToMixture(
     std::shared_ptr<Material> mixture,
     const std::vector<std::pair<std::shared_ptr<Material>, double>> &components,

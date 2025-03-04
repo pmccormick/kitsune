@@ -19,6 +19,8 @@ set(LIB_SOURCES
     src/Cell.cpp
     src/CellExtensions.cpp    
     src/Material.cpp
+    #    src/Units.cpp
+    #    src/Grid.cpp    
     # Add other source files as needed
 )
 
@@ -27,6 +29,7 @@ set(LIB_HEADERS
     include/Cell.h
     include/Material.h
     include/Units.h
+    #    include/Grid.h    
     # Add other header files as needed
 )
 
@@ -46,7 +49,7 @@ target_link_libraries(cell_tests PRIVATE CFDLib)
 add_test(NAME CellTests COMMAND cell_tests)
 
 # Cell units tests
-add_executable(cell_units_tests tests/unit_tests_for_cell_units.cpp)
+add_executable(cell_units_tests tests/tests_for_cell_units.cpp)
 target_link_libraries(cell_units_tests PRIVATE CFDLib)
 add_test(NAME CellUnitsTests COMMAND cell_units_tests)
 

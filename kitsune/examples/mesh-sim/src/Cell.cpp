@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <sstream>
+#include <string>
 
 // Forward declaration if needed
 #include "Material.h"
@@ -263,26 +265,356 @@ void Cell::setPressure(double pressure) {
     }
   }
 
-  
-
-  /* For future consideration...
-  // Register function to compute vorticity for structured grids
-  void registerStructuredGridFunctions() {
-    Cell::registerPropertyComputation(Cell::PropertyType::VORTICITY,
-        [](Cell& cell, const std::array<Cell*, 4>* neighbors) {
-            // Structured grid vorticity calculation
-            // ...
-        }
-    );
+  std::string Cell::cellTypeToString(CellType type) {
+    switch (type) {
+    case CellType::FLUID:
+      return "FLUID";
+    case CellType::SOLID:
+      return "SOLID";
+    case CellType::BOUNDARY:
+      return "BOUNDARY";
+    default:
+      return "UNKNOWN";
+    }
   }
 
-  // Register function to compute vorticity for unstructured grids
-  void registerUnstructuredGridFunctions() {
-    Cell::registerPropertyComputation(Cell::PropertyType::VORTICITY,
-        [](Cell& cell, const std::array<Cell*, 4>* neighbors) {
-            // Unstructured grid vorticity calculation
-            // ...
-        }
-    );
+  std::string Cell::cellFlagToString(CellFlag flag) {
+    switch (flag) {
+    case CellFlag::IS_INLET:
+      return "INLET";
+    case CellFlag::IS_OUTLET:
+      return "OUTLET";
+    case CellFlag::IS_WALL:
+      return "WALL";
+    case CellFlag::IS_SYMMETRY:
+      return "SYMMETRY";
+    case CellFlag::IS_BOUNDARY:
+      return "BOUNDARY";
+    case CellFlag::IS_OBSTACLE:
+      return "OBSTACLE";
+    case CellFlag::COUNT:
+      return "COUNT";
+    default:
+      return "UNKNOWN";
+    }
   }
-  */
+
+  void Cell::print(std::ostream &os, int verbosity) const {
+    os << "Cell [Type: " << cellTypeToString(m_type) << "]" << std::endl;
+
+    if (verbosity >= 1) {
+      // Basic properties
+      os << "  Temperature: " << m_temperature << " K ("
+         << getTemperatureWithUnits("C") << " °C)" << std::endl;
+      os << "  Pressure: " << m_pressure << " Pa ("
+         << getPressureWithUnits("bar") << " bar)" << std::endl;
+      os << "  Density: " << m_density << " kg/m³" << std::endl;
+      os << "  Velocity: [" << m_velocity_x << ", " << m_velocity_y << "] m/s"
+         << std::endl;
+
+      // State flags
+      os << "  Fixed: " << (isFixed() ? "Yes" : "No") << std::endl;
+      os << "  Is Boundary: " << (isBoundary() ? "Yes" : "No") << std::endl;
+      os << "  Is Obstacle: " << (isObstacle() ? "Yes" : "No") << std::endl;
+
+      // Material
+      os << "  Material: " << (m_material ? m_material->getName() : "None")
+         << std::endl;
+    }
+
+    if (verbosity >= 2) {
+      // Detailed - include property values
+      os << "  Properties:" << std::endl;
+      os << "    Vorticity: " << getVorticity() << " 1/s" << std::endl;
+      os << "    Kinetic Energy: " << getKineticEnergy() << " J/kg"
+         << std::endl;
+      os << "    Stream Function: " << getStreamFunction() << " m²/s"
+         << std::endl;
+      os << "    Divergence: " << getDivergence() << " 1/s" << std::endl;
+
+      // Flags
+      os << "  Flags:" << std::endl;
+      for (int i = 0; i < static_cast<int>(CellFlag::COUNT); i++) {
+        CellFlag flag = static_cast<CellFlag>(1 << i);
+        if (getFlag(flag)) {
+          os << "    " << cellFlagToString(flag) << std::endl;
+        }
+      }
+
+      // Vertex velocities
+      os << "  Vertex Velocities:" << std::endl;
+      for (int i = 0; i < 4; i++) {
+        VertexPosition pos = static_cast<VertexPosition>(i);
+        auto [vx, vy] = getVertexVelocity(pos);
+        os << "    "
+           << (pos == VertexPosition::NORTHWEST   ? "NW"
+               : pos == VertexPosition::NORTHEAST ? "NE"
+               : pos == VertexPosition::SOUTHEAST ? "SE"
+                                                  : "SW")
+           << ": [" << vx << ", " << vy << "] m/s" << std::endl;
+      }
+
+      // Dynamic properties
+      if (!m_dynamicProperties.empty()) {
+        os << "  Dynamic Properties:" << std::endl;
+        for (const auto &[name, value] : m_dynamicProperties) {
+          os << "    " << name << ": " << value << std::endl;
+        }
+      }
+    }
+  }
+
+  std::string Cell::toString(int verbosity) const {
+    std::ostringstream oss;
+    print(oss, verbosity);
+    return oss.str();
+  }
+
+  std::string Cell::serialize() const {
+    std::ostringstream oss;
+
+    // Version identifier to support future changes
+    oss << "CELL_V1\n";
+
+    // Core properties
+    oss << "TYPE=" << static_cast<int>(m_type) << "\n";
+    oss << "TEMP=" << m_temperature << "\n";
+    oss << "PRES=" << m_pressure << "\n";
+    oss << "DENS=" << m_density << "\n";
+    oss << "VEL_X=" << m_velocity_x << "\n";
+    oss << "VEL_Y=" << m_velocity_y << "\n";
+    oss << "FIXED=" << (m_isFixed ? 1 : 0) << "\n";
+    oss << "FLAGS=" << m_flags << "\n";
+
+    // Material (just the name, loading will need to find the material)
+    oss << "MAT=" << (m_material ? m_material->getName() : "") << "\n";
+
+    // Vertex velocities
+    for (int i = 0; i < 4; i++) {
+      oss << "VERT" << i << "=" << m_vertices[i].vx << "," << m_vertices[i].vy
+          << "\n";
+    }
+
+    // Properties
+    oss << "PROPS=";
+    for (size_t i = 0; i < static_cast<size_t>(PropertyType::COUNT); i++) {
+      if (i > 0)
+        oss << ",";
+      oss << m_fixedProperties[i];
+    }
+    oss << "\n";
+
+    // Dynamic properties
+    oss << "DYNPROPS=" << m_dynamicProperties.size() << "\n";
+    for (const auto &[key, value] : m_dynamicProperties) {
+      oss << key << "=" << value << "\n";
+    }
+
+    return oss.str();
+  }
+
+  bool Cell::deserialize(const std::string &data) {
+    std::istringstream iss(data);
+    std::string line, key, value;
+
+    // Read version line
+    std::getline(iss, line);
+    if (line != "CELL_V1")
+      return false;
+
+    // Parse key-value pairs
+    while (std::getline(iss, line)) {
+      size_t pos = line.find('=');
+      if (pos == std::string::npos)
+        continue;
+
+      key = line.substr(0, pos);
+      value = line.substr(pos + 1);
+
+      if (key == "TYPE") {
+        setType(static_cast<CellType>(std::stoi(value)));
+      } else if (key == "TEMP") {
+        setTemperature(std::stod(value));
+      } else if (key == "PRES") {
+        setPressure(std::stod(value));
+      } else if (key == "DENS") {
+        setDensity(std::stod(value));
+      } else if (key == "VEL_X") {
+        setVelocityX(std::stod(value));
+      } else if (key == "VEL_Y") {
+        setVelocityY(std::stod(value));
+      } else if (key == "FIXED") {
+        setFixed(std::stoi(value) != 0);
+      } else if (key == "FLAGS") {
+        m_flags = std::stoull(value);
+      } else if (key == "MAT") {
+        // Material handling - would need reference to material registry
+        // This would be handled at a higher level
+      } else if (key.substr(0, 4) == "VERT") {
+        int idx = std::stoi(key.substr(4, 1));
+        pos = value.find(',');
+        if (pos != std::string::npos) {
+          double vx = std::stod(value.substr(0, pos));
+          double vy = std::stod(value.substr(pos + 1));
+          setVertexVelocity(static_cast<VertexPosition>(idx), vx, vy);
+        }
+      } else if (key == "PROPS") {
+        std::istringstream props_ss(value);
+        std::string prop_val;
+        size_t idx = 0;
+
+        while (std::getline(props_ss, prop_val, ',') &&
+               idx < static_cast<size_t>(PropertyType::COUNT)) {
+          setProperty(static_cast<PropertyType>(idx), std::stod(prop_val));
+          idx++;
+        }
+      } else if (key == "DYNPROPS") {
+        // Next N lines contain dynamic properties
+        int count = std::stoi(value);
+        for (int i = 0; i < count && std::getline(iss, line); i++) {
+          pos = line.find('=');
+          if (pos != std::string::npos) {
+            setDynamicProperty(line.substr(0, pos),
+                               std::stod(line.substr(pos + 1)));
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * @brief Generate SVG representation of the cell
+   * @param scale Scale factor for the rendering
+   * @param showVelocity Whether to show velocity vectors
+   * @return SVG string representation
+   */
+  std::string Cell::toSVG(double scale, bool showVelocity) const {
+    std::ostringstream svg;
+
+    // SVG header
+    svg << "<svg width=\"" << 12 * scale << "\" height=\"" << 12 * scale
+        << "\" xmlns=\"http://www.w3.org/2000/svg\">\n";
+
+    // Cell background based on type
+    std::string fillColor;
+    switch (m_type) {
+    case CellType::FLUID:
+      fillColor = "rgb(200,230,255)"; // Light blue for fluid
+      break;
+    case CellType::SOLID:
+      fillColor = "rgb(150,150,150)"; // Gray for solid
+      break;
+    case CellType::BOUNDARY:
+      // Color based on boundary type
+      if (getFlag(CellFlag::IS_INLET)) {
+        fillColor = "rgb(100,200,100)"; // Green for inlet
+      } else if (getFlag(CellFlag::IS_OUTLET)) {
+        fillColor = "rgb(200,100,100)"; // Red for outlet
+      } else if (getFlag(CellFlag::IS_WALL)) {
+        fillColor = "rgb(120,120,120)"; // Dark gray for wall
+      } else if (getFlag(CellFlag::IS_SYMMETRY)) {
+        fillColor = "rgb(255,220,100)"; // Yellow for symmetry
+      } else {
+        fillColor = "rgb(200,200,200)"; // Light gray for generic boundary
+      }
+      break;
+    }
+
+    // Draw cell rectangle
+    svg << "  <rect x=\"" << scale << "\" y=\"" << scale << "\" width=\""
+        << 10 * scale << "\" height=\"" << 10 * scale << "\" fill=\""
+        << fillColor << "\" stroke=\"black\" stroke-width=\"1\"/>\n";
+
+    // Draw temperature indication (red-blue gradient)
+    double normTemp =
+        (m_temperature - 273.15) / 100.0; // Normalize around 0°C = 273.15K
+    normTemp = std::max(0.0, std::min(1.0, normTemp)); // Clamp to [0,1]
+    int red = static_cast<int>(255 * normTemp);
+    int blue = static_cast<int>(255 * (1.0 - normTemp));
+    svg << "  <circle cx=\"" << 3 * scale << "\" cy=\"" << 3 * scale
+        << "\" r=\"" << scale << "\" fill=\"rgb(" << red << ",0," << blue
+        << ")\"/>\n";
+
+    // Draw pressure indication (size of circle)
+    double normPressure = m_pressure / 101325.0; // Normalize around 1 atm
+    normPressure =
+        std::max(0.2, std::min(1.5, normPressure)); // Clamp and scale
+    svg << "  <circle cx=\"" << 8 * scale << "\" cy=\"" << 3 * scale
+        << "\" r=\"" << scale * normPressure
+        << "\" fill=\"rgba(0,0,0,0.3)\"/>\n";
+
+    if (showVelocity) {
+      // Draw velocity vector at center
+      double velMag =
+          std::sqrt(m_velocity_x * m_velocity_x + m_velocity_y * m_velocity_y);
+      if (velMag > 1e-6) {             // Only if non-zero
+        double velScale = 3.0 * scale; // Scale factor for velocity arrows
+        double normVelX = m_velocity_x / velMag;
+        double normVelY = m_velocity_y / velMag;
+
+        // Arrow from center
+        double centerX = 6 * scale;
+        double centerY = 6 * scale;
+        double endX = centerX + normVelX * velScale * std::min(velMag, 3.0);
+        double endY = centerY + normVelY * velScale * std::min(velMag, 3.0);
+
+        // Arrow shaft
+        svg << "  <line x1=\"" << centerX << "\" y1=\"" << centerY << "\" x2=\""
+            << endX << "\" y2=\"" << endY
+            << "\" stroke=\"black\" stroke-width=\"2\"/>\n";
+
+        // Arrow head
+        double arrowSize = 0.5 * scale;
+        double angle = std::atan2(endY - centerY, endX - centerX);
+        double arrow1X = endX - arrowSize * std::cos(angle - 0.5);
+        double arrow1Y = endY - arrowSize * std::sin(angle - 0.5);
+        double arrow2X = endX - arrowSize * std::cos(angle + 0.5);
+        double arrow2Y = endY - arrowSize * std::sin(angle + 0.5);
+
+        svg << "  <polygon points=\"" << endX << "," << endY << " " << arrow1X
+            << "," << arrow1Y << " " << arrow2X << "," << arrow2Y
+            << "\" fill=\"black\"/>\n";
+      }
+    }
+
+    // Draw a small indicator for each property type that has a non-zero value
+    double propRadius = 0.5 * scale;
+    double startY = 9 * scale;
+    for (int i = 0; i < static_cast<int>(PropertyType::COUNT); i++) {
+      PropertyType propType = static_cast<PropertyType>(i);
+      if (std::abs(getProperty(propType)) > 1e-6) {
+        // Position indicators along the bottom
+        double posX = (2 + i) * scale;
+        svg << "  <circle cx=\"" << posX << "\" cy=\"" << startY << "\" r=\""
+            << propRadius << "\" fill=\"purple\"/>\n";
+      }
+    }
+
+    // SVG footer
+    svg << "</svg>\n";
+
+    return svg.str();
+  }
+    /* For future consideration...
+    // Register function to compute vorticity for structured grids
+    void registerStructuredGridFunctions() {
+      Cell::registerPropertyComputation(Cell::PropertyType::VORTICITY,
+          [](Cell& cell, const std::array<Cell*, 4>* neighbors) {
+              // Structured grid vorticity calculation
+              // ...
+          }
+      );
+    }
+
+    // Register function to compute vorticity for unstructured grids
+    void registerUnstructuredGridFunctions() {
+      Cell::registerPropertyComputation(Cell::PropertyType::VORTICITY,
+          [](Cell& cell, const std::array<Cell*, 4>* neighbors) {
+              // Unstructured grid vorticity calculation
+              // ...
+          }
+      );
+    }
+    */

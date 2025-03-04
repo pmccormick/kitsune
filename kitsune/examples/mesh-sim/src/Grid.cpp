@@ -4,15 +4,17 @@
 
 Grid::Grid(size_t nx, size_t ny, double width, double height, double origin_x,
            double origin_y)
-    : m_nx(nx), m_ny(ny), m_width(width), m_height(height),
-      m_origin_x(origin_x), m_origin_y(origin_y) {
-
+    : m_nx(nx), // Grid dimensions first (matches declaration order)
+      m_ny(ny), m_origin_x(origin_x),       // Grid origin next
+      m_origin_y(origin_y), m_width(width), // Physical domain size next
+      m_height(height),
+      m_dx(width / (nx - 1)), // Initialize dx and dy directly in the list
+      m_dy(height / (ny - 1))
+// m_cells will be initialized by default constructor
+{
   if (nx < 2 || ny < 2) {
     throw std::invalid_argument("Grid dimensions must be at least 2x2");
   }
-
-  m_dx = m_width / (m_nx - 1);
-  m_dy = m_height / (m_ny - 1);
 
   // Pre-allocate cells for performance
   m_cells.resize(m_nx * m_ny);
@@ -29,7 +31,67 @@ Grid::Grid(size_t nx, size_t ny, double width, double height, double origin_x,
   }
 }
 
-Cell *getCellData() const { return m_grid ? m_grid->getCellData() : nullptr; }
+/**
+ * @brief Set material for a specific region of the grid
+ * @param i_start Starting x-index
+ * @param i_end Ending x-index (inclusive)
+ * @param j_start Starting y-index
+ * @param j_end Ending y-index (inclusive)
+ * @param material Material to assign to cells in the region
+ */
+void Grid::setMaterialRegion(size_t i_start, size_t i_end, size_t j_start,
+                             size_t j_end, Material *material) {
+  if (!material) {
+    throw std::invalid_argument("Material cannot be null");
+  }
+
+  // Clamp indices to valid range
+  i_start = std::min(i_start, m_nx - 1);
+  i_end = std::min(i_end, m_nx - 1);
+  j_start = std::min(j_start, m_ny - 1);
+  j_end = std::min(j_end, m_ny - 1);
+
+  // Set material for each cell in the region
+  for (size_t j = j_start; j <= j_end; ++j) {
+    for (size_t i = i_start; i <= i_end; ++i) {
+      Cell &cell = getCell(i, j);
+      cell.setMaterial(material);
+    }
+  }
+}
+
+/**
+ * @brief Set material for a specific region of the grid using physical
+ * coordinates with unit conversion
+ * @param min_x Minimum x-coordinate of region in specified units
+ * @param max_x Maximum x-coordinate of region in specified units
+ * @param min_y Minimum y-coordinate of region in specified units
+ * @param max_y Maximum y-coordinate of region in specified units
+ * @param material Material to assign to cells in the region
+ * @param lengthUnit Length unit string (e.g., "m", "ft", "in")
+ */
+void Grid::setMaterialRegionWithUnits(double min_x, double max_x, double min_y,
+                                      double max_y, Material *material,
+                                      const std::string &lengthUnit) {
+  if (!material) {
+    throw std::invalid_argument("Material cannot be null");
+  }
+
+  // Convert physical coordinates to SI units (meters)
+  double min_x_m = Units::convert(min_x, lengthUnit, "m");
+  double max_x_m = Units::convert(max_x, lengthUnit, "m");
+  double min_y_m = Units::convert(min_y, lengthUnit, "m");
+  double max_y_m = Units::convert(max_y, lengthUnit, "m");
+
+  // Convert physical coordinates to grid indices
+  size_t i_start = gridI(min_x_m);
+  size_t i_end = gridI(max_x_m);
+  size_t j_start = gridJ(min_y_m);
+  size_t j_end = gridJ(max_y_m);
+
+  // Delegate to the index-based version
+  setMaterialRegion(i_start, i_end, j_start, j_end, material);
+}
 
 // Get velocity field for visualization or analysis
 void Grid::getVelocityField(std::vector<double> &vx,

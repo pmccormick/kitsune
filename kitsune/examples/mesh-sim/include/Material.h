@@ -124,12 +124,13 @@
 
 #include "Units.h"
 
-#include <string>
-#include <memory>
-#include <vector>
-#include <functional>
 #include <array>
+#include <functional>
 #include <map>
+#include <memory>
+#include <numeric>
+#include <string>
+#include <vector>
 
 /**
  * @class Material
@@ -138,7 +139,7 @@
  * This class provides physical properties of materials (fluids or solids)
  * with support for temperature-dependent properties and material mixing.
  */
-class Material {
+class Material : public std::enable_shared_from_this<Material> {
 public:
   /**
    * @enum MaterialType
@@ -262,12 +263,17 @@ public:
   std::shared_ptr<Material>
   createMixture(std::shared_ptr<Material> other, double mixFraction,
                 const std::string &mixingRule = "linear") const;
+
+  static std::shared_ptr<Material>
+  createMixture(const std::vector<std::shared_ptr<Material>> &materials,
+                const std::vector<double> &fractions,
+                const std::string &mixingRule);
   /**
    * @brief Check if the material is a mixture
    * @return True if the material is a mixture
    */
   bool isMixture() const;
-    
+
   /**
    * @brief For a mixture material, get the components
    * @return Pairs of (component material, fraction)

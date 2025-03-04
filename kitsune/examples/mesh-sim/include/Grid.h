@@ -186,11 +186,11 @@ public:
   Grid(size_t nx, size_t ny, double width, double height, double origin_x = 0.0,
        double origin_y = 0.0);
 
-  static std::shared_ptr<Grid> createWithUnits(size_t nx, size_t ny,
-                                               double width, double height,
-                                               const std::string &lengthUnit,
-                                               double originX = 0.0,
-                                               double originY = 0.0);
+  std::shared_ptr<Grid> createWithUnits(size_t nx, size_t ny, double width,
+                                        double height,
+                                        const std::string &lengthUnit,
+                                        double originX = 0.0,
+                                        double originY = 0.0);
 
   // Index calculation for 1D array - inline for performance
   inline size_t index(size_t i, size_t j) const { return i + j * m_nx; }
@@ -312,6 +312,10 @@ public:
   // Set material for a specific region
   void setMaterialRegion(size_t i_start, size_t i_end, size_t j_start,
                          size_t j_end, Material *material);
+
+  void setMaterialRegionWithUnits(double min_x, double max_x, double min_y,
+                                  double max_y, Material *material,
+                                  const std::string &lengthUnit);
 
   // Define a circular obstacle
   void setCircularObstacle(double center_x, double center_y, double radius,
