@@ -1,21 +1,15 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(CFDTests VERSION 1.0)
+project(CFDTests VERSION 0.01)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Set compiler flags
-if(MSVC)
-    # MSVC compiler flags
-    add_compile_options(/W4 /EHsc)
-else()
-    # GCC/Clang compiler flags
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+# GCC/Clang compiler flags
+add_compile_options(-Wall -Wextra -Wpedantic)
 
 # Enable testing
 enable_testing()
@@ -23,6 +17,7 @@ enable_testing()
 # Add source files for the library
 set(LIB_SOURCES
     src/Cell.cpp
+    src/CellExtensions.cpp    
     src/Material.cpp
     # Add other source files as needed
 )
@@ -59,6 +54,11 @@ add_test(NAME CellUnitsTests COMMAND cell_units_tests)
 add_executable(material_tests tests/material_test_suite.cpp)
 target_link_libraries(material_tests PRIVATE CFDLib)
 add_test(NAME MaterialTests COMMAND material_tests)
+
+# Material mixing tests
+add_executable(material_mixing_tests tests/material_mixing_tests.cpp)
+target_link_libraries(material_mixing_tests PRIVATE CFDLib)
+add_test(NAME MaterialMixingTests COMMAND material_mixing_tests)
 
 # Optional performance tests (build only when specifically requested)
 option(BUILD_PERF_TESTS "Build performance tests" OFF)

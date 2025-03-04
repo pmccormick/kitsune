@@ -399,6 +399,11 @@ public:
    */
   double getThermalConductivity(double temperature) const;
 
+  // Mix properties according to mixing rules
+  static double mixProperties(MaterialProperty property, double value1,
+                              double value2, double fraction,
+                              const std::string &rule);
+
 private:
   MaterialType m_type = MaterialType::FLUID;
   std::string m_name = "DefaultMaterial";
@@ -424,11 +429,6 @@ private:
   // Calculate property value using the specified model
   double calculatePropertyValue(MaterialProperty property, double temperature) const;
     
-  // Mix properties according to mixing rules
-  static double mixProperties(MaterialProperty property, double value1,
-                              double value2, double fraction,
-                              const std::string &rule);
-
   static void addScaledComponentsToMixture(
       std::shared_ptr<Material> mixture,
       const std::vector<std::pair<std::shared_ptr<Material>, double>>

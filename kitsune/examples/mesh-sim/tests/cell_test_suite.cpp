@@ -60,11 +60,50 @@ public:
         RUN_TEST(testDynamicProperties);
         RUN_TEST(testPhysicalValidation);
         RUN_TEST(testPropertyAndFlagAccess);
-        
+        RUN_TEST(testPropertyTypeOperations);
+        RUN_TEST(testPropertyAccessorMethods);
+        RUN_TEST(testCellCenterVelocity);
+        RUN_TEST(testFixedStateOperations);
+
         std::cout << "\nTest Results: " << testsPassed << " of " << testsTotal << " tests passed." << std::endl;
         return testsPassed == testsTotal;
     }
-    
+
+    // Test fixed state functionality
+    bool testFixedStateOperations() {
+      Cell cell;
+      bool pass = true;
+
+      // Default should not be fixed
+      pass &= !cell.isFixed();
+      assert(pass == true);
+
+      // Set fixed state
+      cell.setFixed(true);
+      pass &= cell.isFixed();
+      assert(pass == true);
+
+      // Verify that setting cell type to BOUNDARY makes it fixed
+      cell.setType(Cell::CellType::FLUID);
+      pass &= !cell.isFixed();
+      assert(pass == true);
+
+      cell.setType(Cell::CellType::BOUNDARY);
+      pass &= cell.isFixed();
+      assert(pass == true);
+
+      // Verify that setting cell type to SOLID makes it fixed
+      cell.setType(Cell::CellType::FLUID);
+      pass &= !cell.isFixed();
+      assert(pass == true);
+
+      cell.setType(Cell::CellType::SOLID);
+      pass &= cell.isFixed();
+      assert(pass == true);
+
+      return pass;
+    }
+
 private:
     int testsPassed;
     int testsTotal;
@@ -439,6 +478,137 @@ private:
         
         return pass;
     }
+
+    /**
+     * ====================================================================
+     * Test Case for PropertyType Functionality
+     * ====================================================================
+     *
+     * Below is a test case that should be added to the cell_test_suite.cpp file
+     * to verify the correct functionality of the PropertyType system.
+     * This test validates property storage, retrieval, and reset behavior.
+     */
+
+    bool testPropertyTypeOperations() {
+      Cell cell;
+      bool pass = true;
+
+      // 1. Test default values
+      // All properties should default to 0.0
+      for (int i = 0; i < static_cast<int>(Cell::PropertyType::COUNT); i++) {
+        Cell::PropertyType propType = static_cast<Cell::PropertyType>(i);
+        pass &= cell.getProperty(propType) == 0.0;
+      }
+
+      // 2. Test setting and retrieving individual properties
+      cell.setProperty(Cell::PropertyType::VORTICITY, 0.75);
+      pass &= cell.getProperty(Cell::PropertyType::VORTICITY) == 0.75;
+
+      cell.setProperty(Cell::PropertyType::STREAM_FUNCTION, -1.25);
+      pass &= cell.getProperty(Cell::PropertyType::STREAM_FUNCTION) == -1.25;
+      pass &= cell.getProperty(Cell::PropertyType::VORTICITY) ==
+              0.75; // First value unchanged
+
+      // 3. Test updating existing properties
+      cell.setProperty(Cell::PropertyType::VORTICITY, 1.5);
+      pass &= cell.getProperty(Cell::PropertyType::VORTICITY) == 1.5; // Updated
+
+      // 4. Test multiple properties
+      const double testValues[9] = {1.1, 2.2, 3.3, 4.4, 5.5,
+                                    6.6, 7.7, 8.8, 9.9};
+
+      for (int i = 0; i < static_cast<int>(Cell::PropertyType::COUNT); i++) {
+        Cell::PropertyType propType = static_cast<Cell::PropertyType>(i);
+        cell.setProperty(propType, testValues[i]);
+      }
+
+      for (int i = 0; i < static_cast<int>(Cell::PropertyType::COUNT); i++) {
+        Cell::PropertyType propType = static_cast<Cell::PropertyType>(i);
+        pass &= cell.getProperty(propType) == testValues[i];
+      }
+
+      // 5. Test reset behavior
+      cell.reset();
+
+      for (int i = 0; i < static_cast<int>(Cell::PropertyType::COUNT); i++) {
+        Cell::PropertyType propType = static_cast<Cell::PropertyType>(i);
+        pass &=
+            cell.getProperty(propType) == 0.0; // After reset, all should be 0.0
+      }
+
+      return pass;
+    }
+
+    /**
+     * ====================================================================
+     * Updated Test Case for PropertyType Accessor Methods
+     * ====================================================================
+     *
+     * This test verifies that the new dedicated accessor methods work correctly
+     * and maintain the same functionality as the original property system.
+     */
+
+    bool testPropertyAccessorMethods() {
+      Cell cell;
+      bool pass = true;
+
+      // Test vorticity accessors
+      cell.setVorticity(0.75);
+      pass &= cell.getVorticity() == 0.75;
+      pass &= cell.getProperty(Cell::PropertyType::VORTICITY) ==
+              0.75; // Underlying storage works
+
+      // Test stream function accessors
+      cell.setStreamFunction(-1.25);
+      pass &= cell.getStreamFunction() == -1.25;
+      pass &= cell.getProperty(Cell::PropertyType::STREAM_FUNCTION) == -1.25;
+
+      // Test that values are independent
+      pass &= cell.getVorticity() == 0.75; // Unchanged
+
+      // Test wall distance accessors
+      cell.setWallDistance(3.5);
+      pass &= cell.getWallDistance() == 3.5;
+
+      // Test reset behavior affects the accessors
+      cell.reset();
+      pass &= cell.getVorticity() == 0.0;
+      pass &= cell.getStreamFunction() == 0.0;
+      pass &= cell.getWallDistance() == 0.0;
+
+      return pass;
+    }
+
+    // Test cell center velocity operations
+    bool testCellCenterVelocity() {
+      Cell cell;
+      bool pass = true;
+
+      // Default velocities should be zero
+      pass &= cell.getVelocityX() == 0.0;
+      pass &= cell.getVelocityY() == 0.0;
+
+      // Set and get velocities
+      cell.setVelocityX(3.5);
+      cell.setVelocityY(-2.0);
+      pass &= cell.getVelocityX() == 3.5;
+      pass &= cell.getVelocityY() == -2.0;
+
+      // Test unit conversion functions
+      cell.setVelocityWithUnits(10.0, 5.0, "mph");
+      pass &= std::abs(cell.getVelocityX() - 4.4704) < 1e-4;
+      pass &= std::abs(cell.getVelocityY() - 2.2352) < 1e-4;
+
+      pass &= std::abs(cell.getVelocityXWithUnits("mph") - 10.0) < 1e-4;
+      pass &= std::abs(cell.getVelocityYWithUnits("mph") - 5.0) < 1e-4;
+
+      // Test knots conversion
+      pass &= std::abs(cell.getVelocityXWithUnits("knot") - 8.69) < 1e-2;
+
+      return pass;
+    }
+
+    
 };
 
 int main() {

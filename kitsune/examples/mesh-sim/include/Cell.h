@@ -18,10 +18,10 @@
  *
  * - Material Relationship:
  *   Each Cell maintains a reference to a Material object (via
- * std::shared_ptr<Material>) which defines the physical properties of the
- * fluid/solid within the cell. The material association determines how the cell
- * behaves during simulation, particularly for properties like viscosity,
- * thermal conductivity, and equation of state.
+ *   std::shared_ptr<Material>) which defines the physical properties of the
+ *   fluid/solid within the cell. The material association determines how the
+ * cell behaves during simulation, particularly for properties like viscosity,
+ *   thermal conductivity, and equation of state.
  *
  * Primary Use Cases:
  * ----------------
@@ -64,6 +64,58 @@
  *    SOLID Cells: Obstacle cells representing solid objects in the flow
  *    BOUNDARY Cells: Domain boundary cells with specified conditions
  *
+ * ====================================================================
+ * PropertyType Usage Guide
+ * ====================================================================
+ *
+ * The PropertyType enum in the Cell class is designed to provide efficient
+ * access to commonly used numerical properties in CFD simulations. These
+ * properties are typically calculated during each timestep and need to be
+ * accessed frequently.
+ *
+ * The PropertyType approach offers three key benefits:
+ *
+ * 1. PERFORMANCE OPTIMIZATION:
+ *    PropertyType uses a fixed-size array with enum indexing for O(1) access.
+ *    This is significantly faster than the string-based dynamic property lookup
+ *    which requires hashing and map traversal.
+ *
+ * 2. MEMORY EFFICIENCY:
+ *    Properties are stored in a fixed-size array allocated at initialization,
+ *    avoiding memory fragmentation from dynamic allocations.
+ *
+ * 3. TYPE SAFETY:
+ *    Using an enum instead of string identifiers provides compile-time checking
+ *    and prevents typos or naming inconsistencies.
+ *
+ *    Using an enum instead of string identifiers provides compile-time checking
+ *    and prevents typos or naming inconsistencies.
+ *
+ * Available PropertyTypes:
+ * -------------------------
+ * - VORTICITY: Measures local rotation in the flow field (ω = ∇ × v)
+ * - STREAM_FUNCTION: Used for streamline visualization in 2D flows
+ * - KINETIC_ENERGY: Local kinetic energy per unit mass (0.5 * |v|²)
+ * - DIVERGENCE: Velocity divergence (∇·v), should be ~0 for incompressible flow
+ * - PRESSURE_CORRECTION: Term used in pressure-correction algorithms
+ * - HEAT_FLUX_X/Y: Heat transfer rate in x/y directions
+ * - SHEAR_STRESS: Local fluid shear stress
+ * - WALL_DISTANCE: Distance to nearest wall (for turbulence models)
+ *
+ * Usage Pattern:
+ * -------------
+ * 1. During simulation, calculate derived properties like vorticity
+ * 2. Store using cell.setProperty(PropertyType::VORTICITY, value)
+ * 3. Access using cell.getProperty(PropertyType::VORTICITY)
+ *
+ * When to use PropertyType vs. Dynamic Properties:
+ * ----------------------------------------------
+ * - Use PropertyType for common, performance-critical properties
+ * - Use dynamic properties (string-based) for:
+ *   a) Temporary or rarely accessed values
+ *   b) User-defined or custom properties not in the enum
+ *   c) Properties with variable/runtime-defined names
+ *
  * Structure Diagram:
  * ----------------
  *    +---------------+
@@ -73,7 +125,7 @@
  *    | m_temperature |
  *    | m_pressure    |      +----------+
  *    | m_density     |      | Material |
- *    | m_velocity_x/Y | ◄────┘ properties
+ *    | m_velocity_x/y| ◄────┘ properties
  *    | m_vertices    |
  *    | m_fixedProps  |
  *    | m_flags       |
@@ -186,13 +238,13 @@ public:
    * @brief Boolean flags for various cell states and behaviors
    */
   enum class CellFlag {
-    IS_INLET = 0,    ///< Cell is part of an inlet boundary
-    IS_OUTLET = 1,   ///< Cell is part of an outlet boundary
-    IS_WALL = 2,     ///< Cell is part of a wall boundary
-    IS_SYMMETRY = 3, ///< Cell is part of a symmetry boundary
-    IS_BOUNDARY = 4, ///< Cell is a boundary cell (for Grid compatibility)
-    IS_OBSTACLE = 5, ///< Cell is an obstacle (for Grid compatibility)
-    COUNT            ///< Keep last - used for bit field sizing
+    IS_INLET = 0x00000001,    //< Cell is part of an inlet boundary
+    IS_OUTLET = 0x00000002,   ///< Cell is part of an outlet boundary
+    IS_WALL = 0x00000004,     ///< Cell is part of a wall boundary
+    IS_SYMMETRY = 0x00000008, ///< Cell is part of a symmetry boundary
+    IS_BOUNDARY = 0x00000010, ///< Cell is a boundary cell (Grid compatibility)
+    IS_OBSTACLE = 0x00000020, ///< Cell is an obstacle (for Grid compatibility)
+    COUNT                     ///< Keep last - used for bit field sizing
   };
 
   /**
@@ -464,6 +516,69 @@ public:
    */
   double getProperty(PropertyType type) const;
 
+  // Vorticity - local rotation in the flow field (1/s)
+  double getVorticity() const { return getProperty(PropertyType::VORTICITY); }
+  void setVorticity(double value) {
+    setProperty(PropertyType::VORTICITY, value);
+  }
+
+  // Stream function for 2D flow visualization (m²/s)
+  double getStreamFunction() const {
+    return getProperty(PropertyType::STREAM_FUNCTION);
+  }
+  void setStreamFunction(double value) {
+    setProperty(PropertyType::STREAM_FUNCTION, value);
+  }
+
+  // Kinetic energy per unit mass (J/kg or m²/s²)
+  double getKineticEnergy() const {
+    return getProperty(PropertyType::KINETIC_ENERGY);
+  }
+  void setKineticEnergy(double value) {
+    setProperty(PropertyType::KINETIC_ENERGY, value);
+  }
+
+  // Velocity divergence (1/s) - should be ~0 for incompressible flow
+  double getDivergence() const { return getProperty(PropertyType::DIVERGENCE); }
+  void setDivergence(double value) {
+    setProperty(PropertyType::DIVERGENCE, value);
+  }
+
+  // Pressure correction term for SIMPLE/PISO algorithms (Pa)
+  double getPressureCorrection() const {
+    return getProperty(PropertyType::PRESSURE_CORRECTION);
+  }
+  void setPressureCorrection(double value) {
+    setProperty(PropertyType::PRESSURE_CORRECTION, value);
+  }
+
+  // Heat flux components (W/m²)
+  double getHeatFluxX() const { return getProperty(PropertyType::HEAT_FLUX_X); }
+  void setHeatFluxX(double value) {
+    setProperty(PropertyType::HEAT_FLUX_X, value);
+  }
+
+  double getHeatFluxY() const { return getProperty(PropertyType::HEAT_FLUX_Y); }
+  void setHeatFluxY(double value) {
+    setProperty(PropertyType::HEAT_FLUX_Y, value);
+  }
+
+  // Local shear stress (Pa)
+  double getShearStress() const {
+    return getProperty(PropertyType::SHEAR_STRESS);
+  }
+  void setShearStress(double value) {
+    setProperty(PropertyType::SHEAR_STRESS, value);
+  }
+
+  // Distance to nearest wall for turbulence models (m)
+  double getWallDistance() const {
+    return getProperty(PropertyType::WALL_DISTANCE);
+  }
+  void setWallDistance(double value) {
+    setProperty(PropertyType::WALL_DISTANCE, value);
+  }
+
   /**
    * @brief Set a boolean flag
    * @param flag The flag to set
@@ -549,6 +664,46 @@ public:
    */
   void setVelocityY(double vy);
 
+  /**
+   * @brief Function signature for property computation
+   * @param cell The cell to compute properties for
+   * @param neighbors Optional array of neighboring cells
+   */
+  using PropertyComputeFunction =
+      std::function<void(Cell &, const std::array<Cell *, 4> *)>;
+
+  /**
+   * @brief Register a custom property computation function for a specific
+   * property
+   * @param type The property type to register for
+   * @param computeFunc The function to compute this property
+   */
+  static void registerPropertyComputation(PropertyType type,
+                                          PropertyComputeFunction computeFunc);
+
+  /**
+   * @brief Compute derived properties based on current state using registered
+   * computation functions
+   * @param neighbors Optional array of neighboring cells for gradient-based
+   * properties
+   */
+  void  computeDerivedProperties(const std::array<Cell *, 4> *neighbors = nullptr);
+
+  /**
+   * @brief Get the computation function for a specific property
+   * @param type The property type to get the computation for
+   * @return The registered computation function, or an empty function if none
+   * registered
+   */
+  static PropertyComputeFunction getPropertyComputation(PropertyType type) {
+    auto it = s_propertyComputations.find(type);
+    if (it != s_propertyComputations.end()) {
+      return it->second;
+    }
+    // Return an empty function that does nothing
+    return [](Cell &, const std::array<Cell *, 4> *) {};
+  }
+
 private:
   Grid *m_grid; ///<    // Reference to the grid this cell belongs to (needed
                 ///<    for boundary conditions)
@@ -575,11 +730,15 @@ private:
       m_fixedProperties = {};
 
   // Boolean flags packed into bits (fastest access)
-  uint32_t m_flags = 0;
+  uint64_t m_flags = 0;
 
   // Dynamic properties (flexible but slower access)
   std::unordered_map<std::string, double> m_dynamicProperties;
 
   // Hash function for dynamic properties
   static uint32_t hashName(const std::string &name);
+
+  static 
+  std::unordered_map<PropertyType, PropertyComputeFunction>
+      s_propertyComputations;
 };

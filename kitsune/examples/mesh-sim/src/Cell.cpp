@@ -1,6 +1,7 @@
 #include "Cell.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 // Forward declaration if needed
 #include "Material.h"
@@ -66,15 +67,20 @@ Cell::CellType Cell::getType() const { return m_type; }
 
 void Cell::setType(CellType type) {
   m_type = type;
-  // When setting a cell to SOLID or BOUNDARY, it's typically fixed
-  if (type == CellType::SOLID || type == CellType::BOUNDARY) {
-    m_isFixed = true;
 
-    if (type == CellType::BOUNDARY) {
-      setFlag(CellFlag::IS_BOUNDARY, true);
-    } else if (type == CellType::SOLID) {
-      setFlag(CellFlag::IS_OBSTACLE, true);
-    }
+  // Handle fixed state based on type
+  setFixed(type == CellType::BOUNDARY || type == CellType::SOLID);
+
+  // Update boundary/obstacle flags based on type
+  if (type == CellType::BOUNDARY) {
+    m_flags |= static_cast<uint32_t>(CellFlag::IS_BOUNDARY);
+    m_flags &= ~static_cast<uint32_t>(CellFlag::IS_OBSTACLE);
+  } else if (type == CellType::SOLID) {
+    m_flags |= static_cast<uint32_t>(CellFlag::IS_OBSTACLE);
+    m_flags &= ~static_cast<uint32_t>(CellFlag::IS_BOUNDARY);
+  } else { // FLUID
+    m_flags &= ~static_cast<uint32_t>(CellFlag::IS_BOUNDARY);
+    m_flags &= ~static_cast<uint32_t>(CellFlag::IS_OBSTACLE);
   }
 }
 
@@ -145,15 +151,34 @@ void Cell::setPressure(double pressure) {
   }
 
   void Cell::setFlag(CellFlag flag, bool value) {
+    // Skip COUNT which isn't a real flag
+    if (flag == CellFlag::COUNT)
+      return;
+
     if (value) {
-      m_flags |= (1U << static_cast<uint32_t>(flag));
+      // Handle mutually exclusive flags
+      if (flag == CellFlag::IS_INLET) {
+        // Clear outlet flag if setting inlet
+        m_flags &= ~static_cast<uint32_t>(CellFlag::IS_OUTLET);
+      } else if (flag == CellFlag::IS_OUTLET) {
+        // Clear inlet flag if setting outlet
+        m_flags &= ~static_cast<uint32_t>(CellFlag::IS_INLET);
+      }
+
+      // Set the requested flag
+      m_flags |= static_cast<uint32_t>(flag);
     } else {
-      m_flags &= ~(1U << static_cast<uint32_t>(flag));
+      // Clear the requested flag
+      m_flags &= ~static_cast<uint32_t>(flag);
     }
   }
 
   bool Cell::getFlag(CellFlag flag) const {
-    return (m_flags & (1U << static_cast<uint32_t>(flag))) != 0;
+    // Skip COUNT which isn't a real flag
+    if (flag == CellFlag::COUNT)
+      return false;
+
+    return (m_flags & static_cast<uint32_t>(flag)) != 0;
   }
 
   void Cell::setDynamicProperty(const std::string &name, double value) {
@@ -204,10 +229,10 @@ void Cell::setPressure(double pressure) {
 
   bool Cell::isBoundary() const { return m_is_boundary; }
 
-  void Cell::setObstacle(bool isObstacle) {
-    m_is_obstacle = isObstacle;
-    setFlag(CellFlag::IS_OBSTACLE, isObstacle);
-    if (isObstacle) {
+  void Cell::setObstacle(bool obstacleFlag) {
+    m_is_obstacle = obstacleFlag;
+    setFlag(CellFlag::IS_OBSTACLE, obstacleFlag);
+    if (obstacleFlag) {
       setType(CellType::SOLID);
     }
   }
@@ -221,3 +246,43 @@ void Cell::setPressure(double pressure) {
   void Cell::setVelocityX(double vx) { m_velocity_x = vx; }
 
   void Cell::setVelocityY(double vy) { m_velocity_y = vy; }
+
+  // Static initialization of the property computation map
+  std::unordered_map<Cell::PropertyType, Cell::PropertyComputeFunction>
+      Cell::s_propertyComputations;
+
+  void Cell::registerPropertyComputation(PropertyType type,
+                                         PropertyComputeFunction computeFunc) {
+    s_propertyComputations[type] = computeFunc;
+  }
+
+  void Cell::computeDerivedProperties(const std::array<Cell *, 4> *neighbors) {
+    // Apply registered computation functions
+    for (const auto &[type, computeFunc] : s_propertyComputations) {
+      computeFunc(*this, neighbors);
+    }
+  }
+
+  
+
+  /* For future consideration...
+  // Register function to compute vorticity for structured grids
+  void registerStructuredGridFunctions() {
+    Cell::registerPropertyComputation(Cell::PropertyType::VORTICITY,
+        [](Cell& cell, const std::array<Cell*, 4>* neighbors) {
+            // Structured grid vorticity calculation
+            // ...
+        }
+    );
+  }
+
+  // Register function to compute vorticity for unstructured grids
+  void registerUnstructuredGridFunctions() {
+    Cell::registerPropertyComputation(Cell::PropertyType::VORTICITY,
+        [](Cell& cell, const std::array<Cell*, 4>* neighbors) {
+            // Unstructured grid vorticity calculation
+            // ...
+        }
+    );
+  }
+  */

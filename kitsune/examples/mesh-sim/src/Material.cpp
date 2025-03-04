@@ -286,22 +286,47 @@ std::shared_ptr<Material> Material::createWithUnits(
   return material;
 }
 
-double Material::mixProperties(MaterialProperty property, double value1, double value2, 
-			       double fraction, const std::string& rule) {
-  // Use different mixing rules based on property and specified rule
-  if (rule == "linear") {
+double Material::mixProperties(MaterialProperty property, double value1,
+                               double value2, double fraction,
+                               const std::string &rule) {
+  // Determine the appropriate mixing rule based on property type
+  std::string effectiveRule = rule;
+
+  // If no specific rule provided, use the default for this property
+  if (effectiveRule == "default") {
+    switch (property) {
+    case MaterialProperty::THERMAL_CONDUCTIVITY:
+      effectiveRule = "harmonic"; // Often better for conductivity
+      break;
+    case MaterialProperty::DYNAMIC_VISCOSITY:
+      effectiveRule = "logarithmic"; // Better for viscosity
+      break;
+    case MaterialProperty::DENSITY:
+      effectiveRule = "linear"; // Linear for density
+      break;
+    case MaterialProperty::SPECIFIC_HEAT:
+      effectiveRule = "linear"; // Linear for specific heat
+      break;
+    // Other properties as needed
+    default:
+      effectiveRule = "linear"; // Default to linear for other properties
+    }
+  }
+
+  // Apply the selected mixing rule
+  if (effectiveRule == "linear") {
     // Simple linear interpolation: value = (1-f)*v1 + f*v2
     return (1.0 - fraction) * value1 + fraction * value2;
-  }
-  else if (rule == "logarithmic") {
+  } else if (effectiveRule == "logarithmic") {
     // Logarithmic interpolation: ln(value) = (1-f)*ln(v1) + f*ln(v2)
     // Useful for properties like viscosity
     if (value1 <= 0.0 || value2 <= 0.0) {
-      return (1.0 - fraction) * value1 + fraction * value2; // Fallback to linear if values <= 0
+      return (1.0 - fraction) * value1 +
+             fraction * value2; // Fallback to linear if values <= 0
     }
-    return std::exp((1.0 - fraction) * std::log(value1) + fraction * std::log(value2));
-  }
-  else if (rule == "harmonic") {
+    return std::exp((1.0 - fraction) * std::log(value1) +
+                    fraction * std::log(value2));
+  } else if (effectiveRule == "harmonic") {
     // Harmonic mean: 1/value = (1-f)/v1 + f/v2
     // Useful for resistivity-like properties
     if (value1 == 0.0 || value2 == 0.0) {
@@ -309,15 +334,16 @@ double Material::mixProperties(MaterialProperty property, double value1, double 
     }
     double invValue = (1.0 - fraction) / value1 + fraction / value2;
     return 1.0 / invValue;
+  } else if (effectiveRule == "geometric") {
+    // Geometric mean: value = v1^(1-f) * v2^f
+    // Sometimes used for permeability
+    if (value1 <= 0.0 || value2 <= 0.0) {
+      return (1.0 - fraction) * value1 +
+             fraction * value2; // Fallback to linear
+    }
+    return std::pow(value1, 1.0 - fraction) * std::pow(value2, fraction);
   }
-  else if (rule == "max") {
-    // Maximum value
-    return std::max(value1, value2);
-  }
-  else if (rule == "min") {
-    // Minimum value
-    return std::min(value1, value2);
-  }
+  // Additional mixing rules as needed
   else {
     // Default to linear mixing
     return (1.0 - fraction) * value1 + fraction * value2;

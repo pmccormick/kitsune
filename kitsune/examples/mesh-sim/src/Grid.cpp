@@ -121,6 +121,338 @@ void Grid::setCircularObstacle(double center_x, double center_y, double radius,
   }
 }
 
+void Grid::setRectangularObstacle(double min_x, double min_y, double max_x,
+                                  double max_y, Material *material) {
+  if (!material) {
+    throw std::invalid_argument("Material cannot be null");
+  }
+
+  // Convert physical coordinates to grid indices
+  size_t i_min = gridI(min_x);
+  size_t j_min = gridJ(min_y);
+  size_t i_max = gridI(max_x);
+  size_t j_max = gridJ(max_y);
+
+  // Set cells within rectangle as obstacles with the specified material
+  for (size_t j = j_min; j <= j_max && j < m_ny; ++j) {
+    for (size_t i = i_min; i <= i_max && i < m_nx; ++i) {
+      Cell &cell = getCell(i, j);
+      cell.setObstacle(true);
+      cell.setMaterial(material);
+      cell.setVelocityX(0.0); // No-slip condition for obstacles
+      cell.setVelocityY(0.0);
+    }
+  }
+}
+
+void Grid::setSquareObstacle(double center_x, double center_y,
+                             double side_length, Material *material) {
+  // Calculate the corners of the square
+  double half_side = side_length / 2.0;
+  double min_x = center_x - half_side;
+  double min_y = center_y - half_side;
+  double max_x = center_x + half_side;
+  double max_y = center_y + half_side;
+
+  // Delegate to rectangular obstacle method
+  setRectangularObstacle(min_x, min_y, max_x, max_y, material);
+}
+
+void Grid::setTriangularObstacle(double x1, double y1, double x2, double y2,
+                                 double x3, double y3, Material *material) {
+  if (!material) {
+    throw std::invalid_argument("Material cannot be null");
+  }
+
+  // Find the bounding box of the triangle to limit our search
+  double min_x = std::min({x1, x2, x3});
+  double min_y = std::min({y1, y2, y3});
+  double max_x = std::max({x1, x2, x3});
+  double max_y = std::max({y1, y2, y3});
+
+  // Convert physical coordinates to grid indices for the bounding box
+  size_t i_min = gridI(min_x);
+  size_t j_min = gridJ(min_y);
+  size_t i_max = gridI(max_x);
+  size_t j_max = gridJ(max_y);
+
+  // Helper function to determine if a point is inside a triangle
+  // Using barycentric coordinate method
+  auto pointInTriangle = [](double px, double py, double x1, double y1,
+                            double x2, double y2, double x3,
+                            double y3) -> bool {
+    // Compute vectors
+    double v0x = x3 - x1;
+    double v0y = y3 - y1;
+    double v1x = x2 - x1;
+    double v1y = y2 - y1;
+    double v2x = px - x1;
+    double v2y = py - y1;
+
+    // Compute dot products
+    double dot00 = v0x * v0x + v0y * v0y;
+    double dot01 = v0x * v1x + v0y * v1y;
+    double dot02 = v0x * v2x + v0y * v2y;
+    double dot11 = v1x * v1x + v1y * v1y;
+    double dot12 = v1x * v2x + v1y * v2y;
+
+    // Compute barycentric coordinates
+    double invDenom = 1.0 / (dot00 * dot11 - dot01 * dot01);
+    double u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+    double v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+    // Check if point is in triangle
+    return (u >= 0) && (v >= 0) && (u + v <= 1);
+  };
+
+  // Check each cell within the bounding box
+  for (size_t j = j_min; j <= j_max && j < m_ny; ++j) {
+    for (size_t i = i_min; i <= i_max && i < m_nx; ++i) {
+      // Get the physical coordinates of the cell center
+      double x = physicalX(i);
+      double y = physicalY(j);
+
+      // Check if the cell center is inside the triangle
+      if (pointInTriangle(x, y, x1, y1, x2, y2, x3, y3)) {
+        Cell &cell = getCell(i, j);
+        cell.setObstacle(true);
+        cell.setMaterial(material);
+        cell.setVelocityX(0.0); // No-slip condition for obstacles
+        cell.setVelocityY(0.0);
+      }
+    }
+  }
+}
+
+void Grid::setEllipticalObstacle(double center_x, double center_y,
+                                 double radius_x, double radius_y,
+                                 double rotation_angle, Material *material) {
+  if (!material) {
+    throw std::invalid_argument("Material cannot be null");
+  }
+
+  // Convert rotation angle from degrees to radians
+  double angle_rad = rotation_angle * M_PI / 180.0;
+  double cos_angle = std::cos(angle_rad);
+  double sin_angle = std::sin(angle_rad);
+
+  // Find the bounding box of the ellipse
+  double max_radius = std::max(radius_x, radius_y);
+
+  // Convert physical coordinates to grid indices for the bounding box
+  size_t center_i = gridI(center_x);
+  size_t center_j = gridJ(center_y);
+  size_t radius_cells =
+      static_cast<size_t>(max_radius / std::min(m_dx, m_dy) + 0.5);
+
+  // Check each cell within the bounding box
+  for (size_t j = std::max(center_j, radius_cells) - radius_cells;
+       j <= std::min(center_j + radius_cells, m_ny - 1); ++j) {
+    for (size_t i = std::max(center_i, radius_cells) - radius_cells;
+         i <= std::min(center_i + radius_cells, m_nx - 1); ++i) {
+
+      // Get the physical coordinates of the cell center
+      double x = physicalX(i) - center_x;
+      double y = physicalY(j) - center_y;
+
+      // Apply rotation to check if point is in ellipse
+      double x_rotated = x * cos_angle + y * sin_angle;
+      double y_rotated = -x * sin_angle + y * cos_angle;
+
+      // Check if the cell center is inside the ellipse using the standard
+      // equation (x/a)² + (y/b)² <= 1
+      double ellipse_check = (x_rotated * x_rotated) / (radius_x * radius_x) +
+                             (y_rotated * y_rotated) / (radius_y * radius_y);
+
+      if (ellipse_check <= 1.0) {
+        Cell &cell = getCell(i, j);
+        cell.setObstacle(true);
+        cell.setMaterial(material);
+        cell.setVelocityX(0.0); // No-slip condition for obstacles
+        cell.setVelocityY(0.0);
+      }
+    }
+  }
+}
+
+void Grid::setAirfoilObstacle(double leading_edge_x, double leading_edge_y,
+                              double chord_length, double angle_of_attack,
+                              int naca_digits, Material *material) {
+  if (!material) {
+    throw std::invalid_argument("Material cannot be null");
+  }
+
+  // Extract NACA parameters from 4-digit code
+  double m =
+      static_cast<double>((naca_digits / 1000) % 10) / 100.0; // Maximum camber
+  double p = static_cast<double>((naca_digits / 100) % 10) /
+             10.0; // Location of max camber
+  double t = static_cast<double>(naca_digits % 100) / 100.0; // Thickness
+
+  // Convert angle of attack from degrees to radians
+  double aoa_rad = angle_of_attack * M_PI / 180.0;
+  double cos_aoa = std::cos(aoa_rad);
+  double sin_aoa = std::sin(aoa_rad);
+
+  // Find the bounding box of the airfoil
+  double min_x = leading_edge_x;
+  double max_x = leading_edge_x + chord_length;
+  double buffer = chord_length * t; // Add buffer based on thickness
+  double min_y = leading_edge_y - buffer;
+  double max_y = leading_edge_y + buffer;
+
+  // Convert physical coordinates to grid indices for the bounding box
+  size_t i_min = gridI(min_x);
+  size_t j_min = gridJ(min_y);
+  size_t i_max = gridI(max_x);
+  size_t j_max = gridJ(max_y);
+
+  // NACA airfoil function to compute half-thickness
+  auto naca_thickness = [t](double x) -> double {
+    return 5.0 * t *
+           (0.2969 * std::sqrt(x) - 0.126 * x - 0.3516 * x * x +
+            0.2843 * x * x * x - 0.1015 * x * x * x * x);
+  };
+
+  // NACA airfoil function to compute camber line
+  auto naca_camber = [m, p](double x) -> double {
+    if (x <= p && p > 0) {
+      return m * (x / (p * p)) * (2.0 * p - x);
+    } else if (p > 0) {
+      return m * ((1.0 - x) / ((1.0 - p) * (1.0 - p))) * (1.0 + x - 2.0 * p);
+    } else {
+      return 0.0; // Symmetric airfoil
+    }
+  };
+
+  // NACA airfoil function to compute camber line slope
+  auto naca_camber_slope = [m, p](double x) -> double {
+    if (x <= p && p > 0) {
+      return 2.0 * m * (p - x) / (p * p);
+    } else if (p > 0) {
+      return 2.0 * m * (p - x) / ((1.0 - p) * (1.0 - p));
+    } else {
+      return 0.0; // Symmetric airfoil
+    }
+  };
+
+  // Check each cell within the bounding box
+  for (size_t j = j_min; j <= j_max && j < m_ny; ++j) {
+    for (size_t i = i_min; i <= i_max && i < m_nx; ++i) {
+      // Get the physical coordinates of the cell center
+      double x_phys = physicalX(i);
+      double y_phys = physicalY(j);
+
+      // Translate to airfoil coordinate system
+      double x_local = x_phys - leading_edge_x;
+      double y_local = y_phys - leading_edge_y;
+
+      // Rotate to account for angle of attack
+      double x_rotated = x_local * cos_aoa + y_local * sin_aoa;
+      double y_rotated = -x_local * sin_aoa + y_local * cos_aoa;
+
+      // Skip if outside chord length
+      if (x_rotated < 0 || x_rotated > chord_length) {
+        continue;
+      }
+
+      // Normalize x to [0,1] for NACA functions
+      double x_norm = x_rotated / chord_length;
+
+      // Calculate camber and thickness at this x location
+      double camber = naca_camber(x_norm) * chord_length;
+      double thickness = naca_thickness(x_norm) * chord_length;
+      double theta = std::atan(naca_camber_slope(x_norm));
+
+      // Calculate upper and lower surface y-coordinates
+      double y_upper = camber + thickness * std::cos(theta);
+      double y_lower = camber - thickness * std::cos(theta);
+
+      // Check if point is inside the airfoil
+      if (y_rotated >= y_lower && y_rotated <= y_upper) {
+        Cell &cell = getCell(i, j);
+        cell.setObstacle(true);
+        cell.setMaterial(material);
+        cell.setVelocityX(0.0); // No-slip condition for obstacles
+        cell.setVelocityY(0.0);
+      }
+    }
+  }
+}
+
+void Grid::setPolygonObstacle(
+    const std::vector<std::pair<double, double>> &vertices,
+    Material *material) {
+  if (!material) {
+    throw std::invalid_argument("Material cannot be null");
+  }
+
+  if (vertices.size() < 3) {
+    throw std::invalid_argument("Polygon must have at least 3 vertices");
+  }
+
+  // Find the bounding box of the polygon
+  double min_x = vertices[0].first;
+  double min_y = vertices[0].second;
+  double max_x = vertices[0].first;
+  double max_y = vertices[0].second;
+
+  for (const auto &vertex : vertices) {
+    min_x = std::min(min_x, vertex.first);
+    min_y = std::min(min_y, vertex.second);
+    max_x = std::max(max_x, vertex.first);
+    max_y = std::max(max_y, vertex.second);
+  }
+
+  // Convert physical coordinates to grid indices for the bounding box
+  size_t i_min = gridI(min_x);
+  size_t j_min = gridJ(min_y);
+  size_t i_max = gridI(max_x);
+  size_t j_max = gridJ(max_y);
+
+  // Ray casting algorithm to determine if a point is inside a polygon
+  auto pointInPolygon =
+      [](double x, double y,
+         const std::vector<std::pair<double, double>> &vertices) -> bool {
+    bool inside = false;
+    size_t n = vertices.size();
+
+    for (size_t i = 0, j = n - 1; i < n; j = i++) {
+      double xi = vertices[i].first;
+      double yi = vertices[i].second;
+      double xj = vertices[j].first;
+      double yj = vertices[j].second;
+
+      bool intersect =
+          ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+
+      if (intersect) {
+        inside = !inside;
+      }
+    }
+
+    return inside;
+  };
+
+  // Check each cell within the bounding box
+  for (size_t j = j_min; j <= j_max && j < m_ny; ++j) {
+    for (size_t i = i_min; i <= i_max && i < m_nx; ++i) {
+      // Get the physical coordinates of the cell center
+      double x = physicalX(i);
+      double y = physicalY(j);
+
+      // Check if the cell center is inside the polygon
+      if (pointInPolygon(x, y, vertices)) {
+        Cell &cell = getCell(i, j);
+        cell.setObstacle(true);
+        cell.setMaterial(material);
+        cell.setVelocityX(0.0); // No-slip condition for obstacles
+        cell.setVelocityY(0.0);
+      }
+    }
+  }
+}
+
 void Grid::initializeTemperature(double defaultTemp) {
   // Initialize temperature in each cell
   for (size_t j = 0; j < m_ny; ++j) {

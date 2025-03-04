@@ -317,6 +317,75 @@ public:
   void setCircularObstacle(double center_x, double center_y, double radius,
                            Material *material);
 
+  /**
+   * @brief Define a rectangular obstacle
+   * @param min_x Minimum x-coordinate of rectangle
+   * @param min_y Minimum y-coordinate of rectangle
+   * @param max_x Maximum x-coordinate of rectangle
+   * @param max_y Maximum y-coordinate of rectangle
+   * @param material Material for the obstacle cells
+   */
+  void setRectangularObstacle(double min_x, double min_y, double max_x,
+                              double max_y, Material *material);
+
+  /**
+   * @brief Define a square obstacle
+   * @param center_x X-coordinate of square center
+   * @param center_y Y-coordinate of square center
+   * @param side_length Length of square sides
+   * @param material Material for the obstacle cells
+   */
+  void setSquareObstacle(double center_x, double center_y, double side_length,
+                         Material *material);
+
+  /**
+   * @brief Define a triangular obstacle
+   * @param x1 X-coordinate of first vertex
+   * @param y1 Y-coordinate of first vertex
+   * @param x2 X-coordinate of second vertex
+   * @param y2 Y-coordinate of second vertex
+   * @param x3 X-coordinate of third vertex
+   * @param y3 Y-coordinate of third vertex
+   * @param material Material for the obstacle cells
+   */
+  void setTriangularObstacle(double x1, double y1, double x2, double y2,
+                             double x3, double y3, Material *material);
+
+  /**
+   * @brief Define an elliptical obstacle
+   * @param center_x X-coordinate of ellipse center
+   * @param center_y Y-coordinate of ellipse center
+   * @param radius_x Semi-major axis in x-direction
+   * @param radius_y Semi-major axis in y-direction
+   * @param rotation_angle Rotation angle in degrees
+   * @param material Material for the obstacle cells
+   */
+  void setEllipticalObstacle(double center_x, double center_y, double radius_x,
+                             double radius_y, double rotation_angle,
+                             Material *material);
+
+  /**
+   * @brief Define an airfoil-shaped obstacle using NACA 4-digit parameters
+   * @param leading_edge_x X-coordinate of the airfoil leading edge
+   * @param leading_edge_y Y-coordinate of the airfoil leading edge
+   * @param chord_length Length of the airfoil chord
+   * @param angle_of_attack Angle of attack in degrees
+   * @param naca_digits NACA 4-digit code (e.g., 0012, 2412)
+   * @param material Material for the obstacle cells
+   */
+  void setAirfoilObstacle(double leading_edge_x, double leading_edge_y,
+                          double chord_length, double angle_of_attack,
+                          int naca_digits, Material *material);
+
+  /**
+   * @brief Define a polygonal obstacle
+   * @param vertices Vector of (x,y) coordinates defining the polygon vertices
+   * @param material Material for the obstacle cells
+   */
+  void
+  setPolygonObstacle(const std::vector<std::pair<double, double>> &vertices,
+                     Material *material);
+
   // Clear velocities across the grid (useful between simulation steps)
   inline void clearVelocities() {
     for (auto &cell : m_cells) {
