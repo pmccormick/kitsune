@@ -26,6 +26,7 @@ set(LIB_SOURCES
     src/SlipBoundary.cpp    
     src/CellExtensions.cpp    
     src/Material.cpp
+    src/Mesh.cpp
     # Add other source files as needed
 )
 
@@ -37,6 +38,7 @@ set(LIB_HEADERS
     include/DirichletBoundary.h
     include/InflowBoundary.h
     include/Material.h
+    include/Mesh.h
     include/NeumannBoundary.h
     include/NoSlipBoundary.h
     include/PeriodicBoundary.h
