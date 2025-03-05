@@ -140,12 +140,14 @@ private:
             material.getPropertyAtTemperature(Material::MaterialProperty::DENSITY, 293.15),
             1000.0
         );
-        
+        assert(pass == true);
+
         pass &= approxEqual(
             material.getPropertyAtTemperature(Material::MaterialProperty::DENSITY, 353.15), // 80°C
             1000.0 // No change with constant model
         );
-        
+        assert(pass == true);
+
         // Test linear model
         material.setPropertyModel(
             Material::MaterialProperty::DENSITY,
@@ -158,14 +160,16 @@ private:
             material.getPropertyAtTemperature(Material::MaterialProperty::DENSITY, 293.15),
             1000.0
         );
-        
+        assert(pass == true);
+
         // At T = Tref + 50K, should be base * (1 + coeff*deltaT)
         pass &= approxEqual(
             material.getPropertyAtTemperature(Material::MaterialProperty::DENSITY, 343.15),
             1000.0 * (1.0 - 0.0002 * 50.0),
             0.01
         );
-        
+        assert(pass == true);
+
         // Test polynomial model
         material.setPropertyModel(
             Material::MaterialProperty::THERMAL_CONDUCTIVITY,
@@ -183,7 +187,8 @@ private:
             expectedPolynomial,
             0.0001
         );
-        
+        assert(pass == true);
+
         // Test exponential model
         material.setPropertyModel(
             Material::MaterialProperty::DYNAMIC_VISCOSITY,
@@ -200,7 +205,8 @@ private:
             expectedExponential,
             0.0001
         );
-        
+        assert(pass == true);
+
         return pass;
     }
     
@@ -219,19 +225,18 @@ private:
             double dT = T - 277.15;
             return 1000.0 - 0.0005 * dT * dT;
         };
-        
-        material.setCustomPropertyFunction(
-            Material::MaterialProperty::DENSITY,
-            waterDensityFunction
-        );
-        
+
+        material.setCustomPropertyFunction(Material::MaterialProperty::DENSITY,
+                                           waterDensityFunction);
+
         // At 4°C, density should be 1000.0
         pass &= approxEqual(
             material.getPropertyAtTemperature(Material::MaterialProperty::DENSITY, 277.15),
             1000.0,
             0.01
         );
-        
+        assert(pass == true);
+
         // At 20°C, density should be less
         double expectedDensity = waterDensityFunction(293.15);
         pass &= approxEqual(
@@ -239,7 +244,9 @@ private:
             expectedDensity,
             0.01
         );
-        
+
+        assert(pass == true);
+
         return pass;
     }
    

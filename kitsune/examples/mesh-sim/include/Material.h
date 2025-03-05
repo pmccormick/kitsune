@@ -1,124 +1,11 @@
 /**
  * ====================================================================
- * Material Class - CFD Implementation Documentation
+ * Material Class - CFD Implementation with Optimized Data Structures
  * ====================================================================
  *
- * The Material class defines the physical properties of substances within the
- * CFD simulation. It manages temperature-dependent property models, provides
- * unit conversion, and supports material mixtures for multi-component flows.
- *
- * Relationship with Cell and Grid:
- * -------------------------------
- * - Cell Dependency:
- *   Each Cell object contains a shared_ptr<Material> that defines the physical
- *   behavior of the fluid/solid at that location. The Material provides
- *   essential properties like density, viscosity, and thermal conductivity that
- *   determine how cells evolve during simulation.
- *
- * - Grid Integration:
- *   While not directly referenced by Grid, Materials influence the entire
- *   simulation domain through their association with Cell objects. Materials
- *   are critical for fluid-structure interaction and multi-material simulations
- *   since different regions of the Grid may contain different materials.
- *
- * Primary Use Cases:
- * ----------------
- * 1. Physical Property Management
- *    - Provides temperature-dependent material properties for flow calculations
- *    - Enforces physical consistency through appropriate unit conversions
- *    - Supports predefined materials (water, air, various metals, oils, gases)
- *
- * 2. Multi-physics Simulation
- *    - Enables heat transfer calculations through thermal properties
- *    - Supports variable-property flows where density and viscosity change with
- *      temperature
- *    - Allows modeling of complex fluid behavior through customizable property
- *      models
- *
- * 3. Material Mixing and Interfaces
- *    - Creates composite materials through mixture functionality
- *    - Supports different mixing rules (linear, logarithmic, harmonic) for
- *      physical accuracy
- *    - Enables modeling of multi-component flows with material gradients
- *
- * 4. Property Model Framework
- *    - Implements multiple temperature dependence models (constant, linear,
- *      polynomial, exponential)
- *    - Allows custom property functions for specialized material behavior
- *    - Maintains reference temperatures for consistent property calculations
- *
- * Key Material Properties:
- * ---------------------
- * - Transport Properties: Dynamic viscosity, thermal conductivity
- * - Thermodynamic Properties: Density, specific heat
- * - Additional Properties: Thermal expansion, surface tension, electrical
- * conductivity
- *
- * Material Types:
- * ------------
- *    FLUID: Liquids and gases with flow properties (viscosity)
- *    SOLID: Non-flowing materials with thermal properties
- *    INTERFACE: Special properties for fluid interfaces
- *
- * Structure Diagram:
- * ----------------
- *    +---------------+            +-----------------+
- *    | Cell          |            | Material        |
- *    |---------------| references |-----------------|
- *    | m_material    |----------->| m_type          |
- *    | m_temperature |            | m_baseProperties|
- *    | m_pressure    |            | m_propertyModels|
- *    | m_density     |            | m_customFunctions
- *    +---------------+            +-----------------+
- *                                        ^
- *                                        |
- *                                 +------+------+
- *                                 | Mixture     |
- *                                 | Components  |
- *                                 +-------------+
- *
- * Performance Considerations:
- * -------------------------
- * - Property calculations add computational overhead, especially with complex
- *   models
- * - Material mixing operations can be expensive for large numbers of components
- * - Consider caching property values for fixed temperature ranges
- * - Custom property functions should be optimized for frequently accessed
- *   properties
- *
- * Implementation Notes:
- * ------------------
- * - Material objects are typically shared between multiple cells to save memory
- * - Predefined materials include reference values and appropriate temperature
- *   models
- * - Unit conversion is handled transparently through the Units helper class
- * - Property values maintain SI units internally (kg/m³, Pa·s, W/(m·K),
- *   J/(kg·K))
- *
- * LIMITATIONS:
- * -----------
- * 1. CURRENT IMPLEMENTATION:
- *    - Limited to single-phase materials (no explicit phase change modeling)
- *    - Assumes smooth property transitions with temperature (no
- *      discontinuities)
- *    - Pressure dependence of properties not directly supported
- *
- * 2. MIXING FUNCTIONALITY:
- *    - Simple mixing rules may not capture non-linear interactions between
- *      components
- *    - No automatic handling of chemical reactions between mixed materials
- *    - Memory overhead increases with mixture complexity
- *
- * 3. COMPUTATIONAL EFFICIENCY:
- *    - Temperature-dependent properties require recalculation at each
- *      simulation step
- *    - Complex property models (polynomial, custom functions) increase CPU time
- *    - No built-in property interpolation tables for faster lookup
- *
- * 4. FRAMEWORK CONSTRAINTS:
- *    - New material properties require enum modification and rebuild
- *    - Shared pointer ownership must be carefully managed to prevent leaks
- *    - No built-in validation that material type matches expected cell behavior
+ * This version of the Material class uses flattened arrays for better
+ * performance on modern computer architectures. The data structures
+ * are designed for optimal cache usage and vectorization potential.
  */
 #pragma once
 
@@ -126,29 +13,24 @@
 
 #include <array>
 #include <functional>
-#include <map>
 #include <memory>
-#include <numeric>
 #include <string>
 #include <vector>
 
 /**
  * @class Material
- * @brief Defines physical properties of materials in the CFD simulation
- * 
- * This class provides physical properties of materials (fluids or solids)
- * with support for temperature-dependent properties and material mixing.
+ * @brief Defines physical properties of materials with optimized data layout
  */
-class Material : public std::enable_shared_from_this<Material> {
+class Material {
 public:
   /**
    * @enum MaterialType
    * @brief Defines the general type of material
    */
   enum class MaterialType {
-    FLUID,      ///< Liquid or gas
-    SOLID,      ///< Solid material
-    INTERFACE   ///< Special material for fluid interfaces
+    FLUID,    ///< Liquid or gas
+    SOLID,    ///< Solid material
+    INTERFACE ///< Special material for fluid interfaces
   };
 
   /**
@@ -156,11 +38,11 @@ public:
    * @brief Defines how a property varies with temperature
    */
   enum class PropertyModel {
-    CONSTANT,           ///< Property does not change with temperature
-    LINEAR,             ///< Property varies linearly with temperature
-    POLYNOMIAL,         ///< Property follows a polynomial function of temperature
-    EXPONENTIAL,        ///< Property follows an exponential function of temperature
-    CUSTOM             ///< Property follows a custom function
+    CONSTANT,    ///< Property does not change with temperature
+    LINEAR,      ///< Property varies linearly with temperature
+    POLYNOMIAL,  ///< Property follows a polynomial function of temperature
+    EXPONENTIAL, ///< Property follows an exponential function of temperature
+    CUSTOM       ///< Property follows a custom function
   };
 
   /**
@@ -168,39 +50,46 @@ public:
    * @brief Defines the various physical properties of materials
    */
   enum class MaterialProperty {
-    DENSITY,                ///< Density (kg/m³)
-    DYNAMIC_VISCOSITY,      ///< Dynamic viscosity (Pa·s)
-    THERMAL_CONDUCTIVITY,   ///< Thermal conductivity (W/(m·K))
-    SPECIFIC_HEAT,          ///< Specific heat capacity (J/(kg·K))
-    THERMAL_EXPANSION,      ///< Thermal expansion coefficient (1/K)
-    SURFACE_TENSION,        ///< Surface tension (N/m) - for fluid interfaces
-    ELECTRICAL_CONDUCTIVITY,///< Electrical conductivity (S/m)
-    COUNT                  ///< Keep last - number of properties
+    DENSITY,                 ///< Density (kg/m³)
+    DYNAMIC_VISCOSITY,       ///< Dynamic viscosity (Pa·s)
+    THERMAL_CONDUCTIVITY,    ///< Thermal conductivity (W/(m·K))
+    SPECIFIC_HEAT,           ///< Specific heat capacity (J/(kg·K))
+    THERMAL_EXPANSION,       ///< Thermal expansion coefficient (1/K)
+    SURFACE_TENSION,         ///< Surface tension (N/m) - for fluid interfaces
+    ELECTRICAL_CONDUCTIVITY, ///< Electrical conductivity (S/m)
+    COUNT                    ///< Keep last - number of properties
   };
 
-  /**
-   * @brief Default constructor for Material
-   */
+  // Maximum coefficients per property model
+  static constexpr size_t MAX_COEFFICIENTS = 8;
+
+  // Maximum number of mixture components
+  static constexpr size_t MAX_MIXTURE_COMPONENTS = 16;
+
   Material();
-    
-  /**
-   * @brief Constructor with material type and name
-   * @param type The type of material (fluid, solid, interface)
-   * @param name The name of the material
-   */
-  Material(MaterialType type, const std::string& name);
-    
+  Material(MaterialType type, const std::string &name);
+  Material(const Material &other);
+  Material(Material &&other) noexcept;
+  ~Material();
+
+  Material &operator=(const Material &other);
+  Material &operator=(Material &&other) noexcept;
+
+  // Material registry access
+  uint32_t getID() const { return m_materialID; }
+  static Material *getByID(uint32_t id);
+
   /**
    * @brief Get the material type
    * @return The material type
    */
-  MaterialType getType() const;
-    
+  MaterialType getType() const { return m_type; }
+
   /**
    * @brief Get the material name
    * @return The material name
    */
-  const std::string& getName() const;
+  const std::string &getName() const { return m_name; }
 
   /**
    * @brief Set a base property value (at reference temperature)
@@ -208,98 +97,114 @@ public:
    * @param value The property value
    */
   void setProperty(MaterialProperty property, double value);
-    
+
   /**
    * @brief Get a base property value (at reference temperature)
    * @param property The property to get
    * @return The property value
    */
   double getProperty(MaterialProperty property) const;
-    
+
   /**
    * @brief Set the property temperature model
    * @param property The property to set the model for
    * @param model The temperature dependence model
    * @param coefficients The coefficients for the model
    */
-  void setPropertyModel(MaterialProperty property, PropertyModel model, 
-			const std::vector<double>& coefficients = {});
-    
+  void setPropertyModel(MaterialProperty property, PropertyModel model,
+                        const std::vector<double> &coefficients = {});
+
   /**
    * @brief Set a custom property function
    * @param property The property to set the function for
-   * @param function The custom function taking temperature and returning property value
+   * @param function The custom function taking temperature and returning
+   * property value
    */
-  void setCustomPropertyFunction(MaterialProperty property, 
-				 std::function<double(double)> function);
-    
+  void setCustomPropertyFunction(MaterialProperty property,
+                                 std::function<double(double)> function);
+
   /**
    * @brief Get property value at specific temperature
    * @param property The property to get
    * @param temperature The temperature (K)
    * @return The property value at the given temperature
    */
-  double getPropertyAtTemperature(MaterialProperty property, double temperature) const;
-    
+  double getPropertyAtTemperature(MaterialProperty property,
+                                  double temperature) const;
+
   /**
    * @brief Set the reference temperature
    * @param temperature The reference temperature (K)
    */
-  void setReferenceTemperature(double temperature);
-    
+  void setReferenceTemperature(double temperature) {
+    m_referenceTemperature = temperature;
+  }
+
   /**
    * @brief Get the reference temperature
    * @return The reference temperature (K)
    */
-  double getReferenceTemperature() const;
-    
+  double getReferenceTemperature() const { return m_referenceTemperature; }
+
+  void setMixingRule(const std::string &rule) { m_mixingRule = rule; }
   /**
    * @brief Create a mixture of two materials
    * @param other The material to mix with
    * @param mixFraction The fraction of the other material (0.0 to 1.0)
-   * @param mixingRule The mixing rule to use (linear, logarithmic, etc.)
+   * @param mixingRule The mixing rule to use
    * @return A new material representing the mixture
    */
   std::shared_ptr<Material>
   createMixture(std::shared_ptr<Material> other, double mixFraction,
                 const std::string &mixingRule = "linear") const;
 
+  /**
+   * @brief Create a mixture of multiple materials
+   * @param materials The materials to mix
+   * @param fractions The fractions of each material (should sum to 1.0)
+   * @param mixingRule The mixing rule to use
+   * @return A new material representing the mixture
+   */
   static std::shared_ptr<Material>
   createMixture(const std::vector<std::shared_ptr<Material>> &materials,
                 const std::vector<double> &fractions,
                 const std::string &mixingRule);
+
   /**
    * @brief Check if the material is a mixture
    * @return True if the material is a mixture
    */
-  bool isMixture() const;
+  bool isMixture() const { return m_componentCount > 0; }
 
   /**
    * @brief For a mixture material, get the components
-   * @return Pairs of (component material, fraction)
+   * @return Vector of component materials and fractions
    */
-  const std::vector<std::pair<std::shared_ptr<Material>, double>>& getMixtureComponents() const;
-    
+  std::vector<std::pair<std::shared_ptr<Material>, double>>
+  getMixtureComponents() const;
+
   /**
    * @brief Create a predefined material by name
-   * @param materialName The name of the predefined material (e.g., "water", "air")
+   * @param materialName The name of the predefined material (e.g., "water",
+   * "air")
    * @return A shared pointer to the created material
    */
-  static std::shared_ptr<Material> createPredefined(const std::string& materialName);
-    
+  static std::shared_ptr<Material>
+  createPredefined(const std::string &materialName);
+
   /**
    * @brief Get a human-readable name for a property
    * @param property The property
    * @return The property name
    */
-  static const std::string& getPropertyName(MaterialProperty property);
-    
+  static const std::string &getPropertyName(MaterialProperty property);
+
   /**
    * @brief Get a human-readable name for a property model
    * @param model The property model
    * @return The model name
    */
-  static const std::string& getModelName(PropertyModel model);
+  static const std::string &getModelName(PropertyModel model);
 
   /**
    * @brief Set a property value with unit conversion
@@ -321,15 +226,14 @@ public:
 
   /**
    * @brief Enable or disable temperature-dependent properties
-   * @param enable True to enable temperature-dependent properties, false to disable
-   * 
-   * When temperature-dependent properties are enabled, the material will use
-   * the configured property models to calculate property values based on temperature.
-   * When disabled, it will always return the base property values regardless of temperature.
+   * @param enable True to enable temperature-dependent properties, false to
+   * disable
    */
   void setUseTempDependentProps(bool enable) {
     m_useTempDependentProps = enable;
   }
+
+  bool getUsesTempDependentProps() const { return m_useTempDependentProps; }
 
   /**
    * @brief Set reference temperature with unit conversion
@@ -391,50 +295,89 @@ public:
                   const std::string &tempUnit = "K");
 
   /**
-   * @brief Get the thermal conductivity of the material at the current
-   * reference temperature
+   * @brief Get the thermal conductivity at the reference temperature
    * @return Thermal conductivity value in W/(m·K)
    */
-  double getThermalConductivity() const;
+  double getThermalConductivity() const {
+    return getProperty(MaterialProperty::THERMAL_CONDUCTIVITY);
+  }
 
   /**
-   * @brief Get the thermal conductivity of the material at a specific
-   * temperature
+   * @brief Get the thermal conductivity at a specific temperature
    * @param temperature The temperature at which to calculate conductivity (K)
    * @return Thermal conductivity value in W/(m·K)
    */
-  double getThermalConductivity(double temperature) const;
+  double getThermalConductivity(double temperature) const {
+    return getPropertyAtTemperature(MaterialProperty::THERMAL_CONDUCTIVITY,
+                                    temperature);
+  }
 
-  // Mix properties according to mixing rules
+  bool isUsingTempDependentProps() const { return m_useTempDependentProps; }
+
+  /**
+   * @brief Mix properties according to mixing rules
+   * @param property The property to mix
+   * @param value1 First property value
+   * @param value2 Second property value
+   * @param fraction Fraction of second value (0-1)
+   * @param rule Mixing rule name
+   * @return Mixed property value
+   */
   static double mixProperties(MaterialProperty property, double value1,
                               double value2, double fraction,
                               const std::string &rule);
 
 private:
-  MaterialType m_type = MaterialType::FLUID;
-  std::string m_name = "DefaultMaterial";
-  double m_referenceTemperature = 293.15;  // Default reference temperature (20°C)
-    
-  // Base property values at reference temperature
-  std::array<double, static_cast<size_t>(MaterialProperty::COUNT)> m_baseProperties = {};
-    
-  // Property models for temperature dependence
-  bool m_useTempDependentProps = false;
-  std::array<PropertyModel, static_cast<size_t>(MaterialProperty::COUNT)> m_propertyModels = {};
-    
-  // Coefficients for temperature models
-  std::array<std::vector<double>, static_cast<size_t>(MaterialProperty::COUNT)> m_modelCoefficients = {};
-    
-  // Custom property functions
-  std::array<std::function<double(double)>, static_cast<size_t>(MaterialProperty::COUNT)> m_customFunctions = {};
-    
-  // For mixture materials, store components and fractions
-  bool m_isMixture = false;
-  std::vector<std::pair<std::shared_ptr<Material>, double>> m_mixtureComponents;
-    
+  static std::unordered_map<uint32_t, Material *> s_materialRegistry;
+  std::string m_mixingRule; // User-specified mixing rule for this mixture
+
+  // Basic material info
+  MaterialType m_type;
+  std::string m_name;
+  double m_referenceTemperature;
+  bool m_useTempDependentProps;
+
+  // Flat array for property storage - contiguous memory layout
+  alignas(
+      32) double m_baseProperties[static_cast<size_t>(MaterialProperty::COUNT)];
+
+  // Property models - one per property
+  PropertyModel m_propertyModels[static_cast<size_t>(MaterialProperty::COUNT)];
+
+  // Coefficient storage - fixed size for deterministic memory layout
+  // First dimension: property index
+  // Second dimension: coefficient index (up to MAX_COEFFICIENTS)
+  alignas(32) double m_coefficients[static_cast<size_t>(
+      MaterialProperty::COUNT)][MAX_COEFFICIENTS];
+
+  // Number of coefficients for each property
+  uint8_t m_coefficientCounts[static_cast<size_t>(MaterialProperty::COUNT)];
+
+  // Custom functions - CPU only
+  std::function<double(double)>
+      m_customFunctions[static_cast<size_t>(MaterialProperty::COUNT)];
+
+  // Mixture components with fixed-size arrays
+  uint32_t m_componentIDs[MAX_MIXTURE_COMPONENTS];
+  double m_componentFractions[MAX_MIXTURE_COMPONENTS];
+  uint8_t m_componentCount;
+
+  // Material registry for lookup by ID
+
+  static uint32_t s_nextMaterialID;
+  uint32_t m_materialID;
+
+  // Register/unregister material in registry
+  void registerMaterial();
+  void unregisterMaterial();
+
+  void addComponent(uint32_t materialID, double fraction);
+
   // Calculate property value using the specified model
-  double calculatePropertyValue(MaterialProperty property, double temperature) const;
-    
+  double calculatePropertyValue(MaterialProperty property,
+                                double temperature) const;
+
+  // Helper methods for material mixing
   static void addScaledComponentsToMixture(
       std::shared_ptr<Material> mixture,
       const std::vector<std::pair<std::shared_ptr<Material>, double>>
