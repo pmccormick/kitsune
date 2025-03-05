@@ -3,6 +3,7 @@
 #include "BoundaryClass.h"
 #include "Cell.h"
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -117,12 +118,76 @@ public:
    * @param y Physical y-coordinate of the cell
    * @param dt Time step size
    */
-  void apply(Cell &cell, const std::vector<Cell *> &neighbors, double x,
-             double y, double dt) override;
+  void apply(Cell &cell, double x, double y, double dt,
+             const std::vector<Cell *> *neighbors = nullptr) override;
 
   /**
    * @brief Get the type of the boundary condition
    * @return String identifier for the boundary type
    */
   std::string getType() const override;
+
+  /**
+   * @brief Serialize the periodic boundary condition to a string representation
+   * @return String containing serialized boundary data
+   */
+  std::string serialize() const override {
+    // Start with the base class serialization
+    std::ostringstream oss;
+    oss << BoundaryClass::serialize();
+
+    // Add periodic boundary-specific data
+    oss << "PAIRED_BOUNDARY_NAME=" << m_pairedBoundaryName << "\n";
+    oss << "DIRECTION=" << m_direction << "\n";
+    oss << "X_OFFSET=" << m_xOffset << "\n";
+    oss << "Y_OFFSET=" << m_yOffset << "\n";
+
+    // Note: We cannot serialize the Grid pointer
+    // That would need to be reset separately after deserialization
+
+    return oss.str();
+  }
+
+  /**
+   * @brief Deserialize periodic boundary condition from a string representation
+   * @param data String containing serialized boundary data
+   * @return True if deserialization was successful
+   */
+  bool deserialize(const std::string &data) override {
+    // First call the base class deserialize method
+    if (!BoundaryClass::deserialize(data)) {
+      return false;
+    }
+
+    // Process the data line by line
+    std::istringstream iss(data);
+    std::string line;
+
+    while (std::getline(iss, line)) {
+      size_t pos = line.find('=');
+      if (pos == std::string::npos) {
+        continue;
+      }
+
+      std::string key = line.substr(0, pos);
+      std::string value = line.substr(pos + 1);
+
+      if (key == "PAIRED_BOUNDARY_NAME") {
+        m_pairedBoundaryName = value;
+      } else if (key == "DIRECTION") {
+        if (!value.empty()) {
+          m_direction = value[0]; // Take first character as direction
+        }
+      } else if (key == "X_OFFSET") {
+        m_xOffset = std::stod(value);
+      } else if (key == "Y_OFFSET") {
+        m_yOffset = std::stod(value);
+      }
+    }
+
+    // Note: Grid pointer must be reset separately
+    m_grid = nullptr;
+
+    return true;
+  }
 };

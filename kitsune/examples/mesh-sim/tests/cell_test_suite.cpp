@@ -124,8 +124,8 @@ private:
         pass &= std::abs(cell.getPressure() - 101325.0) < 1e-6;
         pass &= std::abs(cell.getDensity() - 1.0) < 1e-6;
         pass &= !cell.isFixed();
-        pass &= cell.getVelocityX() == 0.0;
-        pass &= cell.getVelocityY() == 0.0;
+        pass &= cell.getVelocityU() == 0.0;
+        pass &= cell.getVelocityV() == 0.0;
         pass &= !cell.isBoundary();
         pass &= !cell.isObstacle();
         
@@ -371,8 +371,8 @@ private:
         cell.setTemperature(350.0);
         cell.setPressure(200000.0);
         cell.setDensity(1200.0);
-        cell.setVelocityX(10.0);
-        cell.setVelocityY(5.0);
+        cell.setVelocityU(10.0);
+        cell.setVelocityV(5.0);
         cell.setVertexVelocity(Cell::VertexPosition::NORTHWEST, 2.0, 3.0);
         cell.setProperty(Cell::PropertyType::VORTICITY, 0.5);
         cell.setDynamicProperty("custom", 42.0);
@@ -385,8 +385,8 @@ private:
         pass &= std::abs(cell.getTemperature() - 293.15) < 1e-6;
         pass &= std::abs(cell.getPressure() - 101325.0) < 1e-6;
         pass &= std::abs(cell.getDensity() - 1.0) < 1e-6;
-        pass &= cell.getVelocityX() == 0.0;
-        pass &= cell.getVelocityY() == 0.0;
+        pass &= cell.getVelocityU() == 0.0;
+        pass &= cell.getVelocityV() == 0.0;
         
         auto [vx, vy] = cell.getVertexVelocity(Cell::VertexPosition::NORTHWEST);
         pass &= vx == 0.0 && vy == 0.0;
@@ -589,25 +589,25 @@ private:
       bool pass = true;
 
       // Default velocities should be zero
-      pass &= cell.getVelocityX() == 0.0;
-      pass &= cell.getVelocityY() == 0.0;
+      pass &= cell.getVelocityU() == 0.0;
+      pass &= cell.getVelocityV() == 0.0;
 
       // Set and get velocities
-      cell.setVelocityX(3.5);
-      cell.setVelocityY(-2.0);
-      pass &= cell.getVelocityX() == 3.5;
-      pass &= cell.getVelocityY() == -2.0;
+      cell.setVelocityU(3.5);
+      cell.setVelocityV(-2.0);
+      pass &= cell.getVelocityU() == 3.5;
+      pass &= cell.getVelocityV() == -2.0;
 
       // Test unit conversion functions
       cell.setVelocityWithUnits(10.0, 5.0, "mph");
-      pass &= std::abs(cell.getVelocityX() - 4.4704) < 1e-4;
-      pass &= std::abs(cell.getVelocityY() - 2.2352) < 1e-4;
+      pass &= std::abs(cell.getVelocityU() - 4.4704) < 1e-4;
+      pass &= std::abs(cell.getVelocityV() - 2.2352) < 1e-4;
 
-      pass &= std::abs(cell.getVelocityXWithUnits("mph") - 10.0) < 1e-4;
-      pass &= std::abs(cell.getVelocityYWithUnits("mph") - 5.0) < 1e-4;
+      pass &= std::abs(cell.getVelocityUWithUnits("mph") - 10.0) < 1e-4;
+      pass &= std::abs(cell.getVelocityVWithUnits("mph") - 5.0) < 1e-4;
 
       // Test knots conversion
-      pass &= std::abs(cell.getVelocityXWithUnits("knot") - 8.69) < 1e-2;
+      pass &= std::abs(cell.getVelocityUWithUnits("knot") - 8.69) < 1e-2;
 
       return pass;
     }
@@ -621,8 +621,8 @@ private:
       originalCell.setTemperature(350.0);
       originalCell.setPressure(200000.0);
       originalCell.setDensity(1200.0);
-      originalCell.setVelocityX(10.0);
-      originalCell.setVelocityY(-5.0);
+      originalCell.setVelocityU(10.0);
+      originalCell.setVelocityV(-5.0);
 
       // Set vertex velocities
       originalCell.setVertexVelocity(Cell::VertexPosition::NORTHWEST, 1.0, 2.0);
@@ -672,10 +672,10 @@ private:
                        originalCell.getPressure()) < 1e-6;
       pass &= std::abs(deserializedCell.getDensity() -
                        originalCell.getDensity()) < 1e-6;
-      pass &= std::abs(deserializedCell.getVelocityX() -
-                       originalCell.getVelocityX()) < 1e-6;
-      pass &= std::abs(deserializedCell.getVelocityY() -
-                       originalCell.getVelocityY()) < 1e-6;
+      pass &= std::abs(deserializedCell.getVelocityU() -
+                       originalCell.getVelocityU()) < 1e-6;
+      pass &= std::abs(deserializedCell.getVelocityV() -
+                       originalCell.getVelocityV()) < 1e-6;
 
       // Vertex velocities
       for (int i = 0; i < 4; i++) {
@@ -742,8 +742,8 @@ private:
       cell.setTemperature(350.0);
       cell.setPressure(200000.0);
       cell.setDensity(1200.0);
-      cell.setVelocityX(10.5);
-      cell.setVelocityY(-5.2);
+      cell.setVelocityU(10.5);
+      cell.setVelocityV(-5.2);
       cell.setVorticity(0.75);
       cell.setFlag(Cell::CellFlag::IS_INLET, true);
       cell.setDynamicProperty("custom_prop", 42.0);

@@ -132,23 +132,23 @@ private:
         bool pass = true;
         
         // Test basic velocity unit conversions
-        cell.setVelocityX(1.0);     // 1 m/s ≈ 2.237 mph ≈ 1.944 knot
-        cell.setVelocityY(0.0);
+        cell.setVelocityU(1.0);     // 1 m/s ≈ 2.237 mph ≈ 1.944 knot
+        cell.setVelocityV(0.0);
         
         // Verify m/s to mph
-        pass &= approxEqual(cell.getVelocityXWithUnits("mph"), 2.237, 0.001);
+        pass &= approxEqual(cell.getVelocityUWithUnits("mph"), 2.237, 0.001);
         
         // Verify m/s to knot
-        pass &= approxEqual(cell.getVelocityXWithUnits("knot"), 1.944, 0.001);
+        pass &= approxEqual(cell.getVelocityUWithUnits("knot"), 1.944, 0.001);
         
         // Test setting velocity in different units
         cell.setVelocityWithUnits(100.0, 50.0, "mph");
-        pass &= approxEqual(cell.getVelocityX(), 44.704, 0.001);
-        pass &= approxEqual(cell.getVelocityY(), 22.352, 0.001);
+        pass &= approxEqual(cell.getVelocityU(), 44.704, 0.001);
+        pass &= approxEqual(cell.getVelocityV(), 22.352, 0.001);
         
         cell.setVelocityWithUnits(10.0, 5.0, "knot");
-        pass &= approxEqual(cell.getVelocityX(), 5.144, 0.001);
-        pass &= approxEqual(cell.getVelocityY(), 2.572, 0.001);
+        pass &= approxEqual(cell.getVelocityU(), 5.144, 0.001);
+        pass &= approxEqual(cell.getVelocityV(), 2.572, 0.001);
         
         return pass;
     }
@@ -216,13 +216,13 @@ private:
         for (const auto& unit : {"m/s", "mph", "knot"}) {
             double initial_x = 10.0;
             double initial_y = 5.0;
-            cell.setVelocityX(initial_x);
-            cell.setVelocityY(initial_y);
-            double converted_x = cell.getVelocityXWithUnits(unit);
-            double converted_y = cell.getVelocityYWithUnits(unit);
+            cell.setVelocityU(initial_x);
+            cell.setVelocityV(initial_y);
+            double converted_x = cell.getVelocityUWithUnits(unit);
+            double converted_y = cell.getVelocityVWithUnits(unit);
             cell.setVelocityWithUnits(converted_x, converted_y, unit);
-            pass &= approxEqual(cell.getVelocityX(), initial_x, 0.01);
-            pass &= approxEqual(cell.getVelocityY(), initial_y, 0.01);
+            pass &= approxEqual(cell.getVelocityU(), initial_x, 0.01);
+            pass &= approxEqual(cell.getVelocityV(), initial_y, 0.01);
         }
         
         return pass;

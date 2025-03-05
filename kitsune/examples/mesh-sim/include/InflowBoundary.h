@@ -2,6 +2,8 @@
 
 #include "BoundaryClass.h"
 #include <functional>
+#include <sstream>
+#include <string>
 
 /**
  * @class InflowBoundary
@@ -40,18 +42,21 @@ private:
   double m_velocityV;
   double m_pressure;
   double m_temperature;
+  double m_density;
 
   // Variable profile functions
   VelocityProfile m_velocityUProfile;
   VelocityProfile m_velocityVProfile;
   ScalarProfile m_pressureProfile;
   ScalarProfile m_temperatureProfile;
+  ScalarProfile m_densityProfile;
 
   // Flags for which variables use profiles vs. constants
   bool m_useVelocityUProfile;
   bool m_useVelocityVProfile;
   bool m_usePressureProfile;
   bool m_useTemperatureProfile;
+  bool m_useDensityProfile;
 
   // Current simulation time (updated during apply)
   double m_currentTime;
@@ -74,13 +79,13 @@ public:
    * variables, using either constant values or profiles.
    *
    * @param cell The boundary cell to apply the condition to
-   * @param neighbors Vector of non-boundary neighboring cells
    * @param x Physical x-coordinate of the cell
    * @param y Physical y-coordinate of the cell
    * @param dt Time step size
+   * @param neighbors Vector of non-boundary neighboring cells
    */
-  void apply(Cell &cell, const std::vector<Cell *> &neighbors, double x,
-             double y, double dt) override;
+  void apply(Cell &cell, double x, double y, double dt,
+             const std::vector<Cell *> *neighbors = nullptr) override;
 
   /**
    * @brief Get the type of the boundary condition
@@ -153,4 +158,87 @@ public:
    * @param time Current simulation time
    */
   void updateTime(double time);
+
+  /**
+   * @brief Serialize the inflow boundary condition to a string representation
+   * @return String containing serialized boundary data
+   */
+  std::string serialize() const override {
+    // Start with the base class serialization
+    std::ostringstream oss;
+    oss << BoundaryClass::serialize();
+
+    // Add inflow-specific constant values
+    oss << "VELOCITY_U=" << m_velocityU << "\n";
+    oss << "VELOCITY_V=" << m_velocityV << "\n";
+    oss << "PRESSURE=" << m_pressure << "\n";
+    oss << "TEMPERATURE=" << m_temperature << "\n";
+    oss << "CURRENT_TIME=" << m_currentTime << "\n";
+
+    // Add flags for which variables use profiles
+    oss << "USE_VELOCITY_U_PROFILE=" << (m_useVelocityUProfile ? 1 : 0) << "\n";
+    oss << "USE_VELOCITY_V_PROFILE=" << (m_useVelocityVProfile ? 1 : 0) << "\n";
+    oss << "USE_PRESSURE_PROFILE=" << (m_usePressureProfile ? 1 : 0) << "\n";
+    oss << "USE_TEMPERATURE_PROFILE=" << (m_useTemperatureProfile ? 1 : 0)
+        << "\n";
+    oss << "USE_DENSITY_PROFILE=" << (m_useDensityProfile ? 1 : 0) << "\n";
+
+    // Note: We cannot serialize std::function objects directly
+    // In a real implementation, would need to use function identifiers or
+    // a functional expression language
+
+    return oss.str();
+  }
+
+  /**
+   * @brief Deserialize inflow boundary condition from a string representation
+   * @param data String containing serialized boundary data
+   * @return True if deserialization was successful
+   */
+  bool deserialize(const std::string &data) override {
+    // First call the base class deserialize method
+    if (!BoundaryClass::deserialize(data)) {
+      return false;
+    }
+
+    // Process the data line by line
+    std::istringstream iss(data);
+    std::string line;
+
+    while (std::getline(iss, line)) {
+      size_t pos = line.find('=');
+      if (pos == std::string::npos) {
+        continue;
+      }
+
+      std::string key = line.substr(0, pos);
+      std::string value = line.substr(pos + 1);
+
+      if (key == "VELOCITY_U") {
+        m_velocityU = std::stod(value);
+      } else if (key == "VELOCITY_V") {
+        m_velocityV = std::stod(value);
+      } else if (key == "PRESSURE") {
+        m_pressure = std::stod(value);
+      } else if (key == "TEMPERATURE") {
+        m_temperature = std::stod(value);
+      } else if (key == "CURRENT_TIME") {
+        m_currentTime = std::stod(value);
+      } else if (key == "USE_VELOCITY_U_PROFILE") {
+        m_useVelocityUProfile = (std::stoi(value) != 0);
+      } else if (key == "USE_VELOCITY_V_PROFILE") {
+        m_useVelocityVProfile = (std::stoi(value) != 0);
+      } else if (key == "USE_PRESSURE_PROFILE") {
+        m_usePressureProfile = (std::stoi(value) != 0);
+      } else if (key == "USE_TEMPERATURE_PROFILE") {
+        m_useTemperatureProfile = (std::stoi(value) != 0);
+      } else if (key == "USE_DENSITY_PROFILE") {
+        m_useDensityProfile = (std::stoi(value) != 0);
+      }
+      // Note: We cannot deserialize the function objects,
+      // these would need to be re-set by the calling code
+    }
+
+    return true;
+  }
 };

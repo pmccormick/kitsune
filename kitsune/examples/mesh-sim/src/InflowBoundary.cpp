@@ -13,25 +13,26 @@ InflowBoundary::InflowBoundary(double velocityU, double velocityV,
       m_currentTime(0.0) {
 
   // Initialize profile functions with defaults (return constant values)
-  m_velocityUProfile = [this](double x, double y, double t) {
-    return m_velocityU;
-  };
-  m_velocityVProfile = [this](double x, double y, double t) {
-    return m_velocityV;
-  };
-  m_pressureProfile = [this](double x, double y, double t) {
-    return m_pressure;
-  };
-  m_temperatureProfile = [this](double x, double y, double t) {
-    return m_temperature;
-  };
+  m_velocityUProfile =
+      [this]([[maybe_unused]] double x, [[maybe_unused]] double y,
+             [[maybe_unused]] double t) { return m_velocityU; };
+  m_velocityVProfile =
+      [this]([[maybe_unused]] double x, [[maybe_unused]] double y,
+             [[maybe_unused]] double t) { return m_velocityV; };
+  m_pressureProfile = [this]([[maybe_unused]] double x,
+                             [[maybe_unused]] double y,
+                             [[maybe_unused]] double t) { return m_pressure; };
+  m_temperatureProfile =
+      [this]([[maybe_unused]] double x, [[maybe_unused]] double y,
+             [[maybe_unused]] double t) { return m_temperature; };
 }
 
 /**
  * Implementation of the inflow boundary condition
  */
-void InflowBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
-                           double x, double y, double dt) {
+void InflowBoundary::apply(Cell &cell, double x, double y, double dt,
+                           const std::vector<Cell *> *neighbors) {
+
   // For inflow, we primarily use Dirichlet conditions (fixed values)
   // but may need neighbor information for some variables (like pressure)
 
@@ -59,9 +60,9 @@ void InflowBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
   } else if (m_pressure != 0.0) {
     // Use a constant pressure value
     cell.setPressure(m_pressure);
-  } else if (!neighbors.empty()) {
+  } else if (neighbors != nullptr && !neighbors->empty()) {
     // Zero-gradient extrapolation from interior (common for subsonic inflows)
-    cell.setPressure(neighbors[0]->getPressure());
+    cell.setPressure((*neighbors)[0]->getPressure());
   }
 
   // For temperature (if used in the simulation)

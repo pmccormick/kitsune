@@ -16,20 +16,32 @@ enable_testing()
 
 # Add source files for the library
 set(LIB_SOURCES
-    src/Cell.cpp
+    src/BoundaryFactory.cpp
+    src/Cell.cpp    
+    src/DirichletBoundary.cpp
+    src/InflowBoundary.cpp
+    src/NeumannBoundary.cpp
+    src/NoSlipBoundary.cpp
+    src/PeriodicBoundary.cpp
+    src/SlipBoundary.cpp    
     src/CellExtensions.cpp    
     src/Material.cpp
-    #    src/Units.cpp
-    #    src/Grid.cpp    
     # Add other source files as needed
 )
 
 # Add header files for the library
 set(LIB_HEADERS
+    include/BoundaryClass.h	
+    include/BoundaryFactory.h
     include/Cell.h
+    include/DirichletBoundary.h
+    include/InflowBoundary.h
     include/Material.h
+    include/NeumannBoundary.h
+    include/NoSlipBoundary.h
+    include/PeriodicBoundary.h
+    include/SlipBoundary.h
     include/Units.h
-    #    include/Grid.h    
     # Add other header files as needed
 )
 
@@ -62,6 +74,23 @@ add_test(NAME MaterialTests COMMAND material_tests)
 add_executable(material_mixing_tests tests/material_mixing_tests.cpp)
 target_link_libraries(material_mixing_tests PRIVATE CFDLib)
 add_test(NAME MaterialMixingTests COMMAND material_mixing_tests)
+
+# Bondary condition tests
+add_executable(inflow_boundary_tests tests/inflow_boundary_tests.cpp)
+target_link_libraries(inflow_boundary_tests PRIVATE CFDLib)
+add_test(NAME InflowBoundaryTests COMMAND inflow_boundary_tests)
+
+add_executable(slip_boundary_tests tests/slip_boundary_tests.cpp)
+target_link_libraries(slip_boundary_tests PRIVATE CFDLib)
+add_test(NAME SlipBoundaryTests COMMAND slip_boundary_tests)
+
+add_executable(neumann_boundary_tests tests/neumann_boundary_tests.cpp)
+target_link_libraries(neumann_boundary_tests PRIVATE CFDLib)
+add_test(NAME NeumannBoundaryTests COMMAND neumann_boundary_tests)
+
+add_executable(periodic_boundary_tests tests/periodic_boundary_tests.cpp)
+target_link_libraries(periodic_boundary_tests PRIVATE CFDLib)
+add_test(NAME PeriodicBoundaryTests COMMAND periodic_boundary_tests)
 
 # Optional performance tests (build only when specifically requested)
 option(BUILD_PERF_TESTS "Build performance tests" OFF)

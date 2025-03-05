@@ -3,6 +3,7 @@
 #include "BoundaryClass.h"
 #include "Cell.h"
 #include <functional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -134,12 +135,88 @@ public:
    * @param y Physical y-coordinate of the cell
    * @param dt Time step size
    */
-  void apply(Cell &cell, const std::vector<Cell *> &neighbors, double x,
-             double y, double dt) override;
+  void apply(Cell &cell, double x, double y, double dt,
+             const std::vector<Cell *> *neighbors = nullptr) override;
 
   /**
    * @brief Get the type of the boundary condition
    * @return String identifier for the boundary type
    */
   std::string getType() const override;
+
+  /**
+   * @brief Serialize the NoSlip boundary condition to a string representation
+   * @return String containing serialized boundary data
+   */
+  std::string serialize() const override {
+    // Start with the base class serialization
+    std::ostringstream oss;
+    oss << BoundaryClass::serialize();
+
+    // Add NoSlip-specific data
+    oss << "WALL_VELOCITY_X=" << m_wallVelocityX << "\n";
+    oss << "WALL_VELOCITY_Y=" << m_wallVelocityY << "\n";
+
+    // Add thermal conditions
+    oss << "WALL_TEMPERATURE=" << m_wallTemperature << "\n";
+    oss << "HEAT_FLUX=" << m_heatFlux << "\n";
+    oss << "FIX_TEMPERATURE=" << (m_fixTemperature ? 1 : 0) << "\n";
+    oss << "FIX_HEAT_FLUX=" << (m_fixHeatFlux ? 1 : 0) << "\n";
+
+    // Note about functions
+    oss << "HAS_VELOCITY_X_FUNC=" << (m_velocityXFunc ? 1 : 0) << "\n";
+    oss << "HAS_VELOCITY_Y_FUNC=" << (m_velocityYFunc ? 1 : 0) << "\n";
+    oss << "HAS_TEMPERATURE_FUNC=" << (m_temperatureFunc ? 1 : 0) << "\n";
+    oss << "HAS_HEAT_FLUX_FUNC=" << (m_heatFluxFunc ? 1 : 0) << "\n";
+
+    // Note: We cannot serialize std::function objects directly
+    // In a real implementation, would need to use function identifiers or
+    // a functional expression language
+
+    return oss.str();
+  }
+
+  /**
+   * @brief Deserialize NoSlip boundary condition from a string representation
+   * @param data String containing serialized boundary data
+   * @return True if deserialization was successful
+   */
+  bool deserialize(const std::string &data) override {
+    // First call the base class deserialize method
+    if (!BoundaryClass::deserialize(data)) {
+      return false;
+    }
+
+    // Process the data line by line
+    std::istringstream iss(data);
+    std::string line;
+
+    while (std::getline(iss, line)) {
+      size_t pos = line.find('=');
+      if (pos == std::string::npos) {
+        continue;
+      }
+
+      std::string key = line.substr(0, pos);
+      std::string value = line.substr(pos + 1);
+
+      if (key == "WALL_VELOCITY_X") {
+        m_wallVelocityX = std::stod(value);
+      } else if (key == "WALL_VELOCITY_Y") {
+        m_wallVelocityY = std::stod(value);
+      } else if (key == "WALL_TEMPERATURE") {
+        m_wallTemperature = std::stod(value);
+      } else if (key == "HEAT_FLUX") {
+        m_heatFlux = std::stod(value);
+      } else if (key == "FIX_TEMPERATURE") {
+        m_fixTemperature = (std::stoi(value) != 0);
+      } else if (key == "FIX_HEAT_FLUX") {
+        m_fixHeatFlux = (std::stoi(value) != 0);
+      }
+      // Note: We cannot deserialize the function objects,
+      // these would need to be re-set by the calling code
+    }
+
+    return true;
+  }
 };

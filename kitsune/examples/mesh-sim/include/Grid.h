@@ -298,8 +298,8 @@ public:
     for (auto &cell : m_cells) {
       cell.setMaterial(default_material);
       cell.setPressure(0.0);
-      cell.setVelocityX(0.0);
-      cell.setVelocityY(0.0);
+      cell.setVelocityU(0.0);
+      cell.setVelocityV(0.0);
       cell.setTemperature(0.0);
     }
   }
@@ -394,8 +394,8 @@ public:
   inline void clearVelocities() {
     for (auto &cell : m_cells) {
       if (!cell.isObstacle()) { // Preserve zero velocity for obstacles
-        cell.setVelocityX(0.0);
-        cell.setVelocityY(0.0);
+        cell.setVelocityU(0.0);
+        cell.setVelocityV(0.0);
       }
     }
   }

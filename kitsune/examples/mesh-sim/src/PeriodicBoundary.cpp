@@ -112,10 +112,12 @@ std::pair<double, double> PeriodicBoundary::getOffsets() const {
  * @param y Physical y-coordinate of the cell
  * @param dt Time step size
  */
-void PeriodicBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
-                             double x, double y, double dt) {
+void PeriodicBoundary::apply(Cell &cell, [[maybe_unused]] double x,
+                             [[maybe_unused]] double y,
+                             [[maybe_unused]] double dt,
+                             const std::vector<Cell *> *neighbors) {
   // Without properly paired cells from the Grid, this is a no-op
-  if (neighbors.empty() || !m_grid)
+  if (neighbors == nullptr || neighbors->empty() || !m_grid)
     return;
 
   // For periodic boundary, we need cells from the opposite boundary
@@ -123,7 +125,7 @@ void PeriodicBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
   // We choose one cell that is not a boundary cell (interior cell near the
   // paired boundary)
   Cell *pairedCell = nullptr;
-  for (auto *neighbor : neighbors) {
+  for (auto *neighbor : *neighbors) {
     if (!neighbor->isBoundary()) {
       pairedCell = neighbor;
       break;
@@ -133,8 +135,8 @@ void PeriodicBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
   // If we found a suitable interior cell, copy its values
   if (pairedCell) {
     // Copy all state variables to ensure physical continuity
-    cell.setVelocityX(pairedCell->getVelocityX());
-    cell.setVelocityY(pairedCell->getVelocityY());
+    cell.setVelocityU(pairedCell->getVelocityU());
+    cell.setVelocityV(pairedCell->getVelocityV());
     cell.setPressure(pairedCell->getPressure());
     cell.setTemperature(pairedCell->getTemperature());
 

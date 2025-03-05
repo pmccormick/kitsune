@@ -1,3 +1,4 @@
+#include <cassert>
 #include "NeumannBoundary.h"
 #include "Cell.h" // Include Cell class for implementation
 
@@ -14,20 +15,19 @@ NeumannBoundary::NeumannBoundary(double gradient)
  * For zero-gradient (most common), this means copying values from neighboring
  * cells.
  */
-void NeumannBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
-                            double x, double y, double dt) {
-  // A Neumann boundary needs at least one neighbor to determine the gradient
-  if (neighbors.empty()) {
-    // Handle error case - not enough neighbors
-    // In a real implementation, could throw an exception or log an error
-    return;
-  }
+void NeumannBoundary::apply(Cell &cell, [[maybe_unused]] double x,
+                            [[maybe_unused]] double y,
+                            [[maybe_unused]] double dt,
+                            const std::vector<Cell *> *neighbors) {
+
+  assert(neighbors != nullptr && !neighbors->empty() &&
+         "Neumann boundary requires at least one neighbor");
 
   // For typical fluid dynamics problems, the Neumann boundary condition
   // requires extrapolation from internal cells
 
   // Identify the primary interior neighbor (usually the closest one)
-  Cell *interiorNeighbor = neighbors[0];
+  Cell *interiorNeighbor = (*neighbors)[0];
 
   // Calculate distance between cells
   // Note: In a real implementation, this might use a more sophisticated

@@ -41,6 +41,7 @@
  * boundary condition"
  * - Pope, S.B. (2000) "Turbulent Flows"
  */
+#include <cassert>
 
 #include "NoSlipBoundary.h"
 #include "Cell.h"
@@ -176,28 +177,29 @@ void NoSlipBoundary::setHeatFluxFunction(
  * @param y Physical y-coordinate of the cell
  * @param dt Time step size
  */
-void NoSlipBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
-                           double x, double y, double dt) {
+void NoSlipBoundary::apply(Cell &cell, double x, double y, double dt,
+                           const std::vector<Cell *> *neighbors) {
+  assert(neighbors != nullptr && "NoSlipBoundary::apply() requires a neighbor list!");
   // Apply the no-slip velocity condition
   if (m_velocityXFunc) {
-    cell.setVelocityX(m_velocityXFunc(x, y, dt));
+    cell.setVelocityU(m_velocityXFunc(x, y, dt));
   } else {
-    cell.setVelocityX(m_wallVelocityX);
+    cell.setVelocityU(m_wallVelocityX);
   }
 
   if (m_velocityYFunc) {
-    cell.setVelocityY(m_velocityYFunc(x, y, dt));
+    cell.setVelocityV(m_velocityYFunc(x, y, dt));
   } else {
-    cell.setVelocityY(m_wallVelocityY);
+    cell.setVelocityV(m_wallVelocityY);
   }
 
   // For pressure, use Neumann zero-gradient from interior cells
-  if (!neighbors.empty()) {
+  if (!neighbors->empty()) {
     double avg_p = 0.0;
-    for (const auto &neighbor : neighbors) {
+    for (const auto &neighbor : *neighbors) {
       avg_p += neighbor->getPressure();
     }
-    avg_p /= neighbors.size();
+    avg_p /= neighbors->size();
     cell.setPressure(avg_p);
   }
 
@@ -208,7 +210,7 @@ void NoSlipBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
     } else {
       cell.setTemperature(m_wallTemperature);
     }
-  } else if (m_fixHeatFlux && !neighbors.empty()) {
+  } else if (m_fixHeatFlux && !neighbors->empty()) {
     // For heat flux boundary condition, we need interior cells
     // to approximate the temperature gradient
 
@@ -218,7 +220,7 @@ void NoSlipBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
     // Get the first interior cell for a simple 1st-order approximation
     // In a more sophisticated implementation, we would use multiple interior
     // cells for higher-order approximations
-    Cell *interiorCell = neighbors[0];
+    Cell *interiorCell = (*neighbors)[0];
 
     // Get the material properties needed for heat flux calculation
     double k = 0.0; // Thermal conductivity

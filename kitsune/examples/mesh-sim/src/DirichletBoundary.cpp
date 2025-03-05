@@ -31,18 +31,18 @@
 #include "DirichletBoundary.h"
 
 DirichletBoundary::DirichletBoundary(const std::string &name)
-    : BoundaryClass(name), m_velocityX(0.0), m_velocityY(0.0), m_pressure(0.0),
-      m_temperature(0.0), m_fixVelocityX(false), m_fixVelocityY(false),
+    : BoundaryClass(name), m_velocityU(0.0), m_velocityV(0.0), m_pressure(0.0),
+      m_temperature(0.0), m_fixVelocityU(false), m_fixVelocityV(false),
       m_fixPressure(false), m_fixTemperature(false) {}
 
-void DirichletBoundary::setVelocityX(double vx) {
-  m_velocityX = vx;
-  m_fixVelocityX = true;
+void DirichletBoundary::setVelocityU(double vu) {
+  m_velocityU = vu;
+  m_fixVelocityU = true;
 }
 
-void DirichletBoundary::setVelocityY(double vy) {
-  m_velocityY = vy;
-  m_fixVelocityY = true;
+void DirichletBoundary::setVelocityV(double vv) {
+  m_velocityV = vv;
+  m_fixVelocityV = true;
 }
 
 void DirichletBoundary::setPressure(double p) {
@@ -55,16 +55,16 @@ void DirichletBoundary::setTemperature(double t) {
   m_fixTemperature = true;
 }
 
-void DirichletBoundary::setVelocityXFunction(
+void DirichletBoundary::setVelocityUFunction(
     std::function<double(double, double, double)> func) {
-  m_velocityXFunc = func;
-  m_fixVelocityX = true;
+  m_velocityUFunc = func;
+  m_fixVelocityU = true;
 }
 
-void DirichletBoundary::setVelocityYFunction(
+void DirichletBoundary::setVelocityVFunction(
     std::function<double(double, double, double)> func) {
-  m_velocityYFunc = func;
-  m_fixVelocityY = true;
+  m_velocityVFunc = func;
+  m_fixVelocityV = true;
 }
 
 void DirichletBoundary::setPressureFunction(
@@ -79,22 +79,27 @@ void DirichletBoundary::setTemperatureFunction(
   m_fixTemperature = true;
 }
 
-void DirichletBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
-                              double x, double y, double dt) {
+void DirichletBoundary::apply(Cell &cell, double x, double y, double dt,
+                              const std::vector<Cell *> *neighbors) {
+
+  // Dirichlet boundaries does not use neighbors...
+  // Cheap shortcut to Silence unused parameter warning.
+  (void)neighbors;
+
   // Apply the fixed values or compute them from functions
-  if (m_fixVelocityX) {
-    if (m_velocityXFunc) {
-      cell.setVelocityX(m_velocityXFunc(x, y, dt));
+  if (m_fixVelocityU) {
+    if (m_velocityUFunc) {
+      cell.setVelocityU(m_velocityUFunc(x, y, dt));
     } else {
-      cell.setVelocityX(m_velocityX);
+      cell.setVelocityV(m_velocityU);
     }
   }
 
-  if (m_fixVelocityY) {
-    if (m_velocityYFunc) {
-      cell.setVelocityY(m_velocityYFunc(x, y, dt));
+  if (m_fixVelocityV) {
+    if (m_velocityVFunc) {
+      cell.setVelocityU(m_velocityVFunc(x, y, dt));
     } else {
-      cell.setVelocityY(m_velocityY);
+      cell.setVelocityV(m_velocityV);
     }
   }
 

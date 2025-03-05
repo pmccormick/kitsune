@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <memory>
@@ -47,12 +46,40 @@ public:
    * @param y Physical y-coordinate of the cell
    * @param dt Time step size
    */
-  virtual void apply(Cell &cell, const std::vector<Cell *> &neighbors, double x,
-                     double y, double dt) = 0;
+  virtual void apply(Cell &cell, double x, double y, double dt, 
+                     const std::vector<Cell *> *neighbors = nullptr) = 0;
 
   /**
    * @brief Get the type of the boundary condition
    * @return String identifier for the boundary type
    */
   virtual std::string getType() const = 0;
+
+  /**
+   * @brief Serialize the boundary condition to a string representation
+   * @return String containing serialized boundary data
+   */
+  virtual std::string serialize() const {
+    // Base implementation just saves the name and type
+    return "NAME=" + m_name + "\nTYPE=" + getType() + "\n";
+  }
+
+  /**
+   * @brief Deserialize boundary condition from a string representation
+   * @param data String containing serialized boundary data
+   * @return True if deserialization was successful
+   */
+  virtual bool deserialize(const std::string &data) {
+    // Base implementation extracts name
+    size_t namePos = data.find("NAME=");
+    if (namePos != std::string::npos) {
+      size_t valueStart = namePos + 5; // "NAME=".length()
+      size_t valueEnd = data.find('\n', valueStart);
+      if (valueEnd != std::string::npos) {
+        m_name = data.substr(valueStart, valueEnd - valueStart);
+        return true;
+      }
+    }
+    return false;
+  }
 };

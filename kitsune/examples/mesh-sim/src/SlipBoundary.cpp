@@ -1,3 +1,4 @@
+#include <cassert>
 #include "SlipBoundary.h"
 #include "Cell.h"    // Include Cell class for implementation
 #include <algorithm> // For std::transform
@@ -19,22 +20,19 @@ SlipBoundary::SlipBoundary(const std::string &orientation)
 /**
  * Implementation of the slip boundary condition
  */
-void SlipBoundary::apply(Cell &cell, const std::vector<Cell *> &neighbors,
-                         double x, double y, double dt) {
-  // A slip boundary needs at least one neighbor to determine the values
-  if (neighbors.empty()) {
-    // Handle error case - not enough neighbors
-    return;
-  }
+void SlipBoundary::apply(Cell &cell, [[maybe_unused]] double x,
+                         [[maybe_unused]] double y, [[maybe_unused]] double dt,
+                         const std::vector<Cell *> *neighbors) {
+  assert(neighbors != nullptr && !neighbors->empty() && "SlipBoundary::apply must have a neighbor list!");
 
   // Determine orientation if set to AUTO
   Orientation orientation = m_orientation;
   if (orientation == Orientation::AUTO) {
-    orientation = detectOrientation(neighbors);
+    orientation = detectOrientation(*neighbors);
   }
 
   // Get the interior neighbor
-  Cell *interiorNeighbor = neighbors[0];
+  Cell *interiorNeighbor = (*neighbors)[0];
 
   // Handle slip condition based on the orientation
   switch (orientation) {

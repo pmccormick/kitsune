@@ -60,8 +60,8 @@ void registerStandardPropertyComputations() {
   Cell::registerPropertyComputation(
       Cell::PropertyType::KINETIC_ENERGY,
       [](Cell &cell, const std::array<Cell *, 4> *) {
-        double vx = cell.getVelocityX();
-        double vy = cell.getVelocityY();
+        double vx = cell.getVelocityU();
+        double vy = cell.getVelocityV();
         double ke = 0.5 * (vx * vx + vy * vy);
         cell.setKineticEnergy(ke);
       });
@@ -84,8 +84,8 @@ void registerStandardPropertyComputations() {
           // Use central difference approximation for derivatives
           // Assuming uniform grid spacing of 1.0 (will be scaled by actual dx,
           // dy in Grid)
-          double dv_dx = (right->getVelocityY() - left->getVelocityY()) / 2.0;
-          double du_dy = (top->getVelocityX() - bottom->getVelocityX()) / 2.0;
+          double dv_dx = (right->getVelocityV() - left->getVelocityV()) / 2.0;
+          double du_dy = (top->getVelocityU() - bottom->getVelocityU()) / 2.0;
 
           // Vorticity = ∂v/∂x - ∂u/∂y (curl in 2D)
           double vorticity = dv_dx - du_dy;
@@ -108,8 +108,8 @@ void registerStandardPropertyComputations() {
 
         if (left && right && bottom && top) {
           // Central difference approximation
-          double du_dx = (right->getVelocityX() - left->getVelocityX()) / 2.0;
-          double dv_dy = (top->getVelocityY() - bottom->getVelocityY()) / 2.0;
+          double du_dx = (right->getVelocityU() - left->getVelocityU()) / 2.0;
+          double dv_dy = (top->getVelocityV() - bottom->getVelocityV()) / 2.0;
 
           // Divergence = ∂u/∂x + ∂v/∂y
           double divergence = du_dx + dv_dy;
@@ -155,10 +155,10 @@ void registerStandardPropertyComputations() {
 
         if (left && right && bottom && top) {
           // Compute velocity gradients for strain rate tensor
-          double du_dx = (right->getVelocityX() - left->getVelocityX()) / 2.0;
-          double du_dy = (top->getVelocityX() - bottom->getVelocityX()) / 2.0;
-          double dv_dx = (right->getVelocityY() - left->getVelocityY()) / 2.0;
-          double dv_dy = (top->getVelocityY() - bottom->getVelocityY()) / 2.0;
+          double du_dx = (right->getVelocityU() - left->getVelocityU()) / 2.0;
+          double du_dy = (top->getVelocityU() - bottom->getVelocityU()) / 2.0;
+          double dv_dx = (right->getVelocityV() - left->getVelocityV()) / 2.0;
+          double dv_dy = (top->getVelocityV() - bottom->getVelocityV()) / 2.0;
 
           // Get viscosity from material
           double viscosity = 1.0; // Default if no material
