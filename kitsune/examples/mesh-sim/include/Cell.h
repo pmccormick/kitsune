@@ -1,274 +1,271 @@
 /**
- * ====================================================================
- * Cell Class - Optimized Implementation for Cache and SIMD
- * ====================================================================
+ * @file Cell.h
+ * @brief Cell class for CFD simulations with unit‐aware property operations.
  *
- * This header defines the optimized Cell class implementation that uses
- * flattened data structures for better cache locality and vectorization.
+ * ================================================================================
+ * Design Considerations and Future Directions:
+ * ================================================================================
+ * This Cell class encapsulates a single computational cell. Its design preserves
+ * the full interface of the original version while incorporating complete support
+ * for physical unit conversions via the Units namespace. Key points include:
+ *
+ *   • **Internal Storage in SI Units:**
+ *     All cell‐center data (temperature, pressure, density, velocity) is stored in
+ *     SI units. For example, temperature is stored in Kelvin, pressure in Pascal,
+ *     density in kg/m³, and velocity in m/s.
+ *
+ *   • **Unit‑Aware Accessors:**
+ *     For each physical quantity, additional “WithUnits” methods allow users to set
+ *     and get values in other units. These functions internally convert to/from SI
+ *     using the Units::convert and Units::enforceValid… functions.
+ *
+ *   • **Full Simulation Interface:**
+ *     The Cell class supports cell types (FLUID, SOLID, BOUNDARY), flags (e.g.,
+ *     IS_INLET, IS_OBSTACLE), fixed state, dynamic and fixed properties (e.g., VORTICITY,
+ *     STREAM_FUNCTION), and serialization. It also provides convenience methods for
+ *     printing and SVG visualization.
+ *
+ *   • **Material Integration and Mixing:**
+ *     A cell holds a shared pointer to a Material. Rather than storing multiple
+ *     materials, the Cell leverages the Material class’s own mixing functionality via
+ *     a mixMaterial() method. This ensures that all complex material physics remains
+ *     encapsulated within the Material class.
+ *
+ *   • **Future Enhancements:**
+ *     - In a full data‐oriented redesign, cell–center data would be stored in separate
+ *       Field objects (structure‑of‑arrays) owned by a Mesh. This version, however, keeps
+ *       per‑cell storage for simplicity and unit testing.
+ *     - More advanced unit–error reporting, custom allocators, and GPU–specific optimizations
+ *       may be added later.
+ *
+ * ================================================================================
+ * Role in Computational Science:
+ * ================================================================================
+ * In simulations such as CFD, it is critical that each cell can readily convert between
+ * its internal SI representation and the various units that users and external libraries
+ * require. This Cell class:
+ *
+ *   - Bridges high-level simulation logic with low-level, unit–safe, efficient numerical
+ *     computations.
+ *   - Provides a clear, self-documenting interface that minimizes unit conversion errors.
+ *   - Integrates with Material physics so that effective properties (like density) can be
+ *     computed based on temperature-dependent or mixed–material models.
+ *
+ * This design is intended to be both performant and maintainable, ensuring that key physical
+ * quantities are accurately represented and easily converted for diverse simulation needs.
+ *
+ * ================================================================================
  */
 
-#pragma once
+#ifndef CELL_H
+#define CELL_H
 
 #include "Units.h"
+#include "Material.h"
+
 #include <array>
-#include <functional>
-#include <memory>
-#include <string>
 #include <unordered_map>
-#include <vector>
+#include <string>
+#include <sstream>
+#include <iostream>
+#include <cstdint>
+#include <algorithm>
+#include <memory>
 
-// Forward declarations
-class Material;
-class Grid;
-class BoundaryClass;
-
-/**
- * @class Cell
- * @brief Represents a single cell in the computational grid for CFD simulation
- *
- * This class is optimized for cache locality, SIMD operations, and future GPU
- * compatibility by using flattened, aligned data structures.
- */
+//------------------------------------------------------------------------------
+// Enumerations and supporting types
+//------------------------------------------------------------------------------
 class Cell {
 public:
-  /**
-   * @enum CellType
-   * @brief Defines the possible types of cells in the simulation
-   */
-  enum class CellType {
-    FLUID,   ///< Regular fluid cell
-    SOLID,   ///< Solid obstacle cell (e.g., cylinder)
-    BOUNDARY ///< Boundary cell
-  };
+    // Cell types.
+    enum class CellType { FLUID = 0, SOLID, BOUNDARY };
 
-  /**
-   * @enum VertexPosition
-   * @brief Defines the relative positions of cell vertices
-   */
-  enum class VertexPosition {
-    NORTHWEST = 0, // Top left
-    NORTHEAST = 1, // Top right
-    SOUTHEAST = 2, // Bottom right
-    SOUTHWEST = 3  // Bottom left
-  };
+    // Positions for vertex velocity access.
+    enum class VertexPosition { NORTHWEST = 0, NORTHEAST, SOUTHEAST, SOUTHWEST };
 
-  /**
-   * @enum PropertyType
-   * @brief Defines the common numerical properties that are frequently accessed
-   */
-  enum class PropertyType {
-    VORTICITY = 0,           ///< Curl of velocity field (rotation)
-    STREAM_FUNCTION = 1,     ///< Stream function value (for visualization)
-    KINETIC_ENERGY = 2,      ///< Kinetic energy per unit mass
-    DIVERGENCE = 3,          ///< Velocity divergence
-    PRESSURE_CORRECTION = 4, ///< Pressure correction term
-    HEAT_FLUX_X = 5,         ///< Heat flux in x-direction
-    HEAT_FLUX_Y = 6,         ///< Heat flux in y-direction
-    SHEAR_STRESS = 7,        ///< Local shear stress
-    WALL_DISTANCE = 8,       ///< Distance to nearest wall
-    COUNT                    ///< Keep last - used for array sizing
-  };
+    // Fixed properties indices.
+    enum class PropertyType {
+        VORTICITY = 0,
+        STREAM_FUNCTION,
+        KINETIC_ENERGY,
+        DIVERGENCE,
+        PRESSURE_CORRECTION,
+        HEAT_FLUX_X,
+        HEAT_FLUX_Y,
+        SHEAR_STRESS,
+        WALL_DISTANCE,
+        COUNT
+    };
 
-  /**
-   * @enum CellFlag
-   * @brief Boolean flags for various cell states and behaviors
-   */
-  enum class CellFlag {
-    IS_INLET = 0x00000001,    //< Cell is part of an inlet boundary
-    IS_OUTLET = 0x00000002,   ///< Cell is part of an outlet boundary
-    IS_WALL = 0x00000004,     ///< Cell is part of a wall boundary
-    IS_SYMMETRY = 0x00000008, ///< Cell is part of a symmetry boundary
-    IS_BOUNDARY = 0x00000010, ///< Cell is a boundary cell
-    IS_OBSTACLE = 0x00000020, ///< Cell is an obstacle
-    COUNT                     ///< Keep last - used for bit field sizing
-  };
+    // Flag definitions (using bitfields).
+    enum class CellFlag : uint32_t {
+        IS_INLET    = 0x00000001,
+        IS_OUTLET   = 0x00000002,
+        IS_WALL     = 0x00000004,
+        IS_SYMMETRY = 0x00000008,
+        IS_BOUNDARY = 0x00000010,
+        IS_OBSTACLE = 0x00000020,
+        COUNT       = 0x00000040  // not used as a flag
+    };
 
-  /**
-   * @struct Vertex
-   * @brief Data structure for cell vertex information
-   */
-  struct Vertex {
-    double vx = 0.0; ///< x-component of velocity
-    double vy = 0.0; ///< y-component of velocity
-  };
+    // Vertex structure for storing vertex velocities.
+    struct Vertex {
+        double vx = 0.0;
+        double vy = 0.0;
+    };
 
-  // Constructors and Destructor
-  Cell(Grid *grid = nullptr);
-  explicit Cell(CellType type, Grid *grid = nullptr);
-  ~Cell() = default;
+    // Default constructor (for unit testing purposes).
+    Cell();
 
-  // Boundary Condition Methods
-  void setBoundaryCondition(std::shared_ptr<BoundaryClass> boundary);
-  std::shared_ptr<BoundaryClass> getBoundaryCondition() const;
-  bool hasBoundaryCondition() const;
-  bool hasTemperature() const {
-    // Always return true since temperature is always available
-    return true;
-  }
-  bool hasDensity() const {
-    // Always return true since density is always available
-    return true;
-  }
+    // Constructors with type specification.
+    Cell(CellType type);
 
-  // Core Properties
-  Grid *getGrid() const;
-  CellType getType() const;
-  void setType(CellType type);
-  double getTemperature() const;
-  void setTemperature(double temperature);
-  double getPressure() const;
-  void setPressure(double pressure);
-  double getDensity() const;
-  void setDensity(double density);
-  std::shared_ptr<Material> getMaterial() const;
-  void setMaterial(std::shared_ptr<Material> material);
-  void setMaterial(Material *material);
-  bool isFixed() const;
-  void setFixed(bool fixed);
+    // Destructor.
+    ~Cell() = default;
 
-  // Temperature with unit conversion
-  void setTemperatureWithUnits(double temperature, const std::string &unit);
-  double getTemperatureWithUnits(const std::string &unit) const;
+    // --- Type and Flag Operations ---
+    CellType getType() const;
+    void setType(CellType type);
 
-  // Pressure with unit conversion
-  void setPressureWithUnits(double pressure, const std::string &unit);
-  double getPressureWithUnits(const std::string &unit) const;
+    bool isFixed() const;
+    void setFixed(bool fixed);
 
-  // Density with unit conversion
-  void setDensityWithUnits(double density, const std::string &unit);
-  double getDensityWithUnits(const std::string &unit) const;
+    bool isBoundary() const;
+    void setBoundary(bool isBoundary);
 
-  // Velocity Methods
-  std::pair<double, double> getVertexVelocity(VertexPosition position) const;
-  void setVertexVelocity(VertexPosition position, double vx, double vy);
-  Vertex &getVertex(VertexPosition position);
-  const Vertex &getVertex(VertexPosition position) const;
+    bool isObstacle() const;
+    void setObstacle(bool isObstacle);
 
-  // Velocity with unit conversion
-  void setVelocityWithUnits(double vx, double vy, const std::string &unit);
-  double getVelocityUWithUnits(const std::string &unit) const;
-  double getVelocityVWithUnits(const std::string &unit) const;
-  void setVertexVelocityWithUnits(VertexPosition position, double vx, double vy,
-                                  const std::string &unit);
-  std::pair<double, double>
-  getVertexVelocityWithUnits(VertexPosition position,
-                             const std::string &unit) const;
+    bool getFlag(CellFlag flag) const;
+    void setFlag(CellFlag flag, bool value);
 
-  // Property Methods
-  void setProperty(PropertyType type, double value);
-  double getProperty(PropertyType type) const;
+    // --- Cell-Centered Physical Property Accessors (SI Units) ---
+    double getTemperature() const;
+    void setTemperature(double temperature);
 
-  // Convenience methods for specific properties
-  double getVorticity() const;
-  void setVorticity(double value);
-  double getStreamFunction() const;
-  void setStreamFunction(double value);
-  double getKineticEnergy() const;
-  void setKineticEnergy(double value);
-  double getDivergence() const;
-  void setDivergence(double value);
-  double getPressureCorrection() const;
-  void setPressureCorrection(double value);
-  double getHeatFluxX() const;
-  void setHeatFluxX(double value);
-  double getHeatFluxY() const;
-  void setHeatFluxY(double value);
-  double getShearStress() const;
-  void setShearStress(double value);
-  double getWallDistance() const;
-  void setWallDistance(double value);
+    double getPressure() const;
+    void setPressure(double pressure);
 
-  // Flag Methods
-  void setFlag(CellFlag flag, bool value);
-  bool getFlag(CellFlag flag) const;
+    double getDensity() const;
+    void setDensity(double density);
 
-  // Dynamic Property Methods
-  void setDynamicProperty(const std::string &name, double value);
-  double getDynamicProperty(const std::string &name,
-                            double defaultValue = 0.0) const;
+    double getVelocityU() const; // x-velocity
+    void setVelocityU(double vx);
 
-  // State Management
-  void reset();
+    double getVelocityV() const; // y-velocity
+    void setVelocityV(double vy);
 
-  // Grid Compatibility Methods
-  void setBoundary(bool isBoundary);
-  bool isBoundary() const;
-  void setObstacle(bool isObstacle);
-  bool isObstacle() const;
-  double getVelocityU() const;
-  double getVelocityV() const;
-  void setVelocityU(double vx);
-  void setVelocityV(double vy);
+    // --- Unit Conversion Functions ---
+    // Temperature conversion.
+    void setTemperatureWithUnits(double temperature, const std::string &unit);
+    double getTemperatureWithUnits(const std::string &unit) const;
 
-  // Derived Properties Computation
-  using PropertyComputeFunction =
-      std::function<void(Cell &, const std::array<Cell *, 4> *)>;
-  static void registerPropertyComputation(PropertyType type,
-                                          PropertyComputeFunction computeFunc);
-  void
-  computeDerivedProperties(const std::array<Cell *, 4> *neighbors = nullptr);
-  static PropertyComputeFunction getPropertyComputation(PropertyType type);
+    // Pressure conversion.
+    void setPressureWithUnits(double pressure, const std::string &unit);
+    double getPressureWithUnits(const std::string &unit) const;
 
-  // Output and Serialization
-  void print(std::ostream &os, int verbosity = 1) const;
-  std::string toString(int verbosity = 1) const;
-  std::string serialize() const;
-  bool deserialize(const std::string &data);
-  std::string toSVG(double scale = 10.0, bool showVelocity = true) const;
+    // Density conversion.
+    void setDensityWithUnits(double density, const std::string &unit);
+    double getDensityWithUnits(const std::string &unit) const;
 
-  // Static Helpers
-  static std::string cellTypeToString(CellType type);
-  static std::string cellFlagToString(CellFlag flag);
+    // Velocity conversion.
+    void setVelocityWithUnits(double vx, double vy, const std::string &unit);
+    double getVelocityUWithUnits(const std::string &unit) const;
+    double getVelocityVWithUnits(const std::string &unit) const;
 
-  // Friend for efficient implementation
-  friend class Grid;
+    // Vertex velocity access (for cell corners).
+    std::pair<double, double> getVertexVelocity(VertexPosition pos) const;
+    void setVertexVelocity(VertexPosition pos, double vx, double vy);
+    void setVertexVelocityWithUnits(VertexPosition pos, double vx, double vy, const std::string &unit);
+    std::pair<double, double> getVertexVelocityWithUnits(VertexPosition pos, const std::string &unit) const;
+    // Also provide direct vertex access.
+    Vertex& getVertex(VertexPosition pos);
+    const Vertex& getVertex(VertexPosition pos) const;
+
+    // --- Material Integration ---
+    std::shared_ptr<Material> getMaterial() const;
+    void setMaterial(std::shared_ptr<Material> material);
+    /**
+     * @brief Mixes the cell’s current material with another using the Material class’s
+     *        mixing function.
+     * @param other Shared pointer to the other material.
+     * @param mixFraction Fraction of the other material.
+     * @param mixingRule Mixing rule string (default uses Material’s default).
+     */
+    void mixMaterial(const std::shared_ptr<Material> &other, double mixFraction, const std::string &mixingRule = "default");
+
+    double getEffectiveDensity() const;
+
+    // --- Dynamic and Fixed Property Access ---
+    void setProperty(PropertyType type, double value);
+    double getProperty(PropertyType type) const;
+
+    // Convenience methods.
+    double getVorticity() const;
+    void setVorticity(double value);
+    double getStreamFunction() const;
+    void setStreamFunction(double value);
+    double getKineticEnergy() const;
+    void setKineticEnergy(double value);
+    double getDivergence() const;
+    void setDivergence(double value);
+    double getPressureCorrection() const;
+    void setPressureCorrection(double value);
+    double getHeatFluxX() const;
+    void setHeatFluxX(double value);
+    double getHeatFluxY() const;
+    void setHeatFluxY(double value);
+    double getShearStress() const;
+    void setShearStress(double value);
+    double getWallDistance() const;
+    void setWallDistance(double value);
+
+    void setDynamicProperty(const std::string &name, double value);
+    double getDynamicProperty(const std::string &name, double defaultValue = 0.0) const;
+
+    // --- State Management ---
+    void reset();
+
+    // --- Serialization ---
+    std::string serialize() const;
+    bool deserialize(const std::string &data);
+
+    // --- Diagnostic Output ---
+    void print(std::ostream &os, int verbosity = 1) const;
+    std::string toString(int verbosity = 1) const;
+    std::string toSVG(double scale = 10.0, bool showVelocity = true) const;
+
+    // --- Static Helper Methods ---
+    static std::string cellTypeToString(CellType type);
+    static std::string cellFlagToString(CellFlag flag);
 
 private:
-  // ====================================================================
-  // OPTIMIZED DATA LAYOUT FOR BETTER CACHE PERFORMANCE
-  // ====================================================================
+    // Basic cell state.
+    CellType m_type = CellType::FLUID;
+    bool m_fixed = false;
+    bool m_isBoundary = false;
+    bool m_isObstacle = false;
+    uint64_t m_flags = 0;
 
-  // Integer and boolean values packed together for better cache locality
-  struct CellState {
-    CellType type = CellType::FLUID;
-    bool isFixed = false;
-    bool isObstacle = false;
-    bool isBoundary = false;
-    uint64_t flags = 0;
-  } m_state;
+    // Basic physical properties (stored in SI units).
+    double m_temperature = 293.15; // Kelvin (default: 20°C)
+    double m_pressure = 101325.0;  // Pascal (1 atm)
+    double m_density = 1.0;        // kg/m³
+    double m_velocityU = 0.0;      // m/s, x-component
+    double m_velocityV = 0.0;      // m/s, y-component
 
-  // Basic physical properties grouped together (frequently accessed together)
-  alignas(64) struct PhysicalProperties {
-    double temperature = 293.15; // K
-    double pressure = 101325.0;  // Pa
-    double density = 1.0;        // kg/m³
-    double velocity_u = 0.0;     // m/s
-    double velocity_v = 0.0;     // m/s
-  } m_physics;
+    // Vertex velocities (for the four corners of the cell).
+    std::array<Vertex, 4> m_vertices;
 
-  // Vertex velocities in a flat array for better SIMD
-  // Layout: [nw.vx, nw.vy, ne.vx, ne.vy, se.vx, se.vy, sw.vx, sw.vy]
-  alignas(64) std::array<double, 8> m_vertexVelocities = {0};
+    // Fixed properties storage (one per PropertyType).
+    std::array<double, static_cast<size_t>(PropertyType::COUNT)> m_fixedProperties{};
 
-  // Fixed properties in contiguous memory
-  alignas(64) std::array<
-      double, static_cast<size_t>(PropertyType::COUNT)> m_fixedProperties = {};
+    // Dynamic properties (stored by name).
+    std::unordered_map<std::string, double> m_dynamicProperties;
 
-  // References to external objects
-  Grid *m_grid = nullptr;
-  std::shared_ptr<Material> m_material = nullptr;
-  std::shared_ptr<BoundaryClass> m_boundaryCondition = nullptr;
-
-  // Dynamic properties - could be further optimized if needed
-  std::unordered_map<std::string, double> m_dynamicProperties;
-
-  // Static storage for property computation functions
-  static std::unordered_map<PropertyType, PropertyComputeFunction>
-      s_propertyComputations;
-
-  // Helper methods
-  static uint32_t hashName(const std::string &name);
-  double getVertexVelocityComponent(VertexPosition position, bool isY) const;
-  void setVertexVelocityComponent(VertexPosition position, bool isY,
-                                  double value);
+    // Associated material.
+    std::shared_ptr<Material> m_material = nullptr;
 };
+
+#endif // CELL_H
+
