@@ -138,7 +138,7 @@ bool __kithip_initialize() {
   // AMD's documentation suggests that there is no need to explicilty
   // call hipInit() as all API entry points will initialize when
   // necessary.  For now, we'll just follow the more direct path.
-  HIP_SAFE_CALL(hipInit(0));
+  //HIP_SAFE_CALL(hipInit(0));
 
   HIP_SAFE_CALL(hipGetDeviceCount(&rt_info.device_count));
   if (rt_info.device_count <= 0) {

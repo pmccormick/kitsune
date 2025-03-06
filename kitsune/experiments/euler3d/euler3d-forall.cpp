@@ -39,7 +39,6 @@ struct Float3 {
 #define __restrict
 #endif
 
-__attribute__((always_inline))
 void cpy(float* dst, const float* src, int N) {
   forall(unsigned int i = 0; i < N; i++)
     dst[i] = src[i];
@@ -74,7 +73,6 @@ void dump(float* variables, int nel, int nelr)
 
 }
 
-__attribute__((always_inline))
 void initialize_variables(int nelr,
                           float* variables,
                           float* ff_variable)
@@ -152,11 +150,12 @@ void compute_step_factor(int nelr,
                          const float* areas,
                          float* __restrict step_factors)
 {
-  forall(int blk = 0; blk < nelr/block_length; ++blk) {
+  
+  forall(unsigned blk = 0; blk < nelr/block_length; ++blk) {
     int b_start = blk*block_length;
     int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
 
-    for(int i = b_start; i < b_end; i++) {
+    for(unsigned i = b_start; i < b_end; i++) {
       float density = variables[i + VAR_DENSITY*nelr];
 
       Float3 momentum;
@@ -194,7 +193,7 @@ void compute_flux(const int nelr,
   using namespace std;
   const float smoothing_coefficient = 0.2f;
 
-  forall(int blk = 0; blk < nelr/block_length; ++blk) {
+  forall(unsigned blk = 0; blk < nelr/block_length; ++blk) {
     unsigned int b_start = blk*block_length;
     unsigned int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
 
@@ -242,8 +241,9 @@ void compute_flux(const int nelr,
       Float3 flux_contribution_nb_density_energy;
       float speed_sqd_nb, speed_of_sound_nb, pressure_nb;
 
-      for(int j = 0; j < NNB; j++) {
-        Float3 normal; float normal_len;
+      for(unsigned int j = 0; j < NNB; j++) {
+        Float3 normal;
+	float normal_len;
         float factor;
 
         int nb = elements_surrounding_elements[i + j*nelr];
@@ -371,10 +371,10 @@ void time_step(int j, int nelr,
 	       float* fluxes)
 {
 
-  forall(int blk = 0; blk < nelr/block_length; ++blk) {
+  forall(unsigned int blk = 0; blk < nelr/block_length; ++blk) {
     int b_start = blk*block_length;
     int b_end = (blk+1)*block_length > nelr ? nelr : (blk+1)*block_length;
-    for(int i = b_start; i < b_end; ++i) {
+    for(unsigned int i = b_start; i < b_end; ++i) {
       float factor = step_factors[i]/float(RK+1-j);
       variables[i + VAR_DENSITY*nelr] = old_variables[i + VAR_DENSITY*nelr]
                   + factor*fluxes[i + VAR_DENSITY*nelr];
@@ -419,6 +419,7 @@ int main(int argc, char** argv)
        << "  Iterations : " << iterations << ".\n\n"; 
   cout << "  Reading input data, allocating arrays, initializing data, etc..." 
        << std::flush;
+
   auto total_start_time = chrono::steady_clock::now();
 
   // these need to be computed the first time in order to compute time step
@@ -514,9 +515,6 @@ int main(int argc, char** argv)
   // Create arrays and set initial conditions
   float* variables = alloc<float>(nelr*NVAR);
   cout << "  done.\n\n";
-
-  cout << "  Starting benchmark...\n" << std::flush;
-  auto start_time = chrono::steady_clock::now();
   
   initialize_variables(nelr, variables, ff_variable);
   float* old_variables = alloc<float>(nelr*NVAR);
@@ -529,6 +527,8 @@ int main(int argc, char** argv)
   double sf_total = 0.0, sf_min = 1000.0, sf_max = 0.0;;
   double rk_total = 0.0, rk_min = 1000.0, rk_max = 0.0;
 
+  cout << "  Starting benchmark...\n" << std::flush;
+  auto start_time = chrono::steady_clock::now();
   for(int i = 0; i < iterations; i++) {
     auto copy_start = chrono::steady_clock::now();
     cpy(old_variables, variables, nelr*NVAR);

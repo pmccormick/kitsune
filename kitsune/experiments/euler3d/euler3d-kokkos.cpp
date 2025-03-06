@@ -94,10 +94,14 @@ void initialize_variables(int nelr, View<float> &variables,
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
-void compute_flux_contribution(const float density, const Float3 &momentum,
-                               const float density_energy, const float pressure,
-                               Float3 &velocity, Float3 &fc_momentum_x,
-                               Float3 &fc_momentum_y, Float3 &fc_momentum_z,
+void compute_flux_contribution(const float density,
+			       const Float3 &momentum,
+                               const float density_energy,
+			       const float pressure,
+                               Float3 &velocity,
+			       Float3 &fc_momentum_x,
+                               Float3 &fc_momentum_y,
+			       Float3 &fc_momentum_z,
                                Float3 &fc_density_energy) {
   fc_momentum_x.x = velocity.x * momentum.x + pressure;
   fc_momentum_x.y = velocity.x * momentum.y;
@@ -118,7 +122,9 @@ void compute_flux_contribution(const float density, const Float3 &momentum,
 }
 
 KOKKOS_FORCEINLINE_FUNCTION
-void compute_velocity(float density, const Float3 &momentum, Float3 &velocity) {
+void compute_velocity(float density,
+		      const Float3 &momentum,
+		      Float3 &velocity) {
   velocity.x = momentum.x / density;
   velocity.y = momentum.y / density;
   velocity.z = momentum.z / density;
@@ -150,7 +156,7 @@ void compute_step_factor(int nelr, View<float> &__restrict variables,
 
   Kokkos::parallel_for(
       "compute_step_factor", nelr / block_length,
-      KOKKOS_LAMBDA(const int &blk) {
+      KOKKOS_LAMBDA(const unsigned &blk) {
         int b_start = blk * block_length;
         int b_end =
             (blk + 1) * block_length > nelr ? nelr : (blk + 1) * block_length;
@@ -183,7 +189,8 @@ void compute_step_factor(int nelr, View<float> &__restrict variables,
   Kokkos::fence();
 }
 
-void compute_flux(int nelr, View<int> &elements_surrounding_elements,
+void compute_flux(int nelr,
+		  View<int> &elements_surrounding_elements,
                   View<float> &normals, View<float> &variables,
                   View<float> &fluxes, View<float> &ff_variable,
                   const Float3 ff_flux_contribution_momentum_x,
@@ -191,7 +198,7 @@ void compute_flux(int nelr, View<int> &elements_surrounding_elements,
                   const Float3 ff_flux_contribution_momentum_z,
                   const Float3 ff_flux_contribution_density_energy) {
 
-  const float smoothing_coefficient = float(0.2f);
+  const float smoothing_coefficient = 0.2f;
   elements_surrounding_elements.sync_device();
   normals.sync_device();
   variables.sync_device();
@@ -200,12 +207,12 @@ void compute_flux(int nelr, View<int> &elements_surrounding_elements,
   fluxes.modify_device();
 
   Kokkos::parallel_for(
-      "compute_flux", nelr / block_length, KOKKOS_LAMBDA(const int &blk) {
-        int b_start = blk * block_length;
-        int b_end =
+      "compute_flux", nelr / block_length, KOKKOS_LAMBDA(const unsigned &blk) {
+        unsigned b_start = blk * block_length;
+        unsigned b_end =
             (blk + 1) * block_length > nelr ? nelr : (blk + 1) * block_length;
 
-        for (int i = b_start; i < b_end; ++i) {
+        for (unsigned int i = b_start; i < b_end; ++i) {
           float density_i = variables.d_view(i + VAR_DENSITY * nelr);
           Float3 momentum_i;
           momentum_i.x = variables.d_view(i + (VAR_MOMENTUM + 0) * nelr);
@@ -233,12 +240,12 @@ void compute_flux(int nelr, View<int> &elements_surrounding_elements,
               flux_contribution_i_momentum_z,
               flux_contribution_i_density_energy);
 
-          float flux_i_density = float(0.0f);
+          float flux_i_density = 0.0f;
           Float3 flux_i_momentum;
-          flux_i_momentum.x = float(0.0f);
-          flux_i_momentum.y = float(0.0f);
-          flux_i_momentum.z = float(0.0f);
-          float flux_i_density_energy = float(0.0f);
+          flux_i_momentum.x = 0.0f;
+          flux_i_momentum.y = 0.0f;
+          flux_i_momentum.z = 0.0f;
+          float flux_i_density_energy = 0.0f;
 
           Float3 velocity_nb;
           float density_nb, density_energy_nb;
@@ -248,7 +255,7 @@ void compute_flux(int nelr, View<int> &elements_surrounding_elements,
           Float3 flux_contribution_nb_density_energy;
           float speed_sqd_nb, speed_of_sound_nb, pressure_nb;
 
-          for (int j = 0; j < NNB; j++) {
+          for (unsigned j = 0; j < NNB; j++) {
             Float3 normal;
             float normal_len;
             float factor;
@@ -372,6 +379,7 @@ void compute_flux(int nelr, View<int> &elements_surrounding_elements,
                                              flux_contribution_i_momentum_z.z);
             }
           }
+	  
           fluxes.d_view(i + VAR_DENSITY * nelr) = flux_i_density;
           fluxes.d_view(i + (VAR_MOMENTUM + 0) * nelr) = flux_i_momentum.x;
           fluxes.d_view(i + (VAR_MOMENTUM + 1) * nelr) = flux_i_momentum.y;
@@ -391,11 +399,11 @@ void time_step(int j, int nelr, View<float> &old_variables,
   fluxes.sync_device();
   variables.modify_device();
   Kokkos::parallel_for(
-      "time_step", nelr / block_length, KOKKOS_LAMBDA(const int &blk) {
+      "time_step", nelr / block_length, KOKKOS_LAMBDA(const unsigned int &blk) {
         int b_start = blk * block_length;
         int b_end =
             (blk + 1) * block_length > nelr ? nelr : (blk + 1) * block_length;
-        for (int i = b_start; i < b_end; ++i) {
+        for (unsigned int i = b_start; i < b_end; ++i) {
           float factor = step_factors.d_view(i) / float(RK + 1 - j);
           variables.d_view(i + VAR_DENSITY * nelr) =
               old_variables.d_view(i + VAR_DENSITY * nelr) +

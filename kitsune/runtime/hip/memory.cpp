@@ -216,6 +216,8 @@ __attribute__((malloc)) void *__kithip_mem_alloc_managed(size_t size) {
                              hipMemAdviseSetPreferredLocation, deviceID()));
   HIP_SAFE_CALL(
       hipMemAdvise(alloced_ptr, size, hipMemAdviseSetAccessedBy, deviceID()));
+  HIP_SAFE_CALL(
+      hipMemAdvise(alloced_ptr, size, hipMemAdviseSetReadMostly, deviceID()));
   // This call currently seems to be the most signifcant in terms of improving
   // performance -- others appear to be mostly ignored...
   HIP_SAFE_CALL(
@@ -325,7 +327,6 @@ void *__kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
   using namespace kithip_rt;
 
   size_t size = 0;
-
   // TODO: Prefetching details and approaches need to be further
   // explored.  In particular, in concert with compiler analysis
   // and code generation.
@@ -353,6 +354,7 @@ void *__kithip_mem_gpu_prefetch(void *vp, void *opaque_stream) {
               "kitrt[hip]: issue prefetch(address=%p, size=%ld, stream=%p)\n",
               vp, size, (void *)hip_stream);
 
+    HIP_SAFE_CALL(hipSetDevice(deviceID()));
     HIP_SAFE_CALL(hipMemPrefetchAsync(vp, size, deviceID(), hip_stream));
 
     // LOCK
@@ -394,8 +396,8 @@ void __kithip_mem_host_prefetch(void *vp) {
       //
       // TODO: A lot of work needs to go into seeing if we can be
       // smarter about device- and host-side prefetching.
-      HIP_SAFE_CALL(
-          hipMemAdvise(vp, size, hipMemAdviseSetPreferredLocation, deviceID()));
+      //HIP_SAFE_CALL(
+      //    hipMemAdvise(vp, size, hipMemAdviseSetPreferredLocation, deviceID()));
       // Issue a prefetch request on the stream associated with the
       // calling thread. Once issued go ahead and mark the memory as
       // no long being prefetched to the device/GPU.  This "mark" does
