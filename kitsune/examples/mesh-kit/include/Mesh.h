@@ -1,11 +1,11 @@
 /**
  * ====================================================================
- * Mesh Class - Core Implementation for CFD Simulations
+ * Mesh Class - Field-Based Implementation for CFD Simulations
  * ====================================================================
  *
- * This implementation focuses on the core grid functionality with a flat
- * memory layout for optimal performance, clean boundary condition handling,
- * and consistent coordinate conversions.
+ * This implementation focuses on field-based storage with a thin Cell facade
+ * to maintain API compatibility while providing optimal performance through
+ * contiguous memory layout.
  */
 #pragma once
 
@@ -17,6 +17,7 @@
 
 #include "BoundaryClass.h"
 #include "Cell.h"
+#include "Field.h"
 #include "Material.h"
 #include "Units.h"
 
@@ -30,10 +31,11 @@ class PeriodicBoundary;
 
 /**
  * @class Mesh
- * @brief Core structured grid implementation for CFD simulations
+ * @brief Core structured grid implementation with field-based storage
  *
  * Features:
- * - Flat memory layout for cache-friendly access and potential GPU acceleration
+ * - Field-based contiguous storage for all physical properties
+ * - Thin Cell facade for compatibility with existing interfaces
  * - Comprehensive boundary condition handling
  * - Consistent coordinate conversions
  * - Built for extensibility through separate specialized modules
@@ -226,24 +228,50 @@ public:
   const Cell &getCell(size_t i, size_t j) const;
 
   /**
-   * @brief Get direct pointer to the cell data array for high-performance
-   * access
-   * @return Pointer to the first cell in the array
-   */
-  Cell *getCellData() { return m_cells.data(); }
-
-  /**
-   * @brief Get direct const pointer to the cell data array for high-performance
-   * access
-   * @return Const pointer to the first cell in the array
-   */
-  const Cell *getCellData() const { return m_cells.data(); }
-
-  /**
    * @brief Get total number of cells in the mesh
    * @return Total cell count
    */
-  size_t getCellCount() const { return m_cells.size(); }
+  size_t getCellCount() const { return m_nx * m_ny; }
+
+  //==== Field Access Methods ====
+  // These methods provide direct access to the underlying fields
+  // for high-performance operations
+
+  // Physical property fields
+  CellCenterField &getTemperatureField() { return m_temperature; }
+  CellCenterField &getPressureField() { return m_pressure; }
+  CellCenterField &getDensityField() { return m_density; }
+  CellCenterField &getVelocityUField() { return m_velocityU; }
+  CellCenterField &getVelocityVField() { return m_velocityV; }
+
+  // Cell state fields
+  Field<Cell::CellType, CellCenterTag> &getCellTypeField() {
+    return m_cellType;
+  }
+  Field<bool, CellCenterTag> &getFixedStatusField() { return m_fixedStatus; }
+  Field<bool, CellCenterTag> &getBoundaryFlagField() { return m_boundaryFlag; }
+  Field<bool, CellCenterTag> &getObstacleFlagField() { return m_obstacleFlag; }
+  Field<uint64_t, CellCenterTag> &getFlagsField() { return m_flags; }
+
+  // Property fields
+  Field<double, CellCenterTag, 3> &getPropertiesField() { return m_properties; }
+
+  // Vertex fields
+  Field<double, CellCenterTag, 4> &getVertexVelocityXField() {
+    return m_vertexVelocityX;
+  }
+  Field<double, CellCenterTag, 4> &getVertexVelocityYField() {
+    return m_vertexVelocityY;
+  }
+
+  // Material and boundary condition access
+  std::shared_ptr<Material> getCellMaterial(size_t i, size_t j) const;
+  void setCellMaterial(size_t i, size_t j, std::shared_ptr<Material> material);
+
+  std::shared_ptr<BoundaryClass> getCellBoundaryCondition(size_t i,
+                                                          size_t j) const;
+  void setCellBoundaryCondition(size_t i, size_t j,
+                                std::shared_ptr<BoundaryClass> bc);
 
   //==== Coordinate Conversion Methods ====
 
@@ -456,12 +484,77 @@ public:
   void setCellAsFluid(size_t i, size_t j,
                       std::shared_ptr<Material> material = nullptr);
 
-  //==== Friend Declarations ====
+  //==== Boundary/Topology Methods ====
 
-  // Declare relevant external modules as friends to allow efficient access
-  // This helps avoid unnecessary accessor/mutator methods
-  // friend class ObstacleGenerator; // If we create these as classes
-  // friend class GridVisualizer;
+  /**
+   * @brief Get a reference to a face by its ID
+   * @param faceID ID of the face
+   * @return Reference to the face
+   * @throws std::out_of_range if the face doesn't exist
+   */
+  Face &getFace(MeshFaceID faceID);
+
+  /**
+   * @brief Get a reference to a boundary cell associated with a face
+   * @param faceID ID of the boundary face
+   * @return Reference to the boundary cell
+   * @throws std::out_of_range if the face isn't a boundary face
+   */
+  Cell &getBoundaryCell(MeshFaceID faceID);
+
+  /**
+   * @brief Get neighboring interior cells for a boundary face
+   * @param faceID ID of the boundary face
+   * @return Vector of pointers to neighboring cells
+   */
+  std::vector<Cell *> getNeighboringCells(MeshFaceID faceID);
+
+  /**
+   * @brief Get all boundary faces in the mesh
+   * @return Vector of IDs for all boundary faces
+   */
+  std::vector<MeshFaceID> getBoundaryFaces() const;
+
+  /**
+   * @brief Get boundary faces by named region
+   * @param regionName Name of the boundary region
+   * @return Vector of face IDs in the named region
+   */
+  std::vector<MeshFaceID>
+  getBoundaryFacesByRegion(const std::string &regionName) const;
+
+  /**
+   * @brief Add a boundary zone to the mesh
+   * @param zone Shared pointer to the boundary zone
+   */
+  void addBoundaryZone(std::shared_ptr<BoundaryZone> zone);
+
+  /**
+   * @brief Get a boundary zone by name
+   * @param name Name of the boundary zone
+   * @return Shared pointer to the boundary zone, or nullptr if not found
+   */
+  std::shared_ptr<BoundaryZone> getBoundaryZone(const std::string &name) const;
+
+  /**
+   * @brief Get all boundary zones
+   * @return Vector of shared pointers to all boundary zones
+   */
+  std::vector<std::shared_ptr<BoundaryZone>> getBoundaryZones() const;
+
+  /**
+   * @brief Get the normal vector of a face
+   * @param faceID ID of the face
+   * @return Normal vector of the face (outward facing for boundary faces)
+   */
+  Vector2D getFaceNormal(MeshFaceID faceID) const;
+
+  /**
+   * @brief Apply all boundary conditions
+   * @param time Current simulation time
+   * @param dt Time step size
+   */
+  void applyAllBoundaryConditions(double time, double dt);
 
 private:
   // Grid dimensions
@@ -480,13 +573,59 @@ private:
   double m_dx;
   double m_dy;
 
-  // Storage for cells in flat array
-  std::vector<Cell> m_cells;
+  // === Field-based storage for cell properties ===
+
+  // Physical properties fields (cell-centered)
+  CellCenterField m_temperature; // Kelvin
+  CellCenterField m_pressure;    // Pascal
+  CellCenterField m_density;     // kg/m³
+  CellCenterField m_velocityU;   // m/s
+  CellCenterField m_velocityV;   // m/s
+
+  // Cell state fields
+  Field<Cell::CellType, CellCenterTag> m_cellType;
+  Field<bool, CellCenterTag> m_fixedStatus;
+  Field<bool, CellCenterTag> m_boundaryFlag;
+  Field<bool, CellCenterTag> m_obstacleFlag;
+  Field<uint64_t, CellCenterTag> m_flags;
+
+  // Material field - stores indices into the materials registry
+  Field<uint32_t, CellCenterTag> m_materialIds;
+
+  // Boundary condition field - stores indices into the boundary conditions map
+  Field<std::string, CellCenterTag> m_boundaryNames;
+
+  // Property fields - 3rd dimension is the property type
+  Field<double, CellCenterTag, 3> m_properties;
+
+  // Vertex velocity fields - 3rd dimension is the vertex index
+  Field<double, CellCenterTag, 4> m_vertexVelocityX;
+  Field<double, CellCenterTag, 4> m_vertexVelocityY;
+
+  // Cell facade cache for returning Cell objects
+  mutable std::vector<Cell> m_cellCache;
 
   // Boundary condition mapping
   std::unordered_map<std::string, std::shared_ptr<BoundaryClass>>
       m_boundaryConditions;
 
+  // Material registry mapping
+  std::unordered_map<uint32_t, std::shared_ptr<Material>> m_materials;
+  uint32_t m_nextMaterialId = 1;
+
   // Helper to compute 1D index from 2D indices
   inline size_t index(size_t i, size_t j) const { return i + j * m_nx; }
+
+  // Helper to get or create a cell in the cache
+  Cell &getCachedCell(size_t i, size_t j) const;
+
+  // Helper to register a material in our registry
+  uint32_t registerMaterial(std::shared_ptr<Material> material);
+
+  // Map of boundary zones by name
+  std::unordered_map<std::string, std::shared_ptr<BoundaryZone>>
+      m_boundaryZones;
+
+  // Map of boundary faces to their regions
+  std::unordered_map<std::string, std::vector<MeshFaceID>> m_boundaryRegions;
 };

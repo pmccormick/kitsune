@@ -36,6 +36,7 @@ set(LIB_HEADERS
     include/BoundaryFactory.h
     include/Cell.h
     include/DirichletBoundary.h
+    include/Field.h  # Added our Field header
     include/InflowBoundary.h
     include/Material.h
     include/Mesh.h
@@ -56,6 +57,11 @@ target_include_directories(CFDLib PUBLIC
 )
 
 # Add test executables
+
+# Field tests (new)
+add_executable(field_tests tests/field_test_suite.cpp)
+target_link_libraries(field_tests PRIVATE CFDLib)
+add_test(NAME FieldTests COMMAND field_tests)
 
 # Cell tests
 add_executable(cell_tests tests/cell_test_suite.cpp)
@@ -94,11 +100,25 @@ add_executable(periodic_boundary_tests tests/periodic_boundary_tests.cpp)
 target_link_libraries(periodic_boundary_tests PRIVATE CFDLib)
 add_test(NAME PeriodicBoundaryTests COMMAND periodic_boundary_tests)
 
+# Mesh-Field integration tests (new)
+add_executable(mesh_field_tests tests/mesh_field_test_suite.cpp)
+target_link_libraries(mesh_field_tests PRIVATE CFDLib)
+add_test(NAME MeshFieldTests COMMAND mesh_field_tests)
+
+# Cell-Field integration tests (new)
+add_executable(cell_field_tests tests/cell_field_test_suite.cpp)
+target_link_libraries(cell_field_tests PRIVATE CFDLib)
+add_test(NAME CellFieldTests COMMAND cell_field_tests)
+
 # Optional performance tests (build only when specifically requested)
 option(BUILD_PERF_TESTS "Build performance tests" OFF)
 if(BUILD_PERF_TESTS)
     add_executable(cell_perf_tests tests/cell_performance_analysis.cpp)
     target_link_libraries(cell_perf_tests PRIVATE CFDLib)
+    
+    # Field performance tests (new)
+    add_executable(field_perf_tests tests/field_performance_analysis.cpp)
+    target_link_libraries(field_perf_tests PRIVATE CFDLib)
 endif()
 
 # Install targets
@@ -114,4 +134,3 @@ install(FILES ${LIB_HEADERS} DESTINATION include)
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
-
