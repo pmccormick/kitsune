@@ -106,9 +106,9 @@ void *__kithip_get_thread_stream() {
     // UNLOCK
   } else {
     HIP_SAFE_CALL(hipSetDevice(deviceID()));
-    HIP_SAFE_CALL(hipStreamCreate(&hip_stream));
-    HIP_SAFE_CALL(hipStreamCreateWithPriority(&hip_stream, hipStreamNonBlocking, -100));
-    //HIP_SAFE_CALL(hipStreamCreateWithFlags(&hip_stream, hipStreamNonBlocking));
+    HIP_SAFE_CALL(hipStreamCreateWithFlags(&hip_stream, hipStreamNonBlocking));
+    // HIP_SAFE_CALL(hipStreamCreateWithPriority(&hip_stream,
+    // hipStreamNonBlocking, -100));
   }
 
   return (void *)hip_stream;

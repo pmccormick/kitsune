@@ -27,8 +27,54 @@ static const std::array<std::string,
 static const std::array<std::string, 5> MODEL_NAMES = {
     "Constant", "Linear", "Polynomial", "Exponential", "Custom"};
 
+// Parses a mixing rule string to enum
+Material::MixingRuleType Material::parseMixingRule(std::string_view rule) {
+  if (rule == "logarithmic")
+    return MixingRuleType::LOGARITHMIC;
+  if (rule == "harmonic")
+    return MixingRuleType::HARMONIC;
+  if (rule == "geometric")
+    return MixingRuleType::GEOMETRIC;
+  if (rule == "custom")
+    return MixingRuleType::CUSTOM;
+  if (rule == "default")
+    return MixingRuleType::DEFAULT;
+  return MixingRuleType::LINEAR; // Default to LINEAR for unknown rules
+}
+
+// Gets string representation of a mixing rule type
+const char *Material::getMixingRuleString(MixingRuleType ruleType) {
+  static const char *RULE_STRINGS[] = {"linear",    "logarithmic", "harmonic",
+                                       "geometric", "custom",      "default"};
+
+  if (ruleType == MixingRuleType::DEFAULT) {
+    return "default";
+  }
+
+  return RULE_STRINGS[static_cast<size_t>(ruleType)];
+}
+
+// Get effective mixing rule for a property
+Material::MixingRuleType
+Material::getEffectiveMixingRule(MixingRuleType requestedRule,
+                                 MaterialProperty property) {
+
+  if (requestedRule == MixingRuleType::DEFAULT) {
+    // Use property-specific defaults
+    switch (property) {
+    case MaterialProperty::DYNAMIC_VISCOSITY:
+      return MixingRuleType::LOGARITHMIC;
+    case MaterialProperty::THERMAL_CONDUCTIVITY:
+      return MixingRuleType::HARMONIC;
+    default:
+      return MixingRuleType::LINEAR;
+    }
+  }
+  return requestedRule;
+}
+
 Material::Material()
-    : m_mixingRule("default"), m_type(MaterialType::FLUID),
+    : m_mixingRuleType(MixingRuleType::DEFAULT), m_type(MaterialType::FLUID),
       m_name("DefaultMaterial"), m_referenceTemperature(293.15),
       m_useTempDependentProps(false), m_componentCount(0), m_materialID(0) {
 
@@ -58,7 +104,7 @@ Material::Material()
 }
 
 Material::Material(MaterialType type, const std::string &name)
-    : m_mixingRule("default"), m_type(type), m_name(name),
+    : m_mixingRuleType(MixingRuleType::DEFAULT), m_type(type), m_name(name),
       m_referenceTemperature(293.15), m_useTempDependentProps(false),
       m_componentCount(0), m_materialID(0) {
 
@@ -88,7 +134,8 @@ Material::Material(MaterialType type, const std::string &name)
 }
 
 Material::Material(const Material &other)
-    : m_mixingRule("default"), m_type(other.m_type), m_name(other.m_name),
+    : m_mixingRuleType(other.m_mixingRuleType), m_type(other.m_type),
+      m_name(other.m_name),
       m_referenceTemperature(other.m_referenceTemperature),
       m_useTempDependentProps(other.m_useTempDependentProps),
       m_componentCount(other.m_componentCount),
@@ -120,7 +167,7 @@ Material::Material(const Material &other)
 }
 
 Material::Material(Material &&other) noexcept
-    : m_mixingRule("default"), m_type(other.m_type),
+    : m_mixingRuleType(other.m_mixingRuleType), m_type(other.m_type),
       m_name(std::move(other.m_name)),
       m_referenceTemperature(other.m_referenceTemperature),
       m_useTempDependentProps(other.m_useTempDependentProps),
@@ -162,91 +209,6 @@ Material::Material(Material &&other) noexcept
 Material::~Material() {
   // Unregister from material registry
   unregisterMaterial();
-}
-
-Material &Material::operator=(const Material &other) {
-  if (this != &other) {
-    // Unregister current object
-    unregisterMaterial();
-
-    // Copy basic properties
-    m_type = other.m_type;
-    m_name = other.m_name;
-    m_referenceTemperature = other.m_referenceTemperature;
-    m_useTempDependentProps = other.m_useTempDependentProps;
-    m_componentCount = other.m_componentCount;
-
-    // Copy all properties
-    for (size_t i = 0; i < static_cast<size_t>(MaterialProperty::COUNT); ++i) {
-      m_baseProperties[i] = other.m_baseProperties[i];
-      m_propertyModels[i] = other.m_propertyModels[i];
-      m_coefficientCounts[i] = other.m_coefficientCounts[i];
-
-      // Copy all coefficients
-      for (size_t j = 0; j < MAX_COEFFICIENTS; ++j) {
-        m_coefficients[i][j] = other.m_coefficients[i][j];
-      }
-
-      // Copy custom functions
-      m_customFunctions[i] = other.m_customFunctions[i];
-    }
-
-    // Copy component arrays
-    for (size_t i = 0; i < MAX_MIXTURE_COMPONENTS; ++i) {
-      m_componentIDs[i] = other.m_componentIDs[i];
-      m_componentFractions[i] = other.m_componentFractions[i];
-    }
-
-    // Register with new ID
-    registerMaterial();
-  }
-  return *this;
-}
-
-Material &Material::operator=(Material &&other) noexcept {
-  if (this != &other) {
-    // Unregister current object
-    unregisterMaterial();
-
-    // Move basic properties
-    m_type = other.m_type;
-    m_name = std::move(other.m_name);
-    m_referenceTemperature = other.m_referenceTemperature;
-    m_useTempDependentProps = other.m_useTempDependentProps;
-    m_componentCount = other.m_componentCount;
-    m_materialID = other.m_materialID;
-
-    // Copy all properties
-    for (size_t i = 0; i < static_cast<size_t>(MaterialProperty::COUNT); ++i) {
-      m_baseProperties[i] = other.m_baseProperties[i];
-      m_propertyModels[i] = other.m_propertyModels[i];
-      m_coefficientCounts[i] = other.m_coefficientCounts[i];
-
-      // Copy all coefficients
-      for (size_t j = 0; j < MAX_COEFFICIENTS; ++j) {
-        m_coefficients[i][j] = other.m_coefficients[i][j];
-      }
-
-      // Move custom functions
-      m_customFunctions[i] = std::move(other.m_customFunctions[i]);
-    }
-
-    // Copy component arrays
-    for (size_t i = 0; i < MAX_MIXTURE_COMPONENTS; ++i) {
-      m_componentIDs[i] = other.m_componentIDs[i];
-      m_componentFractions[i] = other.m_componentFractions[i];
-    }
-
-    // Update registry with the new pointer
-    if (m_materialID != 0) {
-      s_materialRegistry[m_materialID] = this;
-    }
-
-    // Clear the moved-from object
-    other.m_materialID = 0;
-    other.m_componentCount = 0;
-  }
-  return *this;
 }
 
 void Material::registerMaterial() {
@@ -340,6 +302,7 @@ void Material::setCustomPropertyFunction(
     m_useTempDependentProps = true;
   }
 }
+
 double Material::calculatePropertyValue(MaterialProperty property,
                                         double temperature) const {
   size_t index = static_cast<size_t>(property);
@@ -380,22 +343,6 @@ double Material::calculatePropertyValue(MaterialProperty property,
       return m_baseProperties[index];
     }
 
-    // Mix properties using the appropriate rule
-    std::string mixingRule = "linear"; // Default to linear
-
-    // Use appropriate rule based on property type
-    switch (property) {
-    case MaterialProperty::DYNAMIC_VISCOSITY:
-      mixingRule = "logarithmic";
-      break;
-    case MaterialProperty::THERMAL_CONDUCTIVITY:
-      mixingRule = "harmonic";
-      break;
-    default:
-      mixingRule = "linear";
-      break;
-    }
-
     // Get property values from all components
     std::vector<double> values(nonZeroIDs.size());
     for (size_t i = 0; i < nonZeroIDs.size(); ++i) {
@@ -407,15 +354,20 @@ double Material::calculatePropertyValue(MaterialProperty property,
       }
     }
 
-    // Apply mixing rule
+    // Apply the appropriate mixing rule
+    MixingRuleType effectiveRule =
+        getEffectiveMixingRule(m_mixingRuleType, property);
     double result = 0.0;
 
-    if (mixingRule == "linear") {
+    switch (effectiveRule) {
+    case MixingRuleType::LINEAR: {
       // Linear mixing
       for (size_t i = 0; i < values.size(); ++i) {
         result += nonZeroFractions[i] * values[i];
       }
-    } else if (mixingRule == "logarithmic") {
+      break;
+    }
+    case MixingRuleType::LOGARITHMIC: {
       // Check if all values are positive
       bool allPositive = true;
       for (double value : values) {
@@ -438,7 +390,9 @@ double Material::calculatePropertyValue(MaterialProperty property,
           result += nonZeroFractions[i] * values[i];
         }
       }
-    } else if (mixingRule == "harmonic") {
+      break;
+    }
+    case MixingRuleType::HARMONIC: {
       // Check for zero values
       bool hasZero = false;
       for (double value : values) {
@@ -458,7 +412,9 @@ double Material::calculatePropertyValue(MaterialProperty property,
       } else {
         result = 0.0; // If any component has zero, result is zero
       }
-    } else if (mixingRule == "geometric") {
+      break;
+    }
+    case MixingRuleType::GEOMETRIC: {
       // Check if all values are positive
       bool allPositive = true;
       for (double value : values) {
@@ -480,11 +436,14 @@ double Material::calculatePropertyValue(MaterialProperty property,
           result += nonZeroFractions[i] * values[i];
         }
       }
-    } else {
+      break;
+    }
+    default:
       // Unknown mixing rule, use linear
       for (size_t i = 0; i < values.size(); ++i) {
         result += nonZeroFractions[i] * values[i];
       }
+      break;
     }
 
     return result;
@@ -598,8 +557,6 @@ const std::string &Material::getModelName(PropertyModel model) {
   return MODEL_NAMES[static_cast<size_t>(model)];
 }
 
-
-
 void Material::setPropertyWithUnits(MaterialProperty property, double value,
                                     const std::string &unitStr) {
   // Convert value to SI units
@@ -700,8 +657,137 @@ std::shared_ptr<Material> Material::createWithUnits(
   return material;
 }
 
+// Optimized implementation of mixProperties using enum-based rules
+double Material::mixProperties(MaterialProperty property, double value1,
+                               double value2, double fraction,
+                               MixingRuleType ruleType) {
+  // Clamp fraction to [0,1] for safety
+  fraction = std::max(0.0, std::min(1.0, fraction));
+
+  // Handle special cases
+  if (fraction <= 0.0)
+    return value1;
+  if (fraction >= 1.0)
+    return value2;
+
+  // Get effective mixing rule for this property
+  MixingRuleType effectiveRule = getEffectiveMixingRule(ruleType, property);
+
+  // Apply the selected mixing rule with appropriate safeguards
+  switch (effectiveRule) {
+  case MixingRuleType::LINEAR:
+    // Simple linear interpolation: value = (1-f)*v1 + f*v2
+    return (1.0 - fraction) * value1 + fraction * value2;
+
+  case MixingRuleType::LOGARITHMIC:
+    // Logarithmic interpolation: ln(value) = (1-f)*ln(v1) + f*ln(v2)
+    // Only valid for positive values, fallback to linear for non-positive
+    // values
+    if (value1 <= 0.0 || value2 <= 0.0) {
+      return (1.0 - fraction) * value1 + fraction * value2;
+    }
+    return std::exp((1.0 - fraction) * std::log(value1) +
+                    fraction * std::log(value2));
+
+  case MixingRuleType::HARMONIC:
+    // Harmonic mean: 1/value = (1-f)/v1 + f/v2
+    // Handle cases with zero or near-zero values
+    if (std::abs(value1) < 1e-9 || std::abs(value2) < 1e-9) {
+      return 0.0; // Treat very small values as zero
+    }
+    {
+      double invValue = (1.0 - fraction) / value1 + fraction / value2;
+      if (std::abs(invValue) < 1e-9) {
+        return 0.0; // Avoid division by zero
+      }
+      return 1.0 / invValue;
+    }
+
+  case MixingRuleType::GEOMETRIC:
+    // Geometric mean: value = v1^(1-f) * v2^f
+    // Only valid for positive values, fallback to linear for non-positive
+    // values
+    if (value1 <= 0.0 || value2 <= 0.0) {
+      return (1.0 - fraction) * value1 + fraction * value2;
+    }
+    return std::pow(value1, 1.0 - fraction) * std::pow(value2, fraction);
+
+  default:
+    // Default to linear mixing for unknown rules
+    return (1.0 - fraction) * value1 + fraction * value2;
+  }
+}
+
+std::shared_ptr<Material>
+Material::createMixture(std::shared_ptr<Material> other, double mixFraction,
+                        MixingRuleType mixingRuleType) const {
+  // Ensure mixFraction is in valid range [0,1]
+  mixFraction = std::max(0.0, std::min(1.0, mixFraction));
+
+  // Special cases for efficiency
+  if (mixFraction <= 0.0) {
+    // Make a copy of this material
+    auto result = std::make_shared<Material>(*this);
+    return result;
+  }
+  if (mixFraction >= 1.0) {
+    // Make a copy of other material
+    auto result = std::make_shared<Material>(*other);
+    return result;
+  }
+
+  // Create a new material for the mixture
+  auto mixture = std::make_shared<Material>(
+      Material::MaterialType::FLUID,
+      "Mixture(" + getName() + ":" +
+          std::to_string(static_cast<int>((1.0 - mixFraction) * 100)) + "%, " +
+          other->getName() + ":" +
+          std::to_string(static_cast<int>(mixFraction * 100)) + "%)");
+
+  // Add components directly
+  mixture->m_componentIDs[0] = getID();
+  mixture->m_componentFractions[0] = 1.0 - mixFraction;
+  mixture->m_componentIDs[1] = other->getID();
+  mixture->m_componentFractions[1] = mixFraction;
+  mixture->m_componentCount = 2;
+
+  // Set mixing rule type
+  mixture->m_mixingRuleType = mixingRuleType;
+
+  // Calculate reference temperature
+  double refTemp = (1.0 - mixFraction) * getReferenceTemperature() +
+                   mixFraction * other->getReferenceTemperature();
+  mixture->setReferenceTemperature(refTemp);
+
+  // Calculate all properties
+  for (size_t i = 0; i < static_cast<size_t>(MaterialProperty::COUNT); ++i) {
+    MaterialProperty prop = static_cast<MaterialProperty>(i);
+
+    // Get property values
+    double val1 = getPropertyAtTemperature(prop, refTemp);
+    double val2 = other->getPropertyAtTemperature(prop, refTemp);
+
+    // Mix the properties using the appropriate rule
+    double mixedValue =
+        mixProperties(prop, val1, val2, mixFraction, mixingRuleType);
+
+    // Set the calculated property
+    mixture->setProperty(prop, mixedValue);
+  }
+
+  // Enable temperature-dependent properties if either component has them
+  bool usesTempDependentProps =
+      isUsingTempDependentProps() || other->isUsingTempDependentProps();
+  mixture->setUseTempDependentProps(usesTempDependentProps);
+
+  return mixture;
+}
+
 std::shared_ptr<Material>
 Material::createPredefined(const std::string &materialName) {
+  // Implementation remains the same as before, but now uses enum-based mixing
+  // rules where appropriate
+
   if (materialName == "water") {
     auto material = createWithUnits(MaterialType::FLUID, "Water", 998.2,
                                     "kg/m³",            // Density
@@ -937,160 +1023,10 @@ Material::createPredefined(const std::string &materialName) {
   return std::make_shared<Material>(MaterialType::FLUID, materialName);
 }
 
-double Material::mixProperties(MaterialProperty property, double value1,
-                               double value2, double fraction,
-                               const std::string &rule) {
-  // Clamp fraction to [0,1] for safety
-  fraction = std::max(0.0, std::min(1.0, fraction));
-
-  // Handle special cases
-  if (fraction <= 0.0)
-    return value1;
-  if (fraction >= 1.0)
-    return value2;
-
-  // Determine mixing rule
-  std::string effectiveRule = rule;
-
-  // If no specific rule provided, use the default for this property
-  if (effectiveRule == "default") {
-    switch (property) {
-    case MaterialProperty::THERMAL_CONDUCTIVITY:
-      effectiveRule = "harmonic";
-      break;
-    case MaterialProperty::DYNAMIC_VISCOSITY:
-      effectiveRule = "logarithmic";
-      break;
-    case MaterialProperty::DENSITY:
-    case MaterialProperty::SPECIFIC_HEAT:
-      effectiveRule = "linear";
-      break;
-    default:
-      effectiveRule = "linear";
-    }
-  }
-
-  // Apply the selected mixing rule with appropriate safeguards
-  if (effectiveRule == "linear") {
-    // Simple linear interpolation: value = (1-f)*v1 + f*v2
-    return (1.0 - fraction) * value1 + fraction * value2;
-  } else if (effectiveRule == "logarithmic") {
-    // Logarithmic interpolation: ln(value) = (1-f)*ln(v1) + f*ln(v2)
-    // Only valid for positive values, fallback to linear for non-positive
-    // values
-    if (value1 <= 0.0 || value2 <= 0.0) {
-      return (1.0 - fraction) * value1 + fraction * value2;
-    }
-    return std::exp((1.0 - fraction) * std::log(value1) +
-                    fraction * std::log(value2));
-  } else if (effectiveRule == "harmonic") {
-    // Harmonic mean: 1/value = (1-f)/v1 + f/v2
-    // Handle cases with zero or near-zero values
-    if (std::abs(value1) < 1e-9 || std::abs(value2) < 1e-9) {
-      return 0.0; // Treat very small values as zero
-    }
-
-    double invValue = (1.0 - fraction) / value1 + fraction / value2;
-    if (std::abs(invValue) < 1e-9) {
-      return 0.0; // Avoid division by zero
-    }
-    return 1.0 / invValue;
-  } else if (effectiveRule == "geometric") {
-    // Geometric mean: value = v1^(1-f) * v2^f
-    // Only valid for positive values, fallback to linear for non-positive
-    // values
-    if (value1 <= 0.0 || value2 <= 0.0) {
-      return (1.0 - fraction) * value1 + fraction * value2;
-    }
-    return std::pow(value1, 1.0 - fraction) * std::pow(value2, fraction);
-  } else {
-    // Default to linear mixing for unknown rules
-    return (1.0 - fraction) * value1 + fraction * value2;
-  }
-}
-
-std::shared_ptr<Material>
-Material::createMixture(std::shared_ptr<Material> other, double mixFraction,
-                        const std::string &mixingRule) const {
-  // Ensure mixFraction is in valid range [0,1]
-  mixFraction = std::max(0.0, std::min(1.0, mixFraction));
-
-  // Special cases for efficiency
-  if (mixFraction <= 0.0) {
-    // Make a copy of this material
-    auto result = std::make_shared<Material>(*this);
-    return result;
-  }
-  if (mixFraction >= 1.0) {
-    // Make a copy of other material
-    auto result = std::make_shared<Material>(*other);
-    return result;
-  }
-
-  // Create a new material for the mixture
-  auto mixture = std::make_shared<Material>(
-      Material::MaterialType::FLUID,
-      "Mixture(" + getName() + ":" +
-          std::to_string(static_cast<int>((1.0 - mixFraction) * 100)) + "%, " +
-          other->getName() + ":" +
-          std::to_string(static_cast<int>(mixFraction * 100)) + "%)");
-
-  // Add components directly
-  mixture->m_componentIDs[0] = getID();
-  mixture->m_componentFractions[0] = 1.0 - mixFraction;
-  mixture->m_componentIDs[1] = other->getID();
-  mixture->m_componentFractions[1] = mixFraction;
-  mixture->m_componentCount = 2;
-
-  // Calculate reference temperature
-  double refTemp = (1.0 - mixFraction) * getReferenceTemperature() +
-                   mixFraction * other->getReferenceTemperature();
-  mixture->setReferenceTemperature(refTemp);
-
-  // Calculate all properties
-  for (size_t i = 0; i < static_cast<size_t>(MaterialProperty::COUNT); ++i) {
-    MaterialProperty prop = static_cast<MaterialProperty>(i);
-
-    // Determine mixing rule for this property
-    std::string effectiveRule = mixingRule;
-    if (effectiveRule == "default") {
-      switch (prop) {
-      case MaterialProperty::DYNAMIC_VISCOSITY:
-        effectiveRule = "logarithmic";
-        break;
-      case MaterialProperty::THERMAL_CONDUCTIVITY:
-        effectiveRule = "harmonic";
-        break;
-      default:
-        effectiveRule = "linear";
-        break;
-      }
-    }
-
-    // Get property values
-    double val1 = getPropertyAtTemperature(prop, refTemp);
-    double val2 = other->getPropertyAtTemperature(prop, refTemp);
-
-    // Mix the properties using the appropriate rule
-    double mixedValue =
-        mixProperties(prop, val1, val2, mixFraction, effectiveRule);
-
-    // Set the calculated property
-    mixture->setProperty(prop, mixedValue);
-  }
-
-  // Enable temperature-dependent properties if either component has them
-  bool usesTempDependentProps =
-      isUsingTempDependentProps() || other->isUsingTempDependentProps();
-  mixture->setUseTempDependentProps(usesTempDependentProps);
-
-  return mixture;
-}
-
 std::shared_ptr<Material>
 Material::createMixture(const std::vector<std::shared_ptr<Material>> &materials,
                         const std::vector<double> &fractions,
-                        const std::string &mixingRule) {
+                        MixingRuleType mixingRuleType) {
 
   // Validate inputs
   if (materials.size() != fractions.size() || materials.empty()) {
@@ -1136,6 +1072,9 @@ Material::createMixture(const std::vector<std::shared_ptr<Material>> &materials,
 
   // Create a new material for the mixture
   auto mixture = std::make_shared<Material>(Material::MaterialType::FLUID, "");
+
+  // Set mixing rule type
+  mixture->m_mixingRuleType = mixingRuleType;
 
   // Build the mixture name by concatenating component names with fractions
   std::stringstream ss;
@@ -1198,22 +1137,6 @@ Material::createMixture(const std::vector<std::shared_ptr<Material>> &materials,
        propIdx < static_cast<size_t>(MaterialProperty::COUNT); propIdx++) {
     MaterialProperty prop = static_cast<MaterialProperty>(propIdx);
 
-    // Determine mixing rule for this property
-    std::string effectiveRule = mixingRule;
-    if (effectiveRule == "default") {
-      switch (prop) {
-      case MaterialProperty::DYNAMIC_VISCOSITY:
-        effectiveRule = "logarithmic";
-        break;
-      case MaterialProperty::THERMAL_CONDUCTIVITY:
-        effectiveRule = "harmonic";
-        break;
-      default:
-        effectiveRule = "linear";
-        break;
-      }
-    }
-
     // Get property values for each material at the reference temperature
     std::vector<double> values(nonZeroMaterials.size());
     for (size_t i = 0; i < nonZeroMaterials.size(); i++) {
@@ -1222,13 +1145,17 @@ Material::createMixture(const std::vector<std::shared_ptr<Material>> &materials,
 
     // Apply the appropriate mixing rule
     double mixedValue = 0.0;
+    MixingRuleType effectiveRule = getEffectiveMixingRule(mixingRuleType, prop);
 
-    if (effectiveRule == "linear") {
+    switch (effectiveRule) {
+    case MixingRuleType::LINEAR: {
       // Linear mixing - weighted sum
       for (size_t i = 0; i < nonZeroMaterials.size(); i++) {
         mixedValue += values[i] * nonZeroFractions[i];
       }
-    } else if (effectiveRule == "logarithmic") {
+      break;
+    }
+    case MixingRuleType::LOGARITHMIC: {
       // Check if all values are positive (required for logarithmic mixing)
       bool allPositive = true;
       for (double value : values) {
@@ -1251,7 +1178,9 @@ Material::createMixture(const std::vector<std::shared_ptr<Material>> &materials,
           mixedValue += values[i] * nonZeroFractions[i];
         }
       }
-    } else if (effectiveRule == "harmonic") {
+      break;
+    }
+    case MixingRuleType::HARMONIC: {
       // Check for zero values
       bool hasZeroOrNearZero = false;
       for (double value : values) {
@@ -1277,7 +1206,9 @@ Material::createMixture(const std::vector<std::shared_ptr<Material>> &materials,
         mixedValue =
             0.0; // If any component has zero/near-zero value, result is zero
       }
-    } else if (effectiveRule == "geometric") {
+      break;
+    }
+    case MixingRuleType::GEOMETRIC: {
       // Check if all values are positive (required for geometric mixing)
       bool allPositive = true;
       for (double value : values) {
@@ -1299,11 +1230,15 @@ Material::createMixture(const std::vector<std::shared_ptr<Material>> &materials,
           mixedValue += values[i] * nonZeroFractions[i];
         }
       }
-    } else {
+      break;
+    }
+    default: {
       // Unknown mixing rule, use linear
       for (size_t i = 0; i < nonZeroMaterials.size(); i++) {
         mixedValue += values[i] * nonZeroFractions[i];
       }
+      break;
+    }
     }
 
     // Set the calculated property
@@ -1321,4 +1256,139 @@ Material::createMixture(const std::vector<std::shared_ptr<Material>> &materials,
   mixture->setUseTempDependentProps(usesTempDependentProps);
 
   return mixture;
+}
+
+Material &Material::operator=(const Material &other) {
+  if (this != &other) {
+    // Unregister current object
+    unregisterMaterial();
+
+    // Copy basic properties
+    m_type = other.m_type;
+    m_name = other.m_name;
+    m_referenceTemperature = other.m_referenceTemperature;
+    m_useTempDependentProps = other.m_useTempDependentProps;
+    m_componentCount = other.m_componentCount;
+    m_mixingRuleType = other.m_mixingRuleType;
+
+    // Copy all properties
+    for (size_t i = 0; i < static_cast<size_t>(MaterialProperty::COUNT); ++i) {
+      m_baseProperties[i] = other.m_baseProperties[i];
+      m_propertyModels[i] = other.m_propertyModels[i];
+      m_coefficientCounts[i] = other.m_coefficientCounts[i];
+
+      // Copy all coefficients
+      for (size_t j = 0; j < MAX_COEFFICIENTS; ++j) {
+        m_coefficients[i][j] = other.m_coefficients[i][j];
+      }
+
+      // Copy custom functions
+      m_customFunctions[i] = other.m_customFunctions[i];
+    }
+
+    // Copy component arrays
+    for (size_t i = 0; i < MAX_MIXTURE_COMPONENTS; ++i) {
+      m_componentIDs[i] = other.m_componentIDs[i];
+      m_componentFractions[i] = other.m_componentFractions[i];
+    }
+
+    // Register with new ID
+    registerMaterial();
+  }
+  return *this;
+}
+
+Material &Material::operator=(Material &&other) noexcept {
+  if (this != &other) {
+    // Unregister current object
+    unregisterMaterial();
+
+    // Move basic properties
+    m_type = other.m_type;
+    m_name = std::move(other.m_name);
+    m_referenceTemperature = other.m_referenceTemperature;
+    m_useTempDependentProps = other.m_useTempDependentProps;
+    m_componentCount = other.m_componentCount;
+    m_materialID = other.m_materialID;
+    m_mixingRuleType = other.m_mixingRuleType;
+
+    // Copy all properties
+    for (size_t i = 0; i < static_cast<size_t>(MaterialProperty::COUNT); ++i) {
+      m_baseProperties[i] = other.m_baseProperties[i];
+      m_propertyModels[i] = other.m_propertyModels[i];
+      m_coefficientCounts[i] = other.m_coefficientCounts[i];
+
+      // Copy all coefficients
+      for (size_t j = 0; j < MAX_COEFFICIENTS; ++j) {
+        m_coefficients[i][j] = other.m_coefficients[i][j];
+      }
+
+      // Move custom functions
+      m_customFunctions[i] = std::move(other.m_customFunctions[i]);
+    }
+
+    // Copy component arrays
+    for (size_t i = 0; i < MAX_MIXTURE_COMPONENTS; ++i) {
+      m_componentIDs[i] = other.m_componentIDs[i];
+      m_componentFractions[i] = other.m_componentFractions[i];
+    }
+
+    // Update registry entry to point to this object instead of the moved-from
+    // object
+    if (m_materialID != 0) {
+      s_materialRegistry[m_materialID] = this;
+    }
+
+    // Clear the moved-from object's ID so it won't unregister in its destructor
+    other.m_materialID = 0;
+    other.m_componentCount = 0;
+  }
+  return *this;
+}
+
+// Helper method for adding mixture components with scaling
+void Material::addScaledComponentsToMixture(
+    std::shared_ptr<Material> mixture,
+    const std::vector<std::pair<std::shared_ptr<Material>, double>> &components,
+    double scaleFactor) {
+
+  // Add each component with its scaled fraction
+  for (const auto &comp : components) {
+    if (mixture->m_componentCount < MAX_MIXTURE_COMPONENTS) {
+      mixture->m_componentIDs[mixture->m_componentCount] = comp.first->getID();
+      mixture->m_componentFractions[mixture->m_componentCount] =
+          comp.second * scaleFactor;
+      mixture->m_componentCount++;
+    } else {
+      break; // Maximum components reached
+    }
+  }
+}
+
+// Calculate mixed properties for a binary mixture
+void Material::calculateMixedProperties(std::shared_ptr<Material> mixture,
+                                        std::shared_ptr<Material> other,
+                                        double mixFraction,
+                                        MixingRuleType mixingRuleType) const {
+
+  // Calculate reference temperature as weighted average
+  double refTemp = (1.0 - mixFraction) * getReferenceTemperature() +
+                   mixFraction * other->getReferenceTemperature();
+  mixture->setReferenceTemperature(refTemp);
+
+  // Calculate all properties
+  for (size_t i = 0; i < static_cast<size_t>(MaterialProperty::COUNT); ++i) {
+    MaterialProperty prop = static_cast<MaterialProperty>(i);
+
+    // Get property values at the reference temperature
+    double val1 = getPropertyAtTemperature(prop, refTemp);
+    double val2 = other->getPropertyAtTemperature(prop, refTemp);
+
+    // Apply mixing rule
+    double mixedValue =
+        mixProperties(prop, val1, val2, mixFraction, mixingRuleType);
+
+    // Set the mixed property
+    mixture->setProperty(prop, mixedValue);
+  }
 }

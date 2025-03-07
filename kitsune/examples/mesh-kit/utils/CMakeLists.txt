@@ -1,0 +1,28 @@
+# Utils library
+file(GLOB UTILS_SOURCES "*.cpp")
+file(GLOB UTILS_HEADERS "*.h")
+
+# Create the utils library with the same prefix as the main library
+add_library(meshkit_utils STATIC ${UTILS_SOURCES})
+target_include_directories(meshkit_utils PUBLIC 
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+  $<INSTALL_INTERFACE:include/utils>
+)
+
+# Installation rules for utils
+install(TARGETS meshkit_utils
+  EXPORT meshkit_utils-targets  # This needs to match the EXPORT argument below
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
+
+install(FILES ${UTILS_HEADERS} DESTINATION include/utils)
+
+# Install utils CMake targets
+install(EXPORT meshkit_utils-targets
+  FILE meshkit_utils-targets.cmake
+  NAMESPACE meshkit::
+  DESTINATION lib/cmake/meshkit_utils
+)

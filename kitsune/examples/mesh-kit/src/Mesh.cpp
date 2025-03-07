@@ -385,8 +385,10 @@ std::array<Cell *, 4> Mesh::getNeighbors(size_t i, size_t j) {
 
   return neighbors;
 }
+// This snippet shows the changes needed in Mesh.cpp to support the new
+// enum-based approach Specifically focusing on the getField method where
+// boundary type checks are performed
 
-// Get a field of data from the grid
 std::vector<double> Mesh::getField(FieldType fieldType) const {
   std::vector<double> result(m_nx * m_ny);
 
@@ -417,24 +419,42 @@ std::vector<double> Mesh::getField(FieldType fieldType) const {
         double value = 0.0; // Default: not a boundary
         if (m_boundaryFlag(i, j)) {
           if (!m_boundaryNames(i, j).empty()) {
-            // Map different boundary types to numerical values
+            // Map different boundary types to numerical values using the enum
             auto it = m_boundaryConditions.find(m_boundaryNames(i, j));
             if (it != m_boundaryConditions.end()) {
-              const std::string type = it->second->getType();
-              if (type == "Dirichlet")
+              // Use the enum directly for faster, type-safe mapping
+              BoundaryType type = it->second->getTypeEnum();
+              // Map each enum value to a unique numeric value for visualization
+              switch (type) {
+              case BoundaryType::DIRICHLET:
                 value = 1.0;
-              else if (type == "Neumann")
+                break;
+              case BoundaryType::NEUMANN:
                 value = 2.0;
-              else if (type == "Inflow")
+                break;
+              case BoundaryType::INFLOW:
                 value = 3.0;
-              else if (type == "NoSlip")
+                break;
+              case BoundaryType::NO_SLIP:
                 value = 4.0;
-              else if (type == "Slip")
+                break;
+              case BoundaryType::SLIP:
                 value = 5.0;
-              else if (type == "Periodic")
+                break;
+              case BoundaryType::PERIODIC:
                 value = 6.0;
-              else
+                break;
+              case BoundaryType::OUTFLOW:
+                value = 7.0;
+                break;
+              case BoundaryType::SYMMETRY:
+                value = 8.0;
+                break;
+              case BoundaryType::UNKNOWN:
+              default:
                 value = 0.5; // Unknown boundary type
+                break;
+              }
             }
           } else {
             value = 0.5; // Boundary without condition
@@ -462,6 +482,7 @@ std::vector<double> Mesh::getField(FieldType fieldType) const {
 
   return result;
 }
+
 
 // Get velocity field components
 void Mesh::getVelocityField(std::vector<double> &vx,

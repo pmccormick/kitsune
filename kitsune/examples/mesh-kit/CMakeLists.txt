@@ -1,136 +1,180 @@
-cmake_minimum_required(VERSION 3.10)
-
-# Project name
-project(CFDTests VERSION 0.01)
+cmake_minimum_required(VERSION 3.14)
+project(CFD_MeshKit VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# GCC/Clang compiler flags
-add_compile_options(-Wall -Wextra -Wpedantic)
-
-# Enable testing
-enable_testing()
-
-# Add source files for the library
-set(LIB_SOURCES
-    src/BoundaryFactory.cpp
-    src/Cell.cpp    
-    src/DirichletBoundary.cpp
-    src/InflowBoundary.cpp
-    src/NeumannBoundary.cpp
-    src/NoSlipBoundary.cpp
-    src/PeriodicBoundary.cpp
-    src/SlipBoundary.cpp    
-    src/CellExtensions.cpp    
-    src/Material.cpp
-    src/Mesh.cpp
-    # Add other source files as needed
-)
-
-# Add header files for the library
-set(LIB_HEADERS
-    include/BoundaryClass.h	
-    include/BoundaryFactory.h
-    include/Cell.h
-    include/DirichletBoundary.h
-    include/Field.h  # Added our Field header
-    include/InflowBoundary.h
-    include/Material.h
-    include/Mesh.h
-    include/NeumannBoundary.h
-    include/NoSlipBoundary.h
-    include/PeriodicBoundary.h
-    include/SlipBoundary.h
-    include/Units.h
-    # Add other header files as needed
-)
-
-# Create library
-add_library(CFDLib ${LIB_SOURCES})
-
-# Set include directories for the library
-target_include_directories(CFDLib PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-# Add test executables
-
-# Field tests (new)
-add_executable(field_tests tests/field_test_suite.cpp)
-target_link_libraries(field_tests PRIVATE CFDLib)
-add_test(NAME FieldTests COMMAND field_tests)
-
-# Cell tests
-add_executable(cell_tests tests/cell_test_suite.cpp)
-target_link_libraries(cell_tests PRIVATE CFDLib)
-add_test(NAME CellTests COMMAND cell_tests)
-
-# Cell units tests
-add_executable(cell_units_tests tests/tests_for_cell_units.cpp)
-target_link_libraries(cell_units_tests PRIVATE CFDLib)
-add_test(NAME CellUnitsTests COMMAND cell_units_tests)
-
-# Material tests
-add_executable(material_tests tests/material_test_suite.cpp)
-target_link_libraries(material_tests PRIVATE CFDLib)
-add_test(NAME MaterialTests COMMAND material_tests)
-
-# Material mixing tests
-add_executable(material_mixing_tests tests/material_mixing_tests.cpp)
-target_link_libraries(material_mixing_tests PRIVATE CFDLib)
-add_test(NAME MaterialMixingTests COMMAND material_mixing_tests)
-
-# Bondary condition tests
-add_executable(inflow_boundary_tests tests/inflow_boundary_tests.cpp)
-target_link_libraries(inflow_boundary_tests PRIVATE CFDLib)
-add_test(NAME InflowBoundaryTests COMMAND inflow_boundary_tests)
-
-add_executable(slip_boundary_tests tests/slip_boundary_tests.cpp)
-target_link_libraries(slip_boundary_tests PRIVATE CFDLib)
-add_test(NAME SlipBoundaryTests COMMAND slip_boundary_tests)
-
-add_executable(neumann_boundary_tests tests/neumann_boundary_tests.cpp)
-target_link_libraries(neumann_boundary_tests PRIVATE CFDLib)
-add_test(NAME NeumannBoundaryTests COMMAND neumann_boundary_tests)
-
-add_executable(periodic_boundary_tests tests/periodic_boundary_tests.cpp)
-target_link_libraries(periodic_boundary_tests PRIVATE CFDLib)
-add_test(NAME PeriodicBoundaryTests COMMAND periodic_boundary_tests)
-
-# Mesh-Field integration tests (new)
-add_executable(mesh_field_tests tests/mesh_field_test_suite.cpp)
-target_link_libraries(mesh_field_tests PRIVATE CFDLib)
-add_test(NAME MeshFieldTests COMMAND mesh_field_tests)
-
-# Cell-Field integration tests (new)
-add_executable(cell_field_tests tests/cell_field_test_suite.cpp)
-target_link_libraries(cell_field_tests PRIVATE CFDLib)
-add_test(NAME CellFieldTests COMMAND cell_field_tests)
-
-# Optional performance tests (build only when specifically requested)
-option(BUILD_PERF_TESTS "Build performance tests" OFF)
-if(BUILD_PERF_TESTS)
-    add_executable(cell_perf_tests tests/cell_performance_analysis.cpp)
-    target_link_libraries(cell_perf_tests PRIVATE CFDLib)
-    
-    # Field performance tests (new)
-    add_executable(field_perf_tests tests/field_performance_analysis.cpp)
-    target_link_libraries(field_perf_tests PRIVATE CFDLib)
+# Default build type if not specified
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Install targets
-install(TARGETS CFDLib
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
+# Compiler warnings and options
+if(MSVC)
+  add_compile_options(/W4)
+else()
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+#[=======================================================================[.rst:
+GoogleTest Configuration
+-----------------------
+
+This project uses GoogleTest for unit testing through CMake's FetchContent.
+By default, both GoogleTest (GTest) and GoogleMock (GMock) are built.
+
+GoogleTest Options
+^^^^^^^^^^^^^^^^^
+
+BUILD_GMOCK
+  When ON, builds the GoogleMock library (default: ON).
+  Set to OFF to build only GoogleTest without the mocking framework:
+  
+  .. code-block:: cmake
+  
+     set(BUILD_GMOCK OFF CACHE BOOL "Builds the googlemock subproject" FORCE)
+
+gtest_force_shared_crt
+  When ON, uses shared (DLL) run-time lib even when GoogleTest is built as static lib (default: OFF).
+  This is necessary for Windows builds with MSVC to avoid runtime conflicts.
+  
+  .. code-block:: cmake
+  
+     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+INSTALL_GTEST
+  When ON, enables installation of GoogleTest (default: OFF).
+  Usually not needed as GTest is only a test dependency.
+  
+  .. code-block:: cmake
+  
+     set(INSTALL_GTEST OFF CACHE BOOL "Enable installation of googletest" FORCE)
+
+GTEST_CREATE_SHARED_LIBRARY
+  When ON, builds GoogleTest as a shared library (default: OFF).
+  
+  .. code-block:: cmake
+  
+     set(GTEST_CREATE_SHARED_LIBRARY ON CACHE BOOL "" FORCE)
+
+Test Organization
+^^^^^^^^^^^^^^^^
+
+Our tests are organized by functional area in the tests/CMakeLists.txt file.
+To run specific test groups:
+
+* All tests: ``ctest``
+* Material tests only: ``ctest -R Material``
+
+External References
+^^^^^^^^^^^^^^^^^^
+
+* GoogleTest GitHub: https://github.com/google/googletest
+* GoogleTest Documentation: https://google.github.io/googletest/
+* GoogleMock Documentation: https://google.github.io/googletest/gmock_for_dummies.html
+* CMake FetchContent: https://cmake.org/cmake/help/latest/module/FetchContent.html
+* CMake GoogleTest module: https://cmake.org/cmake/help/latest/module/GoogleTest.html
+#]=======================================================================]
+
+# Include directories
+include_directories(
+  ${PROJECT_SOURCE_DIR}/include
 )
 
-install(FILES ${LIB_HEADERS} DESTINATION include)
+# First, build the utils library which has no dependencies
+#add_subdirectory(utils)
 
-# Print configuration information
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
+# Build the MeshKit library
+add_subdirectory(src)
+
+# Testing with Google Test
+option(BUILD_TESTS "Build the tests" ON)
+if(BUILD_TESTS)
+  # Enable testing
+  enable_testing()
+  
+  # Download and build GoogleTest
+  include(FetchContent)
+  FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG v1.14.0  # More recent version with updated CMake requirements
+  )
+  # For Windows: Prevent overriding the parent project's compiler/linker settings
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(googletest)
+  
+  # Build tests
+  add_subdirectory(tests)
+endif()
+
+# In the top-level CMakeLists.txt, add this after the Google Test section:
+
+# Benchmarking with Google Benchmark
+option(BUILD_BENCHMARKS "Build benchmarks" OFF)
+if(BUILD_BENCHMARKS)
+  # Download and build Google Benchmark
+  include(FetchContent)
+  FetchContent_Declare(
+    benchmark
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG v1.8.3  # Use a recent stable version
+  )
+  # Disable benchmark tests and install to keep it simpler
+  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "Disable benchmark testing" FORCE)
+  set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "Disable benchmark install" FORCE)
+  FetchContent_MakeAvailable(benchmark)
+  
+  # Build benchmarks
+  #add_subdirectory(benchmarks)
+endif()
+
+# Installation rules
+install(TARGETS meshkit
+  EXPORT meshkit-targets
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
+
+# Get all header files
+file(GLOB MESHKIT_HEADERS "${PROJECT_SOURCE_DIR}/include/*.h")
+install(FILES ${MESHKIT_HEADERS} DESTINATION include)
+
+install(EXPORT meshkit-targets
+  FILE meshkit-targets.cmake
+  NAMESPACE meshkit::
+  DESTINATION lib/cmake/meshkit
+)
+
+# Generate and install package configuration files
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/meshkit-config-version.cmake"
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+# Update meshkit-config.cmake.in to reference the correct utilities target files
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/meshkit-config.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/meshkit-config.cmake"
+  @ONLY
+)
+
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/meshkit-config.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/meshkit-config-version.cmake"
+  DESTINATION lib/cmake/meshkit
+)
+
+# Add examples if they exist
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/examples")
+  option(BUILD_EXAMPLES "Build example applications" OFF)
+  if(BUILD_EXAMPLES)
+    add_subdirectory(examples)
+  endif()
+endif()

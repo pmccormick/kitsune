@@ -89,9 +89,9 @@ public:
 
   /**
    * @brief Get the type of the boundary condition
-   * @return "Inflow" as the identifier for this boundary type
+   * @return Enum identifying the boundary as Inflow
    */
-  std::string getType() const override;
+  BoundaryType getTypeEnum() const override { return BoundaryType::INFLOW; }
 
   /**
    * @brief Set a velocity profile function for u-component

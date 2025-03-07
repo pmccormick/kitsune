@@ -1,12 +1,4 @@
-/**
- * ====================================================================
- * Material Class - CFD Implementation with Optimized Data Structures
- * ====================================================================
- *
- * This version of the Material class uses flattened arrays for better
- * performance on modern computer architectures. The data structures
- * are designed for optimal cache usage and vectorization potential.
- */
+
 #pragma once
 
 #include "Units.h"
@@ -15,6 +7,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 /**
@@ -27,7 +20,7 @@ public:
    * @enum MaterialType
    * @brief Defines the general type of material
    */
-  enum class MaterialType {
+  enum class MaterialType : uint8_t {
     FLUID,    ///< Liquid or gas
     SOLID,    ///< Solid material
     INTERFACE ///< Special material for fluid interfaces
@@ -37,7 +30,7 @@ public:
    * @enum PropertyModel
    * @brief Defines how a property varies with temperature
    */
-  enum class PropertyModel {
+  enum class PropertyModel : uint8_t {
     CONSTANT,    ///< Property does not change with temperature
     LINEAR,      ///< Property varies linearly with temperature
     POLYNOMIAL,  ///< Property follows a polynomial function of temperature
@@ -49,7 +42,7 @@ public:
    * @enum MaterialProperty
    * @brief Defines the various physical properties of materials
    */
-  enum class MaterialProperty {
+  enum class MaterialProperty : uint8_t {
     DENSITY,                 ///< Density (kg/m³)
     DYNAMIC_VISCOSITY,       ///< Dynamic viscosity (Pa·s)
     THERMAL_CONDUCTIVITY,    ///< Thermal conductivity (W/(m·K))
@@ -58,6 +51,19 @@ public:
     SURFACE_TENSION,         ///< Surface tension (N/m) - for fluid interfaces
     ELECTRICAL_CONDUCTIVITY, ///< Electrical conductivity (S/m)
     COUNT                    ///< Keep last - number of properties
+  };
+
+  /**
+   * @enum MixingRuleType
+   * @brief Defines different algorithms for mixing material properties
+   */
+  enum class MixingRuleType : uint8_t {
+    LINEAR,       ///< Simple weighted average
+    LOGARITHMIC,  ///< Logarithmic interpolation (good for viscosity)
+    HARMONIC,     ///< Harmonic mean (good for thermal conductivity)
+    GEOMETRIC,    ///< Geometric mean
+    CUSTOM,       ///< Custom mixing rule
+    DEFAULT = 255 ///< Use property-specific default
   };
 
   // Maximum coefficients per property model
@@ -146,29 +152,86 @@ public:
    */
   double getReferenceTemperature() const { return m_referenceTemperature; }
 
-  void setMixingRule(const std::string &rule) { m_mixingRule = rule; }
+  /**
+   * @brief Set the mixing rule type
+   * @param ruleType The mixing rule type to use
+   */
+  void setMixingRuleType(MixingRuleType ruleType) {
+    m_mixingRuleType = ruleType;
+  }
+
+  /**
+   * @brief Get the current mixing rule type
+   * @return The mixing rule type
+   */
+  MixingRuleType getMixingRuleType() const { return m_mixingRuleType; }
+
+  /**
+   * @brief Set the mixing rule using a string (for backward compatibility)
+   * @param rule The mixing rule name
+   */
+  void setMixingRule(const std::string &rule) {
+    m_mixingRuleType = parseMixingRule(rule);
+  }
+
+  /**
+   * @brief Get the mixing rule as a string (for backward compatibility)
+   * @return The mixing rule name
+   */
+  std::string getMixingRule() const {
+    return getMixingRuleString(m_mixingRuleType);
+  }
+
   /**
    * @brief Create a mixture of two materials
    * @param other The material to mix with
    * @param mixFraction The fraction of the other material (0.0 to 1.0)
-   * @param mixingRule The mixing rule to use
+   * @param mixingRuleType The mixing rule type to use
    * @return A new material representing the mixture
    */
   std::shared_ptr<Material>
   createMixture(std::shared_ptr<Material> other, double mixFraction,
-                const std::string &mixingRule = "linear") const;
+                MixingRuleType mixingRuleType = MixingRuleType::DEFAULT) const;
+
+  /**
+   * @brief Create a mixture of two materials (string-based for compatibility)
+   * @param other The material to mix with
+   * @param mixFraction The fraction of the other material (0.0 to 1.0)
+   * @param mixingRule The mixing rule name
+   * @return A new material representing the mixture
+   */
+  std::shared_ptr<Material> createMixture(std::shared_ptr<Material> other,
+                                          double mixFraction,
+                                          const std::string &mixingRule) const {
+    return createMixture(other, mixFraction, parseMixingRule(mixingRule));
+  }
 
   /**
    * @brief Create a mixture of multiple materials
    * @param materials The materials to mix
    * @param fractions The fractions of each material (should sum to 1.0)
-   * @param mixingRule The mixing rule to use
+   * @param mixingRuleType The mixing rule type to use
    * @return A new material representing the mixture
    */
   static std::shared_ptr<Material>
   createMixture(const std::vector<std::shared_ptr<Material>> &materials,
                 const std::vector<double> &fractions,
-                const std::string &mixingRule);
+                MixingRuleType mixingRuleType = MixingRuleType::DEFAULT);
+
+  /**
+   * @brief Create a mixture of multiple materials (string-based for
+   * compatibility)
+   * @param materials The materials to mix
+   * @param fractions The fractions of each material (should sum to 1.0)
+   * @param mixingRule The mixing rule name
+   * @return A new material representing the mixture
+   */
+  static std::shared_ptr<Material>
+  createMixture(const std::vector<std::shared_ptr<Material>> &materials,
+                const std::vector<double> &fractions,
+                const std::string &mixingRule) {
+    return createMixture(materials, fractions, parseMixingRule(mixingRule));
+  }
 
   /**
    * @brief Check if the material is a mixture
@@ -320,16 +383,48 @@ public:
    * @param value1 First property value
    * @param value2 Second property value
    * @param fraction Fraction of second value (0-1)
+   * @param ruleType Mixing rule type
+   * @return Mixed property value
+   */
+  static double mixProperties(MaterialProperty property, double value1,
+                              double value2, double fraction,
+                              MixingRuleType ruleType);
+
+  /**
+   * @brief Mix properties according to mixing rules (string-based for
+   * compatibility)
+   * @param property The property to mix
+   * @param value1 First property value
+   * @param value2 Second property value
+   * @param fraction Fraction of second value (0-1)
    * @param rule Mixing rule name
    * @return Mixed property value
    */
   static double mixProperties(MaterialProperty property, double value1,
                               double value2, double fraction,
-                              const std::string &rule);
+                              const std::string &rule) {
+    return mixProperties(property, value1, value2, fraction,
+                         parseMixingRule(rule));
+  }
+
+  /**
+   * @brief Parse a mixing rule string to enum type
+   * @param rule The mixing rule name
+   * @return The corresponding MixingRuleType
+   */
+  static MixingRuleType parseMixingRule(std::string_view rule);
+
+  /**
+   * @brief Get the string representation of a mixing rule type
+   * @param ruleType The mixing rule type
+   * @return The mixing rule name
+   */
+  static const char *getMixingRuleString(MixingRuleType ruleType);
 
 private:
   static std::unordered_map<uint32_t, Material *> s_materialRegistry;
-  std::string m_mixingRule; // User-specified mixing rule for this mixture
+  MixingRuleType m_mixingRuleType =
+      MixingRuleType::DEFAULT; // User-specified mixing rule
 
   // Basic material info
   MaterialType m_type;
@@ -363,7 +458,6 @@ private:
   uint8_t m_componentCount;
 
   // Material registry for lookup by ID
-
   static uint32_t s_nextMaterialID;
   uint32_t m_materialID;
 
@@ -377,6 +471,10 @@ private:
   double calculatePropertyValue(MaterialProperty property,
                                 double temperature) const;
 
+  // Get effective mixing rule type for a specific property
+  static MixingRuleType getEffectiveMixingRule(MixingRuleType requestedRule,
+                                               MaterialProperty property);
+
   // Helper methods for material mixing
   static void addScaledComponentsToMixture(
       std::shared_ptr<Material> mixture,
@@ -387,5 +485,5 @@ private:
   void calculateMixedProperties(std::shared_ptr<Material> mixture,
                                 std::shared_ptr<Material> other,
                                 double mixFraction,
-                                const std::string &mixingRule) const;
+                                MixingRuleType mixingRuleType) const;
 };

@@ -28,7 +28,7 @@
  *     The dimensions of the Field depend on the type tag. For a grid with nx x
  * ny cells:
  *       - Cell-centered data has dimensions:      (nx) x (ny)
- *       - Vertex-centered data has dimensions:     (nx+1) x (ny+1)
+ *       - Vertex-cenatered data has dimensions:     (nx+1) x (ny+1)
  *       - Horizontal edge data has dimensions:     (nx) x (ny+1)
  *       - Vertical edge data has dimensions:       (nx+1) x (ny)
  *

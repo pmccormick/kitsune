@@ -125,12 +125,12 @@ public:
    */
   void apply(Cell &cell, double x, double y, double dt,
              const std::vector<Cell *> *neighbors = nullptr) override;
-   
+
   /**
    * @brief Get the type of the boundary condition
-   * @return String identifier for the boundary type
+   * @return Enum identifying the boundary as Dirichlet
    */
-  std::string getType() const override;
+  BoundaryType getTypeEnum() const override { return BoundaryType::DIRICHLET; }
 
   /**
    * @brief Serialize the Dirichlet boundary condition to a string
@@ -150,7 +150,7 @@ public:
 
     // Add flag information
     oss << "FIX_VELOCITY_U=" << (m_fixVelocityU ? 1 : 0) << "\n";
-    oss << "FIX_VELOCITY_V" << (m_fixVelocityV ? 1 : 0) << "\n";
+    oss << "FIX_VELOCITY_V=" << (m_fixVelocityV ? 1 : 0) << "\n";
     oss << "FIX_PRESSURE=" << (m_fixPressure ? 1 : 0) << "\n";
     oss << "FIX_TEMPERATURE=" << (m_fixTemperature ? 1 : 0) << "\n";
 
