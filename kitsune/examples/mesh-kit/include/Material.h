@@ -92,10 +92,22 @@ public:
   MaterialType getType() const { return m_type; }
 
   /**
+   * @brief Get the material type
+   * @return The material type
+   */
+  void setType(MaterialType newType) { m_type = newType; }
+
+  /**
    * @brief Get the material name
    * @return The material name
    */
   const std::string &getName() const { return m_name; }
+
+  /**
+   * @brief Get the material name
+   * @return The material name
+   */
+   void setName(const std::string &newName)  { m_name = newName; }
 
   /**
    * @brief Set a base property value (at reference temperature)

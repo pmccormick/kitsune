@@ -1,290 +1,262 @@
 /**
- * @file Cell.h
- * @brief Cell class for CFD simulations with Field-based property storage.
- *
- * ================================================================================
- * Design Considerations and Future Directions:
- * ================================================================================
- * This Cell class now serves as a thin access layer over the Field objects
- * owned by the Mesh. Key design points include:
- *
- *   • **Facade Pattern with Field Backend:**
- *     Instead of directly storing physical quantities, this Cell acts as a
- * facade that provides access to data stored in contiguous Field arrays. This
- * allows for cache-friendly operations while maintaining an intuitive
- * cell-based API.
- *
- *   • **Index-Based Access:**
- *     Each Cell stores its (i,j) indices in the grid and uses these to access
- * the appropriate elements in the corresponding Fields.
- *
- *   • **Full Simulation Interface Preservation:**
- *     The Cell class still supports all the same operations (property access,
- * type management, flags, etc.) but now delegates storage to Fields.
- *
- *   • **Material Integration and Mixing:**
- *     A cell's material is now stored in a dedicated material Field owned by
- * the Mesh, ensuring contiguous memory layout for all data.
- *
- *   • **Performance Benefits:**
- *     This design enables:
- *     - Better cache utilization through contiguous memory access
- *     - Potential for vectorized operations on entire Fields
- *     - Reduced memory fragmentation and improved allocation patterns
- *     - Easier integration with GPU acceleration
- *
- * ================================================================================
- * Role in Computational Science:
- * ================================================================================
- * This refactored Cell design bridges the gap between intuitive object-oriented
- * APIs and high-performance data-oriented implementations. By providing a
- * familiar cell-centric interface while leveraging modern hardware-friendly
- * data layouts, this design:
- *
- *   - Maintains compatibility with existing CFD algorithms and boundary
- * conditions
- *   - Improves performance through better memory access patterns
- *   - Provides a path to parallelization (both CPU SIMD and GPU)
- *   - Preserves the physical correctness and unit safety of the original design
- *
- * ================================================================================
+ * @file CellBase.h
+ * @brief Lightweight base class for cell operations with optimized directional components
+ * 
+ * Design Agenda:
+ * --------------
+ * This implementation uses a bit field approach for representing
+ * directions, offering several key benefits:
+ * 
+ * 1. Memory efficiency through compact representation of directions
+ * 2. Improved performance via compile-time optimizations with constexpr
+ * 3. Enhanced flexibility by supporting combined directions (diagonals)
+ * 4. Future extensibility for 3D directions if needed
+ * 
+ * The design intentionally avoids complex template metaprogramming to keep
+ * compilation times reasonable while still providing significant performance
+ * optimizations. We leverage constexpr to enable the compiler to perform
+ * calculations at compile time when directions are known constants.
+ * 
+ * Field Access Strategy:
+ * ----------------------
+ * This base class is designed to work with a code generation system that creates
+ * specialized subclasses with direct field access capabilities. These generated
+ * subclasses provide strongly-typed, direct access to field data without the
+ * overhead of virtual function calls or string-based field lookups.
+ * 
+ * For example, a generated cell might implement:
+ *   double temperature() const;       // Direct access to temperature field
+ *   void setTemperature(double val);  // Direct update to temperature field
+ * 
+ * This approach maintains a lightweight interface for access to cell indices,
+ * neighbors, and related properties, while improving performance and reducing
+ * memory overhead in large-scale simulations.
  */
 
-#ifndef CELL_H
-#define CELL_H
+#ifndef CELL_BASE_H
+#define CELL_BASE_H
 
-#include "BoundaryClass.h"
-#include "Field.h"
-#include "Material.h"
-#include "Units.h"
-
-#include <algorithm>
 #include <array>
 #include <cstdint>
-#include <iostream>
-#include <memory>
-#include <sstream>
-#include <string>
-#include <unordered_map>
+#include <utility>
+#include <vector>
 
-// Forward declaration
-class Mesh;
+// Forward declarations
+class MeshBase;
 
-//------------------------------------------------------------------------------
-// Enumerations and supporting types
-//------------------------------------------------------------------------------
-class Cell {
+/**
+ * @class CellBase
+ * @brief Lightweight base class for cell operations with bit field directions
+ * 
+ * CellBase provides a minimal interface for accessing cell indices,
+ * neighbors, and related properties. It acts as an iterator-like concept,
+ * allowing code to "walk" through mesh elements without directly dealing
+ * with the complexity of index manipulation and data structure details.
+ * 
+ * This implementation uses bit fields for direction representation to
+ * enable more efficient operations and combined directions.
+ * 
+ * @note Specialized subclasses will be generated with direct field access methods
+ *       based on mesh configuration. These provide the most efficient means of
+ *       accessing field data and should be used whenever possible.
+ */
+class CellBase {
 public:
-  // Cell types.
-  enum class CellType { FLUID = 0, SOLID, BOUNDARY };
+    /**
+     * @brief Direction bit flags for neighbor access
+     * 
+     * Each direction is represented as a bit in a uint8_t value,
+     * allowing for combined directions (e.g., NORTHEAST = NORTH | EAST)
+     */
+    static constexpr uint8_t NONE      = 0x00; ///< No direction (0000 0000)
+    static constexpr uint8_t NORTH     = 0x01; ///< North direction (0000 0001)
+    static constexpr uint8_t EAST      = 0x02; ///< East direction (0000 0010)
+    static constexpr uint8_t SOUTH     = 0x04; ///< South direction (0000 0100)
+    static constexpr uint8_t WEST      = 0x08; ///< West direction (0000 1000)
+    
+    // Combined directions for convenience
+    static constexpr uint8_t NORTHEAST = NORTH | EAST; ///< Northeast diagonal (0000 0011)
+    static constexpr uint8_t SOUTHEAST = SOUTH | EAST; ///< Southeast diagonal (0000 0110)
+    static constexpr uint8_t SOUTHWEST = SOUTH | WEST; ///< Southwest diagonal (0000 1100)
+    static constexpr uint8_t NORTHWEST = NORTH | WEST; ///< Northwest diagonal (0000 1001)
+    
+    // Aliases for traditional direction indices (for backward compatibility)
+    static constexpr int NORTH_IDX = 0;
+    static constexpr int EAST_IDX  = 1;
+    static constexpr int SOUTH_IDX = 2;
+    static constexpr int WEST_IDX  = 3;
+    
+    /**
+     * @brief Location types for field data
+     */
+    static constexpr int CELL_CENTER = 0;
+    static constexpr int CELL_VERTEX = 1;
+    static constexpr int HORIZONTAL_EDGE = 2;
+    static constexpr int VERTICAL_EDGE = 3;
+    
+    /**
+     * @brief Get direction offset for a given direction
+     * 
+     * @param direction Direction bit flag
+     * @return std::pair<int, int> (di, dj) offset for the direction
+     */
+    static constexpr std::pair<int, int> getDirectionOffset(uint8_t direction) {
+        int di = 0;
+        int dj = 0;
+        
+        if (direction & NORTH) dj += 1;
+        if (direction & SOUTH) dj -= 1;
+        if (direction & EAST)  di += 1;
+        if (direction & WEST)  di -= 1;
+        
+        return {di, dj};
+    }
+    
+    /**
+     * @brief Get offsets for primary directions
+     * 
+     * Pre-computed array of direction offsets for fast access to
+     * the four primary directions without branches.
+     */
+    static constexpr std::array<std::pair<int, int>, 4> PRIMARY_DIRECTION_OFFSETS = {{
+        {0, 1},   // NORTH
+        {1, 0},   // EAST
+        {0, -1},  // SOUTH
+        {-1, 0}   // WEST
+    }};
+    
+    /**
+     * @brief Construct a new Cell Base object
+     * 
+     * @param i Index in x-direction
+     * @param j Index in y-direction
+     * @param mesh Pointer to the owning mesh
+     */
+    CellBase(int i, int j, MeshBase* mesh);
+    
+    /**
+     * @brief Virtual destructor
+     */
+    virtual ~CellBase() = default;
+    
+    /**
+     * @brief Get index in x-direction
+     * 
+     * @return int Index in x-direction
+     */
+    int i() const;
+    
+    /**
+     * @brief Get index in y-direction
+     * 
+     * @return int Index in y-direction
+     */
+    int j() const;
+    
+    /**
+     * @brief Get pointer to the owning mesh
+     * 
+     * @return MeshBase* Pointer to mesh
+     */
+    MeshBase* mesh() const;
+    
+    /**
+     * @brief Convert to linear index for direct array access
+     * 
+     * @return int Linear index
+     */
+    int linearIndex() const;
+    
+    /**
+     * @brief Get physical position of cell center
+     * 
+     * @return std::pair<double, double> (x,y) position
+     */
+    std::pair<double, double> position() const;
+    
+    /**
+     * @brief Check if cell is at mesh boundary
+     * 
+     * @return true If the cell is at any boundary
+     * @return false If the cell is interior
+     */
+    bool isBoundary() const;
+    
+    /**
+     * @brief Get neighboring cell in specified direction
+     * 
+     * @param direction Direction bit flag (NORTH, EAST, etc.)
+     * @return CellBase* Pointer to neighbor (nullptr if boundary)
+     * 
+     * @note Specialized subclasses may override this to return their specific type
+     */
+    virtual CellBase* neighbor(uint8_t direction) const;
+    
+    /**
+     * @brief Get neighboring cell using traditional direction index
+     * 
+     * Provided for backward compatibility with existing code
+     * 
+     * @param directionIndex One of NORTH_IDX, EAST_IDX, SOUTH_IDX, WEST_IDX
+     * @return CellBase* Pointer to neighbor (nullptr if boundary)
+     */
+    CellBase* neighborByIndex(int directionIndex) const;
+    
+    /**
+     * @brief Get all neighbors in primary directions
+     * 
+     * @return std::array<CellBase*, 4> Array of neighbors (may include nullptr)
+     */
+    std::array<CellBase*, 4> neighbors() const;
+    
+    /**
+     * @brief Get neighbors for specified directions
+     * 
+     * @param directions Direction bit flags (can be combined)
+     * @return std::vector<CellBase*> Vector of neighbors (may include nullptr)
+     */
+    std::vector<CellBase*> getNeighbors(uint8_t directions) const;
+    
+    /**
+     * @brief Get indices of neighbor in specified direction
+     * 
+     * @param direction Direction bit flag (NORTH, EAST, etc.)
+     * @return std::pair<int, int> (i,j) indices of neighbor
+     */
+    std::pair<int, int> neighborIndices(uint8_t direction) const;
+    
+    /**
+     * @brief Get indices for accessing data at a specific location
+     * 
+     * @param location One of CELL_CENTER, CELL_VERTEX, etc.
+     * @param direction Direction bit flag for edges/vertices
+     * @return std::pair<int, int> Adjusted indices for field access
+     */
+    std::pair<int, int> locationIndices(int location, uint8_t direction = NONE) const;
 
-  // Positions for vertex velocity access.
-  enum class VertexPosition { NORTHWEST = 0, NORTHEAST, SOUTHEAST, SOUTHWEST };
-
-  // Fixed properties indices.
-  enum class PropertyType {
-    VORTICITY = 0,
-    STREAM_FUNCTION,
-    KINETIC_ENERGY,
-    DIVERGENCE,
-    PRESSURE_CORRECTION,
-    HEAT_FLUX_X,
-    HEAT_FLUX_Y,
-    SHEAR_STRESS,
-    WALL_DISTANCE,
-    COUNT
-  };
-
-  // Flag definitions (using bitfields).
-  enum class CellFlag : uint32_t {
-    IS_INLET = 0x00000001,
-    IS_OUTLET = 0x00000002,
-    IS_WALL = 0x00000004,
-    IS_SYMMETRY = 0x00000008,
-    IS_BOUNDARY = 0x00000010,
-    IS_OBSTACLE = 0x00000020,
-    COUNT = 0x00000040 // not used as a flag
-  };
-
-  // Vertex structure for storing vertex velocities.
-  struct Vertex {
-    double vx = 0.0;
-    double vy = 0.0;
-  };
-
-  // Constructor for a cell at the specified grid location
-  Cell(Mesh *mesh, size_t i, size_t j);
-
-  // Default constructor for creating temporary cells
-  Cell();
-
-  // Constructors with type specification.
-  Cell(Mesh *mesh, size_t i, size_t j, CellType type);
-
-  // Destructor.
-  ~Cell() = default;
-
-  // --- Type and Flag Operations ---
-  CellType getType() const;
-  void setType(CellType type);
-
-  bool isFixed() const;
-  void setFixed(bool fixed);
-
-  bool isBoundary() const;
-  void setBoundary(bool isBoundary);
-
-  bool isObstacle() const;
-  void setObstacle(bool isObstacle);
-
-  bool getFlag(CellFlag flag) const;
-  void setFlag(CellFlag flag, bool value);
-
-  // --- Cell-Centered Physical Property Accessors (SI Units) ---
-  double getTemperature() const;
-  void setTemperature(double temperature);
-  bool hasBoundaryCondition() const;
-  bool hasTemperature() const { return true; }
-  bool hasDensity() const { return true; }
-
-  double getPressure() const;
-  void setPressure(double pressure);
-
-  double getDensity() const;
-  void setDensity(double density);
-
-  double getVelocityU() const; // x-velocity
-  void setVelocityU(double vx);
-
-  double getVelocityV() const; // y-velocity
-  void setVelocityV(double vy);
-
-  // --- Unit Conversion Functions ---
-  // Temperature conversion.
-  void setTemperatureWithUnits(double temperature, const std::string &unit);
-  double getTemperatureWithUnits(const std::string &unit) const;
-
-  // Pressure conversion.
-  void setPressureWithUnits(double pressure, const std::string &unit);
-  double getPressureWithUnits(const std::string &unit) const;
-
-  // Density conversion.
-  void setDensityWithUnits(double density, const std::string &unit);
-  double getDensityWithUnits(const std::string &unit) const;
-
-  // Velocity conversion.
-  void setVelocityWithUnits(double vx, double vy, const std::string &unit);
-  double getVelocityUWithUnits(const std::string &unit) const;
-  double getVelocityVWithUnits(const std::string &unit) const;
-
-  // Vertex velocity access (for cell corners).
-  std::pair<double, double> getVertexVelocity(VertexPosition pos) const;
-  void setVertexVelocity(VertexPosition pos, double vx, double vy);
-  void setVertexVelocityWithUnits(VertexPosition pos, double vx, double vy,
-                                  const std::string &unit);
-  std::pair<double, double>
-  getVertexVelocityWithUnits(VertexPosition pos, const std::string &unit) const;
-
-  // Access to the parent Mesh
-  Mesh *getGrid() const { return m_mesh; }
-
-  // Boundary condition access
-  std::shared_ptr<BoundaryClass> getBoundaryCondition() const;
-  void setBoundaryCondition(std::shared_ptr<BoundaryClass> bc);
-
-  // --- Material Integration ---
-  std::shared_ptr<Material> getMaterial() const;
-  void setMaterial(std::shared_ptr<Material> material);
-  /**
-   * @brief Mixes the cell's current material with another using the Material
-   * class's mixing function.
-   * @param other Shared pointer to the other material.
-   * @param mixFraction Fraction of the other material.
-   * @param mixingRule Mixing rule string (default uses Material's default).
-   */
-  void mixMaterial(const std::shared_ptr<Material> &other, double mixFraction,
-                   const std::string &mixingRule = "default");
-
-  double getEffectiveDensity() const;
-
-  // --- Dynamic and Fixed Property Access ---
-  void setProperty(PropertyType type, double value);
-  double getProperty(PropertyType type) const;
-
-  // Convenience methods.
-  double getVorticity() const;
-  void setVorticity(double value);
-  double getStreamFunction() const;
-  void setStreamFunction(double value);
-  double getKineticEnergy() const;
-  void setKineticEnergy(double value);
-  double getDivergence() const;
-  void setDivergence(double value);
-  double getPressureCorrection() const;
-  void setPressureCorrection(double value);
-  double getHeatFluxX() const;
-  void setHeatFluxX(double value);
-  double getHeatFluxY() const;
-  void setHeatFluxY(double value);
-  double getShearStress() const;
-  void setShearStress(double value);
-  double getWallDistance() const;
-  void setWallDistance(double value);
-
-  void setDynamicProperty(const std::string &name, double value);
-  double getDynamicProperty(const std::string &name,
-                            double defaultValue = 0.0) const;
-
-  // --- Property Computation Registration ---
-  using PropertyComputeFunction =
-      std::function<void(Cell &, const std::array<Cell *, 4> *)>;
-
-  // Register a computation function for a property
-  static void registerPropertyComputation(PropertyType type,
-                                          PropertyComputeFunction func);
-
-  // Get a computation function for a property
-  static PropertyComputeFunction getPropertyComputation(PropertyType type);
-
-  // Compute all derived properties for this cell
-  void
-  computeDerivedProperties(const std::array<Cell *, 4> *neighbors = nullptr);
-
-  // --- State Management ---
-  void reset();
-
-  // --- Serialization ---
-  std::string serialize() const;
-  bool deserialize(const std::string &data);
-
-  // --- Diagnostic Output ---
-  void print(std::ostream &os, int verbosity = 1) const;
-  std::string toString(int verbosity = 1) const;
-  std::string toSVG(double scale = 10.0, bool showVelocity = true) const;
-
-  // --- Static Helper Methods ---
-  static std::string cellTypeToString(CellType type);
-  static std::string cellFlagToString(CellFlag flag);
-
-  // --- Index Access ---
-  // Get grid indices
-  size_t getI() const { return m_i; }
-  size_t getJ() const { return m_j; }
-
-private:
-  // Reference to the parent mesh that owns the fields
-  Mesh *m_mesh;
-
-  // Grid indices
-  size_t m_i;
-  size_t m_j;
-
-  // Cached dynamic properties for non-field properties
-  std::unordered_map<std::string, double> m_dynamicProperties;
-
-  // Static registry for property computation functions
-  static std::unordered_map<PropertyType, PropertyComputeFunction>
-      s_propertyComputeFunctions;
+protected:
+    int m_i;            ///< Index in x-direction
+    int m_j;            ///< Index in y-direction
+    MeshBase* m_mesh;   ///< Pointer to owning mesh
+    
+    /**
+     * @brief Helper for generated field access methods
+     * 
+     * This method exposes the raw cell indices for use by specialized
+     * field access methods in generated subclasses. It allows the 
+     * code generator to create direct field access without needing to
+     * go through virtual methods.
+     * 
+     * @param location Field location (CELL_CENTER, VERTEX, etc.)
+     * @param direction Direction for non-centered fields (default = NONE)
+     * @return Indices adjusted for the field location
+     * 
+     * @note This method is intended for use by generated code, not direct use.
+     */
+    std::pair<int, int> getFieldIndices(int location, uint8_t direction = NONE) const {
+        return locationIndices(location, direction);
+    }
 };
 
-#endif // CELL_H
+#endif // CELL_BASE_H
+ 

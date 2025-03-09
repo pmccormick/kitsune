@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.14)
 project(CFD_MeshKit VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -128,7 +128,7 @@ if(BUILD_BENCHMARKS)
   FetchContent_MakeAvailable(benchmark)
   
   # Build benchmarks
-  #add_subdirectory(benchmarks)
+  add_subdirectory(benchmarks)
 endif()
 
 # Installation rules
