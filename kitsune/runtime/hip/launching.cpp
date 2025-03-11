@@ -423,7 +423,7 @@ void *__kithip_get_global_symbol(void *fat_bin, const char *sym_name) {
     hip_module = modit->second;
   }
 
-  _kithip_module_map_mutex.lock();
+  _kithip_module_map_mutex.unlock();
   // UNLOCK
 
   // NOTE: The device pointer and size ('bytes') parameters for the
