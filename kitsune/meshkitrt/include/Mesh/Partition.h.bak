@@ -1,0 +1,234 @@
+#ifndef MESH_PARTITION_H
+#define MESH_PARTITION_H
+
+#include "MeshBase.h"
+#include "Cell.h"
+#include <vector>
+#include <cassert>
+#include <algorithm>
+#include <utility>
+#include <functional>
+
+namespace mesh {
+
+  /**
+   * @brief MeshPartition class for representing disjoint subdomains of a mesh.
+   *
+   * The MeshPartition class represents a rectangular subdomain of the full mesh,
+   * intended for parallel processing, load balancing, and improved data locality.
+   * In addition to the interior cells, partitions maintain ghost (halo) cells along
+   * their boundaries to support computations that require neighboring cell data.
+   *
+   * The partition interior is defined by [startI, endI) and [startJ, endJ) in mesh indices.
+   * The ghost cell thickness (number of layers) is configurable.
+   *
+   * Key Features:
+   * - Provides methods to retrieve interior cells.
+   * - Provides methods to extract ghost cells for each side (using Partition::Direction).
+   * - Offers an update mechanism for ghost cells via a user-supplied callback,
+   *   enabling halo exchange functionality.
+   *
+   * @see MeshBase, Cell
+   */
+  class MeshPartition {
+  public:
+    /**
+     * @brief Enumeration for partition ghost cell directions.
+     *
+     * This enum maps the directional constants to those used in the Cell class,
+     * ensuring consistency across our codebase.
+     */
+    enum class Direction : uint8_t {
+    NORTH = Cell::NORTH, ///< Cells above the interior
+      EAST  = Cell::EAST,  ///< Cells to the right of the interior
+      SOUTH = Cell::SOUTH, ///< Cells below the interior
+      WEST  = Cell::WEST   ///< Cells to the left of the interior
+      };
+
+  /**
+   * @brief Construct a new MeshPartition object.
+   *
+   * @param mesh Pointer to the full mesh.
+   * @param startI Starting i-index for the partition's interior (inclusive).
+   * @param startJ Starting j-index for the partition's interior (inclusive).
+   * @param endI Ending i-index for the partition's interior (exclusive).
+   * @param endJ Ending j-index for the partition's interior (exclusive).
+   * @param ghostLayers Number of ghost cell layers to include around the partition (default is 1).
+   *
+   * @note The interior of the partition is defined as cells with indices in
+   * [startI, endI) x [startJ, endJ). The ghost region consists of cells adjacent to
+   * this interior, extending ghostLayers cells outward.
+   */
+  MeshPartition(MeshBase* mesh, int startI, int startJ, int endI, int endJ, int ghostLayers = 1)
+    : m_mesh(mesh),
+    m_startI(startI),
+    m_startJ(startJ),
+    m_endI(endI),
+    m_endJ(endJ),
+    m_ghostLayers(ghostLayers)
+    {
+      assert(mesh != nullptr && "Mesh pointer must not be null");
+      assert(startI >= 0 && startJ >= 0 && endI <= mesh->nx() && endJ <= mesh->ny() &&
+	     "Partition boundaries must be within mesh dimensions");
+      assert(startI < endI && startJ < endJ && "Partition must contain at least one cell");
+    }
+
+  /**
+   * @brief Get the full mesh associated with this partition.
+   *
+   * @return MeshBase* Pointer to the full mesh.
+   */
+  MeshBase* mesh() const { return m_mesh; }
+
+  /**
+   * @brief Get the interior boundaries of the partition.
+   *
+   * @return std::pair<std::pair<int, int>, std::pair<int, int>> A pair of (start, end)
+   *         index pairs for the i and j directions: ((startI, startJ), (endI, endJ)).
+   */
+  std::pair<std::pair<int, int>, std::pair<int, int>> getInteriorBounds() const {
+    return { {m_startI, m_startJ}, {m_endI, m_endJ} };
+  }
+
+  /**
+   * @brief Retrieve a vector of pointers to the interior cells of the partition.
+   *
+   * Iterates over the defined interior region and collects cell views.
+   *
+   * @return std::vector<Cell*> Vector of cell pointers in the partition interior.
+   */
+  std::vector<Cell*> getInteriorCells() const {
+    std::vector<Cell*> cells;
+    cells.reserve(static_cast<size_t>((m_endI - m_startI) * (m_endJ - m_startJ)));
+    for (int j = m_startJ; j < m_endJ; ++j) {
+      for (int i = m_startI; i < m_endI; ++i) {
+	Cell* cell = m_mesh->getCell(i, j);
+	if (cell) {
+	  cells.push_back(cell);
+	}
+      }
+    }
+    return cells;
+  }
+
+  /**
+   * @brief Retrieve ghost cells on a specified side of the partition.
+   *
+   * Ghost cells are cells immediately adjacent to the partition interior but lying
+   * outside it. This function returns ghost cells for a specific side as defined by
+   * the Partition::Direction enum.
+   *
+   * @param side Direction indicating the side (NORTH, EAST, SOUTH, or WEST).
+   * @return std::vector<Cell*> Vector of ghost cell pointers for the specified side.
+   */
+  std::vector<Cell*> getGhostCells(Direction side) const {
+    std::vector<Cell*> ghosts;
+    switch (side) {
+    case Direction::NORTH:  // Cells above the interior
+      for (int j = m_endJ; j < std::min(m_endJ + m_ghostLayers, m_mesh->ny()); ++j) {
+	for (int i = m_startI; i < m_endI; ++i) {
+	  Cell* cell = m_mesh->getCell(i, j);
+	  if (cell) {
+	    ghosts.push_back(cell);
+	  }
+	}
+      }
+      break;
+    case Direction::SOUTH:  // Cells below the interior
+      for (int j = std::max(m_startJ - m_ghostLayers, 0); j < m_startJ; ++j) {
+	for (int i = m_startI; i < m_endI; ++i) {
+	  Cell* cell = m_mesh->getCell(i, j);
+	  if (cell) {
+	    ghosts.push_back(cell);
+	  }
+	}
+      }
+      break;
+    case Direction::EAST:  // Cells to the right of the interior
+      for (int i = m_endI; i < std::min(m_endI + m_ghostLayers, m_mesh->nx()); ++i) {
+	for (int j = m_startJ; j < m_endJ; ++j) {
+	  Cell* cell = m_mesh->getCell(i, j);
+	  if (cell) {
+	    ghosts.push_back(cell);
+	  }
+	}
+      }
+      break;
+    case Direction::WEST:  // Cells to the left of the interior
+      for (int i = std::max(m_startI - m_ghostLayers, 0); i < m_startI; ++i) {
+	for (int j = m_startJ; j < m_endJ; ++j) {
+	  Cell* cell = m_mesh->getCell(i, j);
+	  if (cell) {
+	    ghosts.push_back(cell);
+	  }
+	}
+      }
+      break;
+    default:
+      // Unknown direction; return an empty vector.
+      break;
+    }
+    return ghosts;
+  }
+
+  /**
+   * @brief Retrieve all ghost cells surrounding the partition.
+   *
+   * This function aggregates ghost cells from all four sides of the partition,
+   * sorts them, and removes duplicates that may occur at corner overlaps.
+   *
+   * @return std::vector<Cell*> Vector of ghost cell pointers.
+   */
+  std::vector<Cell*> getAllGhostCells() const {
+    std::vector<Cell*> ghosts;
+    auto north = getGhostCells(Direction::NORTH);
+    auto south = getGhostCells(Direction::SOUTH);
+    auto east  = getGhostCells(Direction::EAST);
+    auto west  = getGhostCells(Direction::WEST);
+    ghosts.insert(ghosts.end(), north.begin(), north.end());
+    ghosts.insert(ghosts.end(), south.begin(), south.end());
+    ghosts.insert(ghosts.end(), east.begin(), east.end());
+    ghosts.insert(ghosts.end(), west.begin(), west.end());
+    // Sort and remove duplicates (e.g., corner cells may be added twice)
+    std::sort(ghosts.begin(), ghosts.end());
+    ghosts.erase(std::unique(ghosts.begin(), ghosts.end()), ghosts.end());
+    return ghosts;
+  }
+
+  /**
+   * @brief Update ghost cells using a user-provided callback function.
+   *
+   * Applies the provided update function to each ghost cell. This enables
+   * halo exchange functionality where ghost cells are updated with data from
+   * neighboring partitions.
+   *
+   * @param updateFunc Function that takes a Cell* and updates its data.
+   */
+  void updateGhostCells(const std::function<void(Cell*)>& updateFunc) {
+    auto ghosts = getAllGhostCells();
+    for (Cell* cell : ghosts) {
+      if (cell) {
+	updateFunc(cell);
+      }
+    }
+  }
+
+  /**
+   * @brief Get the number of ghost layers configured for this partition.
+   *
+   * @return int Number of ghost cell layers.
+   */
+  int getGhostLayerCount() const { return m_ghostLayers; }
+
+  private:
+  MeshBase* m_mesh;  ///< Pointer to the full mesh.
+  int m_startI;      ///< Starting i-index of the partition interior (inclusive).
+  int m_startJ;      ///< Starting j-index of the partition interior (inclusive).
+  int m_endI;        ///< Ending i-index of the partition interior (exclusive).
+  int m_endJ;        ///< Ending j-index of the partition interior (exclusive).
+  int m_ghostLayers; ///< Number of ghost cell layers to include around the partition.
+  };
+
+} // namespace mesh
+
+#endif // MESH_PARTITION_H

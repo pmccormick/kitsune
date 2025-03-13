@@ -1,0 +1,359 @@
+/**
+ * @file HeatTransferExample.cpp
+ * @brief Example implementation of a 2D heat transfer simulation using MeshKit.
+ * 
+ * This example demonstrates how to use the core components of MeshKit
+ * (Mesh, Cell, Field, Region) to implement a basic heat transfer simulation
+ * with different boundary condition types.
+ * 
+ * The simulation solves the heat equation: ∂T/∂t = α∇²T
+ * using an explicit finite difference method on a rectangular grid.
+ */
+
+#include <iostream>
+#include <fstream>
+#include <cmath>
+#include <vector>
+#include <string>
+#include <chrono>
+
+// Include core MeshKit components
+#include "Mesh.h"
+#include "Cell.h"
+#include "Field.h"
+#include "RegionAll.h"
+
+// Physical and simulation parameters
+struct SimulationParameters {
+    double alpha;          // Thermal diffusivity [m²/s]
+    double dx;             // Cell size [m]
+    double dt;             // Time step [s]
+    int numSteps;          // Number of simulation steps
+    int outputInterval;    // How often to output results
+    std::string outputDir; // Directory for output files
+    
+    // Boundary condition types
+    enum class BoundaryType {
+        DIRICHLET,  // Fixed temperature
+        NEUMANN     // Zero gradient (insulated)
+    };
+    
+    // Boundary conditions for each side
+    BoundaryType leftBC;
+    BoundaryType rightBC;
+    BoundaryType bottomBC;
+    BoundaryType topBC;
+    
+    // Fixed temperatures for Dirichlet boundaries [°C]
+    double leftTemp;
+    double rightTemp;
+    double bottomTemp;
+    double topTemp;
+};
+
+/**
+ * @brief Creates output directory and initializes simulation parameters
+ * 
+ * @return SimulationParameters with default values
+ */
+SimulationParameters setupSimulation() {
+    SimulationParameters params;
+    
+    // Physical parameters
+    params.alpha = 0.1;        // Thermal diffusivity (material property)
+    params.dx = 0.01;          // Cell size in meters
+    params.dt = 0.0001;        // Time step in seconds
+    
+    // Simulation control
+    params.numSteps = 1000;    // Total simulation steps
+    params.outputInterval = 100; // Output every 100 steps
+    params.outputDir = "heat_results";
+    
+    // Create output directory if it doesn't exist
+    std::string command = "mkdir -p " + params.outputDir;
+    system(command.c_str());
+    
+    // Default boundary conditions (fixed temperature on all sides)
+    params.leftBC = SimulationParameters::BoundaryType::DIRICHLET;
+    params.rightBC = SimulationParameters::BoundaryType::DIRICHLET;
+    params.bottomBC = SimulationParameters::BoundaryType::DIRICHLET;
+    params.topBC = SimulationParameters::BoundaryType::DIRICHLET;
+    
+    // Default boundary temperatures
+    params.leftTemp = 20.0;
+    params.rightTemp = 20.0;
+    params.bottomTemp = 20.0;
+    params.topTemp = 20.0;
+    
+    return params;
+}
+
+/**
+ * @brief Apply boundary conditions to the temperature field
+ * 
+ * @param mesh Pointer to the mesh
+ * @param temperature Temperature field to update
+ * @param params Simulation parameters containing boundary types
+ */
+void applyBoundaryConditions(
+    mesh::Mesh* mesh, 
+    mesh::Field<double>& temperature,
+    const SimulationParameters& params) {
+    
+    const int nx = mesh->nx();
+    const int ny = mesh->ny();
+    
+    // Left boundary (i=0)
+    if (params.leftBC == SimulationParameters::BoundaryType::DIRICHLET) {
+        // Fixed temperature
+        for (int j = 0; j < ny; j++) {
+            temperature(0, j) = params.leftTemp;
+        }
+    } else {
+        // Zero gradient (copy from neighbor)
+        for (int j = 0; j < ny; j++) {
+            temperature(0, j) = temperature(1, j);
+        }
+    }
+    
+    // Right boundary (i=nx-1)
+    if (params.rightBC == SimulationParameters::BoundaryType::DIRICHLET) {
+        for (int j = 0; j < ny; j++) {
+            temperature(nx-1, j) = params.rightTemp;
+        }
+    } else {
+        for (int j = 0; j < ny; j++) {
+            temperature(nx-1, j) = temperature(nx-2, j);
+        }
+    }
+    
+    // Bottom boundary (j=0)
+    if (params.bottomBC == SimulationParameters::BoundaryType::DIRICHLET) {
+        for (int i = 0; i < nx; i++) {
+            temperature(i, 0) = params.bottomTemp;
+        }
+    } else {
+        for (int i = 0; i < nx; i++) {
+            temperature(i, 0) = temperature(i, 1);
+        }
+    }
+    
+    // Top boundary (j=ny-1)
+    if (params.topBC == SimulationParameters::BoundaryType::DIRICHLET) {
+        for (int i = 0; i < nx; i++) {
+            temperature(i, ny-1) = params.topTemp;
+        }
+    } else {
+        for (int i = 0; i < nx; i++) {
+            temperature(i, ny-1) = temperature(i, ny-2);
+        }
+    }
+}
+
+/**
+ * @brief Solve one time step of the heat equation
+ * 
+ * @param mesh Pointer to the mesh
+ * @param temperature Current temperature field
+ * @param nextTemperature Buffer field for the next time step
+ * @param interiorRegion Region containing interior cells
+ * @param params Simulation parameters
+ */
+void solveTimeStep(
+    mesh::Mesh* mesh,
+    mesh::Field<double>& temperature,
+    mesh::Field<double>& nextTemperature,
+    const mesh::Region& interiorRegion,
+    const SimulationParameters& params) {
+    
+    // Calculate stability parameter
+    double stability = params.alpha * params.dt / (params.dx * params.dx);
+    
+    // Update interior cells using the heat equation
+    mesh::forEachCellInRegion<mesh::Mesh, mesh::Cell>(
+        *mesh, interiorRegion,
+        [&](mesh::Cell* cell) {
+            // Get current cell temperature
+            double T_current = temperature(cell->i(), cell->j());
+            
+            // Get neighbor cells
+            mesh::Cell east = cell->neighbor(mesh::EAST);
+            mesh::Cell west = cell->neighbor(mesh::WEST);
+            mesh::Cell north = cell->neighbor(mesh::NORTH);
+            mesh::Cell south = cell->neighbor(mesh::SOUTH);
+            
+            // Get neighbor temperatures
+            double T_east = temperature(east.i(), east.j());
+            double T_west = temperature(west.i(), west.j());
+            double T_north = temperature(north.i(), north.j());
+            double T_south = temperature(south.i(), south.j());
+            
+            // Apply the heat equation (finite difference)
+            double laplacian = (T_east + T_west + T_north + T_south - 4.0 * T_current) / 
+                               (params.dx * params.dx);
+            double T_new = T_current + params.alpha * params.dt * laplacian;
+            
+            // Store in the buffer field
+            nextTemperature(cell->i(), cell->j()) = T_new;
+        }
+    );
+    
+    // Copy interior solution back to the main field
+    // Note: only update interior cells, not boundaries
+    for (int j = 1; j < mesh->ny() - 1; j++) {
+        for (int i = 1; i < mesh->nx() - 1; i++) {
+            temperature(i, j) = nextTemperature(i, j);
+        }
+    }
+}
+
+/**
+ * @brief Save the temperature field to a CSV file
+ * 
+ * @param mesh Pointer to the mesh
+ * @param temperature Temperature field to save
+ * @param step Current simulation step
+ * @param outputDir Directory for output files
+ */
+void saveTemperatureField(
+    mesh::Mesh* mesh,
+    const mesh::Field<double>& temperature,
+    int step,
+    const std::string& outputDir) {
+    
+    std::string filename = outputDir + "/temperature_" + std::to_string(step) + ".csv";
+    std::ofstream outFile(filename);
+    
+    // Write header
+    outFile << "i,j,x,y,temperature\n";
+    
+    // Write data
+    for (int j = 0; j < mesh->ny(); j++) {
+        for (int i = 0; i < mesh->nx(); i++) {
+            // Calculate physical coordinates (assuming unit cell size for simplicity)
+            double x = static_cast<double>(i) * 0.01;
+            double y = static_cast<double>(j) * 0.01;
+            
+            outFile << i << "," << j << "," << x << "," << y << "," 
+                    << temperature(i, j) << "\n";
+        }
+    }
+    
+    outFile.close();
+    std::cout << "Saved results to " << filename << std::endl;
+}
+
+/**
+ * @brief Set initial conditions with a hot spot in the center of the domain
+ * 
+ * @param mesh Pointer to the mesh
+ * @param temperature Temperature field to initialize
+ * @param ambientTemp Ambient temperature in °C
+ * @param hotspotTemp Hot spot temperature in °C
+ */
+void setInitialConditions(
+    mesh::Mesh* mesh,
+    mesh::Field<double>& temperature,
+    double ambientTemp,
+    double hotspotTemp) {
+    
+    const int nx = mesh->nx();
+    const int ny = mesh->ny();
+    
+    // Fill with ambient temperature
+    for (int j = 0; j < ny; j++) {
+        for (int i = 0; i < nx; i++) {
+            temperature(i, j) = ambientTemp;
+        }
+    }
+    
+    // Set hot spot in the center (covering 20% of the domain)
+    int startI = nx / 2 - nx / 10;
+    int endI = nx / 2 + nx / 10;
+    int startJ = ny / 2 - ny / 10;
+    int endJ = ny / 2 + ny / 10;
+    
+    for (int j = startJ; j < endJ; j++) {
+        for (int i = startI; i < endI; i++) {
+            temperature(i, j) = hotspotTemp;
+        }
+    }
+}
+
+/**
+ * @brief Main function implementing the heat transfer simulation
+ */
+int main() {
+    std::cout << "Starting heat transfer simulation..." << std::endl;
+    
+    // Timer for performance measurement
+    auto startTime = std::chrono::steady_clock::now();
+    
+    // Setup simulation parameters
+    SimulationParameters params = setupSimulation();
+    
+    // Check stability condition
+    double stability = params.alpha * params.dt / (params.dx * params.dx);
+    if (stability > 0.25) {
+        std::cout << "Warning: Solution may be unstable (stability = " 
+                  << stability << " > 0.25).\n";
+        std::cout << "Consider reducing dt or increasing dx.\n";
+    } else {
+        std::cout << "Stability parameter: " << stability << " (stable if <= 0.25)\n";
+    }
+    
+    // Create a mesh (100x100 cells)
+    auto mesh = std::make_unique<mesh::Mesh>(100, 100);
+    std::cout << "Created mesh: " << mesh->nx() << " x " << mesh->ny() << " cells\n";
+    
+    // Create temperature fields
+    mesh::Field<double> temperature(*mesh, 20.0);      // Current temperature
+    mesh::Field<double> nextTemperature(*mesh, 20.0);  // Buffer for next step
+    
+    // Create a region for the interior cells (where we'll solve the heat equation)
+    auto interiorRegion = mesh::createInteriorRegion<mesh::Mesh, mesh::Cell>(*mesh, "Interior");
+    std::cout << "Interior region contains " << interiorRegion.size() << " cells\n";
+    
+    // Set initial conditions - hot spot in the center
+    setInitialConditions(mesh.get(), temperature, 20.0, 100.0);
+    std::cout << "Set initial conditions with hot spot at center\n";
+    
+    // Save initial state
+    saveTemperatureField(mesh.get(), temperature, 0, params.outputDir);
+    
+    // Main simulation loop
+    std::cout << "Starting simulation for " << params.numSteps << " time steps...\n";
+    for (int step = 1; step <= params.numSteps; step++) {
+        // Apply boundary conditions
+        applyBoundaryConditions(mesh.get(), temperature, params);
+        
+        // Solve one time step
+        solveTimeStep(mesh.get(), temperature, nextTemperature, interiorRegion, params);
+        
+        // Output results periodically
+        if (step % params.outputInterval == 0 || step == params.numSteps) {
+            std::cout << "Step " << step << " completed (time = " 
+                      << step * params.dt << " seconds)\n";
+            saveTemperatureField(mesh.get(), temperature, step, params.outputDir);
+        }
+    }
+    
+    // Calculate and report performance
+    auto endTime = std::chrono::steady_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    std::cout << "Simulation completed in " << duration.count() / 1000.0 << " seconds.\n";
+    
+    // Provide visualization hint
+    std::cout << "\nTo visualize results, you can use Python with matplotlib, e.g.:\n";
+    std::cout << "  import pandas as pd\n";
+    std::cout << "  import matplotlib.pyplot as plt\n";
+    std::cout << "  data = pd.read_csv('heat_results/temperature_1000.csv')\n";
+    std::cout << "  plt.figure(figsize=(10, 8))\n";
+    std::cout << "  plt.scatter(data['x'], data['y'], c=data['temperature'], cmap='hot')\n";
+    std::cout << "  plt.colorbar(label='Temperature (°C)')\n";
+    std::cout << "  plt.axis('equal')\n";
+    std::cout << "  plt.title('Temperature Distribution')\n";
+    std::cout << "  plt.show()\n";
+    
+    return 0;
+}

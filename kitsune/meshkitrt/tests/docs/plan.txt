@@ -1,0 +1,182 @@
+Here's a complete list of the proposed tests for all components and our current status:
+
+## BitArray Tests (COMPLETED)
+
+1. **BitArrayConstructionTest.cpp** (8 tests)
+   - Tests for constructors and basic initialization
+   - Copy/move construction and assignment
+
+2. **BitArrayManipulationTest.cpp** (8 tests)
+   - Tests for get/set operations
+   - Setting/clearing all bits
+
+3. **BitArrayCountingTest.cpp** (9 tests)
+   - Tests for count() method
+   - isEmpty() and any() checks
+
+4. **BitArrayTraversalTest.cpp** (7 tests)
+   - Tests for findFirst() and findNext()
+   - Full iteration patterns
+
+5. **BitArrayBitwiseTest.cpp** (8 tests)
+   - Tests for bitwiseOr, bitwiseAnd, bitwiseAndNot, and bitwiseXor
+
+6. **BitArrayResizeTest.cpp** (7 tests)
+   - Growing and shrinking arrays
+   - Edge cases with word boundaries
+
+7. **BitArrayPerformanceTest.cpp** (3 tests)
+   - Benchmarks for different densities
+   - Set operation performance
+
+8. **BitArrayEdgeCaseTest.cpp** (6 tests)
+   - Empty arrays, single-bit arrays
+   - Word boundary handling
+
+## Cell Tests (COMPLETED)
+
+1. **CellBasicTest.cpp** (10 tests)
+   - Default construction
+   - Coordinate access and validation
+   - Linear indexing
+
+2. **CellNavigationTest.cpp** (10 tests)
+   - Neighbor access in all directions
+   - Boundary behavior
+
+3. **CellNeighborsTest.cpp** (8 tests)
+   - neighbors() and getNeighbors() methods
+   - neighborByIndex() with traditional indices
+
+4. **CellDirectionTest.cpp** (10 tests)
+   - Direction offset calculation
+   - Combined directions
+
+5. **CellComparisonTest.cpp** (9 tests)
+   - Equality and inequality operators
+   - Comparison with invalid cells
+
+6. **CellErrorHandlingTest.cpp** (7 tests)
+   - Exception throwing conditions
+   - Error handling at boundaries
+
+7. **CellMeshIntegrationTest.cpp** (7 tests)
+   - Cell creation through mesh
+   - Boundary detection
+
+8. **CellFieldIntegrationTest.cpp** (7 tests)
+   - Field access through cells
+   - Navigation with field access
+
+## Field Tests (COMPLETED)
+
+1. **FieldConstructionTest.cpp** (8 tests)
+   - Constructors with different types
+   - Default value initialization
+
+2. **FieldAccessTest.cpp** (9 tests)
+   - operator() for reading and writing
+   - const/non-const access
+   - Different access patterns
+
+3. **FieldBoundaryTest.cpp** (7 tests)
+   - Access at field boundaries
+   - Special cases (1x1 field, non-square)
+
+4. **FieldMemoryTest.cpp** (8 tests)
+   - Data pointer access
+   - Memory layout and alignment
+
+5. **FieldTypeTest.cpp** (9 tests)
+   - Support for different types
+   - Custom types and complex structures
+
+6. **FieldMeshIntegrationTest.cpp** (8 tests)
+   - Field dimensions matching mesh
+   - Field access through cells
+   - Neighbor navigation with fields
+
+7. **FieldPerformanceTest.cpp** (6 tests)
+   - Access pattern benchmarks
+   - Memory usage analysis
+
+## Region Tests (PROPOSED, NOT IMPLEMENTED)
+
+1. **RegionConstructionTest.cpp**
+   - Construction with different definitions
+   - ID, name, and mesh association
+
+2. **RegionMembershipTest.cpp**
+   - Testing cell membership
+   - Different containment patterns
+
+3. **RegionStorageTest.cpp**
+   - CELL_SET vs BIT_ARRAY modes
+   - Storage mode transitions
+
+4. **RegionSetOperationsTest.cpp**
+   - Union, intersection, difference
+   - Composition of regions
+
+5. **RegionOptimizationTest.cpp**
+   - Automatic optimization strategies
+   - Performance with different densities
+
+6. **RegionTraversalTest.cpp**
+   - Iteration over region cells
+   - Different traversal strategies
+
+7. **RegionBoundaryTest.cpp**
+   - Boundary detection
+   - Region edge operations
+
+8. **RegionMeshIntegrationTest.cpp**
+   - Region creation from mesh predicates
+   - Interaction with mesh coordinates
+
+## Mesh Tests (PROPOSED, NOT IMPLEMENTED)
+
+1. **MeshConstructionTest.cpp**
+   - Creating meshes with different dimensions
+   - Coordinate system setup
+
+2. **MeshIndexingTest.cpp**
+   - Linear index conversion
+   - Boundary checking
+
+3. **MeshCellFactoryTest.cpp**
+   - Cell creation methods
+   - Invalid cell handling
+
+4. **MeshIterationTest.cpp**
+   - Tests for different iterator types
+   - Range-based for loop support
+
+5. **MeshBoundaryTest.cpp**
+   - Boundary cell detection
+   - Interior vs boundary operations
+
+## Partition Tests (PROPOSED, NOT IMPLEMENTED)
+
+1. **PartitionConstructionTest.cpp**
+   - Creating partitions with different sizes
+   - Ghost layer configuration
+
+2. **PartitionSubdomainTest.cpp**
+   - Interior cells access
+   - Subdomain boundaries
+
+3. **PartitionGhostTest.cpp**
+   - Ghost cell retrieval by direction
+   - Ghost cell update mechanisms
+
+4. **PartitionCommunicationTest.cpp**
+   - Data exchange between partitions
+   - Halo update patterns
+
+## Current Status:
+
+1. **Completed**: BitArray, Cell, and Field test suites (23 test files, ~180 tests)
+2. **In Progress**: None at the moment
+3. **Not Started**: Region, Mesh, and Partition test suites
+

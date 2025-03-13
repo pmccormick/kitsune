@@ -1,0 +1,229 @@
+/**
+ * @file Cell.h
+ * @brief Lightweight Cell class for high-performance mesh-based simulations.
+ *
+ * This file defines the lightweight Cell view that is used in conjunction
+ * with the concept-based iterators. It retains the design principles:
+ *
+ * 1. Lightweight View: Contains only a mesh pointer and grid indices.
+ * 2. Logical Grid Only: All physical calculations are delegated to Mesh.
+ * 3. Performance First: Core methods are inlined (using [[clang::always_inline]]) to allow
+ *    the compiler to optimize away overhead.
+ *
+ * ADDITIONAL DEVELOPER NOTES:
+ * - Do not add physical coordinate calculations to this class; these belong in Mesh.
+ * - This class is intended for use in performance-critical loops and range-based iteration.
+ *
+ * @see Mesh.h, CellIterators.h
+ */
+
+#ifndef MESH_CELL_H
+#define MESH_CELL_H
+
+#include <utility>
+#include <stdexcept>
+
+// Forward declarations to avoid circular dependencies
+namespace mesh {
+
+  class Mesh;
+
+  // Direction constants for cell navigation
+  static constexpr uint8_t NORTH = 0x01;
+  static constexpr uint8_t EAST  = 0x02;
+  static constexpr uint8_t SOUTH = 0x04;
+  static constexpr uint8_t WEST  = 0x08;
+
+  /**
+   * @brief Represents a lightweight view of a cell in a mesh.
+   *
+   * The Cell class provides minimal storage (only a mesh pointer and indices)
+   * and basic navigation functions. It is designed to be created on-demand during iteration.
+   * 
+   * Key design features:
+   * - Extremely lightweight (only 3 fields: mesh pointer and 2 indices)
+   * - All methods inlined for maximum performance
+   * - Created on-demand by Mesh factory methods
+   * - No data storage (data is managed separately by Field classes)
+   * - Thread-safe for reading (no internal mutable state)
+   *
+   * IMPLEMENTATION GUIDELINES:
+   * - All methods that are performance-critical are defined as [[clang::always_inline]].
+   * - The cell does not store any data beyond its location; data storage is handled
+   *   separately by the Field class.
+   * - Developers should use this cell view when implementing algorithms that require
+   *   direct access to grid cells.
+   */
+  class Cell {
+  public:
+    /**
+     * @brief Default constructor creates an invalid cell.
+     *
+     * An invalid cell has a nullptr mesh pointer and negative indices.
+     * This is useful for representing "no cell" in algorithms.
+     */
+    [[clang::always_inline]] Cell() : m_mesh(nullptr), m_i(-1), m_j(-1) {}
+
+    /**
+     * @brief Get the column index (i) of the cell.
+     * @return int Column index (horizontal position).
+     */
+    [[clang::always_inline]] int i() const { return m_i; }
+
+    /**
+     * @brief Get the row index (j) of the cell.
+     * @return int Row index (vertical position).
+     */
+    [[clang::always_inline]] int j() const { return m_j; }
+
+    /**
+     * @brief Get a pointer to the owning mesh.
+     * @return Mesh* Pointer to the mesh.
+     */
+    [[clang::always_inline]] Mesh* mesh() const { return m_mesh; }
+
+    /**
+     * @brief Returns the cell indices as a pair (i, j).
+     * @return std::pair<int, int> Pair containing the cell indices (column, row).
+     */
+    [[clang::always_inline]] std::pair<int, int> indices() const { return {m_i, m_j}; }
+
+    /**
+     * @brief Converts the 2D cell indices to a 1D linear index.
+     *
+     * This method relies on the Mesh's linearIndex() function. It throws
+     * a std::logic_error if the cell is invalid.
+     *
+     * @return int Linear index corresponding to the cell.
+     * @throws std::logic_error if the cell is invalid.
+     */
+    [[clang::always_inline]] int linearIndex() const;
+
+    /**
+     * @brief Determines whether the cell is at the boundary of the mesh.
+     *
+     * A cell is on the boundary if any of its indices are at 0 or at the maximum value.
+     *
+     * @return true if the cell is a boundary cell; false otherwise.
+     * @throws std::logic_error if the cell is invalid.
+     */
+    [[clang::always_inline]] bool isBoundary() const;
+
+    /**
+     * @brief Returns a neighboring cell in the specified direction.
+     *
+     * The direction is specified using bit flags:
+     *   - NORTH, EAST, SOUTH, WEST, and their combinations.
+     * If the neighbor would fall outside the mesh, an invalid cell is returned.
+     *
+     * @param direction Bit flag indicating the desired direction.
+     * @return Cell Neighbor cell view.
+     * @throws std::logic_error if the current cell is invalid.
+     */
+    [[clang::always_inline]] Cell neighbor(uint8_t direction) const;
+
+    /**
+     * @brief Equality operator compares two cells for the same mesh and indices.
+     */
+    [[clang::always_inline]] bool operator==(const Cell& other) const {
+      return m_mesh == other.m_mesh && m_i == other.m_i && m_j == other.m_j;
+    }
+
+    /**
+     * @brief Inequality operator.
+     */
+    [[clang::always_inline]] bool operator!=(const Cell& other) const {
+      return !(*this == other);
+    }
+
+    /**
+     * @brief Checks whether the cell is valid.
+     *
+     * A valid cell has a non-null mesh pointer and indices within the mesh bounds.
+     *
+     * @return true if valid, false otherwise.
+     */
+    [[clang::always_inline]] bool isValid() const;
+
+    /**
+     * @brief Utility: Returns the (di,dj) offset corresponding to a direction flag.
+     *
+     * @param direction Direction bit flag.
+     * @return std::pair<int, int> Pair containing the offset.
+     */
+    [[clang::always_inline]] static std::pair<int, int> getDirectionOffset(uint8_t direction) {
+      int di = 0;
+      int dj = 0;
+      // Add offsets for each direction flag.
+      if (direction & NORTH) dj += 1;
+      if (direction & SOUTH) dj -= 1;
+      if (direction & EAST)  di += 1;
+      if (direction & WEST)  di -= 1;
+      return {di, dj};
+    }
+
+  private:
+    // Private constructor; only Mesh and iterator classes can create a valid cell.
+    [[clang::always_inline]] Cell(Mesh* mesh, int i, int j)
+      : m_mesh(mesh), m_i(i), m_j(j) {}
+
+    Mesh* m_mesh;    ///< Pointer to the mesh containing this cell.
+    uint32_t  m_i;   ///< Column index.
+    uint32_t  m_j;   ///< Row index.
+
+    // Grant friend access to Mesh and iterator classes for constructing cells.
+    friend class Mesh;
+    friend class BasicCellIterator;
+    friend class InteriorCellIterator;
+    friend class BoundaryCellIterator;
+    friend class RectangleCellIterator;
+  };
+
+} // namespace mesh
+
+// Now implement Cell methods that depend on complete Mesh definition
+// These must be placed after including Mesh.h
+
+namespace mesh {
+  // Implementation of linearIndex
+  [[clang::always_inline]] int Cell::linearIndex() const {
+    if (!isValid()) {
+      throw std::logic_error("Cannot compute linear index: invalid cell");
+    }
+    return m_mesh->linearIndex(m_i, m_j);
+  }
+
+  // Implementation of isBoundary
+  [[clang::always_inline]] bool Cell::isBoundary() const {
+    if (!isValid()) {
+      throw std::logic_error("Cannot determine boundary status: invalid cell");
+    }
+    return (m_i == 0 || m_j == 0 || m_i == m_mesh->nx() - 1 || m_j == m_mesh->ny() - 1);
+  }
+
+  // Implementation of neighbor
+  [[clang::always_inline]] Cell Cell::neighbor(uint8_t direction) const {
+    if (!isValid()) {
+      throw std::logic_error("Cannot get neighbor: invalid cell");
+    }
+
+    auto [di, dj] = getDirectionOffset(direction);
+    int ni = m_i + di;
+    int nj = m_j + dj;
+
+    // Check for out-of-bound indices
+    if (ni < 0 || ni >= m_mesh->nx() || nj < 0 || nj >= m_mesh->ny()) {
+      return Cell(nullptr, -1, -1);
+    }
+
+    return Cell(m_mesh, ni, nj);
+  }
+
+  // Implementation of isValid
+  [[clang::always_inline]] bool Cell::isValid() const {
+    return m_mesh != nullptr && m_i >= 0 && m_j >= 0 &&
+           m_i < m_mesh->nx() && m_j < m_mesh->ny();
+  }
+} // namespace mesh
+
+#endif // MESH_CELL_H

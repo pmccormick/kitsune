@@ -1,0 +1,478 @@
+/**
+ * @file BitArray.h
+ * @brief High-performance, thread-safe bit array implementation for region storage.
+ *
+ * This class provides a memory-efficient, cache-friendly bit array using 64-bit words.
+ * It includes optimized bit-level operations such as population count and bitwise
+ * operations. In this refactored version:
+ *
+ * 1. Thread Safety: The cached bit count (m_bitCount) and the dirty flag (m_bitCountDirty)
+ *    have been changed to atomic variables. This helps prevent race conditions when the BitArray
+ *    is accessed concurrently.
+ *
+ * 2. Detailed Documentation: Inline comments explain the purpose of each function,
+ *    especially the bitwise operations, to help developers understand the implementation.
+ *
+ * 3. Fast Bit Operations: The code still leverages CPU intrinsics (__builtin_popcountll
+ *    and __builtin_ctzll) for maximum performance.
+ *
+ * Future optimizations may include SIMD-based batch operations; for now, the focus is on
+ * thread safety and clarity.
+ */
+
+#ifndef BIT_ARRAY_H
+#define BIT_ARRAY_H
+
+#include <vector>
+#include <cstdint>
+#include <cassert>
+#include <algorithm>
+#include <climits>
+#include <atomic>
+
+class BitArray {
+public:
+  using WordType = uint64_t;
+  static constexpr size_t BITS_PER_WORD = sizeof(WordType) * CHAR_BIT;
+
+  /**
+   * @brief Default constructor creates an empty BitArray.
+   */
+  BitArray() : m_size(0), m_bitCount(0), m_bitCountDirty(false) {}
+
+  /**
+   * @brief Construct a new BitArray with a specified size.
+   *
+   * Allocates enough words to hold 'size' bits. All bits are initialized to the
+   * specified initialValue. If initialValue is true, any extra bits in the last word
+   * (beyond 'size') are cleared.
+   *
+   * @param size Number of bits to allocate.
+   * @param initialValue Default value for all bits.
+   */
+  explicit BitArray(size_t size, bool initialValue = false)
+    : m_size(size), m_bitCount(0), m_bitCountDirty(false)
+  {
+    m_words.resize(wordCount(size), initialValue ? ~WordType(0) : 0);
+
+    // If the size is not a multiple of BITS_PER_WORD and all bits were set,
+    // clear the extra bits in the last word.
+    if (size % BITS_PER_WORD != 0 && initialValue) {
+      size_t usedBitsInLastWord = size % BITS_PER_WORD;
+      WordType mask = (WordType(1) << usedBitsInLastWord) - 1;
+      m_words.back() &= mask;
+    }
+
+    // Initialize bit count: if all bits set, store 'size'
+    if (initialValue) {
+      m_bitCount.store(size, std::memory_order_relaxed);
+    }
+  }
+
+  /**
+   * @brief Copy constructor.
+   */
+  BitArray(const BitArray& other) = default;
+
+  /**
+   * @brief Move constructor.
+   */
+  BitArray(BitArray&& other) noexcept = default;
+
+  /**
+   * @brief Copy assignment operator.
+   */
+  BitArray& operator=(const BitArray& other) = default;
+
+  /**
+   * @brief Move assignment operator.
+   */
+  BitArray& operator=(BitArray&& other) noexcept = default;
+
+  /**
+   * @brief Get the value of a bit at the given index.
+   *
+   * @param index Bit index.
+   * @return true if the bit is set, false otherwise.
+   *
+   * This function returns false for indices beyond m_size.
+   */
+  bool get(size_t index) const {
+    if (index >= m_size) return false;
+    size_t wordIndex = index / BITS_PER_WORD;
+    size_t bitIndex = index % BITS_PER_WORD;
+    return (m_words[wordIndex] & (WordType(1) << bitIndex)) != 0;
+  }
+
+  /**
+   * @brief Set the value of a bit at the given index.
+   *
+   * Updates the bit value and, if the bit changes, adjusts the cached bit count.
+   *
+   * @param index Bit index.
+   * @param value New bit value.
+   */
+  void set(size_t index, bool value) {
+    if (index >= m_size) return;
+
+    size_t wordIndex = index / BITS_PER_WORD;
+    size_t bitIndex = index % BITS_PER_WORD;
+    WordType bitMask = WordType(1) << bitIndex;
+
+    // Determine the current bit value.
+    bool oldValue = (m_words[wordIndex] & bitMask) != 0;
+
+    // Update the bit: set or clear the bit in the appropriate word.
+    if (value) {
+      m_words[wordIndex] |= bitMask;   // Set the bit.
+    } else {
+      m_words[wordIndex] &= ~bitMask;  // Clear the bit.
+    }
+
+    // Update the bit count if the value changed and the cache is not marked dirty.
+    if (!m_bitCountDirty.load(std::memory_order_relaxed) && oldValue != value) {
+      m_bitCount.fetch_add(value ? 1 : -1, std::memory_order_relaxed);
+    }
+  }
+
+  /**
+   * @brief Set all bits to the specified value.
+   *
+   * Fills all words with the fill pattern corresponding to the value.
+   * Also ensures that any unused bits in the last word are properly cleared.
+   *
+   * @param value Value to set for all bits.
+   */
+  void setAll(bool value) {
+    WordType fillPattern = value ? ~WordType(0) : 0;
+    std::fill(m_words.begin(), m_words.end(), fillPattern);
+
+    // If m_size is not a multiple of BITS_PER_WORD, clear the extra bits in the last word.
+    if (m_size % BITS_PER_WORD != 0 && value) {
+      size_t usedBitsInLastWord = m_size % BITS_PER_WORD;
+      WordType mask = (WordType(1) << usedBitsInLastWord) - 1;
+      m_words.back() &= mask;
+    }
+
+    // Update cached bit count accordingly.
+    m_bitCount.store(value ? m_size : 0, std::memory_order_relaxed);
+    m_bitCountDirty.store(false, std::memory_order_relaxed);
+  }
+
+  /**
+   * @brief Get the number of bits in the array.
+   *
+   * @return size_t Total number of bits in the array.
+   */
+  size_t size() const {
+    return m_size;
+  }
+
+  /**
+   * @brief Resize the bit array.
+   *
+   * If the new size is smaller, the array is truncated and extra bits are cleared.
+   * If the new size is larger, new bits are initialized to the given value.
+   *
+   * @param newSize New size in bits.
+   * @param value Value for new bits if the array is expanded.
+   */
+  void resize(size_t newSize, bool value = false) {
+    if (newSize == m_size) return;
+
+    size_t newWordCount = wordCount(newSize);
+
+    if (newSize < m_size) {
+      // Truncate: clear any bits that will be removed.
+      if (newSize % BITS_PER_WORD != 0) {
+	size_t usedBitsInLastWord = newSize % BITS_PER_WORD;
+	WordType mask = (WordType(1) << usedBitsInLastWord) - 1;
+	m_words[newWordCount - 1] &= mask;
+      }
+      m_words.resize(newWordCount);
+      m_size = newSize;
+      m_bitCountDirty.store(true, std::memory_order_relaxed);
+    } else {
+      // Expand: resize and initialize new words.
+      m_words.resize(newWordCount, value ? ~WordType(0) : 0);
+      if (value && newSize % BITS_PER_WORD != 0) {
+	size_t usedBitsInLastWord = newSize % BITS_PER_WORD;
+	WordType mask = (WordType(1) << usedBitsInLastWord) - 1;
+	m_words.back() &= mask;
+      }
+      if (value) {
+	m_bitCount.fetch_add(newSize - m_size, std::memory_order_relaxed);
+      }
+      m_size = newSize;
+    }
+  }
+
+  /**
+   * @brief Count the number of bits set to 1 (population count).
+   *
+   * If the cached count is marked as dirty, it recalculates the count by traversing
+   * each word in the array, then updates the cache.
+   *
+   * @return size_t Number of bits set to 1.
+   */
+  size_t count() const {
+    if (m_bitCountDirty.load(std::memory_order_relaxed)) {
+      size_t count = 0;
+      for (size_t i = 0; i < m_words.size(); ++i) {
+	count += popCount(m_words[i]);
+      }
+      m_bitCount.store(count, std::memory_order_relaxed);
+      m_bitCountDirty.store(false, std::memory_order_relaxed);
+    }
+    return m_bitCount.load(std::memory_order_relaxed);
+  }
+
+  /**
+   * @brief Perform bitwise OR with another BitArray (union).
+   *
+   * Combines this BitArray with another using the OR operation. The underlying words
+   * are updated accordingly. Marks the cached bit count as dirty.
+   *
+   * @param other BitArray to OR with.
+   */
+  void bitwiseOr(const BitArray& other) {
+    assert(m_size == other.m_size && "Bit arrays must be the same size for bitwise OR");
+    for (size_t i = 0; i < m_words.size(); ++i) {
+      m_words[i] |= other.m_words[i];
+    }
+    m_bitCountDirty.store(true, std::memory_order_relaxed);
+  }
+
+  /**
+   * @brief Perform bitwise AND with another BitArray (intersection).
+   *
+   * Updates this BitArray to be the intersection with another. Marks the cached
+   * bit count as dirty.
+   *
+   * @param other BitArray to AND with.
+   */
+  void bitwiseAnd(const BitArray& other) {
+    assert(m_size == other.m_size && "Bit arrays must be the same size for bitwise AND");
+    for (size_t i = 0; i < m_words.size(); ++i) {
+      m_words[i] &= other.m_words[i];
+    }
+    m_bitCountDirty.store(true, std::memory_order_relaxed);
+  }
+
+  /**
+   * @brief Perform bitwise AND-NOT with another BitArray (difference).
+   *
+   * This operation computes A & ~B, effectively removing bits that are set in 'other'
+   * from this BitArray. Marks the cached bit count as dirty.
+   *
+   * @param other BitArray to AND-NOT with.
+   */
+  void bitwiseAndNot(const BitArray& other) {
+    assert(m_size == other.m_size && "Bit arrays must be the same size for bitwise AND-NOT");
+    for (size_t i = 0; i < m_words.size(); ++i) {
+      m_words[i] &= ~other.m_words[i];
+    }
+    m_bitCountDirty.store(true, std::memory_order_relaxed);
+  }
+
+  /**
+   * @brief Perform bitwise XOR with another BitArray (symmetric difference).
+   *
+   * Computes the XOR between this BitArray and another, updating the bits accordingly.
+   * Marks the cached bit count as dirty.
+   *
+   * @param other BitArray to XOR with.
+   */
+  void bitwiseXor(const BitArray& other) {
+    assert(m_size == other.m_size && "Bit arrays must be the same size for bitwise XOR");
+    for (size_t i = 0; i < m_words.size(); ++i) {
+      m_words[i] ^= other.m_words[i];
+    }
+    m_bitCountDirty.store(true, std::memory_order_relaxed);
+  }
+
+  /**
+   * @brief Get the underlying words for direct manipulation (non-const).
+   *
+   * This function returns a reference to the internal vector of words. Note that
+   * modifying the returned vector directly will mark the cached bit count as dirty.
+   *
+   * @return Reference to the word vector.
+   */
+  std::vector<WordType>& getWords() {
+    m_bitCountDirty.store(true, std::memory_order_relaxed);
+    return m_words;
+  }
+
+  /**
+   * @brief Get the underlying words for read-only access.
+   *
+   * @return Const reference to the word vector.
+   */
+  const std::vector<WordType>& getWords() const {
+    return m_words;
+  }
+
+  /**
+   * @brief Clear all bits in the array.
+   *
+   * Sets all words to zero and resets the cached bit count.
+   */
+  void clear() {
+    std::fill(m_words.begin(), m_words.end(), 0);
+    m_bitCount.store(0, std::memory_order_relaxed);
+    m_bitCountDirty.store(false, std::memory_order_relaxed);
+  }
+
+  /**
+   * @brief Check if all bits are clear (i.e., the array is empty).
+   *
+   * Uses the cached bit count for a fast check if available.
+   *
+   * @return true if all bits are 0, false otherwise.
+   */
+  bool isEmpty() const {
+    // Fast path using cached count.
+    if (!m_bitCountDirty.load(std::memory_order_relaxed) && m_bitCount.load(std::memory_order_relaxed) == 0) {
+      return true;
+    }
+    // Fallback: iterate through words.
+    for (WordType word : m_words) {
+      if (word != 0) {
+	return false;
+      }
+    }
+    // Update cache.
+    m_bitCount.store(0, std::memory_order_relaxed);
+    m_bitCountDirty.store(false, std::memory_order_relaxed);
+    return true;
+  }
+
+  /**
+   * @brief Check if any bit is set in the array.
+   *
+   * @return true if at least one bit is 1; false if all are 0.
+   */
+  bool any() const {
+    return !isEmpty();
+  }
+
+  /**
+   * @brief Find the index of the first set bit.
+   *
+   * Iterates over the internal words and uses countTrailingZeros to locate
+   * the first set bit. Returns m_size if no bits are set.
+   *
+   * @return Index of the first set bit, or m_size if none are set.
+   */
+  size_t findFirst() const {
+    for (size_t wordIndex = 0; wordIndex < m_words.size(); ++wordIndex) {
+      WordType word = m_words[wordIndex];
+      if (word != 0) {
+	unsigned int bitPos = countTrailingZeros(word);
+	size_t index = wordIndex * BITS_PER_WORD + bitPos;
+	return (index < m_size) ? index : m_size;
+      }
+    }
+    return m_size;
+  }
+
+  /**
+   * @brief Find the index of the next set bit after a given position.
+   *
+   * Searches for the next set bit after the provided position and returns its index.
+   * If no such bit exists, returns m_size.
+   *
+   * @param pos Position to start searching from (exclusive).
+   * @return Index of the next set bit, or m_size if none are set.
+   */
+  size_t findNext(size_t pos) const {
+    if (pos >= m_size) return m_size;
+
+    size_t wordIndex = pos / BITS_PER_WORD;
+    size_t bitIndex = pos % BITS_PER_WORD;
+
+    // Mask to ignore bits up to and including pos.
+    WordType mask = (bitIndex == BITS_PER_WORD - 1) ? 0 : ~((WordType(1) << (bitIndex + 1)) - 1);
+    WordType remainingBits = m_words[wordIndex] & mask;
+
+    if (remainingBits != 0) {
+      unsigned int bitPos = countTrailingZeros(remainingBits);
+      size_t index = wordIndex * BITS_PER_WORD + bitPos;
+      return (index < m_size) ? index : m_size;
+    }
+
+    // Check subsequent words.
+    for (++wordIndex; wordIndex < m_words.size(); ++wordIndex) {
+      if (m_words[wordIndex] != 0) {
+	unsigned int bitPos = countTrailingZeros(m_words[wordIndex]);
+	size_t index = wordIndex * BITS_PER_WORD + bitPos;
+	return (index < m_size) ? index : m_size;
+      }
+    }
+
+    return m_size;
+  }
+
+private:
+  std::vector<WordType> m_words;  ///< Array of words storing the bits.
+  size_t m_size;                  ///< Total number of bits in the array.
+
+  // Cached bit count and dirty flag are now atomic for thread safety.
+  mutable std::atomic<size_t> m_bitCount;  ///< Cached count of bits set to 1.
+  mutable std::atomic<bool> m_bitCountDirty; ///< Indicates whether m_bitCount is valid.
+
+  /**
+   * @brief Calculate the number of words required to store a given number of bits.
+   *
+   * @param bitCount Number of bits.
+   * @return Number of 64-bit words required.
+   */
+  static size_t wordCount(size_t bitCount) {
+    return (bitCount + BITS_PER_WORD - 1) / BITS_PER_WORD;
+  }
+
+  /**
+   * @brief Count the number of set bits in a 64-bit word (population count).
+   *
+   * Uses compiler intrinsics (__builtin_popcountll) when available for maximum performance.
+   *
+   * @param word Word to count bits in.
+   * @return Number of bits set to 1.
+   */
+  static size_t popCount(WordType word) {
+#if defined(__GNUC__) || defined(__clang__)
+    return __builtin_popcountll(word);
+        #else
+    // Fallback implementation if intrinsics are unavailable.
+    word = word - ((word >> 1) & 0x5555555555555555ULL);
+    word = (word & 0x3333333333333333ULL) + ((word >> 2) & 0x3333333333333333ULL);
+    word = (word + (word >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
+    return (word * 0x0101010101010101ULL) >> 56;
+        #endif
+  }
+
+  /**
+   * @brief Count the number of trailing zeros in a 64-bit word.
+   *
+   * Uses __builtin_ctzll if available. Returns BITS_PER_WORD if the word is zero.
+   *
+   * @param word Word in which to count trailing zeros.
+   * @return Number of trailing zeros.
+   */
+  static unsigned int countTrailingZeros(WordType word) {
+    if (word == 0) return BITS_PER_WORD;
+#if defined(__GNUC__) || defined(__clang__)
+    return __builtin_ctzll(word);
+        #else
+    unsigned int count = 0;
+    while ((word & 1) == 0) {
+      word >>= 1;
+      ++count;
+    }
+    return count;
+        #endif
+  }
+};
+
+#endif // BIT_ARRAY_H
