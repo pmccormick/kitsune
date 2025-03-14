@@ -189,7 +189,7 @@ namespace mesh {
      * @param j Index in y-direction (row)
      * @return Cell View of the cell at (i,j)
      */
-    Cell getCell(uint32_t i, uint32_t j) const {
+    [[clang::always_inline]] Cell getCell(uint32_t i, uint32_t j) const {
       return Cell(const_cast<Mesh*>(this), static_cast<int>(i), static_cast<int>(j));
     }
 

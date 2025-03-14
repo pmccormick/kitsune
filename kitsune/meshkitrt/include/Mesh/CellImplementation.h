@@ -118,9 +118,9 @@ namespace mesh {
    * @param j Index in y-direction (row)
    * @return Cell View of the cell at (i,j)
    */
-  [[clang::always_inline]] Cell Mesh::getCell(uint32_t i, uint32_t j) const {
-    return Cell(const_cast<Mesh*>(this), static_cast<int>(i), static_cast<int>(j));
-  }
+  //[[clang::always_inline]] Cell Mesh::getCell(uint32_t i, uint32_t j) const {
+  //  return Cell(const_cast<Mesh*>(this), static_cast<int>(i), static_cast<int>(j));
+  //}
 
 } // namespace mesh
 

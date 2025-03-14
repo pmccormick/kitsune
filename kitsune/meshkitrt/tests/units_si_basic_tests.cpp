@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
-#include "units/core.h"
-#include "units/si_units.h"
-#include "units/constants.h"
+#include "Units/core.h"
+#include "Units/si_units.h"
+#include "Units/constants.h"
+#include "Units/derived_units.h"
+
 
 using namespace units;
 

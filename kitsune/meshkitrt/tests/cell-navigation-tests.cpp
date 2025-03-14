@@ -1,196 +1,253 @@
 /**
  * @file CellNavigationTests.cpp
- * @brief Tests for Cell navigation functionality
- * 
- * These tests focus on the neighbor() method and cell navigation
- * in different directions, including boundary conditions.
+ * @brief Unit tests for the Cell's navigation functionality
  */
 
 #include <gtest/gtest.h>
-#include "Cell.h"
 #include "Mesh.h"
+#include "Cell.h"
 
 namespace mesh {
 namespace testing {
 
-// Fixture for Cell navigation tests
+/**
+ * @brief Test fixture for Cell navigation tests
+ */
 class CellNavigationTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Create a 5x5 test mesh for navigation tests
-        mesh = new Mesh(5, 5);
+        // Create standard 10x10 mesh for navigation tests
+        standardMesh = new Mesh(10, 10);
     }
 
     void TearDown() override {
-        delete mesh;
+        delete standardMesh;
     }
 
-    Mesh* mesh;
+    // Mesh for testing
+    Mesh* standardMesh;
 };
 
-// Test navigation in cardinal directions from interior cell
-TEST_F(CellNavigationTest, NavigateFromInteriorCell) {
-    Cell center = mesh->getCell(2, 2);
+/**
+ * @brief Test getting neighbors in cardinal directions
+ */
+TEST_F(CellNavigationTest, CardinalNeighbors) {
+    // Get a cell in the middle of the mesh
+    Cell cell = standardMesh->getCell(5, 5);
     
-    // Test navigation in each cardinal direction
-    Cell north = center.neighbor(NORTH);
+    // Test getting neighbor to the north (increasing j)
+    Cell north = cell.neighbor(NORTH);
+    EXPECT_EQ(north.i(), 5);
+    EXPECT_EQ(north.j(), 6);
     EXPECT_TRUE(north.isValid());
-    EXPECT_EQ(north.i(), 2);
-    EXPECT_EQ(north.j(), 3);
     
-    Cell east = center.neighbor(EAST);
+    // Test getting neighbor to the east (increasing i)
+    Cell east = cell.neighbor(EAST);
+    EXPECT_EQ(east.i(), 6);
+    EXPECT_EQ(east.j(), 5);
     EXPECT_TRUE(east.isValid());
-    EXPECT_EQ(east.i(), 3);
-    EXPECT_EQ(east.j(), 2);
     
-    Cell south = center.neighbor(SOUTH);
+    // Test getting neighbor to the south (decreasing j)
+    Cell south = cell.neighbor(SOUTH);
+    EXPECT_EQ(south.i(), 5);
+    EXPECT_EQ(south.j(), 4);
     EXPECT_TRUE(south.isValid());
-    EXPECT_EQ(south.i(), 2);
-    EXPECT_EQ(south.j(), 1);
     
-    Cell west = center.neighbor(WEST);
+    // Test getting neighbor to the west (decreasing i)
+    Cell west = cell.neighbor(WEST);
+    EXPECT_EQ(west.i(), 4);
+    EXPECT_EQ(west.j(), 5);
     EXPECT_TRUE(west.isValid());
-    EXPECT_EQ(west.i(), 1);
-    EXPECT_EQ(west.j(), 2);
 }
 
-// Test navigation in diagonal directions from interior cell
-TEST_F(CellNavigationTest, NavigateDiagonallyFromInteriorCell) {
-    Cell center = mesh->getCell(2, 2);
+/**
+ * @brief Test getting neighbors in diagonal directions
+ */
+TEST_F(CellNavigationTest, DiagonalNeighbors) {
+    // Get a cell in the middle of the mesh
+    Cell cell = standardMesh->getCell(5, 5);
     
-    // Test diagonal navigation
-    Cell northeast = center.neighbor(NORTH | EAST);
+    // Test getting neighbor to the northeast
+    Cell northeast = cell.neighbor(NORTH | EAST);
+    EXPECT_EQ(northeast.i(), 6);
+    EXPECT_EQ(northeast.j(), 6);
     EXPECT_TRUE(northeast.isValid());
-    EXPECT_EQ(northeast.i(), 3);
-    EXPECT_EQ(northeast.j(), 3);
     
-    Cell southeast = center.neighbor(SOUTH | EAST);
+    // Test getting neighbor to the southeast
+    Cell southeast = cell.neighbor(SOUTH | EAST);
+    EXPECT_EQ(southeast.i(), 6);
+    EXPECT_EQ(southeast.j(), 4);
     EXPECT_TRUE(southeast.isValid());
-    EXPECT_EQ(southeast.i(), 3);
-    EXPECT_EQ(southeast.j(), 1);
     
-    Cell southwest = center.neighbor(SOUTH | WEST);
+    // Test getting neighbor to the southwest
+    Cell southwest = cell.neighbor(SOUTH | WEST);
+    EXPECT_EQ(southwest.i(), 4);
+    EXPECT_EQ(southwest.j(), 4);
     EXPECT_TRUE(southwest.isValid());
-    EXPECT_EQ(southwest.i(), 1);
-    EXPECT_EQ(southwest.j(), 1);
     
-    Cell northwest = center.neighbor(NORTH | WEST);
+    // Test getting neighbor to the northwest
+    Cell northwest = cell.neighbor(NORTH | WEST);
+    EXPECT_EQ(northwest.i(), 4);
+    EXPECT_EQ(northwest.j(), 6);
     EXPECT_TRUE(northwest.isValid());
-    EXPECT_EQ(northwest.i(), 1);
-    EXPECT_EQ(northwest.j(), 3);
 }
 
-// Test navigation from boundary cells
-TEST_F(CellNavigationTest, NavigateFromBoundary) {
-    // Test from left edge
-    Cell leftEdge = mesh->getCell(0, 2);
-    Cell leftToEast = leftEdge.neighbor(EAST);
-    EXPECT_TRUE(leftToEast.isValid());
-    EXPECT_EQ(leftToEast.i(), 1);
-    EXPECT_EQ(leftToEast.j(), 2);
+/**
+ * @brief Test boundary conditions for neighbors
+ */
+TEST_F(CellNavigationTest, BoundaryNeighbors) {
+    // Test at bottom-left corner (0,0)
+    Cell bottomLeft = standardMesh->getCell(0, 0);
     
-    Cell leftToWest = leftEdge.neighbor(WEST);
-    EXPECT_FALSE(leftToWest.isValid()); // Should be invalid (outside mesh)
+    // West should be invalid (out of bounds)
+    Cell westOfBottomLeft = bottomLeft.neighbor(WEST);
+    EXPECT_FALSE(westOfBottomLeft.isValid());
     
-    // Test from right edge
-    Cell rightEdge = mesh->getCell(4, 2);
-    Cell rightToWest = rightEdge.neighbor(WEST);
-    EXPECT_TRUE(rightToWest.isValid());
-    EXPECT_EQ(rightToWest.i(), 3);
-    EXPECT_EQ(rightToWest.j(), 2);
+    // South should be invalid (out of bounds)
+    Cell southOfBottomLeft = bottomLeft.neighbor(SOUTH);
+    EXPECT_FALSE(southOfBottomLeft.isValid());
     
-    Cell rightToEast = rightEdge.neighbor(EAST);
-    EXPECT_FALSE(rightToEast.isValid()); // Should be invalid (outside mesh)
+    // Southwest should be invalid (out of bounds)
+    Cell southwestOfBottomLeft = bottomLeft.neighbor(SOUTH | WEST);
+    EXPECT_FALSE(southwestOfBottomLeft.isValid());
     
-    // Test from bottom edge
-    Cell bottomEdge = mesh->getCell(2, 0);
-    Cell bottomToNorth = bottomEdge.neighbor(NORTH);
-    EXPECT_TRUE(bottomToNorth.isValid());
-    EXPECT_EQ(bottomToNorth.i(), 2);
-    EXPECT_EQ(bottomToNorth.j(), 1);
-    
-    Cell bottomToSouth = bottomEdge.neighbor(SOUTH);
-    EXPECT_FALSE(bottomToSouth.isValid()); // Should be invalid (outside mesh)
-    
-    // Test from top edge
-    Cell topEdge = mesh->getCell(2, 4);
-    Cell topToSouth = topEdge.neighbor(SOUTH);
-    EXPECT_TRUE(topToSouth.isValid());
-    EXPECT_EQ(topToSouth.i(), 2);
-    EXPECT_EQ(topToSouth.j(), 3);
-    
-    Cell topToNorth = topEdge.neighbor(NORTH);
-    EXPECT_FALSE(topToNorth.isValid()); // Should be invalid (outside mesh)
-}
-
-// Test navigation from corner cells
-TEST_F(CellNavigationTest, NavigateFromCorners) {
-    // Bottom-left corner
-    Cell bottomLeft = mesh->getCell(0, 0);
-    EXPECT_FALSE(bottomLeft.neighbor(WEST).isValid());
-    EXPECT_FALSE(bottomLeft.neighbor(SOUTH).isValid());
-    EXPECT_FALSE(bottomLeft.neighbor(SOUTH | WEST).isValid());
+    // North and East should be valid
     EXPECT_TRUE(bottomLeft.neighbor(NORTH).isValid());
     EXPECT_TRUE(bottomLeft.neighbor(EAST).isValid());
     EXPECT_TRUE(bottomLeft.neighbor(NORTH | EAST).isValid());
     
-    // Top-right corner
-    Cell topRight = mesh->getCell(4, 4);
-    EXPECT_FALSE(topRight.neighbor(EAST).isValid());
-    EXPECT_FALSE(topRight.neighbor(NORTH).isValid());
-    EXPECT_FALSE(topRight.neighbor(NORTH | EAST).isValid());
+    // Test at top-right corner (9,9)
+    Cell topRight = standardMesh->getCell(9, 9);
+    
+    // East should be invalid (out of bounds)
+    Cell eastOfTopRight = topRight.neighbor(EAST);
+    EXPECT_FALSE(eastOfTopRight.isValid());
+    
+    // North should be invalid (out of bounds)
+    Cell northOfTopRight = topRight.neighbor(NORTH);
+    EXPECT_FALSE(northOfTopRight.isValid());
+    
+    // Northeast should be invalid (out of bounds)
+    Cell northeastOfTopRight = topRight.neighbor(NORTH | EAST);
+    EXPECT_FALSE(northeastOfTopRight.isValid());
+    
+    // South and West should be valid
     EXPECT_TRUE(topRight.neighbor(SOUTH).isValid());
     EXPECT_TRUE(topRight.neighbor(WEST).isValid());
     EXPECT_TRUE(topRight.neighbor(SOUTH | WEST).isValid());
 }
 
-// Test navigation with no direction specified
-TEST_F(CellNavigationTest, NavigateWithNoDirection) {
-    Cell cell = mesh->getCell(2, 2);
-    Cell result = cell.neighbor(0); // No direction flags set
-    
-    // Should return the same position (no movement)
-    EXPECT_TRUE(result.isValid());
-    EXPECT_EQ(result.i(), 2);
-    EXPECT_EQ(result.j(), 2);
-}
-
-// Test navigation from invalid cell
-TEST_F(CellNavigationTest, NavigateFromInvalidCell) {
-    Cell invalidCell; // Default constructor creates invalid cell
-    
-    // Trying to get neighbor from invalid cell should throw
+/**
+ * @brief Test that neighbor method throws for invalid cells
+ */
+TEST_F(CellNavigationTest, NeighborThrowsForInvalidCell) {
+    Cell invalidCell;
     EXPECT_THROW(invalidCell.neighbor(NORTH), std::logic_error);
+    EXPECT_THROW(invalidCell.neighbor(EAST), std::logic_error);
+    EXPECT_THROW(invalidCell.neighbor(SOUTH), std::logic_error);
+    EXPECT_THROW(invalidCell.neighbor(WEST), std::logic_error);
+    EXPECT_THROW(invalidCell.neighbor(NORTH | EAST), std::logic_error);
 }
 
-// Test multiple navigation steps (chaining neighbors)
+/**
+ * @brief Test direction offset calculation
+ */
+TEST_F(CellNavigationTest, DirectionOffsetCalculation) {
+    // Test cardinal directions
+    auto northOffset = Cell::getDirectionOffset(NORTH);
+    EXPECT_EQ(northOffset.first, 0);
+    EXPECT_EQ(northOffset.second, 1);
+    
+    auto eastOffset = Cell::getDirectionOffset(EAST);
+    EXPECT_EQ(eastOffset.first, 1);
+    EXPECT_EQ(eastOffset.second, 0);
+    
+    auto southOffset = Cell::getDirectionOffset(SOUTH);
+    EXPECT_EQ(southOffset.first, 0);
+    EXPECT_EQ(southOffset.second, -1);
+    
+    auto westOffset = Cell::getDirectionOffset(WEST);
+    EXPECT_EQ(westOffset.first, -1);
+    EXPECT_EQ(westOffset.second, 0);
+    
+    // Test diagonal directions
+    auto northeastOffset = Cell::getDirectionOffset(NORTH | EAST);
+    EXPECT_EQ(northeastOffset.first, 1);
+    EXPECT_EQ(northeastOffset.second, 1);
+    
+    auto southeastOffset = Cell::getDirectionOffset(SOUTH | EAST);
+    EXPECT_EQ(southeastOffset.first, 1);
+    EXPECT_EQ(southeastOffset.second, -1);
+    
+    auto southwestOffset = Cell::getDirectionOffset(SOUTH | WEST);
+    EXPECT_EQ(southwestOffset.first, -1);
+    EXPECT_EQ(southwestOffset.second, -1);
+    
+    auto northwestOffset = Cell::getDirectionOffset(NORTH | WEST);
+    EXPECT_EQ(northwestOffset.first, -1);
+    EXPECT_EQ(northwestOffset.second, 1);
+}
+
+/**
+ * @brief Test navigation with zero direction
+ */
+TEST_F(CellNavigationTest, ZeroDirectionNavigation) {
+    Cell cell = standardMesh->getCell(5, 5);
+    
+    // Zero direction should return a neighbor at the same position
+    Cell same = cell.neighbor(0);
+    EXPECT_EQ(same.i(), 5);
+    EXPECT_EQ(same.j(), 5);
+    EXPECT_TRUE(same.isValid());
+}
+
+/**
+ * @brief Test navigation with all directions combined
+ */
+TEST_F(CellNavigationTest, CombinedDirectionNavigation) {
+    Cell cell = standardMesh->getCell(5, 5);
+    
+    // Combine NORTH and SOUTH (should cancel out j-component)
+    Cell northAndSouth = cell.neighbor(NORTH | SOUTH);
+    EXPECT_EQ(northAndSouth.i(), 5);
+    EXPECT_EQ(northAndSouth.j(), 5);
+    
+    // Combine EAST and WEST (should cancel out i-component)
+    Cell eastAndWest = cell.neighbor(EAST | WEST);
+    EXPECT_EQ(eastAndWest.i(), 5);
+    EXPECT_EQ(eastAndWest.j(), 5);
+    
+    // Combine all directions (should cancel out)
+    Cell allDirections = cell.neighbor(NORTH | EAST | SOUTH | WEST);
+    EXPECT_EQ(allDirections.i(), 5);
+    EXPECT_EQ(allDirections.j(), 5);
+}
+
+/**
+ * @brief Test multiple steps of navigation
+ */
 TEST_F(CellNavigationTest, MultiStepNavigation) {
-    Cell start = mesh->getCell(1, 1);
+    Cell start = standardMesh->getCell(5, 5);
     
-    // Navigate multiple steps
-    Cell result = start.neighbor(NORTH).neighbor(EAST).neighbor(NORTH);
+    // Take multiple steps in different directions
+    Cell step1 = start.neighbor(NORTH);
+    Cell step2 = step1.neighbor(EAST);
+    Cell step3 = step2.neighbor(NORTH);
     
-    EXPECT_TRUE(result.isValid());
-    EXPECT_EQ(result.i(), 2);
-    EXPECT_EQ(result.j(), 3);
-}
-
-// Test that neighbor() properly handles combined directions
-TEST_F(CellNavigationTest, CombinedDirections) {
-    Cell center = mesh->getCell(2, 2);
+    // Check final position
+    EXPECT_EQ(step3.i(), 6);
+    EXPECT_EQ(step3.j(), 7);
     
-    // Test with multiple directions set
-    Cell diagResult = center.neighbor(NORTH | EAST);
-    Cell stepResult = center.neighbor(NORTH).neighbor(EAST);
+    // Try different path to same destination
+    Cell altPath = start.neighbor(NORTH | EAST).neighbor(NORTH);
+    EXPECT_EQ(altPath.i(), 6);
+    EXPECT_EQ(altPath.j(), 7);
     
-    // The results should be the same
-    EXPECT_EQ(diagResult.i(), stepResult.i());
-    EXPECT_EQ(diagResult.j(), stepResult.j());
-    
-    // Should be at (3,3)
-    EXPECT_EQ(diagResult.i(), 3);
-    EXPECT_EQ(diagResult.j(), 3);
+    // Verify both paths lead to the same cell
+    EXPECT_TRUE(step3 == altPath);
 }
 
 } // namespace testing
 } // namespace mesh
+
+

@@ -79,14 +79,14 @@ set(BITARRAY_TESTS
    bit-array-traversal-test.cpp
 )
 
-set(CELLS_TESTS
+set(CELL_TESTS
    cell-basic-tests.cpp
-   cell-edge-case-tests.cpp
-   cell-mesh-integration-tests.cpp
-   cell-performance-tests.cpp
-   cell-boundary-tests.cpp
-   cell-index-tests.cpp
    cell-navigation-tests.cpp
+   cell-edge-cases-tests.cpp
+   cell-thread-safety-tests.cpp
+   cell-interaction-tests.cpp
+   cell-perf-tests.cpp 
+   cell-stress-tests.cpp
 )
 
 
@@ -122,6 +122,19 @@ set(REGION_TESTS
 	# region_advanced_tests.cpp
 )
 
+set(UNITS_TESTS
+   units_bounds_tests.cpp
+   units_derived_tests.cpp
+   units_si_basic_tests.cpp
+   units_validation_tests.cpp
+   units_core_basic_tests.cpp 
+   units_formatting_tests.cpp
+   units_si_extended_tests.cpp
+   units_core_conversion_tests.cpp
+   units_math_tests.cpp
+   units_string_conversion_tests.cpp
+)
+
 # Collect all test source files
 set(TEST_SOURCES
    ${BITARRAY_TESTS}
@@ -129,6 +142,7 @@ set(TEST_SOURCES
    ${FIELD_TESTS}
    ${MATERIAL_TESTS}
    ${REGION_TESTS}
+   ${UNITS_TESTS}
 )
 
 # Create a STATIC library with the mock objects for potential reuse

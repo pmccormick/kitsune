@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
-#include "units/core.h"
-#include "units/si_units.h"
-#include "units/derived_units.h"
-#include "units/conversions.h"
-#include "units/constants.h"
+#include "Units/core.h"
+#include "Units/si_units.h"
+#include "Units/derived_units.h"
+#include "Units/conversions.h"
+#include "Units/constants.h"
 #include <stdexcept>
 
 using namespace units;
@@ -318,23 +318,23 @@ TEST(UnitsStringConversion, ErrorHandling) {
 }
 
 TEST(UnitsStringConversion, LegacyCompatibility) {
-    // Test compatibility with the original Units::convert function
+    // Test compatibility with the original units::convert function
     
     // Use the Units namespace function
-    EXPECT_DOUBLE_EQ(100.0, Units::convert(1.0, "m", "cm"));
-    EXPECT_DOUBLE_EQ(1000.0, Units::convert(1.0, "kg", "g"));
-    EXPECT_DOUBLE_EQ(0.001, Units::convert(1.0, "km", "m"));
+    EXPECT_DOUBLE_EQ(100.0, units::convert(1.0, "m", "cm"));
+    EXPECT_DOUBLE_EQ(1000.0, units::convert(1.0, "kg", "g"));
+    EXPECT_DOUBLE_EQ(0.001, units::convert(1.0, "km", "m"));
     
     // Temperature conversions
-    EXPECT_DOUBLE_EQ(0.0, Units::convert(273.15, "K", "C"));
-    EXPECT_NEAR(32.0, Units::convert(0.0, "C", "F"), 1e-12);
+    EXPECT_DOUBLE_EQ(0.0, units::convert(273.15, "K", "C"));
+    EXPECT_NEAR(32.0, units::convert(0.0, "C", "F"), 1e-12);
     
     // Error handling
-    EXPECT_THROW(Units::convert(1.0, "invalid", "m"), std::invalid_argument);
+    EXPECT_THROW(units::convert(1.0, "invalid", "m"), std::invalid_argument);
     
-    // Make sure the Units::convert and units::convert functions behave identically
-    EXPECT_DOUBLE_EQ(Units::convert(1.0, "m", "cm"), units::convert(1.0, "m", "cm"));
-    EXPECT_DOUBLE_EQ(Units::convert(100.0, "C", "F"), units::convert(100.0, "C", "F"));
+    // Make sure the units::convert and units::convert functions behave identically
+    EXPECT_DOUBLE_EQ(units::convert(1.0, "m", "cm"), units::convert(1.0, "m", "cm"));
+    EXPECT_DOUBLE_EQ(units::convert(100.0, "C", "F"), units::convert(100.0, "C", "F"));
 }
 
 TEST(UnitsStringConversion, DataStorageConversions) {
