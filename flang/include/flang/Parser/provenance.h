@@ -227,6 +227,14 @@ private:
   bool showColors_{false};
 };
 
+// A comment extracted during prescanning, before it is discarded from
+// the cooked character stream.  The source CharBlock points directly into
+// the SourceFile content, which persists for the lifetime of compilation.
+struct SourceComment {
+  CharBlock source;           // points into SourceFile content (raw text)
+  bool isDocComment{false};   // starts with !> or !! (Doxygen-style)
+};
+
 // Represents the result of preprocessing and prescanning a single source
 // file (and all its inclusions) or module file.  Parsers operate within
 // single instances of CookedSource.
@@ -263,6 +271,13 @@ public:
     possibleFixedFormContinuations_.push_back(BufferedBytes());
   }
 
+  // Record a comment found during prescanning.  The CharBlock must point
+  // into a SourceFile's content buffer, which outlives this CookedSource.
+  void AddComment(CharBlock source);
+
+  // Return all comments collected during prescanning, sorted by provenance.
+  const std::vector<SourceComment> &Comments() const { return comments_; }
+
   std::size_t BufferedBytes() const;
   void Marshal(AllCookedSources &); // marshals text into one contiguous block
   void CompileProvenanceRangeToOffsetMappings(AllSources &);
@@ -276,6 +291,7 @@ private:
   OffsetToProvenanceMappings provenanceMap_;
   ProvenanceRangeToOffsetMappings invertedMap_;
   std::list<std::size_t> possibleFixedFormContinuations_;
+  std::vector<SourceComment> comments_; // collected during prescanning
 };
 
 class AllCookedSources {
@@ -300,6 +316,15 @@ public:
       GetSourcePositionRange(CharBlock) const;
   std::optional<CharBlock> GetCharBlock(ProvenanceRange) const;
   void Dump(llvm::raw_ostream &) const;
+
+  // Find the documentation comment(s) immediately preceding or following
+  // the source range of a parse-tree node (identified by its CharBlock).
+  // Uses provenance-based lookup across all cooked sources.
+  std::vector<SourceComment> GetCommentsInRange(
+      Provenance first, Provenance last) const;
+  std::vector<SourceComment> GetPrecedingComments(
+      CharBlock, int maxLines = 50) const;
+  std::optional<SourceComment> GetFollowingComment(CharBlock) const;
 
   // For sorting symbol names without being dependent on pointer values
   bool Precedes(CharBlock, CharBlock) const;

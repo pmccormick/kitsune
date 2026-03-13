@@ -533,6 +533,21 @@ std::optional<CharBlock> CookedSource::GetCharBlock(
 
 std::size_t CookedSource::BufferedBytes() const { return buffer_.bytes(); }
 
+void CookedSource::AddComment(CharBlock source) {
+  bool isDoc{false};
+  // Detect Doxygen-style doc comments: !> or !!
+  for (std::size_t i{0}; i < source.size(); ++i) {
+    if (source[i] == '!') {
+      if (i + 1 < source.size()) {
+        char next{source[i + 1]};
+        isDoc = (next == '>' || next == '!');
+      }
+      break;
+    }
+  }
+  comments_.push_back(SourceComment{source, isDoc});
+}
+
 void CookedSource::Marshal(AllCookedSources &allCookedSources) {
   CHECK(provenanceMap_.SizeInBytes() == buffer_.bytes());
   provenanceMap_.Put(allCookedSources.allSources().AddCompilerInsertion(
@@ -727,6 +742,128 @@ bool AllCookedSources::Precedes(CharBlock x, CharBlock y) const {
 void AllCookedSources::Register(CookedSource &cooked) {
   index_.emplace(cooked.AsCharBlock(), cooked);
   cooked.set_number(static_cast<int>(index_.size()));
+}
+
+std::vector<SourceComment> AllCookedSources::GetCommentsInRange(
+    Provenance first, Provenance last) const {
+  std::vector<SourceComment> result;
+  // Resolve the provenance range to a source file and offset range
+  auto firstPos{allSources_.GetSourcePosition(first)};
+  auto lastPos{allSources_.GetSourcePosition(last)};
+  if (!firstPos || !lastPos) {
+    return result;
+  }
+  const SourceFile *file{&firstPos->sourceFile.get()};
+  if (&lastPos->sourceFile.get() != file) {
+    return result; // cross-file range not supported
+  }
+  auto content{file->content()};
+  for (const auto &c : cooked_) {
+    for (const auto &comment : c.Comments()) {
+      const char *p{comment.source.begin()};
+      if (p >= content.data() && p < content.data() + content.size()) {
+        auto offset{static_cast<std::size_t>(p - content.data())};
+        auto pos{file->GetSourcePosition(offset)};
+        if (pos.line >= firstPos->line && pos.line <= lastPos->line) {
+          result.push_back(comment);
+        }
+      }
+    }
+  }
+  return result;
+}
+
+std::vector<SourceComment> AllCookedSources::GetPrecedingComments(
+    CharBlock cb, int maxLines) const {
+  std::vector<SourceComment> result;
+  auto range{GetProvenanceRange(cb)};
+  if (!range) {
+    return result;
+  }
+  // Get the source position of the entity to find its file and line
+  auto pos{allSources_.GetSourcePosition(range->start())};
+  if (!pos) {
+    return result;
+  }
+  const SourceFile *file{&pos->sourceFile.get()};
+  int entityLine{pos->line};
+  if (entityLine <= 1) {
+    return result;
+  }
+  auto content{file->content()};
+
+  // Gather all comments from this file that precede the entity line
+  for (const auto &c : cooked_) {
+    for (const auto &comment : c.Comments()) {
+      const char *p{comment.source.begin()};
+      if (p < content.data() || p >= content.data() + content.size()) {
+        continue; // different file
+      }
+      auto offset{static_cast<std::size_t>(p - content.data())};
+      auto commentPos{file->GetSourcePosition(offset)};
+      if (commentPos.line < entityLine &&
+          commentPos.line >= entityLine - maxLines) {
+        result.push_back(comment);
+      }
+    }
+  }
+
+  // Sort by position in file (pointer order within same file buffer)
+  std::sort(result.begin(), result.end(),
+      [](const SourceComment &a, const SourceComment &b) {
+        return a.source.begin() < b.source.begin();
+      });
+
+  // Keep only the contiguous block immediately preceding the entity.
+  if (!result.empty()) {
+    std::vector<SourceComment> contiguous;
+    int expectedLine{entityLine - 1};
+    for (auto it{result.rbegin()}; it != result.rend(); ++it) {
+      auto offset{static_cast<std::size_t>(it->source.begin() - content.data())};
+      auto cPos{file->GetSourcePosition(offset)};
+      if (cPos.line == expectedLine) {
+        contiguous.push_back(*it);
+        --expectedLine;
+      } else {
+        break;
+      }
+    }
+    std::reverse(contiguous.begin(), contiguous.end());
+    return contiguous;
+  }
+  return result;
+}
+
+std::optional<SourceComment> AllCookedSources::GetFollowingComment(
+    CharBlock cb) const {
+  auto range{GetProvenanceRange(cb)};
+  if (!range) {
+    return std::nullopt;
+  }
+  auto pos{allSources_.GetSourcePosition(
+      range->start() + (range->size() - 1))};
+  if (!pos) {
+    return std::nullopt;
+  }
+  const SourceFile *file{&pos->sourceFile.get()};
+  int entityEndLine{pos->line};
+  auto content{file->content()};
+
+  // Find the first comment on the line immediately following the entity
+  for (const auto &c : cooked_) {
+    for (const auto &comment : c.Comments()) {
+      const char *p{comment.source.begin()};
+      if (p < content.data() || p >= content.data() + content.size()) {
+        continue;
+      }
+      auto offset{static_cast<std::size_t>(p - content.data())};
+      auto commentPos{file->GetSourcePosition(offset)};
+      if (commentPos.line == entityEndLine + 1) {
+        return comment;
+      }
+    }
+  }
+  return std::nullopt;
 }
 
 } // namespace Fortran::parser
