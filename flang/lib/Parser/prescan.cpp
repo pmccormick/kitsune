@@ -105,10 +105,22 @@ void Prescanner::Statement() {
   const char *statementStart{nextLine_};
   LineClassification line{ClassifyLine(statementStart)};
   switch (line.kind) {
-  case LineClassification::Kind::Comment:
+  case LineClassification::Kind::Comment: {
+    // Capture the comment text before discarding it from the cooked stream.
+    const char *commentStart{nextLine_};
     nextLine_ += line.payloadOffset; // advance to '!' or newline
+    // Find end of line
+    const char *p{nextLine_};
+    while (p < limit_ && *p != '\n') {
+      ++p;
+    }
+    if (p > commentStart) {
+      cooked_.AddComment(
+          CharBlock{commentStart, static_cast<std::size_t>(p - commentStart)});
+    }
     NextLine();
     return;
+  }
   case LineClassification::Kind::IncludeLine:
     FortranInclude(nextLine_ + line.payloadOffset);
     NextLine();
@@ -598,6 +610,16 @@ bool Prescanner::SkipToNextSignificantCharacter() {
     auto anyContinuationLine{false};
     bool atNewline{false};
     if (MustSkipToEndOfLine()) {
+      if (*at_ == '!' && !inCharLiteral_) {
+        // Capture inline comment before skipping
+        const char *commentStart{at_};
+        const char *p{at_};
+        while (*p != '\n') {
+          ++p;
+        }
+        cooked_.AddComment(CharBlock{
+            commentStart, static_cast<std::size_t>(p - commentStart)});
+      }
       SkipToEndOfLine();
     } else {
       atNewline = *at_ == '\n';
@@ -606,6 +628,15 @@ bool Prescanner::SkipToNextSignificantCharacter() {
       anyContinuationLine = true;
       ++continuationLines_;
       if (MustSkipToEndOfLine()) {
+        if (*at_ == '!' && !inCharLiteral_) {
+          const char *commentStart{at_};
+          const char *p{at_};
+          while (*p != '\n') {
+            ++p;
+          }
+          cooked_.AddComment(CharBlock{
+              commentStart, static_cast<std::size_t>(p - commentStart)});
+        }
         SkipToEndOfLine();
       }
     }
@@ -1329,6 +1360,16 @@ bool Prescanner::SkipCommentLine(bool afterAmpersand) {
   } else {
     auto lineClass{ClassifyLine(nextLine_)};
     if (lineClass.kind == LineClassification::Kind::Comment) {
+      // Capture the comment before skipping
+      const char *commentStart{nextLine_};
+      const char *p{nextLine_};
+      while (p < limit_ && *p != '\n') {
+        ++p;
+      }
+      if (p > commentStart) {
+        cooked_.AddComment(CharBlock{
+            commentStart, static_cast<std::size_t>(p - commentStart)});
+      }
       NextLine();
       return true;
     } else if (lineClass.kind ==

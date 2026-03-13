@@ -119,6 +119,12 @@ public:
   parser::Messages &messages() { return messages_; }
   evaluate::FoldingContext &foldingContext() { return foldingContext_; }
   parser::AllCookedSources &allCookedSources() { return allCookedSources_; }
+
+  // Bind a documentation comment to a symbol by looking up the nearest
+  // preceding doc comment (!> or !!) in the prescanner's comment index.
+  // Returns the bound comment, or nullptr if none found.  Results are
+  // cached on the Symbol itself.
+  const parser::SourceComment *GetDocComment(Symbol &);
   ModuleDependences &moduleDependences() { return moduleDependences_; }
   std::map<const Symbol *, SourceName> &moduleFileOutputRenamings() {
     return moduleFileOutputRenamings_;

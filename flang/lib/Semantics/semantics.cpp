@@ -828,4 +828,52 @@ bool SemanticsContext::IsSymbolUsed(const Symbol &symbol) const {
   return isUsed_.find(symbol) != isUsed_.end();
 }
 
+const parser::SourceComment *SemanticsContext::GetDocComment(Symbol &symbol) {
+  if (symbol.docComment()) {
+    return symbol.docComment(); // already bound
+  }
+  // Search for the nearest preceding doc comment (!> or !!) in the
+  // prescanner's comment index.  Comments are stored in CookedSource
+  // and persist for the lifetime of the compilation, so pointers to
+  // them are stable.
+  auto sourceRange{allCookedSources_.GetProvenanceRange(symbol.name())};
+  if (!sourceRange) {
+    return nullptr;
+  }
+  auto pos{allCookedSources_.allSources().GetSourcePosition(
+      sourceRange->start())};
+  if (!pos) {
+    return nullptr;
+  }
+  const parser::SourceFile *file{&pos->sourceFile.get()};
+  int symbolLine{pos->line};
+  auto content{file->content()};
+
+  // Walk through all cooked sources to find comments in the same file
+  // immediately preceding the symbol.  Take the closest doc comment.
+  const parser::SourceComment *best{nullptr};
+  int bestLine{0};
+  if (const auto *cooked{allCookedSources_.Find(symbol.name())}) {
+    for (const auto &comment : cooked->Comments()) {
+      if (!comment.isDocComment) {
+        continue;
+      }
+      const char *p{comment.source.begin()};
+      if (p < content.data() || p >= content.data() + content.size()) {
+        continue; // different file
+      }
+      auto offset{static_cast<std::size_t>(p - content.data())};
+      auto commentPos{file->GetSourcePosition(offset)};
+      if (commentPos.line < symbolLine && commentPos.line > bestLine) {
+        best = &comment;
+        bestLine = commentPos.line;
+      }
+    }
+  }
+  if (best) {
+    symbol.set_docComment(best);
+  }
+  return best;
+}
+
 } // namespace Fortran::semantics

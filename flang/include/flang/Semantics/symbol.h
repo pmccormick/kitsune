@@ -13,6 +13,7 @@
 #include "flang/Common/enum-set.h"
 #include "flang/Common/reference.h"
 #include "flang/Common/visit.h"
+#include "flang/Parser/provenance.h"
 #include "flang/Semantics/module-dependences.h"
 #include "flang/Support/Fortran.h"
 #include "llvm/ADT/DenseMapInfo.h"
@@ -920,6 +921,11 @@ public:
   inline const DeclTypeSpec *GetType() const;
   void SetType(const DeclTypeSpec &);
 
+  // Documentation comment bound to this symbol during semantic analysis.
+  // Set by SemanticsContext::GetDocComment(); nullptr if none.
+  const parser::SourceComment *docComment() const { return docComment_; }
+  void set_docComment(const parser::SourceComment *c) { docComment_ = c; }
+
   const std::string *GetBindName() const;
   void SetBindName(std::string &&);
   bool GetIsExplicitBindName() const;
@@ -989,6 +995,7 @@ private:
   std::size_t size_{0}; // size in bytes
   std::size_t offset_{0}; // byte offset in scope or common block
   Details details_;
+  const parser::SourceComment *docComment_{nullptr};
 
   Symbol() {} // only created in class Symbols
   std::string GetDetailsName() const;
