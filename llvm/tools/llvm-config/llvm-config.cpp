@@ -215,6 +215,7 @@ Options:\n\
   --bindir          Directory containing LLVM executables.\n\
   --build-mode      Print build mode of LLVM tree (e.g. Debug or Release).\n\
   --build-system    Print the build system used to build LLVM (e.g. `cmake` or `gn`).\n\
+  --caravel         Print whether this is a Caravel LLVM build (YES).\n\
   --cflags          C compiler flags for files that include LLVM headers.\n\
   --cmakedir        Directory containing LLVM CMake modules.\n\
   --components      List of all possible components.\n\
@@ -612,6 +613,8 @@ int main(int argc, char **argv) {
 #endif
       } else if (Arg == "--build-system") {
         OS << LLVM_BUILD_SYSTEM << '\n';
+      } else if (Arg == "--caravel") {
+        OS << "YES\n";
       } else if (Arg == "--has-rtti") {
         OS << (LLVM_HAS_RTTI ? "YES" : "NO") << '\n';
       } else if (Arg == "--shared-mode") {
