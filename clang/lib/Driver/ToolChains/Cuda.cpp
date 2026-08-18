@@ -97,6 +97,8 @@ CudaVersion getCudaVersion(uint32_t raw_version) {
     return CudaVersion::CUDA_131;
   if (raw_version < 13030)
     return CudaVersion::CUDA_132;
+  if (raw_version < 13040)
+    return CudaVersion::CUDA_133;
   return CudaVersion::NEW;
 }
 
@@ -691,6 +693,7 @@ void NVPTX::getNVPTXTargetFeatures(const Driver &D, const llvm::Triple &Triple,
   case CudaVersion::CUDA_##CUDA_VER:                                           \
     PtxFeature = "+ptx" #PTX_VER;                                              \
     break;
+    CASE_CUDA_VERSION(133, 93);
     CASE_CUDA_VERSION(132, 92);
     CASE_CUDA_VERSION(131, 91);
     CASE_CUDA_VERSION(130, 90);
@@ -722,9 +725,14 @@ void NVPTX::getNVPTXTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     CASE_CUDA_VERSION(75, 43);
     CASE_CUDA_VERSION(70, 42);
 #undef CASE_CUDA_VERSION
-  // TODO: Use specific CUDA version once it's public.
+  // A toolkit newer than anything in the table above should get the highest
+  // PTX ISA the NVPTX backend can actually emit (PTX93, see NVPTX.td), rather
+  // than the stale +ptx86 that sat here. Note this arm is currently
+  // unreachable from the driver: CudaInstallationDetector::version() clamps
+  // NEW to PARTIALLY_SUPPORTED before this switch sees it. It is kept correct
+  // so the mapping does not become a trap if that clamp is ever relaxed.
   case clang::CudaVersion::NEW:
-    PtxFeature = "+ptx86";
+    PtxFeature = "+ptx93";
     break;
   default:
     // No PTX feature specified; let the backend choose based on the target SM.
