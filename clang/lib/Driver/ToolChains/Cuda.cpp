@@ -90,6 +90,14 @@ CudaVersion getCudaVersion(uint32_t raw_version) {
     return CudaVersion::CUDA_128;
   if (raw_version < 13000)
     return CudaVersion::CUDA_129;
+  if (raw_version < 13010)
+    return CudaVersion::CUDA_130;
+  if (raw_version < 13020)
+    return CudaVersion::CUDA_131;
+  if (raw_version < 13030)
+    return CudaVersion::CUDA_132;
+  if (raw_version < 13040)
+    return CudaVersion::CUDA_133;
   return CudaVersion::NEW;
 }
 
@@ -682,6 +690,10 @@ void NVPTX::getNVPTXTargetFeatures(const Driver &D, const llvm::Triple &Triple,
   case CudaVersion::CUDA_##CUDA_VER:                                           \
     PtxFeature = "+ptx" #PTX_VER;                                              \
     break;
+    CASE_CUDA_VERSION(133, 90);
+    CASE_CUDA_VERSION(132, 90);
+    CASE_CUDA_VERSION(131, 90);
+    CASE_CUDA_VERSION(130, 90);
     CASE_CUDA_VERSION(129, 88);
     CASE_CUDA_VERSION(128, 87);
     CASE_CUDA_VERSION(126, 85);
@@ -707,9 +719,14 @@ void NVPTX::getNVPTXTargetFeatures(const Driver &D, const llvm::Triple &Triple,
     CASE_CUDA_VERSION(91, 61);
     CASE_CUDA_VERSION(90, 60);
 #undef CASE_CUDA_VERSION
-  // TODO: Use specific CUDA version once it's public.
+  // A toolkit newer than anything in the table above should get the highest
+  // PTX ISA the NVPTX backend can actually emit (PTX90, see NVPTX.td), rather
+  // than the stale +ptx86 that sat here. Note this arm is currently
+  // unreachable from the driver: CudaInstallationDetector::version() clamps
+  // NEW to PARTIALLY_SUPPORTED before this switch sees it. It is kept correct
+  // so the mapping does not become a trap if that clamp is ever relaxed.
   case clang::CudaVersion::NEW:
-    PtxFeature = "+ptx86";
+    PtxFeature = "+ptx90";
     break;
   default:
     PtxFeature = "+ptx42";
