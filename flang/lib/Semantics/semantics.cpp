@@ -46,6 +46,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/Triple.h"
+#include <set>
 
 namespace Fortran::semantics {
 
@@ -882,21 +883,38 @@ const parser::SourceComment *SemanticsContext::GetDocComment(Symbol &symbol) {
   // immediately preceding the symbol.  Take the closest doc comment.
   const parser::SourceComment *best{nullptr};
   int bestLine{0};
+  // Lines occupied entirely by a comment.  A whole-line comment is captured
+  // from the start of its line, so it reports column 1; a comment trailing a
+  // statement is captured from its '!' and reports a later column.  Only the
+  // former can join a doc comment to the declaration below it.
+  std::set<int> wholeLineCommentLines;
   if (const auto *cooked{allCookedSources_.Find(symbol.name())}) {
     for (const auto &comment : cooked->Comments()) {
-      if (!comment.isDocComment) {
-        continue;
-      }
       const char *p{comment.source.begin()};
       if (p < content.data() || p >= content.data() + content.size()) {
         continue; // different file
       }
       auto offset{static_cast<std::size_t>(p - content.data())};
       auto commentPos{file->GetSourcePosition(offset)};
+      if (commentPos.column == 1) {
+        wholeLineCommentLines.insert(commentPos.line);
+      }
+      if (!comment.isDocComment) {
+        continue;
+      }
       if (commentPos.line < symbolLine && commentPos.line > bestLine) {
         best = &comment;
         bestLine = commentPos.line;
       }
+    }
+  }
+  // The candidate only documents this symbol if nothing but comment lines
+  // separates the two.  Without this check the nearest preceding doc comment
+  // anywhere earlier in the file would bind, so every declaration following a
+  // documented one would silently inherit that documentation.
+  for (int line{bestLine + 1}; best && line < symbolLine; ++line) {
+    if (wholeLineCommentLines.find(line) == wholeLineCommentLines.end()) {
+      best = nullptr;
     }
   }
   if (best) {
