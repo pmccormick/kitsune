@@ -25,3 +25,11 @@ RUN: llvm-config --shared-mode 2>&1 Support | FileCheck --check-prefix=CHECK-SHA
 CHECK-SHARED-MODE: {{static|shared}}
 CHECK-SHARED-MODE-NOT: error:
 CHECK-SHARED-MODE-NOT: warning
+
+# --caravel identifies this as a Caravel build and is unconditionally YES here;
+# downstream configure scripts branch on it, so it must stay a bare YES rather
+# than gaining a version or a NO arm.
+RUN: llvm-config --caravel 2>&1 | FileCheck --check-prefix=CHECK-CARAVEL %s
+CHECK-CARAVEL: YES
+CHECK-CARAVEL-NOT: error:
+CHECK-CARAVEL-NOT: warning
